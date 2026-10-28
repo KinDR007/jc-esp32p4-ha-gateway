@@ -164,6 +164,9 @@ esp_err_t gw_http_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = MAX_HANDLERS;
     config.stack_size = 10240;
+    /* Core 1 belongs to the sound recognition: an upload running there between its short yields
+     * (httpd inherits a high priority from the flash lock) starves IDLE1 and trips the task watchdog. */
+    config.core_id = 0;
     config.max_open_sockets = 8;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 15;
