@@ -33,6 +33,10 @@ header { position: sticky; top: 0; z-index: 20; height: 52px; background: var(--
 #hdr-flash .progress { width: 70px; height: 6px; }
 #hdr-flash .progress > div { background: var(--warn); }
 #hdr-flash { border-color: var(--warn); }
+/* identify: the gateway was asked to make itself visible (UI button, Zigbee2MQTT, Home Assistant) */
+#hdr-ident { border-color: var(--accent); color: var(--accent); }
+#hdr-ident .mdi { animation: blink 1s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .15; } }
 #flash-strip { position: absolute; left: 0; bottom: -1px; height: 3px; width: 0; background: var(--warn); transition: width .4s; display: none; }
 header.flashing #flash-strip { display: block; }
 .bar { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 12px; }
@@ -66,7 +70,8 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
   main { padding: 14px; }
   .brand small, #hdr-uptime { display: none; }
 }
-@media (max-width: 560px) { #hdr-eth, #hdr-role, #hdr-peer, #hdr-flash { display: none; } }
+@media (max-width: 560px) { #hdr-eth, #hdr-role, #hdr-peer, #hdr-flash { display: none; }
+#hdr-ident span { display: none; } }
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .grid > .wide { grid-column: 1 / -1; }
@@ -196,6 +201,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <span class="pill" id="hdr-role"><span class="dot"></span><span>…</span></span>
     <span class="pill" id="hdr-eth"><span class="dot"></span><span>Ethernet</span></span>
     <span class="pill hidden" id="hdr-peer"><span class="dot"></span><span></span></span>
+    <span class="pill hidden" id="hdr-ident"></span>
     <span class="pill hidden" id="hdr-flash"><span class="dot warn"></span><span id="hdr-flash-text"></span><span class="progress"><div></div></span></span>
     <div class="spacer"></div>
     <span class="muted" id="hdr-uptime"></span>
@@ -362,7 +368,7 @@ const CS = {
   'C6 reset': 'C6 resetován', 'State': 'Stav', 'Short address': 'Krátká adresa', 'IEEE address': 'IEEE adresa',
   'Parent / neighbors': 'Rodič / sousedé', 'Permit join': 'Povolit připojení', 'open': 'otevřeno', 'closed': 'zavřeno',
   'No status from the C6 router yet.': 'Router na C6 zatím nehlásí stav.', 'Join network (steer)': 'Připojit do sítě (steer)',
-  'Permit join 180 s': 'Povolit připojení 180 s', 'Leave network': 'Opustit síť', 'Factory reset': 'Tovární reset',
+  'Permit join 180 s': 'Povolit připojení 180 s', 'Leave network': 'Opustit síť', 'Factory reset': 'Tovární reset', 'Identify': 'Identifikovat',
   'The router leaves its Zigbee network.': 'Router opustí svou Zigbee síť.', 'Zigbee network backups': 'Zálohy Zigbee sítí',
   'Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.': 'Ukládají se z C6 při každém odchodu ze Zigbee role a obnoví se po návratu.',
   'Size': 'Velikost', 'Generation': 'Generace', 'No snapshot yet.': 'Zatím žádná záloha.',
@@ -725,6 +731,7 @@ const TIPS = {
   'Join network (steer)': ['Searches for an open Zigbee network and joins it. Open joining in Zigbee2MQTT or ZHA first.', 'Vyhledá otevřenou Zigbee síť a připojí se. Nejdřív povolte připojování v Zigbee2MQTT nebo ZHA.'],
   'Permit join 180 s': ['Lets new devices join through this router for 3 minutes.', 'Na 3 minuty povolí připojení nových zařízení přes tento router.'],
   'Leave network': ['The router leaves its network; devices behind it look for another parent.', 'Router opustí síť; zařízení za ním si najdou jiného rodiče.'],
+  'Identify': ['Blinks the identify icon in the header for 10 s. Zigbee2MQTT and Home Assistant can trigger the same through the Identify cluster.', 'Na 10 s rozbliká ikonu identifikace v hlavičce. Totéž může vyvolat Zigbee2MQTT a Home Assistant přes cluster Identify.'],
   'Factory reset': ['Erases the network data on the C6; the router has to be joined again.', 'Smaže data sítě na C6; router se musí znovu připojit.'],
   // sound
   'Gain': ['Microphone amplifier gain. Raise it when the level meter hardly moves.', 'Zesílení mikrofonu. Zvyšte, když se ukazatel hladiny skoro nehýbe.'],
@@ -811,6 +818,7 @@ const ICONS = {
   'key-outline': 'M21 18H15V15H13.3C12.2 17.4 9.7 19 7 19C3.1 19 0 15.9 0 12S3.1 5 7 5C9.7 5 12.2 6.6 13.3 9H24V15H21V18M17 16H19V13H22V11H11.9L11.7 10.3C11 8.3 9.1 7 7 7C4.2 7 2 9.2 2 12S4.2 17 7 17C9.1 17 11 15.7 11.7 13.7L11.9 13H17V16M7 15C5.3 15 4 13.7 4 12S5.3 9 7 9 10 10.3 10 12 8.7 15 7 15M7 11C6.4 11 6 11.4 6 12S6.4 13 7 13 8 12.6 8 12 7.6 11 7 11Z',
   'lan-connect': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,13V18L3,20H10V18H5V13H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M14,15H20V19H14V15Z',
   'lan-pending': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,12V14H5V12H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M3,15V17H5V15H3M14,15H20V19H14V15M3,18V20H5V18H3M6,18V20H8V18H6M9,18V20H11V18H9Z',
+  'lightbulb-on-outline': 'M20,11H23V13H20V11M1,11H4V13H1V11M13,1V4H11V1H13M4.92,3.5L7.05,5.64L5.63,7.05L3.5,4.93L4.92,3.5M16.95,5.63L19.07,3.5L20.5,4.93L18.37,7.05L16.95,5.63M12,6A6,6 0 0,1 18,12C18,14.22 16.79,16.16 15,17.2V19A1,1 0 0,1 14,20H10A1,1 0 0,1 9,19V17.2C7.21,16.16 6,14.22 6,12A6,6 0 0,1 12,6M14,21V22A1,1 0 0,1 13,23H11A1,1 0 0,1 10,22V21H14M11,18H13V15.87C14.73,15.43 16,13.86 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12C8,13.86 9.27,15.43 11,15.87V18Z',
   'lock-outline': 'M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
   'memory': 'M17,17H7V7H17M21,11V9H19V7C19,5.89 18.1,5 17,5H15V3H13V5H11V3H9V5H7C5.89,5 5,5.89 5,7V9H3V11H5V13H3V15H5V17A2,2 0 0,0 7,19H9V21H11V19H13V21H15V19H17A2,2 0 0,0 19,17V15H21V13H19V11M13,13H11V11H13M15,9H9V15H15V9Z',
   'menu': 'M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z',
@@ -823,6 +831,7 @@ const ICONS = {
   'restart': 'M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z',
   'router-network': 'M5 9C3.9 9 3 9.9 3 11V15C3 16.11 3.9 17 5 17H11V19H10C9.45 19 9 19.45 9 20H2V22H9C9 22.55 9.45 23 10 23H14C14.55 23 15 22.55 15 22H22V20H15C15 19.45 14.55 19 14 19H13V17H19C20.11 17 21 16.11 21 15V11C21 9.9 20.11 9 19 9H5M6 12H8V14H6V12M9.5 12H11.5V14H9.5V12M13 12H15V14H13V12Z',
   'router-wireless': 'M20.2,5.9L21,5.1C19.6,3.7 17.8,3 16,3C14.2,3 12.4,3.7 11,5.1L11.8,5.9C13,4.8 14.5,4.2 16,4.2C17.5,4.2 19,4.8 20.2,5.9M19.3,6.7C18.4,5.8 17.2,5.3 16,5.3C14.8,5.3 13.6,5.8 12.7,6.7L13.5,7.5C14.2,6.8 15.1,6.5 16,6.5C16.9,6.5 17.8,6.8 18.5,7.5L19.3,6.7M19,13H17V9H15V13H5A2,2 0 0,0 3,15V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V15A2,2 0 0,0 19,13M8,18H6V16H8V18M11.5,18H9.5V16H11.5V18M15,18H13V16H15V18Z',
+  'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
   'text-box-outline': 'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
@@ -980,6 +989,12 @@ function renderHeader() {
     $('#hdr-flash').title = fl.stage;
     $('#flash-strip').style.width = fl.percent + '%';
   }
+  const idl = status.identify_s || 0;
+  $('#hdr-ident').classList.toggle('hidden', !idl);
+  if (idl) {
+    $('#hdr-ident').innerHTML = `${ic('lightbulb-on-outline')}<span>Identify · ${idl} s</span>`;
+    $('#hdr-ident').title = L('The gateway was asked to identify itself', 'Brána byla požádána o identifikaci');
+  }
   /* who uses the gateway: Zigbee2MQTT keeps a TCP session; Home Assistant calls the OTBR REST API
    * only now and then (start, Thread settings, dataset changes), so for Thread the last contact */
   const rs = status.role_status || {}, peer = $('#hdr-peer');
@@ -1092,7 +1107,21 @@ views['thread/settings'] = () => !isThread() ? notThread() : `<div class="grid">
     <label class="field" style="margin-top:12px"><span>Apply dataset (hex TLVs from Home Assistant, joins that network)${tip('Apply dataset')}</span>
       <textarea id="ds-tlvs" rows="4" placeholder="0e080000000000010000…"></textarea></label>
     <button class="btn primary" id="ds-apply">${ic('check')}Apply dataset</button></div></div>
-  </div></div>`;
+  </div>${txPowerCard('thr')}</div>`;
+
+/* C6 radio transmit power, -15..20 dBm (Thread: the RCP; Zigbee router: the router firmware) */
+const txPowerCard = (id, now) => `<div class="card">${h3('signal', L('Transmit power', 'Vysílací výkon'))}
+  <p class="muted">${L('Lower power keeps a router in the room it serves; 20 dBm is the C6 maximum. Kept across restarts.', 'Nižší výkon udrží router v místnosti, kterou obsluhuje; 20 dBm je maximum C6. Platí i po restartu.')}</p>
+  <div class="row"><input type="number" id="${id}-txp" min="-15" max="20" step="1" value="${now ?? ''}" style="width:90px"> dBm
+    <button class="btn primary" id="${id}-txp-set">${ic('check')}${L('Set', 'Nastavit')}</button>
+    <span class="muted" id="${id}-txp-now"></span></div></div>`;
+async function loadThreadTxPower() {
+  try {
+    const t = await api('/api/thread/status');
+    if ($('#thr-txp') && document.activeElement !== $('#thr-txp')) $('#thr-txp').value = t.tx_power ?? '';
+    if ($('#thr-txp-now')) $('#thr-txp-now').textContent = t.tx_power !== undefined ? `${L('now', 'nyní')} ${t.tx_power} dBm${t.tx_power_set ? '' : L(' (default)', ' (výchozí)')}` : '';
+  } catch (e) { /* role not running */ }
+}
 
 async function loadThread() {
   const box = $('#thread-status');
@@ -1183,14 +1212,17 @@ views['zigbee/info'] = () => {
       ['State', pill(r.joined ? 'ok' : 'warn', r.state || (r.joined ? 'joined' : 'not joined')), 'Zigbee state'],
       ['PAN ID', esc(r.pan_id)], ['Ext PAN ID', esc(r.ext_pan_id), 'Zigbee Ext PAN ID'], ['Channel', esc(r.channel)],
       ['Short address', esc(r.short_addr)], ['IEEE address', esc(r.ieee)], ['Parent / neighbors', esc(r.neighbors)],
-      ['Permit join', r.permit_join ? pill('ok', 'open') : 'closed'], ['Firmware', esc(r.version), 'C6 firmware'],
+      ['Permit join', r.permit_join ? pill('ok', 'open') : 'closed'], [L('Transmit power', 'Vysílací výkon'), r.tx_power !== undefined ? r.tx_power + ' dBm' : ''],
+      ['Firmware', esc(r.version), 'C6 firmware'],
       ['Status age', z.router_status_age_s.toFixed(0) + ' s']]) : '<p class="warn-text">No status from the C6 router yet.</p>'}</div>
     <div class="card">${h3('wrench-outline', 'Network membership')}
       <div class="row"><button class="btn primary" data-zr="steer">${ic('radar')}Join network (steer)</button>${tip('Join network (steer)')}</div>
       <div class="row"><button class="btn" data-zr="permit">${ic('lan-pending')}Permit join 180 s</button>${tip('Permit join 180 s')}</div>
-      <div class="row"><button class="btn" data-zr="status">${ic('restart')}Refresh</button></div>
+      <div class="row"><button class="btn" data-zr="status">${ic('restart')}Refresh</button>
+        <button class="btn" id="identify-btn">${ic('lightbulb-on-outline')}Identify</button>${tip('Identify')}</div>
       <div class="row"><button class="btn danger" data-zr="leave">${ic('close')}Leave network</button>${tip('Leave network')}
-        <button class="btn danger" data-zr="factory_reset">${ic('delete-outline')}Factory reset</button>${tip('Factory reset')}</div></div></div>`;
+        <button class="btn danger" data-zr="factory_reset">${ic('delete-outline')}Factory reset</button>${tip('Factory reset')}</div></div>
+    ${z.router ? txPowerCard('zr', r.tx_power) : ''}</div>`;
 };
 views['zigbee/diag'] = () => {
   if (!isZigbee()) return notZigbee();
@@ -1914,7 +1946,9 @@ function renderZDevices(devs, now) {
     <td>${esc(zTypeText(x.type))}</td><td>${esc(zPower(x.power))}${x.battery !== undefined ? ` · ${x.battery} %` : ''}</td>
     <td>${x.lqi !== undefined ? `<span class="${zLqiCls(x.lqi)}-text">${x.lqi}</span>` : ''}</td><td>${zAgo(x.last_seen, now)}</td>
     <td>${x.availability === 'offline' ? pill('bad', L('offline', 'nedostupné')) : x.availability === 'online' ? pill('ok', 'online') : ''}${x.update === 'available' ? ' ' + pill('warn', L('update', 'aktualizace')) : ''}${x.interview && x.interview !== 'SUCCESSFUL' ? ' ' + pill('warn', x.interview.toLowerCase()) : ''}</td>
-    <td class="zact">${x.type === 'Coordinator' ? '' : `<button class="btn" data-zact="rename" data-zdev="${esc(x.name)}" title="${L('Rename', 'Přejmenovat')}">${ic('pencil-outline')}</button>
+    <td class="zact">${x.type === 'Coordinator' ? '' : `<button class="btn" data-zact="identify" data-zdev="${esc(x.name)}" title="Identify">${ic('lightbulb-on-outline')}</button>
+      ${x.own && activeRole() === 'zigbee_router' ? `<button class="btn" data-zact="txpower" data-zdev="${esc(x.name)}" title="${L('Transmit power', 'Vysílací výkon')}">${ic('signal')}</button>` : ''}
+      <button class="btn" data-zact="rename" data-zdev="${esc(x.name)}" title="${L('Rename', 'Přejmenovat')}">${ic('pencil-outline')}</button>
       <button class="btn" data-zact="interview" data-zdev="${esc(x.name)}" title="${L('Interview again', 'Znovu načíst zařízení')}">${ic('restart')}</button>
       ${x.ota ? `<button class="btn" data-zact="${x.update === 'available' ? 'ota_update' : 'ota_check'}" data-zdev="${esc(x.name)}" title="${x.update === 'available' ? L('Install the update', 'Nainstalovat aktualizaci') : L('Check for an update', 'Zkontrolovat aktualizaci')}">${ic('download')}</button>` : ''}
       <button class="btn danger" data-zact="remove" data-zdev="${esc(x.name)}" title="${L('Remove', 'Odebrat')}">${ic('delete-outline')}</button>`}</td></tr>`).join('')}</table>`;
@@ -1994,6 +2028,8 @@ function zBox(ieee) {
   add(L('Description', 'Popis'), esc(x.description || ''));
   add(L('Type', 'Typ'), esc(zTypeText(x.type)));
   add(L('Gateway', 'Brána'), x.own ? L('this gateway', 'tato brána') : '');
+  add(L('Transmit power', 'Vysílací výkon'), x.own && status.role_status?.router?.tx_power !== undefined ? status.role_status.router.tx_power + ' dBm'
+    : x.tx_power !== undefined ? x.tx_power + ' dBm' : '');
   add(L('Power', 'Napájení'), esc((x.power || '') + (x.battery !== undefined ? ` · ${x.battery} %` : '')));
   add('LQI', x.lqi !== undefined ? `<span class="${zLqiCls(x.lqi)}-text">${x.lqi}</span>` : '');
   add(L('Last seen', 'Naposledy viděno'), zAgo(x.last_seen, z2m?.now));
@@ -2306,6 +2342,17 @@ document.addEventListener('click', async e => {
       if (!await confirmDialog('Reset the C6?', 'The Zigbee host loses its connection and has to reinitialise the coordinator.')) return;
       await api('/api/zigbee/reset', { method: 'POST' });
       toast('C6 reset');
+    } else if (t.id === 'identify-btn') {
+      await api('/api/identify', { json: { seconds: 10 } });
+      status = await api('/api/status');
+      renderHeader();
+    } else if (t.id === 'thr-txp-set' || t.id === 'zr-txp-set') {
+      const thr = t.id === 'thr-txp-set', v = +$(thr ? '#thr-txp' : '#zr-txp').value;
+      if (!Number.isInteger(v) || v < -15 || v > 20) return toast(L('Transmit power: -15 to 20 dBm', 'Vysílací výkon: -15 až 20 dBm'));
+      if (thr) { await api('/api/thread/txpower', { json: { dbm: v } }); loadThreadTxPower(); }
+      else await api('/api/zigbee/command', { json: { cmd: 'txpower', value: v } });
+      t.blur();
+      toast(L(`Transmit power ${v} dBm`, `Vysílací výkon ${v} dBm`));
     } else if (t.dataset.zr) {
       const cmd = t.dataset.zr;
       if (['leave', 'factory_reset'].includes(cmd) && !await confirmDialog('Run ' + cmd + '?', 'The router leaves its Zigbee network.')) return;
@@ -2402,6 +2449,17 @@ document.addEventListener('click', async e => {
         toast(L('Interviewing, wake a battery device up now', 'Načítám zařízení, bateriové teď probuďte'));
         const r = await zRequest({ action: 'interview', device: dev });
         toast(r.status === 'ok' ? L('Interview done', 'Načtení dokončeno') : L('Sent, no answer yet', 'Odesláno, zatím bez odpovědi'));
+      } else if (act === 'identify') {
+        await zRequest({ action: 'identify', device: dev });
+        toast(L('Identify sent', 'Identifikace odeslána'));
+        return;
+      } else if (act === 'txpower') {
+        const r = await zDialog(L('Transmit power', 'Vysílací výkon'), L('C6 router transmit power, -15 to 20 dBm.', 'Vysílací výkon C6 routeru, -15 až 20 dBm.'), String(status.role_status?.router?.tx_power ?? 20));
+        const v = r ? +r.input : NaN;
+        if (!r) return;
+        if (!Number.isInteger(v) || v < -15 || v > 20) return toast(L('Transmit power: -15 to 20 dBm', 'Vysílací výkon: -15 až 20 dBm'));
+        await api('/api/zigbee/command', { json: { cmd: 'txpower', value: v } });
+        toast(L(`Transmit power ${v} dBm`, `Vysílací výkon ${v} dBm`));
       } else if (act === 'ota_check') {
         const r = await zRequest({ action: 'ota_check', device: dev });
         toast(r.data?.update_available || r.data?.updateAvailable ? L('Update available', 'Aktualizace je k dispozici') : r.status === 'ok' ? L('No update', 'Bez aktualizace') : L('Sent, no answer yet', 'Odesláno, zatím bez odpovědi'));
@@ -2595,10 +2653,11 @@ function render(full) {
   renderHeader();
   const main = $('#main');
   /* Forms keep their input: only redraw passive pages on every poll. */
-  if (full || PASSIVE.includes(route())) {
+  const editing = document.activeElement?.matches?.('#main input, #main select');
+  if (full || (PASSIVE.includes(route()) && !editing)) {
     if (full) renderNav();
     main.innerHTML = pageTitle() + views[route()]();
-    if (tab === 'thread') { loadThread(); if (sub === 'settings') loadDataset(false); if (sub === 'topology') loadTopology(); }
+    if (tab === 'thread') { loadThread(); if (sub === 'settings') { loadDataset(false); loadThreadTxPower(); } if (sub === 'topology') loadTopology(); }
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
     if (route() === 'system/netscan') loadNetscan();
@@ -2617,7 +2676,7 @@ async function poll() {
   if (!restarting) {
     try { status = await api('/api/status'); render(false); } catch (e) { $('#hdr-role').innerHTML = '<span class="dot bad"></span><span>offline</span>'; }
   }
-  setTimeout(poll, status?.c6?.flash?.busy ? 1000 : 5000);
+  setTimeout(poll, status?.c6?.flash?.busy || status?.identify_s ? 1000 : 5000);
 }
 
 renderNav();

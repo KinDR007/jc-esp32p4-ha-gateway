@@ -30,4 +30,9 @@
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
 - [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin
+- [x] Vysílací výkon C6 (Thread, Zigbee router, Zigbee2MQTT) a Identify s ikonou v hlavičce (UI13)
+- [ ] Ověřit zápis výkonu ze Zigbee2MQTT (`analog_output` / `tx_power`), MQTT broker vyžaduje přihlášení
+- [ ] Chyba: Zigbee router po návratu z jiné role (úplný sken okolí, přepnutí role) není v síti a
+      steeruje, ačkoli snapshot `zb_storage` síť obsahuje a obnoví se; žádný test to nehlídal (TC07 jen
+      snapshot koordinátora). Prověřit start ZBOSS po obnově (vymazané NVS?), doplnit test.
 - [ ] Ověřit HA cestu k "active dataset TLVs" v aktuální verzi HA (text v UI)

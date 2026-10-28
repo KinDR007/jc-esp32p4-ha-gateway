@@ -45,6 +45,8 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_RCP_TEL_OFF "rcp_tel_off" /* str, RCP version that hung on the telemetry request */
 #define GW_KEY_HA_SEEN "ha_seen"       /* blob gw_ha_seen_t, last client of the OTBR REST API */
 #define GW_KEY_MATTER_URL "matter_url" /* str, Matter Server WebSocket for device names in the Thread map */
+#define GW_KEY_ZR_TXPOWER "zr_txpower" /* i8 as u8+128, Zigbee router transmit power (restored after a reflash) */
+#define GW_KEY_THR_TXPOWER "thr_txpower" /* i8 as u8+128, Thread radio transmit power, 0 = default */
 #define GW_KEY_FAIL_RST "fail_rst"   /* u8, the last software restart was a recovery from a failure */
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
@@ -124,6 +126,10 @@ bool gw_api_temperature(float *celsius);
 #define GW_C6_TELEMETRY_MAX 256
 #define GW_C6_TELEMETRY_SPINEL_PROP 0x3cf0 /* P4GW_SPINEL_PROP_TELEMETRY of the C6 side */
 void gw_c6_telemetry_set(const char *json);
+
+/* Identify: the web UI blinks an icon while it runs (the board has no LED it could drive). */
+void gw_identify(int seconds);
+int gw_identify_left(void);
 
 /* Last Home Assistant contact over the OTBR REST API, kept across restarts. */
 typedef struct {

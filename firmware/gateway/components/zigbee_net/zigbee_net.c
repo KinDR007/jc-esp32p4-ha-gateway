@@ -214,6 +214,22 @@ static void handle_devices(const char *data)
             copy_str(c, "model", def, "model");
             copy_str(c, "description", def, "description");
             cJSON_AddBoolToObject(c, "ota", cJSON_IsTrue(cJSON_GetObjectItem(def, "supports_ota")));
+            /* names of what Zigbee2MQTT exposes (identify, tx_power, ...), also inside composites */
+            cJSON *names = cJSON_AddArrayToObject(c, "exposes"), *e, *f;
+            cJSON_ArrayForEach(e, cJSON_GetObjectItem(def, "exposes"))
+            {
+                const char *name = str(e, "property") ? str(e, "property") : str(e, "name");
+                if (name) {
+                    cJSON_AddItemToArray(names, cJSON_CreateString(name));
+                }
+                cJSON_ArrayForEach(f, cJSON_GetObjectItem(e, "features"))
+                {
+                    const char *fn = str(f, "property");
+                    if (fn) {
+                        cJSON_AddItemToArray(names, cJSON_CreateString(fn));
+                    }
+                }
+            }
         }
         cJSON_AddItemToArray(list, c);
     }
@@ -256,6 +272,9 @@ static void handle_state(const char *name, const char *data)
     }
     if (cJSON_IsNumber(v = cJSON_GetObjectItem(j, "battery"))) {
         set_field(s, "battery", cJSON_CreateNumber(v->valuedouble));
+    }
+    if (cJSON_IsNumber(v = cJSON_GetObjectItem(j, "tx_power"))) {
+        set_field(s, "tx_power", cJSON_CreateNumber(v->valuedouble));
     }
     const char *upd = str(cJSON_GetObjectItem(j, "update"), "state");
     if (upd) {
@@ -478,6 +497,22 @@ static esp_err_t request_post(httpd_req_t *req)
     } else if (action && device && strcmp(action, "ota_check") == 0) {
         path = "device/ota_update/check";
         cJSON_AddStringToObject(p, "id", device);
+    } else if (action && device && strcmp(action, "identify") == 0) {
+        /* a device command, not a bridge request: <base>/<device>/set, no answer */
+        char topic[160];
+        snprintf(topic, sizeof(topic), "%s/%s/set", s_base, device);
+        cJSON_Delete(body); /* device points into it */
+        cJSON_AddStringToObject(p, "identify", "identify");
+        char *text = cJSON_PrintUnformatted(p);
+        esp_err_t err = s_base[0] && text ? gw_mqtt_publish_to(topic, text) : ESP_ERR_INVALID_STATE;
+        cJSON_free(text);
+        cJSON_Delete(p);
+        if (err != ESP_OK) {
+            return gw_http_send_error(req, 503, "MQTT not connected or no Zigbee2MQTT");
+        }
+        cJSON *json = cJSON_CreateObject();
+        cJSON_AddStringToObject(json, "status", "sent");
+        return gw_http_send_json(req, json);
     } else if (action && device && strcmp(action, "ota_update") == 0) {
         path = "device/ota_update/update";
         cJSON_AddStringToObject(p, "id", device);

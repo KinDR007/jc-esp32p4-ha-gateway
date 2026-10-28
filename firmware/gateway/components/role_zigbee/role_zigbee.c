@@ -263,6 +263,40 @@ static SemaphoreHandle_t s_router_lock;
 static char s_router_status[ROUTER_LINE_MAX];
 static int64_t s_router_status_us;
 
+/*
+ * The router keeps its transmit power in its NVS, which a reflash (role switch) erases. The gateway
+ * remembers the last reported value: after a start it restores it once, later changes (from the web
+ * UI or from Zigbee2MQTT) are adopted.
+ */
+static bool s_txpower_checked;
+
+static void router_send(const char *line)
+{
+    uart_write_bytes(UART_PORT, line, strlen(line));
+    s_stats.uart_tx += strlen(line);
+}
+
+static void router_tx_power(const char *json)
+{
+    cJSON *j = cJSON_Parse(json);
+    cJSON *v = cJSON_GetObjectItem(j, "tx_power");
+    if (cJSON_IsNumber(v)) {
+        uint8_t stored = gw_config_get_u8(GW_KEY_ZR_TXPOWER, 0);
+        int reported = v->valueint;
+        if (!s_txpower_checked) {
+            s_txpower_checked = true;
+            if (stored && stored - 128 != reported) {
+                char line[24];
+                snprintf(line, sizeof(line), "txpower %d\n", stored - 128);
+                router_send(line);
+            }
+        } else if (stored - 128 != reported || !stored) {
+            gw_config_set_u8(GW_KEY_ZR_TXPOWER, (uint8_t)(reported + 128));
+        }
+    }
+    cJSON_Delete(j);
+}
+
 static void router_reader_task(void *arg)
 {
     char line[ROUTER_LINE_MAX];
@@ -280,8 +314,20 @@ static void router_reader_task(void *arg)
                 strlcpy(s_router_status, line + 4, sizeof(s_router_status));
                 s_router_status_us = esp_timer_get_time();
                 xSemaphoreGive(s_router_lock);
+                router_tx_power(line + 4);
             } else if (len > 4 && strncmp(line, "@ZT ", 4) == 0) {
                 gw_c6_telemetry_set(line + 4);
+            } else if (len > 4 && strncmp(line, "@ZI ", 4) == 0) {
+                /* identify from the network (Zigbee2MQTT, Home Assistant): until it ends, at most a minute;
+                 * Zigbee2MQTT asks for 3 s, the header icon blinks at least 10 s to be noticed */
+                static int64_t ident_start_us;
+                if (strstr(line, "true")) {
+                    ident_start_us = esp_timer_get_time();
+                    gw_identify(60);
+                } else {
+                    int elapsed = (esp_timer_get_time() - ident_start_us) / 1000000;
+                    gw_identify(elapsed < 10 ? 10 - elapsed : 0);
+                }
             } else if (len > 0) {
                 ESP_LOGI("c6", "%s", line);
             }
@@ -300,6 +346,17 @@ static esp_err_t router_command_post(httpd_req_t *req)
     }
     static const char *const allowed[] = {"status", "steer", "permit", "leave", "factory_reset"};
     const char *cmd = GW_JSON_STR(body, "cmd");
+    if (cmd && strcmp(cmd, "txpower") == 0) {
+        cJSON *v = cJSON_GetObjectItem(body, "value");
+        cJSON_Delete(body);
+        if (!cJSON_IsNumber(v) || v->valueint < -15 || v->valueint > 20) {
+            return gw_http_send_error(req, 400, "value: -15..20 dBm");
+        }
+        char line[24];
+        snprintf(line, sizeof(line), "txpower %d\nstatus\n", v->valueint);
+        router_send(line);
+        return gw_http_send_json(req, cJSON_CreateObject());
+    }
     bool ok = false;
     for (size_t i = 0; cmd && i < sizeof(allowed) / sizeof(allowed[0]); i++) {
         ok |= strcmp(cmd, allowed[i]) == 0;

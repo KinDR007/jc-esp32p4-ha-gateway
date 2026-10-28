@@ -116,6 +116,34 @@ static cJSON *hw_json(void)
     return hw;
 }
 
+static int64_t s_identify_until_us;
+
+void gw_identify(int seconds)
+{
+    s_identify_until_us = seconds > 0 ? esp_timer_get_time() + seconds * 1000000LL : 0;
+}
+
+int gw_identify_left(void)
+{
+    int64_t left = s_identify_until_us - esp_timer_get_time();
+    return left > 0 ? (int)((left + 999999) / 1000000) : 0;
+}
+
+static esp_err_t identify_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    cJSON *s = cJSON_GetObjectItem(body, "seconds");
+    int seconds = cJSON_IsNumber(s) ? s->valueint : 10;
+    cJSON_Delete(body);
+    gw_identify(seconds < 0 ? 0 : seconds > 120 ? 120 : seconds);
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "identify_s", gw_identify_left());
+    return gw_http_send_json(req, json);
+}
+
 static portMUX_TYPE s_c6_tel_mux = portMUX_INITIALIZER_UNLOCKED;
 static char s_c6_tel[GW_C6_TELEMETRY_MAX];
 static int64_t s_c6_tel_us;
@@ -299,6 +327,7 @@ static esp_err_t status_get(httpd_req_t *req)
     }
 
     cJSON_AddItemToObject(json, "hw", hw_json());
+    cJSON_AddNumberToObject(json, "identify_s", gw_identify_left());
     if (s_role_status) {
         cJSON_AddItemToObject(json, "role_status", s_role_status());
     }
@@ -853,6 +882,7 @@ esp_err_t gw_api_register(void)
     }
 
     gw_http_register("/api/status", HTTP_GET, status_get);
+    gw_http_register("/api/identify", HTTP_POST, identify_post);
     gw_http_register("/api/logs", HTTP_GET, logs_get);
     gw_http_register("/api/role", HTTP_POST, role_post);
     gw_http_register("/api/reboot", HTTP_POST, reboot_post);

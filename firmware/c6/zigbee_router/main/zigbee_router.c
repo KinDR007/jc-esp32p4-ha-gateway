@@ -3,10 +3,15 @@
  *
  * UART0 (460800 Bd) carries a line protocol to the P4:
  *   C6 -> P4: "@ZR {json}" status lines every 10 s and after every state change,
- *             "@ZT {json}" telemetry (temperature, memory, uptime) every 30 s
- *   P4 -> C6: "status", "steer", "permit", "leave", "factory_reset"
+ *             "@ZT {json}" telemetry (temperature, memory, uptime) every 30 s,
+ *             "@ZI {json}" identify started or ended (Identify cluster, e.g. from Zigbee2MQTT)
+ *   P4 -> C6: "status", "steer", "permit", "leave", "factory_reset", "txpower <dBm>"
+ *
+ * The transmit power is also the PresentValue (dBm) of an Analog Output cluster on endpoint 1, so
+ * Zigbee2MQTT can read and set it; it is kept in NVS.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "driver/uart.h"
@@ -18,6 +23,7 @@
 #include "esp_zigbee_core.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nvs.h"
 #include "nvs_flash.h"
 #include "p4gw_telemetry.h"
 
@@ -29,6 +35,8 @@ static const char *TAG = "zr";
 #define TELEMETRY_INTERVAL_MS 30000
 #define PERMIT_JOIN_S 180
 #define LINK_BAUD 460800 /* CONFIG_GW_C6_UART_BAUD of the gateway */
+#define TX_POWER_MIN (-15)
+#define TX_POWER_MAX 20
 
 static volatile bool s_joined;
 static volatile bool s_steering;
@@ -48,11 +56,13 @@ static void print_status(void)
         sprintf(ieee_hex + 2 * i, "%02x", ieee[7 - i]);
     }
     bool permit = esp_timer_get_time() < s_permit_until_us;
+    int8_t tx = 0;
+    esp_zb_get_tx_power(&tx);
     printf("@ZR {\"state\":\"%s\",\"joined\":%s,\"pan_id\":\"0x%04x\",\"ext_pan_id\":\"%s\",\"channel\":%u,"
-           "\"short_addr\":\"0x%04x\",\"ieee\":\"%s\",\"permit_join\":%s,\"version\":\"%s\"}\n",
+           "\"short_addr\":\"0x%04x\",\"ieee\":\"%s\",\"permit_join\":%s,\"tx_power\":%d,\"version\":\"%s\"}\n",
            s_joined ? "joined" : s_steering ? "steering" : "idle", s_joined ? "true" : "false",
            esp_zb_get_pan_id(), ext_hex, esp_zb_get_current_channel(), esp_zb_get_short_address(), ieee_hex,
-           permit ? "true" : "false", esp_app_get_description()->version);
+           permit ? "true" : "false", tx, esp_app_get_description()->version);
     fflush(stdout);
 }
 
@@ -63,6 +73,56 @@ static void print_telemetry(void)
         printf("@ZT %s\n", json);
         fflush(stdout);
     }
+}
+
+/* Transmit power: radio, NVS and the Analog Output attribute (when the change did not come from it). */
+static void apply_tx_power(int dbm, bool update_attribute)
+{
+    dbm = dbm < TX_POWER_MIN ? TX_POWER_MIN : dbm > TX_POWER_MAX ? TX_POWER_MAX : dbm;
+    esp_zb_set_tx_power((int8_t)dbm);
+    nvs_handle_t h;
+    if (nvs_open("p4gw", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_i8(h, "txpower", (int8_t)dbm);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    if (update_attribute) {
+        float value = dbm;
+        esp_zb_zcl_set_attribute_val(ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_ANALOG_OUTPUT, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_PRESENT_VALUE_ID, &value, false);
+    }
+}
+
+static int saved_tx_power(void)
+{
+    nvs_handle_t h;
+    int8_t v = TX_POWER_MAX;
+    if (nvs_open("p4gw", NVS_READONLY, &h) == ESP_OK) {
+        nvs_get_i8(h, "txpower", &v);
+        nvs_close(h);
+    }
+    return v;
+}
+
+/* Writes from the network (Zigbee2MQTT sets the PresentValue). */
+static esp_err_t on_action(esp_zb_core_action_callback_id_t id, const void *message)
+{
+    if (id == ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID) {
+        const esp_zb_zcl_set_attr_value_message_t *m = message;
+        if (m->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ANALOG_OUTPUT &&
+            m->attribute.id == ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_PRESENT_VALUE_ID && m->attribute.data.value) {
+            float v = *(const float *)m->attribute.data.value;
+            apply_tx_power((int)(v < 0 ? v - 0.5f : v + 0.5f), false);
+            print_status();
+        }
+    }
+    return ESP_OK;
+}
+
+static void on_identify(uint8_t on)
+{
+    printf("@ZI {\"on\":%s}\n", on ? "true" : "false");
+    fflush(stdout);
 }
 
 static void start_steering(uint8_t unused)
@@ -127,6 +187,10 @@ static void handle_command(const char *cmd)
         if (esp_zb_bdb_open_network(PERMIT_JOIN_S) == ESP_OK) {
             s_permit_until_us = esp_timer_get_time() + PERMIT_JOIN_S * 1000000LL;
         }
+        esp_zb_lock_release();
+    } else if (strncmp(cmd, "txpower ", 8) == 0) {
+        esp_zb_lock_acquire(portMAX_DELAY);
+        apply_tx_power(atoi(cmd + 8), true);
         esp_zb_lock_release();
     } else if (strcmp(cmd, "leave") == 0 || strcmp(cmd, "factory_reset") == 0) {
         /* Clears zb_storage and restarts factory new; steering then waits for a command. */
@@ -198,6 +262,13 @@ static void zigbee_task(void *arg)
     esp_zb_cluster_list_add_basic_cluster(clusters, basic, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
     esp_zb_cluster_list_add_identify_cluster(clusters, esp_zb_identify_cluster_create(&identify_cfg),
                                              ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    /* transmit power, readable and writable from the network */
+    esp_zb_analog_output_cluster_cfg_t power_cfg = {.present_value = saved_tx_power()};
+    esp_zb_attribute_list_t *power = esp_zb_analog_output_cluster_create(&power_cfg);
+    esp_zb_analog_output_cluster_add_attr(power, ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_DESCRIPTION_ID, "\x0e" "TX power (dBm)");
+    float resolution = 1;
+    esp_zb_analog_output_cluster_add_attr(power, ESP_ZB_ZCL_ATTR_ANALOG_OUTPUT_RESOLUTION_ID, &resolution);
+    esp_zb_cluster_list_add_analog_output_cluster(clusters, power, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
     esp_zb_ep_list_t *eps = esp_zb_ep_list_create();
     esp_zb_endpoint_config_t ep_cfg = {
         .endpoint = ENDPOINT,
@@ -207,9 +278,12 @@ static void zigbee_task(void *arg)
     };
     esp_zb_ep_list_add_ep(eps, clusters, ep_cfg);
     esp_zb_device_register(eps);
+    esp_zb_core_action_handler_register(on_action);
+    esp_zb_identify_notify_handler_register(ENDPOINT, on_identify);
 
     esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK);
     ESP_ERROR_CHECK(esp_zb_start(false));
+    esp_zb_set_tx_power((int8_t)saved_tx_power());
     s_stack_ready = true;
     esp_zb_stack_main_loop();
 }

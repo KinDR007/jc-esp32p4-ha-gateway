@@ -331,6 +331,37 @@ await test('UI12', 'Zigbee network: Zigbee2MQTT instance, devices with details, 
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
+await test('UI13', 'Zigbee router: transmit power set from the page, Identify blinks the header icon', async () => {
+  if (status.role.active !== 'zigbee_router') {
+    console.log('  skipped: Zigbee router role is not active');
+    return;
+  }
+  const before = (await page.evaluate(() => fetch('/api/status').then(r => r.json()))).role_status.router.tx_power;
+  await tab('zigbee/info');
+  await page.waitForSelector('#zr-txp');
+  check(+(await page.inputValue('#zr-txp')) === before, `power field shows ${before} dBm`);
+  const target = before === 10 ? 11 : 10;
+  await page.fill('#zr-txp', String(target));
+  await page.waitForTimeout(6000);
+  check(+(await page.inputValue('#zr-txp')) === target, 'status poll keeps the value being typed');
+  await page.click('#zr-txp-set');
+  await page.waitForFunction(t => document.querySelector('#main').textContent.includes(t + ' dBm'), target, { timeout: 15000 });
+  check(true, `router reports ${target} dBm`);
+  await page.fill('#zr-txp', String(before));
+  await page.click('#zr-txp-set');
+  await page.click('#identify-btn');
+  await page.waitForFunction(() => !document.querySelector('#hdr-ident').classList.contains('hidden'), null, { timeout: 5000 });
+  const anim = await page.$eval('#hdr-ident .mdi', e => getComputedStyle(e).animationName);
+  check(anim === 'blink', `header icon blinks (${anim})`);
+  await page.waitForFunction(() => document.querySelector('#hdr-ident').classList.contains('hidden'), null, { timeout: 15000 });
+  check(true, 'icon gone after 10 s');
+  await tab('zigbee/network');
+  await page.waitForSelector('#zdev table', { timeout: 20000 }).catch(() => {});
+  const own = await page.$('#zdev tr[data-znode] [data-zact="txpower"]');
+  if (own) check(!!await page.$('#zdev [data-zact="identify"]'), 'own router row has power and Identify buttons');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
 await browser.close();
 console.log('Summary: ' + results.map(r => `${r[0]} ${r[1]}`).join(', '));
 process.exit(results.every(r => r[1] === 'PASS') ? 0 : 1);

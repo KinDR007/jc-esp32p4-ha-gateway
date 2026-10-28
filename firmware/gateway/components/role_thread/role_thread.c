@@ -32,6 +32,7 @@
 #include "openthread/instance.h"
 #include "openthread/ip6.h"
 #include "openthread/link.h"
+#include "openthread/platform/radio.h"
 #include "openthread/mesh_diag.h"
 #include "openthread/nat64.h"
 #include "openthread/srp_server.h"
@@ -270,6 +271,15 @@ static void read_rcp_telemetry(otInstance *instance)
     }
 }
 
+/* transmit power of the RCP radio (Thread > Settings), kept in NVS, 0 = default */
+static void apply_saved_tx_power(otInstance *ot)
+{
+    uint8_t v = gw_config_get_u8(GW_KEY_THR_TXPOWER, 0);
+    if (v) {
+        otPlatRadioSetTransmitPower(ot, (int8_t)(v - 128));
+    }
+}
+
 static void thread_task(void *arg)
 {
     esp_vfs_eventfd_config_t eventfd_config = {.max_fds = 3};
@@ -299,6 +309,9 @@ static void thread_task(void *arg)
         start_router(instance);
         esp_openthread_lock_release();
     }
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    apply_saved_tx_power(instance);
+    esp_openthread_lock_release();
     s_started = true;
     /* Every 30 s: follow dataset changes made by Home Assistant (REST) or the web UI, read the C6 telemetry. */
     while (true) {
@@ -429,6 +442,36 @@ static esp_err_t quick_scan(cJSON *result, char *err, size_t err_len)
     }
     vSemaphoreDelete(ctx.done);
     return ret;
+}
+
+/* ---- transmit power of the RCP radio (Thread > Settings) ---- */
+
+static esp_err_t txpower_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    cJSON *v = cJSON_GetObjectItem(body, "dbm");
+    int dbm = cJSON_IsNumber(v) ? v->valueint : 999;
+    cJSON_Delete(body);
+    if (dbm < -15 || dbm > 20) {
+        return gw_http_send_error(req, 400, "dbm: -15..20");
+    }
+    if (!s_started || !esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
+        return gw_http_send_error(req, 409, "OpenThread not running");
+    }
+    otError e = otPlatRadioSetTransmitPower(esp_openthread_get_instance(), (int8_t)dbm);
+    int8_t now = 0;
+    otPlatRadioGetTransmitPower(esp_openthread_get_instance(), &now);
+    esp_openthread_lock_release();
+    if (e != OT_ERROR_NONE) {
+        return gw_http_send_error(req, 500, otThreadErrorToString(e));
+    }
+    gw_config_set_u8(GW_KEY_THR_TXPOWER, (uint8_t)(dbm + 128));
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "tx_power", now);
+    return gw_http_send_json(req, json);
 }
 
 /* ---- topology map (Thread > Topology) ---- */
@@ -627,6 +670,11 @@ static cJSON *thread_status(void)
 
     cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(otThreadGetDeviceRole(ot)));
     cJSON_AddStringToObject(json, "rcp_version", otGetRadioVersionString(ot));
+    int8_t tx_power;
+    if (otPlatRadioGetTransmitPower(ot, &tx_power) == OT_ERROR_NONE) {
+        cJSON_AddNumberToObject(json, "tx_power", tx_power);
+    }
+    cJSON_AddBoolToObject(json, "tx_power_set", gw_config_get_u8(GW_KEY_THR_TXPOWER, 0) != 0);
     cJSON_AddStringToObject(json, "network_name", otThreadGetNetworkName(ot));
     cJSON_AddNumberToObject(json, "channel", otLinkGetChannel(ot));
     snprintf(buf, sizeof(buf), "0x%04x", otLinkGetPanId(ot));
@@ -953,6 +1001,7 @@ esp_err_t role_thread_start(bool border_router)
     s_topo_busy = xSemaphoreCreateMutex();
     s_topo_done = xSemaphoreCreateBinary();
     gw_http_register("/api/thread/topology", HTTP_GET, topology_get);
+    gw_http_register("/api/thread/txpower", HTTP_POST, txpower_post);
     gw_api_set_role_status(thread_summary);
     netscan_set_quick(quick_scan);
 

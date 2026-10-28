@@ -45,6 +45,14 @@ The gateway keeps a copy of the coordinator NVRAM whenever it leaves the role (Z
 
 Permit join in the Zigbee host, then **Zigbee → Join network (steer)** in the gateway UI.
 
+Transmit power (-15..20 dBm) is set under Zigbee › Information or with the power button of the
+gateway's row in Zigbee › Network and devices. Zigbee2MQTT shows the router with an automatically
+generated definition (`identify`, `analog_output` = transmit power in dBm). For a named
+`tx_power` setting with its range and unit, copy `tools/z2m/p4gw_router.mjs` to
+`<zigbee2mqtt data>/external_converters/` and restart Zigbee2MQTT. Identify from Zigbee2MQTT or
+Home Assistant blinks the icon in the gateway's web UI header for at least 10 s (the board has no
+LED the firmware can drive).
+
 ## ESPHome BLE proxy
 
 HA discovers the node (ESPHome integration); enter the API key from
@@ -123,4 +131,4 @@ for a Zigbee network on another adapter.
   a network with dozens of routers.
 - Operations go to Zigbee2MQTT (`bridge/request/...`) and show its answer: permit join for 254 s
   (whole network or via a router), rename (Home Assistant entities too), remove (optionally
-  forced), interview, OTA check and update.
+  forced), interview, OTA check and update, Identify.

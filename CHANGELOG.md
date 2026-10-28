@@ -19,6 +19,16 @@
   model, power, LQI, last seen and state, permit join (whole network or via a router), rename,
   remove, interview, OTA check and update. Works in every role. MQTT messages of any size; JSON in
   PSRAM. Tests TC22, UI12.
+- C6 transmit power (-15..20 dBm, kept across restarts and role switches): Thread › Settings for
+  both Thread roles (`/api/thread/txpower`), Zigbee › Information and the gateway's row in
+  Zigbee › Network and devices for the Zigbee router. The router firmware (1.2.0) exposes it as
+  Analog Output PresentValue, so Zigbee2MQTT can set it too (`tools/z2m/p4gw_router.mjs` names it
+  `tx_power`). Test UI13.
+- Identify: a blinking icon in the header for at least 10 s, from the Identify button
+  (`/api/identify`), the Identify button of any device in Zigbee › Network and devices, or the
+  Zigbee Identify cluster of the router (Zigbee2MQTT, Home Assistant). The board has no controllable
+  LED.
+- Fix: a page redrawn on every status poll no longer drops the value being typed into its field.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
 
