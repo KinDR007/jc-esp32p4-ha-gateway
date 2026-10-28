@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include "gw.h"
 #include "mdns.h"
+#include "netscan.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
 #include "sound.h"
@@ -158,12 +159,17 @@ void app_main(void)
     init_mdns(st->hostname);
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
+    netscan_init();
     sound_init();
     gw_mqtt_start();
 
     if (boot_loop) {
         gw_set_maintenance("repeated crashes during start, role %s not started", gw_role_name(st->desired));
     } else {
+        if (netscan_full_pending()) {
+            /* the scanner image runs on the C6 first; apply_role flashes the role image back */
+            netscan_run_full();
+        }
         apply_role(st->desired);
     }
 

@@ -88,7 +88,7 @@ Port 80, single page embedded in the firmware with a left menu (sections and sub
 theme (switches in the header, remembered by the browser). HTTP Basic auth (user `admin`) once a password is
 set. Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/ota/{gateway,esphome,c6fw}`,
 `/api/c6/{backup,reflash,zigbee-snapshot}`, `/api/thread/{status,dataset,cli}`,
-`/api/zigbee/{status,reset,command}`, `/api/mqtt`, `/api/settings`, `/api/tools/ping`, `/api/coredump`.
+`/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/mqtt`, `/api/settings`, `/api/tools/ping`, `/api/coredump`.
 The OTBR REST API for Home Assistant is on port 8081 (Thread border router role).
 
 ## Licenses

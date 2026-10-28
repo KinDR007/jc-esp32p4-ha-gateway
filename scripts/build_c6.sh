@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build one or all C6 co-processor firmwares into build/c6/<name>/.
-# Usage: build_c6.sh [ot_rcp|zigbee_ncp|zigbee_router|esp_hosted|all]
+# Usage: build_c6.sh [ot_rcp|zigbee_ncp|zigbee_router|esp_hosted|scanner|all]
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 
@@ -12,6 +12,7 @@ src_of() {
         zigbee_ncp) echo "$ROOT_DIR/third_party/esp-coordinator" ;;
         esp_hosted) echo "$ROOT_DIR/third_party/esp-hosted-mcu|slave" ;;
         zigbee_router) echo "$ROOT_DIR/firmware/c6/zigbee_router" ;;
+        scanner) echo "$ROOT_DIR/firmware/c6/scanner" ;;
         *) echo "unknown firmware: $1" >&2; return 1 ;;
     esac
 }
@@ -47,7 +48,7 @@ build_one() {
 
 target=${1:-all}
 if [ "$target" = all ]; then
-    for n in ot_rcp zigbee_ncp zigbee_router esp_hosted; do build_one "$n"; done
+    for n in ot_rcp zigbee_ncp zigbee_router esp_hosted scanner; do build_one "$n"; done
 else
     build_one "$target"
 fi

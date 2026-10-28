@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI08).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI09).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -55,7 +55,7 @@ const toastText = () => page.textContent('#toast');
 // every page of the left menu (section/sub page)
 const ROUTES = ['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/info', 'zigbee/diag',
   'zigbee/backups', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
-  'system/info', 'system/firmware', 'system/diag', 'system/settings', 'system/maint'];
+  'system/info', 'system/firmware', 'system/diag', 'system/netscan', 'system/settings', 'system/maint'];
 const tab = async route => {
   const [sec] = route.split('/');
   // the section link opens its first sub page and lists the others
@@ -229,6 +229,26 @@ await test('UI08', 'Navigation: left menu with sub pages, deep links, mobile dra
   await page.waitForTimeout(600);
   check(await x() <= 0 && await page.evaluate(() => location.hash) === '#role', 'choosing a page closes the drawer');
   await page.setViewportSize({ width: 1280, height: 720 });
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI09', 'Network surroundings: the last scan shows channels, spectrum and a recommendation', async () => {
+  const d = await page.evaluate(() => fetch('/api/net/scan').then(r => r.json()));
+  if (!d.last) {
+    console.log('  skipped: no scan stored on the gateway');
+    return;
+  }
+  await tab('system/netscan');
+  await page.waitForSelector('#ns-channels table', { timeout: 20000 });
+  check(await page.$$eval('#ns-channels tr', r => r.length) === 17, 'all 16 channels (11-26) rated');
+  check(await page.$$eval('#ns-spectrum svg rect', r => r.length) === 16, 'spectrum shows the 16 channels');
+  check(/\d/.test(await page.textContent('#ns-reco')), `recommendation shown (${(await page.textContent('#ns-reco')).replace(/\s+/g, ' ').slice(0, 60)}…)`);
+  if (d.last.wifi) {
+    const rows = await page.$$eval('#ns-wifi tr', r => r.length - 1);
+    const unique = new Set(d.last.wifi.map(a => a.bssid)).size;
+    check(rows === unique, `Wi-Fi table: one row per BSSID (${rows})`);
+  }
+  check(await page.isDisabled('#ns-quick') === !d.quick_available, 'quick scan offered only when the role can run it');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

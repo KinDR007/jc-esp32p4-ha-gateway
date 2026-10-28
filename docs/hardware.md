@@ -88,6 +88,23 @@ The RCP links newlib nano printf: telemetry code must not use `%llu` or float co
 crashed the first RCP builds). The router console runs at the link rate (460800 Bd), so C6 panics
 in that role appear in the P4 log as `c6:` lines.
 
+## Network surroundings scan
+
+System › Network surroundings rates the 2.4 GHz band for placing a new Thread, Zigbee or Wi-Fi
+network.
+
+- **Quick** (Thread roles, no outage): OpenThread energy scan, active scan (beacons, also Zigbee
+  PANs) and Thread discovery on channels 11–26, about 13 s with the radio off its channel.
+- **Full** (any role, about a minute without the role): the gateway restarts, flashes the
+  `scanner` image (`firmware/c6/scanner`) to the C6, which scans Wi-Fi (two passes) and every
+  802.15.4 channel (energy, beacon request with Zigbee/Thread payload parsing, PANs in traffic),
+  then flashes the role image back; Zigbee network data is kept by the usual snapshot.
+
+The last result is stored in NVS with its time (SNTP). Ratings are computed in the web UI: Wi-Fi
+overlap (a 20 MHz channel covers about four 802.15.4 channels), measured noise and networks
+already on the channel. The C6 bundle with the scanner uses 2.04 of 2.10 MB of the `c6fw`
+partition: another C6 image needs a bigger partition or a smaller image.
+
 ## Radio limits
 
 The C6 has one 2.4 GHz radio. BLE scanning and a Thread/Zigbee router cannot run together

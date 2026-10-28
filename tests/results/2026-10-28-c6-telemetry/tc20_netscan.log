@@ -1,0 +1,19 @@
+TC20 Network surroundings: quick scan in the Thread role, full scan with Wi-Fi, role restored afterwards.
+  17:10:18 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  17:10:18 ok: thread_br started without maintenance ('')
+  17:10:18 ok: active role is thread_br
+  17:10:18 switch took 13 s
+  17:10:18 ok: quick scan started ({'started': True})
+  17:10:33 ok: quick: 16 channels in 13328 ms
+  17:10:33 ok: quick: own network MyHome284238473 found on channel 25
+  17:10:33 ok: no RCP failure caused by the scan
+  17:10:33 ok: full scan requested, gateway restarts
+  17:11:12 ok: full: scanner 1.0.0, 16 channels, 33176 ms
+  17:11:12 ok: full: 20 Wi-Fi access points, one entry each
+  17:11:12 ok: full: own Thread PAN seen in traffic
+  17:11:21 back after restart: active=thread_br c6=ot_rcp uptime=45s
+  17:11:21 ok: role firmware back on the C6
+  17:11:21 ok: Thread network unchanged after the scan
+TC20 PASS (77 s) 
+
+Summary: TC20 PASS

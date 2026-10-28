@@ -1,6 +1,6 @@
 idf_component_register(SRCS "role_thread.c"
                        INCLUDE_DIRS "include"
-                       PRIV_REQUIRES gw_core openthread esp_ot_br_server vfs esp_netif)
+                       PRIV_REQUIRES gw_core netscan openthread esp_ot_br_server vfs esp_netif)
 
 # REST API port of the patched esp_ot_br_server (the web UI keeps port 80).
 idf_component_get_property(br_server_lib esp_ot_br_server COMPONENT_LIB)

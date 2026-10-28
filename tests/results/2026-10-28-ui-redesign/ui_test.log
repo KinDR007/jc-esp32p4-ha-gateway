@@ -18,6 +18,7 @@ UI01 every tab renders without script errors or error toasts
   ok: system/info: opened, no error toast
   ok: system/firmware: opened, no error toast
   ok: system/diag: opened, no error toast
+  ok: system/netscan: opened, no error toast
   ok: system/settings: opened, no error toast
   ok: system/maint: opened, no error toast
   ok: no uncaught script errors 
@@ -69,6 +70,7 @@ UI06 Language: Czech translates every tab, keeps sound names, English restores t
   ok: system/info: no error toast
   ok: system/firmware: no error toast
   ok: system/diag: no error toast
+  ok: system/netscan: no error toast
   ok: system/settings: no error toast
   ok: system/maint: no error toast
   ok: language kept after reload
@@ -100,4 +102,13 @@ UI08 Navigation: left menu with sub pages, deep links, mobile drawer, explanatio
   ok: no uncaught script errors 
 UI08 PASS
 
-Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS
+UI09 Network surroundings: the last scan shows channels, spectrum and a recommendation
+  ok: all 16 channels (11-26) rated
+  ok: spectrum shows the 16 channels
+  ok: recommendation shown ( New Thread network19also 20 (92), 18 (91) New Zigbee networ…)
+  ok: Wi-Fi table: one row per BSSID (20)
+  ok: quick scan offered only when the role can run it
+  ok: no uncaught script errors 
+UI09 PASS
+
+Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS, UI09 PASS

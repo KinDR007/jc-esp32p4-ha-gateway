@@ -7,6 +7,9 @@
   (Thread, Zigbee, ESPHome), deep links `#section/page`, drawer menu on phones, wider tiles, Material
   Design Icons embedded as SVG (`tools/web/gen_icons.mjs`), explanation tooltips (ⓘ) for values,
   network devices, roles and actions in Czech and English. Browser test UI08.
+- Network surroundings (System): quick 802.15.4 scan in the Thread roles and a full scan with
+  Wi-Fi through a new C6 scanner image; 2.4 GHz spectrum, channel ratings and recommendations for
+  new Thread, Zigbee and Wi-Fi networks. SNTP for scan times. Tests TC20, UI09.
 - C6 telemetry (temperature, free RAM, uptime, reset reason) from the Thread RCP, the Zigbee
   coordinator and the Zigbee router, each over its own link; Zigbee2MQTT never sees it. Patched
   ESP-IDF openthread component, ZBOSS frame filter with host unit test, test TC19.

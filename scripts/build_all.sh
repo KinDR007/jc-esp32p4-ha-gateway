@@ -21,7 +21,8 @@ part_size() { awk -F, -v n="$1" '$1 ~ "^"n"[ ]*$" {gsub(/ /, "", $5); print $5}'
 
 python3 scripts/pack_c6fw.py --out dist/c6fw.bin --size "$(part_size c6fw)" \
     ot_rcp=build/c6/ot_rcp/build zigbee_ncp=build/c6/zigbee_ncp/build \
-    zigbee_router=build/c6/zigbee_router/build esp_hosted=build/c6/esp_hosted/build
+    zigbee_router=build/c6/zigbee_router/build esp_hosted=build/c6/esp_hosted/build \
+    scanner=build/c6/scanner/build
 
 cp build/gateway/p4gw.bin dist/p4gw.bin
 cp firmware/esphome/.esphome/build/ble-proxy-p4gw/build/firmware.ota.bin dist/esphome.bin

@@ -608,6 +608,41 @@ def tc19_c6_telemetry():
     switch('thread_br')
 
 
+def tc20_netscan():
+    """Network surroundings: quick scan in the Thread role, full scan with Wi-Fi, role restored afterwards."""
+    switch('thread_br')
+    wait_thread_running()
+    t = http('GET', '/api/thread/status')[1]
+
+    def finished(mode, since):
+        d = http('GET', '/api/net/scan', timeout=5)[1]
+        last = d.get('last') or {}
+        return last if d.get('state') == 'idle' and last.get('mode') == mode and last.get('duration_ms') != since else None
+
+    before = (http('GET', '/api/net/scan')[1].get('last') or {}).get('duration_ms')
+    code, r = http('POST', '/api/net/scan', {'mode': 'quick'})
+    check(code == 200, f'quick scan started ({r})')
+    q = wait_until('quick scan', lambda: finished('quick', before), 90, 3)
+    check(len(q['channels']) == 16 and not q.get('errors'), f'quick: 16 channels in {q["duration_ms"]} ms')
+    own = [n for n in q.get('thread', []) if n.get('name') == t['network_name']]
+    check(own and own[0]['ch'] == t['channel'], f'quick: own network {t["network_name"]} found on channel {t["channel"]}')
+    check(http('GET', '/api/thread/status')[1]['rcp_failures'] == t['rcp_failures'], 'no RCP failure caused by the scan')
+
+    code, r = http('POST', '/api/net/scan', {'mode': 'full'})
+    check(code == 200 and r.get('restarting'), 'full scan requested, gateway restarts')
+    time.sleep(10)
+    f = wait_until('full scan', lambda: finished('full', None), 240, 5)
+    check(len(f['channels']) == 16 and f.get('scanner') and not f.get('errors'),
+          f'full: scanner {f.get("scanner")}, 16 channels, {f["duration_ms"]} ms')
+    bssids = [a['bssid'] for a in f['wifi']]
+    check(len(bssids) == len(set(bssids)), f'full: {len(bssids)} Wi-Fi access points, one entry each')
+    check(any(p['ch'] == t['channel'] for p in f['pans']), 'full: own Thread PAN seen in traffic')
+    s = wait_restart('thread_br')
+    check(s['c6']['bundle'] == 'ot_rcp' and not s['role']['maintenance'], 'role firmware back on the C6')
+    t2 = wait_thread_running()
+    check(t2['network_name'] == t['network_name'], 'Thread network unchanged after the scan')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -615,7 +650,7 @@ TESTS = [
     ('TC10', tc10_ota_rollback_slots), ('TC11', tc11_auth), ('TC12', tc12_invalid_uploads),
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
-    ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry),
+    ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
 ]
 
 

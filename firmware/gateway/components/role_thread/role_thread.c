@@ -21,6 +21,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "netscan.h"
 #include "openthread/border_agent.h"
 #include "openthread/border_routing.h"
 #include "openthread/cli.h"
@@ -308,6 +309,125 @@ static void thread_task(void *arg)
     }
 }
 
+/* ---- quick scan of the radio surroundings (System > Network surroundings) ---- */
+
+#define SCAN_ALL_CHANNELS 0x07fff800 /* 11..26 */
+#define SCAN_WAIT pdMS_TO_TICKS(30000)
+
+typedef struct {
+    SemaphoreHandle_t done;
+    cJSON *list;
+} scan_ctx_t;
+
+static void hex_into(char *out, const uint8_t *p, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        sprintf(out + 2 * i, "%02x", p[i]);
+    }
+}
+
+static void on_energy(otEnergyScanResult *r, void *arg)
+{
+    scan_ctx_t *ctx = arg;
+    if (!r) {
+        xSemaphoreGive(ctx->done);
+        return;
+    }
+    cJSON *ch = cJSON_CreateObject();
+    cJSON_AddNumberToObject(ch, "ch", r->mChannel);
+    cJSON_AddNumberToObject(ch, "ed_max", r->mMaxRssi);
+    cJSON_AddItemToArray(ctx->list, ch);
+}
+
+static void on_scan(otActiveScanResult *r, void *arg)
+{
+    scan_ctx_t *ctx = arg;
+    if (!r) {
+        xSemaphoreGive(ctx->done);
+        return;
+    }
+    char buf[20];
+    cJSON *n = cJSON_CreateObject();
+    cJSON_AddNumberToObject(n, "ch", r->mChannel);
+    snprintf(buf, sizeof(buf), "0x%04x", r->mPanId);
+    cJSON_AddStringToObject(n, "pan", buf);
+    hex_into(buf, r->mExtAddress.m8, sizeof(r->mExtAddress.m8));
+    cJSON_AddStringToObject(n, "src", buf);
+    cJSON_AddNumberToObject(n, "rssi", r->mRssi);
+    cJSON_AddNumberToObject(n, "lqi", r->mLqi);
+    if (r->mNetworkName.m8[0]) {
+        cJSON_AddStringToObject(n, "type", "thread");
+        cJSON_AddStringToObject(n, "name", r->mNetworkName.m8);
+        hex_into(buf, r->mExtendedPanId.m8, sizeof(r->mExtendedPanId.m8));
+        cJSON_AddStringToObject(n, "epid", buf);
+        cJSON_AddBoolToObject(n, "joinable", r->mIsJoinable);
+    } else {
+        cJSON_AddStringToObject(n, "type", r->mDiscover ? "thread" : "no_payload");
+    }
+    cJSON_AddItemToArray(ctx->list, n);
+}
+
+/* One OpenThread scan: started with the lock held, waited for without it. */
+static esp_err_t run_scan(const char *what, otError (*start)(otInstance *, scan_ctx_t *), scan_ctx_t *ctx,
+                          char *err, size_t err_len)
+{
+    if (!esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
+        snprintf(err, err_len, "%s: OpenThread busy", what);
+        return ESP_ERR_TIMEOUT;
+    }
+    otError e = start(esp_openthread_get_instance(), ctx);
+    esp_openthread_lock_release();
+    if (e != OT_ERROR_NONE) {
+        snprintf(err, err_len, "%s: %s", what, otThreadErrorToString(e));
+        return ESP_FAIL;
+    }
+    if (xSemaphoreTake(ctx->done, SCAN_WAIT) != pdTRUE) {
+        snprintf(err, err_len, "%s: no result in time", what);
+        return ESP_ERR_TIMEOUT;
+    }
+    return ESP_OK;
+}
+
+static otError start_energy(otInstance *ot, scan_ctx_t *ctx)
+{
+    return otLinkEnergyScan(ot, SCAN_ALL_CHANNELS, 200, on_energy, ctx);
+}
+
+static otError start_active(otInstance *ot, scan_ctx_t *ctx)
+{
+    return otLinkActiveScan(ot, SCAN_ALL_CHANNELS, 0, on_scan, ctx);
+}
+
+static otError start_discover(otInstance *ot, scan_ctx_t *ctx)
+{
+    return otThreadDiscover(ot, SCAN_ALL_CHANNELS, 0xffff, false, false, on_scan, ctx);
+}
+
+static esp_err_t quick_scan(cJSON *result, char *err, size_t err_len)
+{
+    if (!s_started) {
+        snprintf(err, err_len, "OpenThread is not running yet");
+        return ESP_ERR_INVALID_STATE;
+    }
+    scan_ctx_t ctx = {.done = xSemaphoreCreateBinary()};
+    if (!ctx.done) {
+        return ESP_ERR_NO_MEM;
+    }
+    esp_err_t ret;
+    ctx.list = cJSON_AddArrayToObject(result, "channels");
+    ret = run_scan("energy scan", start_energy, &ctx, err, err_len);
+    if (ret == ESP_OK) {
+        ctx.list = cJSON_AddArrayToObject(result, "beacons");
+        ret = run_scan("active scan", start_active, &ctx, err, err_len);
+    }
+    if (ret == ESP_OK) {
+        ctx.list = cJSON_AddArrayToObject(result, "thread");
+        ret = run_scan("Thread discovery", start_discover, &ctx, err, err_len);
+    }
+    vSemaphoreDelete(ctx.done);
+    return ret;
+}
+
 /* ---- status ---- */
 
 static cJSON *thread_status(void)
@@ -583,6 +703,7 @@ esp_err_t role_thread_start(bool border_router)
     gw_http_register("/api/thread/dataset", HTTP_POST, dataset_post);
     gw_http_register("/api/thread/cli", HTTP_POST, cli_post);
     gw_api_set_role_status(thread_summary);
+    netscan_set_quick(quick_scan);
 
     return xTaskCreate(thread_task, "thread_start", 6144, NULL, 5, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }
