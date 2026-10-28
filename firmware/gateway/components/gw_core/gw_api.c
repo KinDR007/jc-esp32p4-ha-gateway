@@ -5,6 +5,7 @@
 #include "c6_flasher.h"
 #include "driver/temperature_sensor.h"
 #include "esp_app_desc.h"
+#include "esp_app_format.h"
 #include "esp_chip_info.h"
 #include "esp_core_dump.h"
 #include "esp_flash.h"
@@ -249,26 +250,72 @@ static esp_err_t receive_body(httpd_req_t *req, sink_fn sink, void *ctx)
     esp_err_t err = ESP_OK;
     uint32_t received = 0;
     int timeouts = 0;
+    /* Sinks get full blocks (only the last one shorter), whatever the TCP segmentation. */
     while (received < req->content_len && err == ESP_OK) {
-        int n = httpd_req_recv(req, buf, MIN(UPLOAD_CHUNK, req->content_len - received));
-        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 5) {
-            continue;
+        size_t want = MIN(UPLOAD_CHUNK, req->content_len - received);
+        size_t fill = 0;
+        while (fill < want) {
+            int n = httpd_req_recv(req, buf + fill, want - fill);
+            if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 5) {
+                continue;
+            }
+            if (n <= 0) {
+                err = ESP_ERR_TIMEOUT;
+                break;
+            }
+            timeouts = 0;
+            fill += n;
         }
-        if (n <= 0) {
-            err = ESP_ERR_TIMEOUT;
-            break;
+        if (err == ESP_OK) {
+            err = sink(ctx, received, buf, fill);
         }
-        timeouts = 0;
-        err = sink(ctx, received, buf, n);
-        received += n;
+        received += fill;
     }
     free(buf);
     return err;
 }
 
-static esp_err_t ota_sink(void *ctx, uint32_t offset, const void *data, size_t len)
+typedef struct {
+    const esp_partition_t *target;
+    size_t size;
+    bool gateway;
+    bool begun;
+    esp_ota_handle_t handle;
+    const char *reject; /* why the image was refused before touching the slot */
+} ota_ctx_t;
+
+/*
+ * Checks the image header and the project name in the first chunk, before esp_ota_begin()
+ * erases the slot: a wrong file must not destroy the image already stored there.
+ */
+static esp_err_t ota_sink(void *arg, uint32_t offset, const void *data, size_t len)
 {
-    return esp_ota_write(*(esp_ota_handle_t *)ctx, data, len);
+    ota_ctx_t *ctx = arg;
+    if (!ctx->begun) {
+        const uint8_t *p = data;
+        const size_t desc_offset = sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t);
+        esp_app_desc_t desc;
+        if (offset != 0 || len < desc_offset + sizeof(desc) || p[0] != ESP_IMAGE_HEADER_MAGIC) {
+            ctx->reject = "not an ESP application image";
+            return ESP_ERR_INVALID_ARG;
+        }
+        memcpy(&desc, p + desc_offset, sizeof(desc));
+        if (desc.magic_word != ESP_APP_DESC_MAGIC_WORD) {
+            ctx->reject = "image has no application description";
+            return ESP_ERR_INVALID_ARG;
+        }
+        /* The gateway slots only take this firmware; ESPHome must not land there and vice versa. */
+        if ((strncmp(desc.project_name, "p4gw", sizeof(desc.project_name)) == 0) != ctx->gateway) {
+            ctx->reject = ctx->gateway ? "not a p4gw image" : "this is the gateway image, not ESPHome";
+            return ESP_ERR_INVALID_ARG;
+        }
+        esp_err_t err = esp_ota_begin(ctx->target, ctx->size, &ctx->handle);
+        if (err != ESP_OK) {
+            return err;
+        }
+        ctx->begun = true;
+    }
+    return esp_ota_write(ctx->handle, data, len);
 }
 
 static const esp_partition_t *other_gateway_slot(void)
@@ -282,26 +329,22 @@ static const esp_partition_t *other_gateway_slot(void)
 
 static esp_err_t app_upload(httpd_req_t *req, const esp_partition_t *target, bool gateway)
 {
-    esp_ota_handle_t handle;
     esp_app_desc_t desc;
     esp_err_t err;
 
     if (req->content_len == 0 || req->content_len > target->size) {
         return gw_http_send_error(req, 413, "image size does not fit the slot");
     }
-    err = esp_ota_begin(target, req->content_len, &handle);
-    if (err == ESP_OK) {
-        err = receive_body(req, ota_sink, &handle);
-        esp_err_t end = err == ESP_OK ? esp_ota_end(handle) : (esp_ota_abort(handle), err);
-        err = end;
+    ota_ctx_t ctx = {.target = target, .size = req->content_len, .gateway = gateway};
+    err = receive_body(req, ota_sink, &ctx);
+    if (ctx.begun) {
+        err = err == ESP_OK ? esp_ota_end(ctx.handle) : (esp_ota_abort(ctx.handle), err);
+    }
+    if (ctx.reject) {
+        return gw_http_send_error(req, 400, ctx.reject);
     }
     if (err == ESP_OK) {
         err = esp_ota_get_partition_description(target, &desc);
-    }
-    /* The gateway slots only take this firmware; ESPHome must not land there and vice versa. */
-    if (err == ESP_OK && (strcmp(desc.project_name, "p4gw") == 0) != gateway) {
-        esp_partition_erase_range(target, 0, target->erase_size);
-        return gw_http_send_error(req, 400, gateway ? "not a p4gw image" : "this is the gateway image, not ESPHome");
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "upload to %s: %s", target->label, esp_err_to_name(err));
