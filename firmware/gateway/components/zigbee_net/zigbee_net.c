@@ -35,6 +35,7 @@ static SemaphoreHandle_t s_req_done;
 static cJSON *s_instances;             /* [{base, version, ...}] */
 static char s_base[64];                /* selected instance */
 static bool s_base_subscribed;
+static int64_t s_subscribed_us;
 static cJSON *s_devices;               /* compact list */
 static cJSON *s_states;                /* friendly name -> {lqi, last_seen, availability, update} */
 static cJSON *s_map;                   /* {at, nodes, links} */
@@ -117,6 +118,7 @@ static void subscribe_base(void)
         snprintf(filter, sizeof(filter), "%s/#", s_base);
         s_base_subscribed = gw_mqtt_subscribe(filter) == ESP_OK;
         if (s_base_subscribed) {
+            s_subscribed_us = esp_timer_get_time();
             ESP_LOGI(TAG, "Zigbee2MQTT at %s", s_base);
         }
     }
@@ -182,13 +184,15 @@ static void handle_info(const char *base, const char *data)
 
 /* ---------------------------------------------------------------- devices, states, map */
 
-static void handle_devices(const char *data)
+static void handle_devices(const char *data, size_t len)
 {
     cJSON *all = cJSON_Parse(data);
     if (!cJSON_IsArray(all)) {
+        ESP_LOGW(TAG, "bridge/devices: %u B not a JSON array", (unsigned)len);
         cJSON_Delete(all);
         return;
     }
+    ESP_LOGI(TAG, "%d devices (%u B)", cJSON_GetArraySize(all), (unsigned)len);
     cJSON *list = cJSON_CreateArray(), *d;
     cJSON_ArrayForEach(d, all)
     {
@@ -370,7 +374,7 @@ static void on_message(const char *topic, const char *data, size_t len)
     }
     const char *rest = topic + blen + 1;
     if (strcmp(rest, "bridge/devices") == 0) {
-        handle_devices(data);
+        handle_devices(data, len);
     } else if (strcmp(rest, "bridge/response/networkmap") == 0) {
         handle_map(data);
     } else if (strncmp(rest, "bridge/response/", 16) == 0) {
@@ -406,6 +410,20 @@ static esp_err_t net_get(httpd_req_t *req)
 {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddBoolToObject(json, "mqtt", gw_mqtt_connected());
+    /* the retained device list sometimes does not arrive after a (re)connect: subscribing again resends it;
+     * outside s_lock, the MQTT task may wait for it while holding the client */
+    char filter[80] = "";
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (s_base_subscribed && !s_devices && gw_mqtt_connected() && esp_timer_get_time() - s_subscribed_us > 30000000) {
+        snprintf(filter, sizeof(filter), "%s/#", s_base);
+        s_subscribed_us = esp_timer_get_time();
+    }
+    xSemaphoreGive(s_lock);
+    if (filter[0]) {
+        ESP_LOGW(TAG, "no device list, subscribing to %s again", filter);
+        gw_mqtt_unsubscribe(filter);
+        gw_mqtt_subscribe(filter);
+    }
     xSemaphoreTake(s_lock, portMAX_DELAY);
     cJSON_AddItemToObject(json, "instances", cJSON_Duplicate(s_instances, true));
     cJSON_AddStringToObject(json, "base", s_base);

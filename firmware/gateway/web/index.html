@@ -149,6 +149,8 @@ td.zact .btn { padding: 4px 6px; margin: 1px 0; }
 [data-znode] { cursor: pointer; }
 .topo text { font: 11px system-ui, sans-serif; fill: var(--muted); }
 .topo .topo-link { stroke-width: 2.5; stroke-opacity: .7; }
+.tmap.focus .topo-link { stroke-opacity: .08; }
+.tmap.focus .topo-link.hi { stroke-opacity: 1; stroke-width: 3.5; }
 .topo .topo-link.ok { stroke: var(--ok); } .topo .topo-link.warn { stroke: var(--warn); } .topo .topo-link.bad { stroke: var(--bad); }
 .topo .topo-node circle { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2; }
 .topo .topo-node.this circle { fill: var(--accent); }
@@ -1772,8 +1774,20 @@ function showNodeBox(el, ev) {
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 14)) + 'px';
   box.style.top = Math.max(8, Math.min(innerHeight - h - 8, y + 14)) + 'px';
 }
-document.addEventListener('mouseover', e => { const el = e.target.closest('[data-node]'); if (el) showNodeBox(el, e); });
-document.addEventListener('mouseout', e => { if (e.target.closest('[data-node]')) $('#nodebox').style.display = 'none'; });
+/* a device on a map: highlight its own links (Thread and Zigbee map) */
+function mapFocus(el, key) {
+  const svg = el.closest('svg.tmap, svg.zmap');
+  if (!svg) return;
+  svg.classList.add('focus');
+  svg.querySelectorAll('[data-a]').forEach(l => l.classList.toggle('hi', l.dataset.a === key || l.dataset.b === key));
+}
+document.addEventListener('mouseover', e => { const el = e.target.closest('[data-node]'); if (el) { showNodeBox(el, e); mapFocus(el, el.dataset.node); } });
+document.addEventListener('mouseout', e => {
+  const el = e.target.closest('[data-node]');
+  if (!el) return;
+  $('#nodebox').style.display = 'none';
+  el.closest('svg.tmap')?.classList.remove('focus');
+});
 document.addEventListener('click', e => { const el = e.target.closest('[data-node]'); if (el) showNodeBox(el, e); else if (!e.target.closest('#nodebox')) $('#nodebox').style.display = 'none'; });
 
 async function loadTopology() {
@@ -1834,14 +1848,14 @@ async function loadTopology() {
     const back = routers.get(l.id).links.find(x => x.id === r.id);
     const q = back ? Math.min(back.lq, l.lq) : l.lq;
     const p1 = pos.get(r.id), p2 = pos.get(l.id);
-    edges += `<line class="topo-link ${lqCls(q)}" ${back ? '' : 'stroke-dasharray="5 5"'} x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"><title>R${r.id} ↔ R${l.id}: ${L('link quality', 'kvalita linky')} ${back ? `${l.lq} / ${back.lq}` : l.lq}</title></line>`;
+    edges += `<line class="topo-link ${lqCls(q)}" data-a="r${r.id}" data-b="r${l.id}" ${back ? '' : 'stroke-dasharray="5 5"'} x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"><title>R${r.id} ↔ R${l.id}: ${L('link quality', 'kvalita linky')} ${back ? `${l.lq} / ${back.lq}` : l.lq}</title></line>`;
   }
   for (const r of routers.values()) {
     const p = pos.get(r.id);
     r.children.forEach((c, i) => {
       const spread = 0.22, a = p.a + (i - (r.children.length - 1) / 2) * spread, dist = ids.length > 1 ? 58 : 70 + 12 * i;
       const x = p.x + dist * Math.cos(a), y = p.y + dist * Math.sin(a);
-      children += `<line class="topo-link ${lqCls(c.lq)}" x1="${p.x}" y1="${p.y}" x2="${x}" y2="${y}"/>
+      children += `<line class="topo-link ${lqCls(c.lq)}" data-a="r${r.id}" data-b="c${c.rloc16}" x1="${p.x}" y1="${p.y}" x2="${x}" y2="${y}"/>
         <circle class="topo-child ${c.rx_on ? '' : 'sleepy'}" cx="${x}" cy="${y}" r="7" data-node="c${c.rloc16}" tabindex="0"/>
         ${topoInfo.get('c' + c.rloc16).name ? `<text x="${x + (Math.cos(a) >= 0 ? 10 : -10)}" y="${y + 4}" text-anchor="${Math.cos(a) >= 0 ? 'start' : 'end'}">${esc(topoInfo.get('c' + c.rloc16).name.slice(0, 20))}</text>` : ''}`;
     });
@@ -1852,11 +1866,11 @@ async function loadTopology() {
       <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${esc(label)}</text></g>`;
   }
   box.classList.remove('muted');
-  box.innerHTML = `<svg class="topo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
-    <p class="muted">${L('Number = router ID, ★ leader, BR border router. Lines: green good, orange medium, red weak link; dashed = reported by one side only. Small nodes: end devices (hollow = sleepy). Hover for details.',
-      'Číslo = ID routeru, ★ leader, BR border router. Čáry: zelená dobrá, oranžová střední, červená slabá linka; přerušovaná = hlásí jen jedna strana. Malé body: koncová zařízení (prázdné = spící). Detaily v bublině po najetí myší.')}</p>`;
+  box.innerHTML = `<svg class="topo tmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
+    <p class="muted">${L('Number = router ID, ★ leader, BR border router. Lines: green good, orange medium, red weak link; dashed = reported by one side only. Small nodes: end devices (hollow = sleepy). Hover a device for details and its links.',
+      'Číslo = ID routeru, ★ leader, BR border router. Čáry: zelená dobrá, oranžová střední, červená slabá linka; přerušovaná = hlásí jen jedna strana. Malé body: koncová zařízení (prázdné = spící). Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.')}</p>`;
   const devs = [...topoInfo.entries()];
-  $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', 'Thread role', 'RLOC16', 'Matter node', 'Firmware'].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr data-node="${key}">
+  $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', 'Thread role', 'RLOC16', 'Matter node', 'Firmware'].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr>
     <td data-notr><b>${esc(v.name || v.fallback)}</b></td><td data-notr>${esc(v.matter?.vendor || v.vendor || '')}</td><td data-notr>${esc(v.matter?.product || v.model || '')}</td>
     <td>${esc(v.matter?.types.join(', ') || '')}</td><td>${esc(v.role)}</td><td>${esc(v.rloc16 || '')}</td><td>${v.matter ? v.matter.node : ''}</td><td data-notr>${esc(v.matter?.sw || v.sw || '')}</td></tr>`).join('')}</table>`;
 }
@@ -1940,7 +1954,7 @@ function renderZDevices(devs, now) {
   const list = devs.filter(x => !q || [x.name, x.vendor, x.model, x.description, x.ieee].join(' ').toLowerCase().includes(q))
     .sort((a, b) => (order[a.type] ?? 3) - (order[b.type] ?? 3) || a.name.localeCompare(b.name));
   $('#zdev-count').textContent = `${list.length} / ${devs.length}`;
-  $('#zdev').innerHTML = `<table><tr>${['Device', 'Model', 'Type', 'Power', 'LQI', 'Last seen', 'State'].map(th).join('')}<th></th></tr>${list.map(x => `<tr data-znode="${esc(x.ieee)}">
+  $('#zdev').innerHTML = `<table><tr>${['Device', 'Model', 'Type', 'Power', 'LQI', 'Last seen', 'State'].map(th).join('')}<th></th></tr>${list.map(x => `<tr data-zrow="${esc(x.ieee)}">
     <td data-notr><b>${esc(x.name)}</b>${x.own ? ' ' + pill('ok', L('this gateway', 'tato brána')) : ''}</td>
     <td data-notr style="white-space:normal;min-width:220px">${esc([x.vendor, x.model].filter(Boolean).join(' '))}<div class="muted">${esc(x.description || '')}</div></td>
     <td>${esc(zTypeText(x.type))}</td><td>${esc(zPower(x.power))}${x.battery !== undefined ? ` · ${x.battery} %` : ''}</td>
@@ -2051,11 +2065,7 @@ document.addEventListener('mouseover', e => {
   const w = box.offsetWidth, h = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, e.clientX + 14)) + 'px';
   box.style.top = Math.max(8, Math.min(innerHeight - h - 8, e.clientY + 14)) + 'px';
-  const svg = el.closest('svg.zmap');
-  if (svg) {
-    svg.classList.add('focus');
-    svg.querySelectorAll('.zl').forEach(l => l.classList.toggle('hi', l.dataset.a === el.dataset.znode || l.dataset.b === el.dataset.znode));
-  }
+  mapFocus(el, el.dataset.znode);
 });
 document.addEventListener('mouseout', e => {
   const el = e.target.closest('[data-znode]');

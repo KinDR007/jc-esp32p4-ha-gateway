@@ -28,6 +28,10 @@
   (`/api/identify`), the Identify button of any device in Zigbee › Network and devices, or the
   Zigbee Identify cluster of the router (Zigbee2MQTT, Home Assistant). The board has no controllable
   LED.
+- Thread map: hovering a device highlights its links, as in the Zigbee map. The device lists under
+  the maps no longer open the details box (map only). Test UI14.
+- Fix: the Zigbee2MQTT device list sometimes did not arrive after a restart (retained message
+  missed); the gateway subscribes again when it is still missing after 30 s.
 - Fix: the Thread router showed the phase "joining" for good; it shows "running" once attached.
 - Fix: a page redrawn on every status poll no longer drops the value being typed into its field.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in

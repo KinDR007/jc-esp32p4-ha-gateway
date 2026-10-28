@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI12).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI14).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -317,17 +317,23 @@ await test('UI12', 'Zigbee network: Zigbee2MQTT instance, devices with details, 
   }
   await tab('zigbee/network');
   await page.waitForSelector('#zdev table', { timeout: 20000 });
-  const rows = await page.$$eval('#zdev tr[data-znode]', r => r.length);
+  const rows = await page.$$eval('#zdev tr[data-zrow]', r => r.length);
   check(rows === d.devices.length, `${rows} devices listed (${d.devices.length} in Zigbee2MQTT)`);
   check((await page.textContent('#z2m-info')).includes(d.base), `instance ${d.base} shown`);
-  const row = await page.$('#zdev tr[data-znode]:nth-child(3)');
+  const row = await page.$('#zdev tr[data-zrow]:nth-child(3)');
   await row.scrollIntoViewIfNeeded();
   const bb = await row.boundingBox();
   await page.mouse.move(bb.x + 40, bb.y + bb.height / 2);
   await page.waitForTimeout(300);
-  check(/IEEE/.test(await page.textContent('#nodebox')), 'device details on hover');
+  check(await page.$eval('#nodebox', e => getComputedStyle(e).display) === 'none', 'no details box over the device list');
   await page.mouse.move(2, 2);
-  if (d.map) check(await page.$$eval('#zmap svg .zn', n => n.length) === d.map.nodes.length, `map with ${d.map.nodes.length} nodes`);
+  if (d.map) {
+    check(await page.$$eval('#zmap svg .zn', n => n.length) === d.map.nodes.length, `map with ${d.map.nodes.length} nodes`);
+    await hoverMapNode('#zmap svg .zn.router');
+    check(/IEEE/.test(await page.textContent('#nodebox')), 'device details on hover over the map');
+    check(await page.$$eval('#zmap svg.focus .zl.hi', l => l.length) > 0, 'links of the device highlighted');
+    await page.mouse.move(2, 2);
+  }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
@@ -357,10 +363,44 @@ await test('UI13', 'Zigbee router: transmit power set from the page, Identify bl
   check(true, 'icon gone after 10 s');
   await tab('zigbee/network');
   await page.waitForSelector('#zdev table', { timeout: 20000 }).catch(() => {});
-  const own = await page.$('#zdev tr[data-znode] [data-zact="txpower"]');
+  const own = await page.$('#zdev tr[data-zrow] [data-zact="txpower"]');
   if (own) check(!!await page.$('#zdev [data-zact="identify"]'), 'own router row has power and Identify buttons');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
+
+await test('UI14', 'Thread map: hovering a router highlights its links, the device list has no details box', async () => {
+  if (!status.role.active.startsWith('thread')) {
+    console.log('  skipped: no Thread role active');
+    return;
+  }
+  await tab('thread/topology');
+  await page.waitForSelector('#topo-map svg.tmap', { timeout: 30000 });
+  await hoverMapNode('#topo-map svg .topo-node');
+  check(/RLOC16/.test(await page.textContent('#nodebox')), 'router details on hover over the map');
+  const hi = await page.$$eval('#topo-map svg.focus .topo-link.hi', l => l.length);
+  const links = await page.$$eval('#topo-map svg .topo-link', l => l.length);
+  check(links === 0 || hi > 0, `${hi} of ${links} links highlighted`);
+  await page.mouse.move(2, 2);
+  check(!await page.$('#topo-map svg.focus'), 'highlight gone after leaving the node');
+  const row = await page.$('#topo-devices tr:nth-child(2)');
+  if (row) {
+    await row.scrollIntoViewIfNeeded();
+    const bb = await row.boundingBox();
+    await page.mouse.move(bb.x + 40, bb.y + bb.height / 2);
+    await page.waitForTimeout(300);
+    check(await page.$eval('#nodebox', e => getComputedStyle(e).display) === 'none', 'no details box over the device list');
+    await page.mouse.move(2, 2);
+  }
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+async function hoverMapNode(sel) {
+  const node = await page.$(sel);
+  await node.scrollIntoViewIfNeeded();
+  const bb = await node.boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+  await page.waitForTimeout(300);
+}
 
 await browser.close();
 console.log('Summary: ' + results.map(r => `${r[0]} ${r[1]}`).join(', '));
