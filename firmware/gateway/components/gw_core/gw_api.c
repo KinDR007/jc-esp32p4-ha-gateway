@@ -220,6 +220,9 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "idf", app->idf_ver);
     cJSON_AddStringToObject(json, "built", app->date);
     cJSON_AddStringToObject(json, "built_time", app->time);
+    char matter_url[128];
+    gw_config_get_str(GW_KEY_MATTER_URL, matter_url, sizeof(matter_url));
+    cJSON_AddStringToObject(json, "matter_url", matter_url);
     cJSON_AddNumberToObject(json, "chip_revision", chip.revision);
     cJSON_AddNumberToObject(json, "uptime_s", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddStringToObject(json, "reset_reason", reset_reason_name(esp_reset_reason()));
@@ -669,7 +672,15 @@ static esp_err_t settings_post(httpd_req_t *req)
     }
     const char *hostname = GW_JSON_STR(body, "hostname");
     const char *password = GW_JSON_STR(body, "password");
+    const char *matter_url = GW_JSON_STR(body, "matter_url");
     esp_err_t err = ESP_OK;
+    if (matter_url) {
+        if (strlen(matter_url) > 120 || (matter_url[0] && strncmp(matter_url, "ws://", 5) != 0)) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 400, "matter_url: ws://host:5580/ws, max 120 characters, empty to clear");
+        }
+        err = gw_config_set_str(GW_KEY_MATTER_URL, matter_url);
+    }
     if (hostname) {
         size_t len = strlen(hostname);
         bool valid = len < 32;

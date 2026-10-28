@@ -1,12 +1,12 @@
 TC21 Thread network map: topology discovery returns this gateway and the routers it links to.
-  18:23:31 back after restart: active=thread_br c6=ot_rcp uptime=11s
-  18:23:31 ok: thread_br started without maintenance ('')
-  18:23:31 ok: active role is thread_br
-  18:23:31 switch took 13 s
-  18:23:41 ok: 10 routers in 10007 ms (ResponseTimeout)
-  18:23:41 ok: this gateway is in the map as border router R10
-  18:23:41 ok: its links: [1]
-  18:23:42 ok: a second discovery right after works too
-TC21 PASS (24 s) 
+  18:55:19 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  18:55:19 ok: thread_br started without maintenance ('')
+  18:55:19 ok: active role is thread_br
+  18:55:19 switch took 19 s
+  18:55:38 ok: 11 routers in 2206 ms (all answered)
+  18:55:38 ok: this gateway is in the map as border router R10
+  18:55:38 ok: its links: [13, 28]
+  18:55:41 ok: a second discovery right after works too
+TC21 PASS (42 s) 
 
 Summary: TC21 PASS

@@ -93,3 +93,12 @@ changed in the meantime.
 python3 tools/matter_watch.py --url ws://homeassistant.local:5580/ws --node 39 \
     --cluster 0x117CFC01 --interval 300 --log liljebagge.jsonl
 ```
+
+## Thread network map: device names
+
+Thread › Topology shows the mesh. To see which device is which, enter the Matter Server WebSocket
+(`ws://homeassistant.local:5580/ws`) in the map card; port 5580 has to be exposed in the Matter
+Server add-on (Configuration → Network). The browser reads the nodes from it and matches them with
+the map by Thread MAC or IPv6 address; Home Assistant shows the same node ID in the device info of
+the Matter integration. Devices that are not Matter (other border routers) show what they report
+over Thread diagnostics, often only the vendor.

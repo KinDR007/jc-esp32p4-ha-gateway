@@ -436,6 +436,18 @@ static SemaphoreHandle_t s_topo_done;
 static cJSON *s_topo_routers;
 static otError s_topo_error;
 
+/* IPv6 addresses of a router or child, lets the web UI match it with a Matter node */
+static void add_ip6_list(cJSON *obj, otMeshDiagIp6AddrIterator *it)
+{
+    cJSON *list = cJSON_AddArrayToObject(obj, "ip6");
+    otIp6Address addr;
+    char buf[OT_IP6_ADDRESS_STRING_SIZE];
+    while (it && otMeshDiagGetNextIp6Address(it, &addr) == OT_ERROR_NONE) {
+        otIp6AddressToString(&addr, buf, sizeof(buf));
+        cJSON_AddItemToArray(list, cJSON_CreateString(buf));
+    }
+}
+
 static void add_ext(cJSON *obj, const char *key, const otExtAddress *ext)
 {
     char buf[17];
@@ -459,6 +471,7 @@ static void on_topology(otError error, otMeshDiagRouterInfo *r, void *ctx)
         cJSON_AddBoolToObject(n, "leader", r->mIsLeader);
         cJSON_AddBoolToObject(n, "br", r->mIsBorderRouter);
         cJSON_AddBoolToObject(n, "this", r->mIsThisDevice);
+        add_ip6_list(n, r->mIp6AddrIterator);
         cJSON *links = cJSON_AddArrayToObject(n, "links");
         for (int id = 0; id <= OT_NETWORK_MAX_ROUTER_ID; id++) {
             if (r->mLinkQualities[id]) {
@@ -498,6 +511,55 @@ static void on_topology(otError error, otMeshDiagRouterInfo *r, void *ctx)
     }
 }
 
+/* IPv6 addresses of the MTD children of one parent, added to the children of that router in the map */
+static cJSON *s_topo_children;
+
+static void on_child_ip6(otError error, uint16_t rloc16, otMeshDiagIp6AddrIterator *it, void *ctx)
+{
+    if (it) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "0x%04x", rloc16);
+        cJSON *c;
+        cJSON_ArrayForEach(c, s_topo_children)
+        {
+            const char *r = GW_JSON_STR(c, "rloc16");
+            if (r && strcmp(r, buf) == 0 && !cJSON_GetObjectItem(c, "ip6")) {
+                add_ip6_list(c, it);
+            }
+        }
+    }
+    if (error != OT_ERROR_PENDING) {
+        xSemaphoreGive(s_topo_done);
+    }
+}
+
+static void query_children_ip6(cJSON *routers)
+{
+    cJSON *r;
+    cJSON_ArrayForEach(r, routers)
+    {
+        cJSON *children = cJSON_GetObjectItem(r, "children");
+        const char *rloc = GW_JSON_STR(r, "rloc16");
+        if (!rloc || cJSON_GetArraySize(children) == 0) {
+            continue;
+        }
+        s_topo_children = children;
+        xSemaphoreTake(s_topo_done, 0);
+        otError e = OT_ERROR_BUSY;
+        if (esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
+            e = otMeshDiagQueryChildrenIp6Addrs(esp_openthread_get_instance(), (uint16_t)strtol(rloc, NULL, 16),
+                                                on_child_ip6, NULL);
+            esp_openthread_lock_release();
+        }
+        if (e == OT_ERROR_NONE && xSemaphoreTake(s_topo_done, pdMS_TO_TICKS(12000)) != pdTRUE) {
+            esp_openthread_lock_acquire(portMAX_DELAY);
+            otMeshDiagCancel(esp_openthread_get_instance());
+            esp_openthread_lock_release();
+        }
+    }
+    s_topo_children = NULL;
+}
+
 static esp_err_t topology_get(httpd_req_t *req)
 {
     if (!s_started) {
@@ -509,7 +571,10 @@ static esp_err_t topology_get(httpd_req_t *req)
     static const uint8_t extra[] = {OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_NAME, OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_MODEL,
                                     OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_SW_VERSION};
     const otMeshDiagDiscoverConfig cfg = {
-        .mDiscoverChildTable = true, .mExtraTlvTypes = extra, .mExtraTlvTypesLength = sizeof(extra)};
+        .mDiscoverIp6Addresses = true,
+        .mDiscoverChildTable = true,
+        .mExtraTlvTypes = extra,
+        .mExtraTlvTypesLength = sizeof(extra)};
     int64_t start = esp_timer_get_time();
     cJSON *json = cJSON_CreateObject();
     s_topo_routers = cJSON_AddArrayToObject(json, "routers");
@@ -530,6 +595,7 @@ static esp_err_t topology_get(httpd_req_t *req)
     } else if (e != OT_ERROR_NONE) {
         s_topo_error = e;
     }
+    query_children_ip6(s_topo_routers);
     if (s_topo_error != OT_ERROR_NONE) {
         /* a router that does not answer leaves the map incomplete, the rest is still useful */
         cJSON_AddStringToObject(json, "error", otThreadErrorToString(s_topo_error));

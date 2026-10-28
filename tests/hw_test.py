@@ -648,8 +648,10 @@ def tc21_thread_topology():
     switch('thread_br')
     wait_until('Thread router role', lambda: (lambda t: t if t.get('role') in ('router', 'leader') else None)(
         http('GET', '/api/thread/status')[1]), 180, 5)
-    code, d = http('GET', '/api/thread/topology', timeout=40)
-    check(code == 200 and d['routers'], f'{len(d.get("routers", []))} routers in {d.get("ms")} ms ({d.get("error") or "all answered"})')
+    # after a start the border router flag appears once the gateway publishes its routes in the network data
+    d = wait_until('this gateway in the map as border router', lambda: (lambda d: d if any(
+        r['this'] and r['br'] for r in d.get('routers', [])) else None)(http('GET', '/api/thread/topology', timeout=40)[1]), 180, 10)
+    check(d['routers'], f'{len(d["routers"])} routers in {d.get("ms")} ms ({d.get("error") or "all answered"})')
     me = [r for r in d['routers'] if r['this']]
     check(len(me) == 1 and me[0]['br'], f'this gateway is in the map as border router R{me[0]["id"] if me else "?"}')
     ids = {r['id'] for r in d['routers']}

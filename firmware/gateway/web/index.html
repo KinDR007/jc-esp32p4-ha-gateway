@@ -115,6 +115,13 @@ pre { background: var(--code); border: 1px solid var(--border); border-radius: 8
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .log { height: 420px; white-space: pre; overflow: auto; }
+#nodebox { position: fixed; z-index: 50; max-width: 420px; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: none;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); pointer-events: none; }
+#nodebox .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
+#nodebox table { width: auto; }
+#nodebox th { color: var(--muted); font-weight: 400; padding: 2px 12px 2px 0; border: 0; vertical-align: top; white-space: nowrap; }
+#nodebox td { padding: 2px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+[data-node] { cursor: pointer; }
 .topo { width: 100%; max-height: 640px; display: block; }
 .topo text { font: 11px system-ui, sans-serif; fill: var(--muted); }
 .topo .topo-link { stroke-width: 2.5; stroke-opacity: .7; }
@@ -184,6 +191,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 </div>
 <div id="toast"></div>
 <div id="tipbox" role="tooltip"></div>
+<div id="nodebox" role="tooltip"></div>
 <dialog id="login">
   <form method="dialog" id="login-form">
     <h3 style="margin-top:0">Sign in</h3>
@@ -243,7 +251,8 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
-  'Overview': 'Přehled', 'Information': 'Informace', 'Topology': 'Topologie', 'Network map': 'Mapa sítě', 'Live': 'Živě', 'Events': 'Události',
+  'Overview': 'Přehled', 'Information': 'Informace', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
+  'Product': 'Produkt', 'Device type': 'Typ zařízení', 'Matter node': 'Uzel Matter', 'Topology': 'Topologie', 'Network map': 'Mapa sítě', 'Live': 'Živě', 'Events': 'Události',
   'ESP32-C6 radio': 'Rádio ESP32-C6', 'read at the next C6 flashing': 'načte se při příštím flashování C6', 'Refresh map': 'Obnovit mapu', 'Network surroundings': 'Síťové okolí', 'Scan': 'Sken', 'Recommendation': 'Doporučení',
   '2.4 GHz spectrum': 'Spektrum 2,4 GHz', 'IEEE 802.15.4 channels': 'Kanály IEEE 802.15.4', 'Thread and Zigbee networks': 'Sítě Thread a Zigbee',
   'Wi-Fi networks': 'Sítě Wi-Fi', 'Quick scan': 'Rychlý sken', 'Full scan with Wi-Fi': 'Úplný sken s Wi-Fi', 'No scan yet.': 'Zatím bez skenu.',
@@ -713,6 +722,8 @@ const TIPS = {
   'Restart': ['Restarts the P4; the active role is back after about 10 s.', 'Restartuje P4; aktivní role naběhne asi za 10 s.'],
   'Reflash C6 now': ['Rewrites the C6 with the firmware of the current role. Use after repeated radio failures.', 'Přepíše C6 firmwarem aktuální role. Použijte po opakovaných výpadcích rádia.'],
   'Back up C6 flash': ['Reads the whole 4 MB C6 flash to a file. Works only in maintenance mode.', 'Přečte celou 4MB flash C6 do souboru. Funguje jen v režimu údržby.'],
+  'Matter Server': ['WebSocket of the Matter Server add-on (Home Assistant), e.g. ws://homeassistant.local:5580/ws. Port 5580 has to be exposed in the add-on (Configuration, Network). Gives vendor, product, name, serial number and device type of each Matter device; they are matched with the map by Thread MAC or IPv6 address.', 'WebSocket doplňku Matter Server (Home Assistant), např. ws://homeassistant.local:5580/ws. Port 5580 musí být v doplňku zpřístupněný (Konfigurace, Síť). Dodá výrobce, produkt, název, sériové číslo a typ každého zařízení Matter; s mapou se párují podle MAC Thread nebo IPv6 adresy.'],
+  'Matter node': ['Node ID in the Matter Server; Home Assistant shows it in the device info of the Matter integration.', 'ID uzlu v Matter Serveru; Home Assistant ho ukazuje v informacích o zařízení integrace Matter.'],
   // network surroundings
   'Quick scan': ['Energy scan, beacon request and Thread discovery on channels 11–26 through the running Thread role. Only in Thread roles.', 'Měření energie, dotaz na beacony a hledání Thread sítí na kanálech 11–26 přes běžící roli Thread. Jen v rolích Thread.'],
   'Full scan': ['Restarts into a C6 scanner firmware: Wi-Fi access points, 802.15.4 beacons, PANs seen in traffic and noise. The role is off for about a minute; Zigbee network data is kept.', 'Restart do skenovacího firmwaru C6: přístupové body Wi-Fi, beacony 802.15.4, PAN viditelné v provozu a šum. Role je asi minutu mimo provoz; data Zigbee sítě zůstanou.'],
@@ -988,7 +999,11 @@ views['thread/info'] = () => isThread() ? `<div id="thread-status"><div class="c
 /* the map sits outside #thread-status, which the status poll redraws every few seconds */
 views['thread/topology'] = () => isThread() ? `<div class="card">${h3('graph-outline', 'Network map')}
     <div class="row"><button class="btn" id="topo-refresh">${ic('restart')}Refresh map</button><span id="topo-state" class="muted"></span></div>
+    <div class="row" style="margin-top:8px"><span class="muted">Matter Server${tip('Matter Server')}</span>
+      <input type="text" id="matter-url" value="${esc(status.matter_url || '')}" placeholder="ws://homeassistant.local:5580/ws" style="flex:1;max-width:360px">
+      <button class="btn" id="matter-save">${ic('check')}Save</button><span id="matter-state" class="muted"></span></div>
     <div id="topo-map" class="muted" style="margin-top:10px">Loading…</div></div>
+  <div class="card" style="margin-top:16px">${h3('lan-connect', 'Devices in the network')}<div class="table-wrap" id="topo-devices"><p class="muted">Loading…</p></div></div>
   <div id="thread-status" style="margin-top:16px"><div class="card muted">Loading…</div></div>` : notThread();
 views['thread/diag'] = () => !isThread() ? notThread() : `<div id="thread-status"><div class="card muted">Loading…</div></div>
   <div class="card">${h3('console', 'OpenThread CLI')}
@@ -1518,12 +1533,124 @@ views['system/firmware'] = () => {
  * Routers on a circle by router ID, router links coloured by link quality (both directions known:
  * the weaker one, dashed when only one side reports it), children as small nodes next to their
  * parent (hollow = sleepy end device). Routers that others list but that did not answer are grey. */
+/* Matter Server (python-matter-server WebSocket API, port 5580 of the Home Assistant add-on):
+ * vendor, product, labels and device types of every node. Nodes are matched with the map by the
+ * Thread hardware address (extended MAC) or a shared IPv6 address (mesh-local EID, OMR). */
+const MATTER_TYPES = { 0x0100: ['On/off light', 'Světlo'], 0x0101: ['Dimmable light', 'Stmívatelné světlo'], 0x010c: ['Color temperature light', 'Světlo s teplotou barvy'],
+  0x010d: ['Color light', 'Barevné světlo'], 0x010a: ['Plug', 'Zásuvka'], 0x010b: ['Dimmable plug', 'Stmívatelná zásuvka'], 0x0103: ['Light switch', 'Vypínač'],
+  0x0104: ['Dimmer switch', 'Stmívač'], 0x000f: ['Button', 'Tlačítko'], 0x0015: ['Contact sensor', 'Kontaktní senzor'], 0x0107: ['Occupancy sensor', 'Senzor přítomnosti'],
+  0x0106: ['Light sensor', 'Senzor osvětlení'], 0x0302: ['Temperature sensor', 'Teploměr'], 0x0307: ['Humidity sensor', 'Vlhkoměr'], 0x0305: ['Pressure sensor', 'Barometr'],
+  0x002c: ['Air quality sensor', 'Senzor kvality vzduchu'], 0x0043: ['Water leak detector', 'Detektor úniku vody'], 0x0076: ['Smoke/CO alarm', 'Detektor kouře/CO'],
+  0x0202: ['Window covering', 'Žaluzie/roleta'], 0x0301: ['Thermostat', 'Termostat'], 0x000a: ['Door lock', 'Zámek'], 0x002b: ['Fan', 'Ventilátor'],
+  0x0072: ['Air conditioner', 'Klimatizace'], 0x002d: ['Air purifier', 'Čistička vzduchu'], 0x0510: ['Electrical sensor', 'Měření energie'], 0x0022: ['Speaker', 'Reproduktor'],
+  0x000e: ['Bridge', 'Bridge'], 0x0091: ['Thread border router', 'Thread border router'], 0x0042: ['Water valve', 'Ventil'], 0x0044: ['Rain sensor', 'Senzor deště'],
+  0x0309: ['Heat pump', 'Tepelné čerpadlo'], 0x0041: ['Water freeze detector', 'Detektor mrazu'] };
+const THREAD_ROLES = ['', '', ['sleepy end device', 'spící koncové zařízení'], ['end device', 'koncové zařízení'], ['REED', 'REED'], ['router', 'router'], ['leader', 'leader']];
+const b64hex = b => { try { return Array.from(atob(b), c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(''); } catch (e) { return ''; } };
+/* canonical IPv6 text: eight groups without leading zeros (the gateway prints them this way) */
+function ip6Norm(a) {
+  if (/^[0-9a-f]{32}$/i.test(a)) return a.match(/.{4}/g).map(g => parseInt(g, 16).toString(16)).join(':');
+  let [head, tail] = a.toLowerCase().split('::');
+  const h = head ? head.split(':') : [], t = tail !== undefined && tail ? tail.split(':') : [];
+  const groups = tail !== undefined ? [...h, ...Array(8 - h.length - t.length).fill('0'), ...t] : h;
+  return groups.map(g => parseInt(g || '0', 16).toString(16)).join(':');
+}
+let matterCache = { url: '', at: 0, nodes: null, error: '' };
+function matterFetch(url) {
+  return new Promise((resolve, reject) => {
+    let ws;
+    try { ws = new WebSocket(url); } catch (e) { reject(e); return; }
+    const timer = setTimeout(() => { ws.close(); reject(new Error(L('no answer in 15 s', 'bez odpovědi do 15 s'))); }, 15000);
+    ws.onopen = () => ws.send(JSON.stringify({ message_id: 'p4gw-nodes', command: 'get_nodes' }));
+    ws.onmessage = ev => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.message_id !== 'p4gw-nodes') return;
+      clearTimeout(timer);
+      ws.close();
+      if (m.error_code !== undefined) reject(new Error(m.details || 'error ' + m.error_code)); else resolve(m.result || []);
+    };
+    ws.onerror = () => { clearTimeout(timer); reject(new Error(L('cannot connect (is port 5580 exposed in the Matter Server add-on?)', 'nelze se připojit (je v doplňku Matter Server zpřístupněný port 5580?)'))); };
+  });
+}
+/* one entry per Matter node with what identifies it, and keys to find it in the map */
+function matterIndex(nodes) {
+  return nodes.map(n => {
+    const a = n.attributes || {};
+    const nif = (a['0/51/0'] || []).find(i => i['7'] === 4) || null;
+    const types = new Set();
+    for (const [k, v] of Object.entries(a)) {
+      if (!/^\d+\/29\/0$/.test(k) || k === '0/29/0' || !Array.isArray(v)) continue;
+      v.forEach(t => { const id = t['0'] ?? t.deviceType; if (MATTER_TYPES[id]) types.add(L(...MATTER_TYPES[id])); });
+    }
+    return { node: n.node_id, available: n.available, vendor: a['0/40/1'], vendorId: a['0/40/2'], product: a['0/40/3'], productId: a['0/40/4'],
+      label: a['0/40/5'] || a['0/40/14'] || '', hw: a['0/40/8'], sw: a['0/40/10'], serial: a['0/40/15'], types: [...types],
+      role: a['0/53/1'], channel: a['0/53/0'], ext: nif && nif['4'] ? b64hex(nif['4']) : '',
+      ip6: nif ? (nif['6'] || []).map(b => ip6Norm(b64hex(b))) : [] };
+  });
+}
+function matterMatch(index, dev) {
+  if (!index) return null;
+  const ips = new Set((dev.ip6 || []).map(ip6Norm));
+  return index.find(m => (dev.ext && m.ext === dev.ext) || m.ip6.some(ip => ips.has(ip))) || null;
+}
+async function matterLoad() {
+  const url = status.matter_url;
+  if (!url) return null;
+  if (matterCache.url === url && Date.now() - matterCache.at < 60000) return matterCache;
+  try {
+    matterCache = { url, at: Date.now(), nodes: matterIndex(await matterFetch(url)), error: '' };
+  } catch (e) {
+    matterCache = { url, at: Date.now(), nodes: null, error: e.message };
+  }
+  return matterCache;
+}
+
+/* formatted details box of a map node (hover, focus or tap) */
+let topoInfo = new Map();
+function nodeBox(key) {
+  const d = topoInfo.get(key);
+  if (!d) return '';
+  const m = d.matter, rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== '') rows.push(`<tr><th>${k}</th><td>${v}</td></tr>`); };
+  add(L('Vendor', 'Výrobce'), esc(m?.vendor || d.vendor || ''));
+  add(L('Product', 'Produkt'), esc(m?.product || d.model || ''));
+  add(L('Type', 'Typ'), esc(m?.types.join(', ') || ''));
+  add(L('Matter IDs', 'Matter ID'), m ? `node ${m.node}${m.vendorId !== undefined ? ` · VID 0x${m.vendorId.toString(16).padStart(4, '0')}` : ''}${m.productId !== undefined ? ` · PID 0x${m.productId.toString(16).padStart(4, '0')}` : ''}` : '');
+  add(L('Firmware', 'Firmware'), esc(m?.sw || d.sw || ''));
+  add(L('Hardware', 'Hardware'), esc(m?.hw || ''));
+  add(L('Serial number', 'Sériové číslo'), esc(m?.serial || ''));
+  add(L('Role', 'Role'), esc(d.role));
+  add('RLOC16', esc(d.rloc16));
+  add(L('Extended MAC', 'Rozšířená MAC'), d.ext ? `<code>${esc(d.ext)}</code>` : '');
+  add(L('Thread version', 'Verze Thread'), d.version ? '1.' + (d.version - 1) + ` (${d.version})` : '');
+  add(L('Links', 'Linky'), esc(d.links || ''));
+  /* without RLOC/ALOC and link-local addresses: they do not identify a device */
+  add('IPv6', (d.ip6 || []).filter(ip => !/:0:ff:fe00:/.test(ip) && !/^fe80:/.test(ip)).map(ip => `<code>${esc(ip)}</code>`).join('<br>'));
+  if (m && m.available === false) add(L('Matter', 'Matter'), `<span class="warn-text">${L('offline in the Matter Server', 'v Matter Serveru nedostupné')}</span>`);
+  const title = m?.label || m?.product || [d.vendor, d.model].filter(Boolean).join(' ') || d.fallback;
+  return `<div class="nb-title">${esc(title)}</div><table>${rows.join('')}</table>`;
+}
+function showNodeBox(el, ev) {
+  const box = $('#nodebox');
+  box.innerHTML = nodeBox(el.dataset.node);
+  box.style.display = 'block';
+  const x = ev?.clientX ?? el.getBoundingClientRect().right, y = ev?.clientY ?? el.getBoundingClientRect().top;
+  const w = box.offsetWidth, h = box.offsetHeight;
+  box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 14)) + 'px';
+  box.style.top = Math.max(8, Math.min(innerHeight - h - 8, y + 14)) + 'px';
+}
+document.addEventListener('mouseover', e => { const el = e.target.closest('[data-node]'); if (el) showNodeBox(el, e); });
+document.addEventListener('mouseout', e => { if (e.target.closest('[data-node]')) $('#nodebox').style.display = 'none'; });
+document.addEventListener('click', e => { const el = e.target.closest('[data-node]'); if (el) showNodeBox(el, e); else if (!e.target.closest('#nodebox')) $('#nodebox').style.display = 'none'; });
+
 async function loadTopology() {
   const box = $('#topo-map');
   if (!box) return;
   $('#topo-state').textContent = L(' discovering…', ' zjišťuji…');
   $('#topo-refresh').disabled = true;
   let d;
+  const matterPromise = matterLoad();
   try { d = await api('/api/thread/topology'); } catch (e) {
     if ($('#topo-map')) { $('#topo-map').innerHTML = `<span class="warn-text">${esc(e.message)}</span>`; $('#topo-refresh').disabled = false; $('#topo-state').textContent = ''; }
     return;
@@ -1534,6 +1661,29 @@ async function loadTopology() {
   d.routers.forEach(r => r.links.forEach(l => { if (!routers.has(l.id)) routers.set(l.id, { id: l.id, links: [], children: [], missing: true }); }));
   const ids = [...routers.keys()].sort((a, b) => a - b);
   const kids = d.routers.reduce((a, r) => a + r.children.length, 0);
+  const matter = await matterPromise;
+  if (!$('#topo-map')) return;
+  const index = matter?.nodes || null;
+  topoInfo = new Map();
+  let matched = 0;
+  const roleText = (r) => [r.leader ? 'leader' : 'router', r.br ? 'border router' : ''].filter(Boolean).join(' · ');
+  for (const r of routers.values()) {
+    const m = r.missing ? null : matterMatch(index, r);
+    matched += m ? 1 : 0;
+    const name = r.this ? L('this gateway', 'tato brána') : m ? (m.label || m.product || '') : r.missing ? L('no answer', 'bez odpovědi') : [r.vendor, r.model].filter(x => x && x !== 'RD:' && x !== 'Default').join(' ');
+    topoInfo.set('r' + r.id, { ...r, matter: m, role: r.missing ? L('router (did not answer)', 'router (neodpověděl)') : roleText(r),
+      links: r.links.length ? `${r.links.length} ${L('routers', 'routerů')}, ${r.children.length} ${L('end devices', 'koncových zařízení')}` : '',
+      vendor: r.vendor === 'RD:' ? '' : r.vendor, model: r.model === 'Default' ? '' : r.model, sw: r.sw === 'Default' ? '' : r.sw, name, fallback: 'R' + r.id });
+    r.children.forEach(c => {
+      const cm = matterMatch(index, c);
+      matched += cm ? 1 : 0;
+      topoInfo.set('c' + c.rloc16, { ...c, matter: cm, name: cm ? (cm.label || cm.product || '') : '', fallback: c.rloc16, parent: r.id,
+        role: (c.rx_on ? L('end device, always on', 'koncové zařízení, stále zapnuté') : L('sleepy end device (battery)', 'spící koncové zařízení (baterie)')) + ` · ${L('parent', 'rodič')} R${r.id}`,
+        links: `${L('link quality to the parent', 'kvalita linky k rodiči')} ${c.lq}` });
+    });
+  }
+  $('#matter-state').innerHTML = !status.matter_url ? L('not set: names come only from Thread diagnostics', 'nenastaveno: názvy jen z diagnostiky Thread')
+    : matter.error ? `<span class="warn-text">${esc(matter.error)}</span>` : `${matter.nodes.length} ${L('Matter nodes', 'uzlů Matter')}, ${matched} ${L('found in the map', 'nalezeno v mapě')}`;
   $('#topo-state').textContent = ` ${ids.length} ${L('routers', 'routerů')}, ${kids} ${L('end devices', 'koncových zařízení')} · ${d.ms} ms` +
     (d.error ? ` · ${L('some routers did not answer', 'některé routery neodpověděly')}` : '');
   const W = 900, H = 640, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 110;
@@ -1559,20 +1709,23 @@ async function loadTopology() {
       const spread = 0.22, a = p.a + (i - (r.children.length - 1) / 2) * spread, dist = ids.length > 1 ? 58 : 70 + 12 * i;
       const x = p.x + dist * Math.cos(a), y = p.y + dist * Math.sin(a);
       children += `<line class="topo-link ${lqCls(c.lq)}" x1="${p.x}" y1="${p.y}" x2="${x}" y2="${y}"/>
-        <circle class="topo-child ${c.rx_on ? '' : 'sleepy'}" cx="${x}" cy="${y}" r="6"><title>${c.rloc16} · ${c.rx_on ? L('end device, always on', 'koncové zařízení, stále zapnuté') : L('sleepy end device (battery)', 'spící koncové zařízení (baterie)')}${c.br ? ' · BR' : ''} · ${L('link quality', 'kvalita linky')} ${c.lq}</title></circle>`;
+        <circle class="topo-child ${c.rx_on ? '' : 'sleepy'}" cx="${x}" cy="${y}" r="7" data-node="c${c.rloc16}" tabindex="0"/>
+        ${topoInfo.get('c' + c.rloc16).name ? `<text x="${x + (Math.cos(a) >= 0 ? 10 : -10)}" y="${y + 4}" text-anchor="${Math.cos(a) >= 0 ? 'start' : 'end'}">${esc(topoInfo.get('c' + c.rloc16).name.slice(0, 20))}</text>` : ''}`;
     });
-    const label = r.missing ? L('no answer', 'bez odpovědi') : [r.vendor, r.model].filter(x => x && x !== 'RD:' && x !== 'Default').join(' ').slice(0, 22);
-    const info = r.missing ? '' : `${r.rloc16} · ${esc(r.ext)}${r.version ? ` · Thread v${r.version}` : ''}${r.vendor ? ` · ${esc(r.vendor)} ${esc(r.model || '')} ${esc(r.sw || '')}` : ''}`;
-    nodes += `<g class="topo-node ${r.this ? 'this' : ''} ${r.missing ? 'missing' : ''}"><circle cx="${p.x}" cy="${p.y}" r="18"/>
+    const label = topoInfo.get('r' + r.id).name.slice(0, 22);
+    nodes += `<g class="topo-node ${r.this ? 'this' : ''} ${r.missing ? 'missing' : ''}" data-node="r${r.id}" tabindex="0"><circle cx="${p.x}" cy="${p.y}" r="18"/>
       <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" class="id">${r.id}</text>
       ${r.leader ? `<text x="${p.x + 15}" y="${p.y - 13}" class="badge">★</text>` : ''}${r.br ? `<text x="${p.x - 26}" y="${p.y - 13}" class="badge">BR</text>` : ''}
-      <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${r.this ? L('this gateway', 'tato brána') : esc(label)}</text>
-      <title>R${r.id}${r.leader ? ' · leader' : ''}${r.br ? ' · border router' : ''}${r.this ? ' · ' + L('this gateway', 'tato brána') : ''}\n${info}\n${r.links.length} ${L('router links', 'spojení s routery')}, ${r.children.length} ${L('end devices', 'koncových zařízení')}</title></g>`;
+      <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${esc(label)}</text></g>`;
   }
   box.classList.remove('muted');
   box.innerHTML = `<svg class="topo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
     <p class="muted">${L('Number = router ID, ★ leader, BR border router. Lines: green good, orange medium, red weak link; dashed = reported by one side only. Small nodes: end devices (hollow = sleepy). Hover for details.',
       'Číslo = ID routeru, ★ leader, BR border router. Čáry: zelená dobrá, oranžová střední, červená slabá linka; přerušovaná = hlásí jen jedna strana. Malé body: koncová zařízení (prázdné = spící). Detaily v bublině po najetí myší.')}</p>`;
+  const devs = [...topoInfo.entries()];
+  $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', 'Thread role', 'RLOC16', 'Matter node', 'Firmware'].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr data-node="${key}">
+    <td data-notr><b>${esc(v.name || v.fallback)}</b></td><td data-notr>${esc(v.matter?.vendor || v.vendor || '')}</td><td data-notr>${esc(v.matter?.product || v.model || '')}</td>
+    <td>${esc(v.matter?.types.join(', ') || '')}</td><td>${esc(v.role)}</td><td>${esc(v.rloc16 || '')}</td><td>${v.matter ? v.matter.node : ''}</td><td data-notr>${esc(v.matter?.sw || v.sw || '')}</td></tr>`).join('')}</table>`;
 }
 
 /* ---------------- network surroundings ----------------
@@ -1895,6 +2048,13 @@ document.addEventListener('click', async e => {
       audio.classList.remove('hidden');
       audio.play().catch(() => {});
     } else if (t.id === 'topo-refresh') {
+      matterCache.at = 0;
+      loadTopology();
+    } else if (t.id === 'matter-save') {
+      await api('/api/settings', { json: { matter_url: $('#matter-url').value.trim() } });
+      status.matter_url = $('#matter-url').value.trim();
+      matterCache.at = 0;
+      toast(L('Saved', 'Uloženo'));
       loadTopology();
     } else if (t.id === 'ns-quick') {
       await api('/api/net/scan', { json: { mode: 'quick' } });

@@ -43,6 +43,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_C6_TRIES "c6_tries"  /* u8, consecutive flash attempts */
 #define GW_KEY_C6_ADOPTED "c6_ok"   /* u8, the user allowed overwriting the C6 factory firmware */
 #define GW_KEY_RCP_TEL_OFF "rcp_tel_off" /* str, RCP version that hung on the telemetry request */
+#define GW_KEY_MATTER_URL "matter_url" /* str, Matter Server WebSocket for device names in the Thread map */
 #define GW_KEY_FAIL_RST "fail_rst"   /* u8, the last software restart was a recovery from a failure */
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */

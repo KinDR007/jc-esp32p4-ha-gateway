@@ -5,6 +5,9 @@
 - Thread network map (Thread › Topology): routers with link quality between them, end devices,
   leader and border routers, vendor/model where devices report it (OpenThread mesh diagnostics,
   `/api/thread/topology`). Test TC21.
+- Map devices are identified through the Matter Server of Home Assistant (WebSocket, port 5580,
+  set under Thread › Topology): name, vendor, product, device type, Matter node, firmware, serial
+  number, matched by Thread MAC or IPv6 address. Formatted details on hover and a device table.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
 
