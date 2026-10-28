@@ -239,9 +239,7 @@ static esp_err_t reboot_post(httpd_req_t *req)
 
 /* ---- uploads ---- */
 
-typedef esp_err_t (*sink_fn)(void *ctx, uint32_t offset, const void *data, size_t len);
-
-static esp_err_t receive_body(httpd_req_t *req, sink_fn sink, void *ctx)
+esp_err_t gw_http_receive(httpd_req_t *req, gw_sink_fn sink, void *ctx)
 {
     char *buf = malloc(UPLOAD_CHUNK);
     if (!buf) {
@@ -336,7 +334,7 @@ static esp_err_t app_upload(httpd_req_t *req, const esp_partition_t *target, boo
         return gw_http_send_error(req, 413, "image size does not fit the slot");
     }
     ota_ctx_t ctx = {.target = target, .size = req->content_len, .gateway = gateway};
-    err = receive_body(req, ota_sink, &ctx);
+    err = gw_http_receive(req, ota_sink, &ctx);
     if (ctx.begun) {
         err = err == ESP_OK ? esp_ota_end(ctx.handle) : (esp_ota_abort(ctx.handle), err);
     }
@@ -426,7 +424,7 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
         return gw_http_send_error(req, 413, "image does not fit the c6fw partition");
     }
     c6fw_sink_t ctx = {.part = part, .erase_len = (req->content_len + 0xfff) & ~0xfff};
-    esp_err_t err = receive_body(req, c6fw_sink, &ctx);
+    esp_err_t err = gw_http_receive(req, c6fw_sink, &ctx);
     if (err == ESP_OK) {
         err = c6fw_verify_all();
     }

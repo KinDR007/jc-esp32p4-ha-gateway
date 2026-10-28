@@ -98,6 +98,9 @@ esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
 esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message);
 /* Reads a JSON body (max 4 KiB). NULL after an error response was sent. */
 cJSON *gw_http_read_json(httpd_req_t *req);
+/* Streams the request body to sink in full 4 KiB blocks (the last one may be shorter). */
+typedef esp_err_t (*gw_sink_fn)(void *ctx, uint32_t offset, const void *data, size_t len);
+esp_err_t gw_http_receive(httpd_req_t *req, gw_sink_fn sink, void *ctx);
 /* System API: status, logs, role switching, OTA, settings, tools. */
 esp_err_t gw_api_register(void);
 /* The running role adds its summary to /api/status under "role_status". */
@@ -107,6 +110,15 @@ bool gw_api_temperature(float *celsius);
 
 /* Optional MQTT link with Home Assistant discovery, configured via /api/mqtt. */
 esp_err_t gw_mqtt_start(void);
+/* Extra discovery entities (called on every connect) and extra keys in the state JSON. */
+void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state));
+/* One retained discovery config; value_template reads the shared state topic, extra adds fields. */
+void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
+                    void (*extra)(cJSON *cfg));
+bool gw_mqtt_connected(void);
+/* Publishes to <base>/<suffix>, QoS 1. */
+void gw_mqtt_publish(const char *suffix, const char *payload, bool retain);
+const char *gw_mqtt_base_topic(void);
 
 #define GW_JSON_STR(obj, key) (cJSON_IsString(cJSON_GetObjectItem((obj), (key))) ? cJSON_GetObjectItem((obj), (key))->valuestring : NULL)
 

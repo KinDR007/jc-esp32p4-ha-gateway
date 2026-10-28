@@ -11,3 +11,8 @@ firmware/esphome/secrets.yaml
 firmware/esphome/.esphome/
 dist/
 !tests/results/**/*.log
+tools/yamnet/.venv/
+tools/yamnet/data/
+tools/yamnet/out/
+__pycache__/
+tools/yamnet/out_*.log

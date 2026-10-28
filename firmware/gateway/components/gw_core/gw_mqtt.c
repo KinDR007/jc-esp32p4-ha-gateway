@@ -61,7 +61,36 @@ static cJSON *device_json(void)
 }
 
 /* One retained discovery config per entity; HA builds the device from them. */
-static void publish_entity(const char *component, const char *object_id, const char *name, const char *value_template,
+static void (*s_ext_discovery)(void);
+static void (*s_ext_state)(cJSON *state);
+
+void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state))
+{
+    s_ext_discovery = discovery;
+    s_ext_state = state;
+}
+
+bool gw_mqtt_connected(void)
+{
+    return s_client && s_connected;
+}
+
+void gw_mqtt_publish(const char *suffix, const char *payload, bool retain)
+{
+    char buf[128];
+    if (!gw_mqtt_connected()) {
+        return;
+    }
+    topic(buf, sizeof(buf), suffix);
+    esp_mqtt_client_publish(s_client, buf, payload, 0, 1, retain);
+}
+
+const char *gw_mqtt_base_topic(void)
+{
+    return s_base;
+}
+
+void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
                            void (*extra)(cJSON *))
 {
     gw_state_t *st = gw_state();
@@ -150,19 +179,22 @@ static void restart_extra(cJSON *cfg)
 
 static void publish_discovery(void)
 {
-    publish_entity("sensor", "role", "Active role", "{{ value_json.role }}", NULL);
-    publish_entity("select", "desired_role", "Role", "{{ value_json.desired }}", role_select_extra);
-    publish_entity("sensor", "maintenance", "Maintenance reason", "{{ value_json.maintenance }}", diag);
-    publish_entity("sensor", "uptime", "Uptime", "{{ value_json.uptime }}", uptime_extra);
-    publish_entity("sensor", "temperature", "Chip temperature", "{{ value_json.temperature }}", temp_extra);
-    publish_entity("sensor", "heap_free", "Free internal heap", "{{ value_json.heap_free }}", heap_extra);
-    publish_entity("binary_sensor", "ethernet", "Ethernet", "{{ value_json.eth_link }}", connectivity_extra);
-    publish_entity("sensor", "ip", "IP address", "{{ value_json.ipv4 }}", diag);
-    publish_entity("sensor", "c6_firmware", "C6 firmware", "{{ value_json.c6 }}", diag);
-    publish_entity("sensor", "thread_state", "Thread state", "{{ value_json.thread_role | default('n/a') }}", NULL);
-    publish_entity("binary_sensor", "zigbee_client", "Zigbee host connected", "{{ value_json.zigbee_client }}",
+    gw_mqtt_entity("sensor", "role", "Active role", "{{ value_json.role }}", NULL);
+    gw_mqtt_entity("select", "desired_role", "Role", "{{ value_json.desired }}", role_select_extra);
+    gw_mqtt_entity("sensor", "maintenance", "Maintenance reason", "{{ value_json.maintenance }}", diag);
+    gw_mqtt_entity("sensor", "uptime", "Uptime", "{{ value_json.uptime }}", uptime_extra);
+    gw_mqtt_entity("sensor", "temperature", "Chip temperature", "{{ value_json.temperature }}", temp_extra);
+    gw_mqtt_entity("sensor", "heap_free", "Free internal heap", "{{ value_json.heap_free }}", heap_extra);
+    gw_mqtt_entity("binary_sensor", "ethernet", "Ethernet", "{{ value_json.eth_link }}", connectivity_extra);
+    gw_mqtt_entity("sensor", "ip", "IP address", "{{ value_json.ipv4 }}", diag);
+    gw_mqtt_entity("sensor", "c6_firmware", "C6 firmware", "{{ value_json.c6 }}", diag);
+    gw_mqtt_entity("sensor", "thread_state", "Thread state", "{{ value_json.thread_role | default('n/a') }}", NULL);
+    gw_mqtt_entity("binary_sensor", "zigbee_client", "Zigbee host connected", "{{ value_json.zigbee_client }}",
                    connectivity_extra);
-    publish_entity("button", "restart", "Restart", NULL, restart_extra);
+    gw_mqtt_entity("button", "restart", "Restart", NULL, restart_extra);
+    if (s_ext_discovery) {
+        s_ext_discovery();
+    }
 }
 
 static void publish_state(void)
@@ -188,6 +220,9 @@ static void publish_state(void)
     gw_config_get_str(GW_KEY_C6_BUNDLE, buf, sizeof(buf));
     cJSON_AddStringToObject(state, "c6", buf);
 
+    if (s_ext_state) {
+        s_ext_state(state);
+    }
     cJSON *role = gw_api_role_status();
     if (role) {
         /* Only the Thread roles report an OpenThread device role. */

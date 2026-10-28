@@ -191,7 +191,7 @@ let tab = 'overview';
 try { tab = localStorage.getItem('tab') || tab; } catch (e) { /* storage blocked */ }
 
 const TABS = [
-  ['overview', 'Overview'], ['role', 'Role'], ['thread', 'Thread'], ['zigbee', 'Zigbee'],
+  ['overview', 'Overview'], ['role', 'Role'], ['thread', 'Thread'], ['zigbee', 'Zigbee'], ['sound', 'Sound'],
   ['ha', 'Home Assistant'], ['tools', 'Tools'], ['system', 'System'],
 ];
 
@@ -473,6 +473,68 @@ async function loadMqtt() {
   }
 }
 
+views.sound = () => `<div class="grid">
+  <div class="card"><h3>Microphone</h3>
+    <div class="row"><label><input type="checkbox" id="snd-en"> Enabled</label><span id="snd-run" class="muted"></span></div>
+    <label class="field" style="margin-top:10px"><span>Gain <b id="snd-gain-v"></b> dB</span><input type="range" id="snd-gain" min="0" max="42" step="3"></label>
+    <div class="progress" style="height:14px"><div id="snd-meter" style="width:0"></div></div>
+    <div id="snd-levels" class="muted" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="snd-clip">Record last 5 s</button><audio id="snd-audio" controls class="hidden" style="max-width:100%"></audio></div>
+    <p class="muted">Audio stays on the device. Only the clip you request here leaves it.</p></div>
+  <div class="card"><h3>Sound recognition (YAMNet)</h3>
+    <div class="row"><label><input type="checkbox" id="snd-ai"> Recognition</label></div>
+    <label class="field" style="margin-top:10px"><span>Run only above <b id="snd-gate-v"></b> dBFS</span><input type="range" id="snd-gate" min="-90" max="-10" step="5"></label>
+    <div id="snd-model"></div>
+    <div class="row" style="margin-top:10px"><input type="file" id="model-file"><button class="btn" data-upload="model">Upload model</button></div>
+    <div class="progress hidden" id="model-prog" style="margin-top:10px"><div></div></div></div>
+</div>
+<div class="card"><h3>Heard now</h3><div id="snd-top" class="muted">Recognition is off or nothing above the gate yet.</div></div>`;
+
+let soundTimer = null;
+async function loadSound() {
+  if (tab !== 'sound') { clearInterval(soundTimer); soundTimer = null; return; }
+  let st;
+  try { st = await api('/api/sound/status'); } catch (e) { return; }
+  const set = (id, fn) => { const el = $('#' + id); if (el && document.activeElement !== el) fn(el); };
+  set('snd-en', el => { el.checked = st.enabled; });
+  set('snd-ai', el => { el.checked = st.inference.enabled; });
+  set('snd-gain', el => { el.value = st.gain_db; });
+  set('snd-gate', el => { el.value = st.gate_db; });
+  $('#snd-gain-v').textContent = $('#snd-gain').value;
+  $('#snd-gate-v').textContent = $('#snd-gate').value;
+  $('#snd-run').innerHTML = st.running ? pill('ok', 'capturing') : st.error ? pill('bad', st.error) : pill('', st.enabled ? 'restart to start' : 'off');
+  if (st.running) {
+    $('#snd-meter').style.width = Math.max(0, Math.min(100, (st.level_db + 90) / 90 * 100)) + '%';
+    $('#snd-levels').textContent = `level ${st.level_db} dBFS, peak ${st.peak_db}, noise floor ${st.floor_db}, ${st.read_errors} read errors`;
+  }
+  const m = st.model, inf = st.inference;
+  $('#snd-model').innerHTML = dl([
+    ['Model', m.stored_bytes ? `${fmtBytes(m.stored_bytes)} stored, ${m.loaded ? pill('ok', 'loaded') : pill('warn', 'not loaded')}` : pill('bad', 'none, upload yamnet_p4.espdl')],
+    ['Load time', m.load_ms ? m.load_ms + ' ms' : ''], ['Error', esc(m.error)],
+    ['Inference', inf.runs ? `${inf.avg_ms} ms avg, ${inf.max_ms} ms max, last ${inf.last_ms} ms` : ''],
+    ['CPU (core 1)', inf.runs ? inf.cpu_pct + ' %' : ''],
+    ['Runs / skipped quiet', `${inf.runs} / ${inf.skipped_quiet}`]]);
+  $('#snd-top').innerHTML = inf.top ? `<table>${inf.top.map(t => `<tr><td>${esc(t.name)}</td><td style="width:50%"><div class="progress"><div style="width:${t.score * 100}%"></div></div></td><td>${(t.score * 100).toFixed(0)} %</td></tr>`).join('')}</table>
+    <p class="muted">${inf.top_age_s.toFixed(0)} s ago</p>` : 'Recognition is off or nothing above the gate yet.';
+}
+
+async function soundConfig(body) {
+  const r = await api('/api/sound/config', { json: body });
+  if (r.restart_required && await confirmDialog('Restart now?', 'The microphone setting takes effect after a restart.')) {
+    await api('/api/reboot', { method: 'POST' });
+    waitForRestart();
+  }
+  loadSound();
+}
+
+document.addEventListener('change', e => {
+  const id = e.target.id;
+  if (id === 'snd-en') soundConfig({ enabled: e.target.checked }).catch(err => toast('Error: ' + err.message));
+  else if (id === 'snd-ai') soundConfig({ inference: e.target.checked }).catch(err => toast('Error: ' + err.message));
+  else if (id === 'snd-gain') soundConfig({ gain_db: +e.target.value }).catch(err => toast('Error: ' + err.message));
+  else if (id === 'snd-gate') soundConfig({ gate_db: +e.target.value }).catch(err => toast('Error: ' + err.message));
+});
+
 views.tools = () => `<div class="grid">
   <div class="card"><h3>Ping</h3><div class="row"><input type="text" id="ping-host" placeholder="192.168.1.1 or fd00::1" style="flex:1">
     <input type="number" id="ping-count" value="4" min="1" max="10" style="width:70px"><button class="btn primary" id="ping-run">Ping</button></div>
@@ -579,6 +641,13 @@ document.addEventListener('click', async e => {
       toast('Reading the C6 flash, about 2 minutes…');
       t.disabled = true;
       try { await download('/api/c6/backup', status.hostname + '_c6_flash.bin'); toast('C6 backup saved'); } finally { t.disabled = false; }
+    } else if (t.id === 'snd-clip') {
+      const res = await fetch('/api/sound/clip?seconds=5', { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
+      if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+      const audio = $('#snd-audio');
+      audio.src = URL.createObjectURL(await res.blob());
+      audio.classList.remove('hidden');
+      audio.play().catch(() => {});
     } else if (t.id === 'cd-get') {
       download('/api/coredump', 'coredump.elf');
     } else if (t.id === 'cd-del') {
@@ -714,6 +783,7 @@ function render(full) {
     if (tab === 'thread') { loadThread(); loadDataset(false); }
     if (tab === 'ha') loadMqtt();
     if (tab === 'tools') renderLog();
+    if (tab === 'sound') { loadSound(); if (!soundTimer) soundTimer = setInterval(loadSound, 1000); }
   } else if (tab === 'thread') {
     loadThread();
   }

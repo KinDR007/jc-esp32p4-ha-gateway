@@ -1,12 +1,15 @@
 # P4 flash layout (16 MB), shared by the gateway and the ESPHome role image.
-# Do not change offsets on deployed boards: the gateway and ESPHome locate each other by them.
+# Layout v2 (2026-10-28): nvs/otadata/phy/gw_a/gw_b unchanged from v1, so a migration keeps the
+# settings and the Thread network. The gateway and ESPHome locate each other by these offsets.
 # Name,   Type, SubType,  Offset,   Size
 nvs,      data, nvs,      0x9000,   0x14000
 otadata,  data, ota,      0x1d000,  0x2000
 phy_init, data, phy,      0x1f000,  0x1000
 gw_a,     app,  ota_0,    0x20000,  0x300000
 gw_b,     app,  ota_1,    0x320000, 0x300000
-esphome,  app,  ota_2,    0x620000, 0x400000
-c6fw,     data, 0x40,     0xa20000, 0x500000
-c6data,   data, 0x41,     0xf20000, 0x10000
-coredump, data, coredump, 0xf30000, 0x40000
+esphome,  app,  ota_2,    0x620000, 0x200000
+c6fw,     data, 0x40,     0x820000, 0x200000
+c6data,   data, 0x41,     0xa20000, 0x10000
+model,    data, 0x42,     0xa30000, 0x400000
+sounds,   data, 0x43,     0xe30000, 0x190000
+coredump, data, coredump, 0xfc0000, 0x40000

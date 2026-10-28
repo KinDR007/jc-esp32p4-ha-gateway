@@ -5,10 +5,12 @@ Layout (little endian, must match firmware/gateway/components/c6_flasher/c6fw_fo
   directory at offset 0 (4 KiB): magic "C6FW", format version, entry count,
       entries[MAX_ENTRIES] {name[16], version[32], offset, size, sha256[32]}, crc32 of all previous bytes
   bundle at a 4 KiB aligned offset: magic "C6BN", segment count,
-      segments {addr, size, data_off, flags, md5[16]}, then segment data (4 byte aligned)
+      segments {addr, size, data_off, stored_size, flags, md5[16]}, then segment data (4 byte aligned)
 
 Segment flags: WRITE writes data, ERASE erases the region, PRESERVE marks a region whose
-content the gateway snapshots before leaving this firmware and restores when it returns.
+content the gateway snapshots before leaving this firmware and restores when it returns,
+DEFLATE means the stored data is a zlib stream (stored_size bytes) that the C6 ROM loader
+inflates while writing; size and md5 always describe the uncompressed data.
 """
 import argparse
 import hashlib
@@ -19,11 +21,11 @@ import zlib
 
 DIR_MAGIC = b'C6FW'
 BUNDLE_MAGIC = b'C6BN'
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 MAX_ENTRIES = 8
 ENTRY_FMT = '<16s32sII32s'
-SEG_FMT = '<IIII16s'
-SEG_WRITE, SEG_ERASE, SEG_PRESERVE = 1, 2, 4
+SEG_FMT = '<IIIII16s'
+SEG_WRITE, SEG_ERASE, SEG_PRESERVE, SEG_DEFLATE = 1, 2, 4, 8
 ALIGN = 4096
 APP_DESC_MAGIC = 0xABCD5432
 # Wiped on every switch: nvs/otadata/phy of all supported layouts lie in 0x9000..0x10000.
@@ -75,7 +77,7 @@ def build_bundle(build_dir):
               key=os.path.getsize)
     segments = [(SCRATCH_ERASE[0], SCRATCH_ERASE[1], b'', SEG_ERASE)]
     for addr, path in sorted(files):
-        segments.append((addr, os.path.getsize(path), open(path, 'rb').read(), SEG_WRITE))
+        segments.append((addr, os.path.getsize(path), open(path, 'rb').read(), SEG_WRITE | SEG_DEFLATE))
     for name, offset, size in parse_partition_table(pt):
         if name in PRESERVE_PARTITIONS:
             segments.append((offset, size, b'', SEG_PRESERVE))
@@ -87,9 +89,10 @@ def build_bundle(build_dir):
     for addr, size, data, flags in segments:
         off = data_off + len(payload) if data else 0
         md5 = hashlib.md5(data).digest() if data else bytes(16)
-        header += struct.pack(SEG_FMT, addr, size, off, flags, md5)
-        if data:
-            payload += data + b'\xff' * (align(len(data), 4) - len(data))
+        stored = zlib.compress(data, 9) if flags & SEG_DEFLATE else data
+        header += struct.pack(SEG_FMT, addr, size, off, len(stored), flags, md5)
+        if stored:
+            payload += stored + b'\xff' * (align(len(stored), 4) - len(stored))
     header += b'\xff' * (data_off - len(header))
     return bytes(header + payload), app_version(app)
 

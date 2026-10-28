@@ -3,6 +3,7 @@
 #   p4gw.bin          gateway app (web UI upload or OTA)
 #   esphome.bin       ESPHome BLE proxy role image (web UI upload)
 #   c6fw.bin          C6 firmware bundle (web UI upload)
+#   yamnet_p4.espdl   sound recognition model (web UI upload), if scripts/build_model.sh ran
 #   p4gw-factory.bin  complete flash image for the first USB flash (scripts/flash_p4.sh)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -24,6 +25,14 @@ python3 scripts/pack_c6fw.py --out dist/c6fw.bin --size "$(part_size c6fw)" \
 
 cp build/gateway/p4gw.bin dist/p4gw.bin
 cp firmware/esphome/.esphome/build/ble-proxy-p4gw/build/firmware.ota.bin dist/esphome.bin
+model=tools/yamnet/out/yamnet_p4.espdl
+model_args=()
+if [ -f "$model" ]; then
+    cp "$model" dist/yamnet_p4.espdl
+    model_args=("$(part_offset model)" dist/yamnet_p4.espdl)
+else
+    echo "warning: no $model, run scripts/build_model.sh for sound recognition" >&2
+fi
 
 # flash_args lists bootloader, partition table, otadata and app with their offsets.
 gw_args=()
@@ -33,6 +42,6 @@ done < <(tail -n +2 build/gateway/flash_args)
 esptool --chip esp32p4 merge-bin -o dist/p4gw-factory.bin --flash-mode dio --flash-size 16MB \
     "${gw_args[@]}" \
     "$(part_offset esphome)" dist/esphome.bin \
-    "$(part_offset c6fw)" dist/c6fw.bin
-( cd dist && shasum -a 256 p4gw.bin esphome.bin c6fw.bin p4gw-factory.bin > SHA256SUMS )
+    "$(part_offset c6fw)" dist/c6fw.bin "${model_args[@]}"
+( cd dist && shasum -a 256 *.bin *.espdl 2>/dev/null > SHA256SUMS )
 ls -l dist

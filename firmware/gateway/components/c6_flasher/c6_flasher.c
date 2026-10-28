@@ -279,6 +279,42 @@ typedef struct {
     uint32_t base;
 } part_reader_t;
 
+/* Compressed write: the ROM loader inflates; the result is checked against the plain md5. */
+static esp_err_t write_deflate(session_t *s, const c6fw_segment_t *seg, const part_reader_t *r, int pct_from,
+                               int pct_to)
+{
+    uint8_t *buf = heap_caps_malloc(FLASH_BLOCK, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, TAG, "no mem");
+    esp_loader_flash_deflate_cfg_t cfg = {
+        .offset = seg->addr,
+        .image_size = seg->size,
+        .compressed_size = seg->stored_size,
+        .block_size = FLASH_BLOCK,
+    };
+    esp_err_t ret = ESP_OK;
+
+    if (esp_loader_flash_deflate_start(&s->loader, &cfg) != ESP_LOADER_SUCCESS) {
+        ret = ESP_FAIL;
+        goto out;
+    }
+    for (uint32_t pos = 0; pos < seg->stored_size; pos += FLASH_BLOCK) {
+        uint32_t n = seg->stored_size - pos < FLASH_BLOCK ? seg->stored_size - pos : FLASH_BLOCK;
+        if (esp_partition_read(r->part, r->base + pos, buf, n) != ESP_OK ||
+            esp_loader_flash_deflate_write(&s->loader, &cfg, buf, n) != ESP_LOADER_SUCCESS) {
+            ret = ESP_FAIL;
+            goto out;
+        }
+        s_progress.percent = pct_from + (int)((int64_t)(pct_to - pct_from) * (pos + n) / seg->stored_size);
+    }
+    if (esp_loader_flash_deflate_finish(&s->loader, &cfg) != ESP_LOADER_SUCCESS ||
+        esp_loader_flash_verify_known_md5(&s->loader, seg->addr, seg->size, seg->md5) != ESP_LOADER_SUCCESS) {
+        ret = ESP_ERR_INVALID_CRC;
+    }
+out:
+    free(buf);
+    return ret;
+}
+
 static uint32_t fill_from_partition(void *ctx, uint32_t pos, uint8_t *buf, uint32_t n)
 {
     part_reader_t *r = ctx;
@@ -533,7 +569,9 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
             int from_pct = 10 + (int)(80LL * done_bytes / total);
             int to_pct = 10 + (int)(80LL * (done_bytes + seg->size) / total);
             for (int attempt = 0; attempt < 3; attempt++) {
-                err = write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
+                err = (seg->flags & C6FW_SEG_DEFLATE)
+                          ? write_deflate(s, seg, &r, from_pct, to_pct)
+                          : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
                 if (err == ESP_OK) {
                     break;
                 }

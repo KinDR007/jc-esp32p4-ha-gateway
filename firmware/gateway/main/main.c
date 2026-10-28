@@ -12,6 +12,7 @@
 #include "mdns.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
+#include "sound.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "main";
@@ -157,6 +158,7 @@ void app_main(void)
     init_mdns(st->hostname);
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
+    sound_init();
     gw_mqtt_start();
 
     if (boot_loop) {

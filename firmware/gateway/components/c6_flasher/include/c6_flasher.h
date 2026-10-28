@@ -13,11 +13,12 @@ extern "C" {
 /* On-flash format written by scripts/pack_c6fw.py. */
 #define C6FW_DIR_MAGIC "C6FW"
 #define C6FW_BUNDLE_MAGIC "C6BN"
-#define C6FW_FORMAT_VERSION 1
+#define C6FW_FORMAT_VERSION 2
 #define C6FW_MAX_ENTRIES 8
 #define C6FW_SEG_WRITE 1
 #define C6FW_SEG_ERASE 2
 #define C6FW_SEG_PRESERVE 4
+#define C6FW_SEG_DEFLATE 8 /* stored data is a zlib stream of stored_size bytes */
 
 typedef struct __attribute__((packed)) {
     char name[16];
@@ -39,6 +40,7 @@ typedef struct __attribute__((packed)) {
     uint32_t addr;
     uint32_t size;
     uint32_t data_off;
+    uint32_t stored_size;
     uint32_t flags;
     uint8_t md5[16];
 } c6fw_segment_t;
