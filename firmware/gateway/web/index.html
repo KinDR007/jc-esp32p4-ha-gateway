@@ -1772,34 +1772,20 @@ function showNodeBox(el, ev) {
   const x = ev?.clientX ?? el.getBoundingClientRect().right, y = ev?.clientY ?? el.getBoundingClientRect().top;
   placeNodeBox(el, x, y);
 }
-/* Over a map the box takes the free place (beside the drawing, a corner) that hides the fewest devices
- * and highlighted links; elsewhere it is next to the pointer. */
+/* Over a map the box always sits in the top left corner of the map; elsewhere next to the pointer. */
 function placeNodeBox(el, x, y) {
   const box = $('#nodebox'), w = box.offsetWidth, h = box.offsetHeight;
   const svg = el.closest('svg.tmap, svg.zmap');
-  if (svg) [x, y] = mapBoxPlace(svg, el, w, h);
-  else { x += 14; y += 14; }
+  if (svg) {
+    const r = svg.getBoundingClientRect();
+    x = Math.max(r.left, 0) + 12;
+    y = Math.max(r.top, 52) + 12;
+  } else {
+    x += 14;
+    y += 14;
+  }
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
   box.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
-}
-function mapBoxPlace(svg, el, w, h) {
-  const r = svg.getBoundingClientRect(), n = el.getBoundingClientRect(), m = svg.getScreenCTM(), bb = svg.getBBox();
-  const top = Math.max(r.top, 60) + 8, bottom = Math.min(r.bottom, innerHeight) - 8;
-  const left = Math.max(r.left, 0) + 8, right = Math.min(r.right, innerWidth) - 8;
-  const cl = m.e + bb.x * m.a, cr = cl + bb.width * m.a, ny = Math.max(top, Math.min(bottom - h, n.top + n.height / 2 - h / 2));
-  const spots = [[cr + 8, ny], [cl - w - 8, ny], [left, top], [right - w, top], [left, bottom - h], [right - w, bottom - h]]
-    .filter(([x]) => x >= left && x + w <= right);
-  const nodes = [...svg.querySelectorAll('[data-node], [data-znode]')].map(e => e.getBoundingClientRect());
-  /* highlighted links as sample points along each line */
-  const pts = [];
-  svg.querySelectorAll('.hi').forEach(l => {
-    const [x1, y1, x2, y2] = ['x1', 'y1', 'x2', 'y2'].map(a => +l.getAttribute(a));
-    for (let i = 0; i <= 16; i++) pts.push([m.a * (x1 + (x2 - x1) * i / 16) + m.e, m.d * (y1 + (y2 - y1) * i / 16) + m.f]);
-  });
-  const hides = ([x, y]) => nodes.filter(b => b.right > x && b.left < x + w && b.bottom > y && b.top < y + h).length * 3 +
-    pts.filter(([px, py]) => px > x && px < x + w && py > y && py < y + h).length +
-    (n.right > x && n.left < x + w && n.bottom > y && n.top < y + h ? 1000 : 0);
-  return spots.reduce((best, s) => (best === null || hides(s) < hides(best) ? s : best), null) || [right - w, top];
 }
 /* a device on a map: highlight its own links (Thread and Zigbee map) */
 function mapFocus(el, key) {

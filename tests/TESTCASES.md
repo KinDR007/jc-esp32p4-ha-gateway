@@ -75,7 +75,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI06 | jazyk CZ, všechny záložky (i všechny položky menu přeložené), pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
 | UI12 | Zigbee › Síť a zařízení (je-li Zigbee2MQTT) | instance, všechna zařízení v tabulce, detail po najetí, mapa s uzly, je-li uložená |
 | UI13 | Zigbee router: vysílací výkon a Identify | pole ukazuje výkon routeru a při psaní ho obnova stránky nepřepíše, nastavená hodnota se vrátí ve stavu routeru, Identify rozbliká ikonu v hlavičce a po 10 s zmizí, řádek brány má tlačítka výkonu a Identify |
-| UI14 | Thread › Topologie (je-li role Thread) | najetí na router v mapě ukáže detail a zvýrazní jeho linky, po odjetí zvýraznění zmizí; seznam zařízení bublinu nezobrazuje (UI12 totéž pro Zigbee) |
+| UI14 | Thread › Topologie (je-li role Thread) | najetí na router v mapě ukáže detail v levém horním rohu mapy a zvýrazní jeho linky, po odjetí zvýraznění zmizí; seznam zařízení bublinu nezobrazuje (UI12 totéž pro Zigbee) |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; po skončení zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |
 | UI09 | Systém › Síťové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |
