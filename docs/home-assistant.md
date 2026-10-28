@@ -81,3 +81,15 @@ actions:
 ```
 
 Deleting or disabling an event removes its entities from Home Assistant.
+
+## Matter attribute watcher
+
+`tools/matter_watch.py` logs attribute updates and events of one Matter node (standard library
+only), highlights one cluster and polls its attributes. Needs port 5580 exposed in the Matter
+Server add-on (Configuration → Network). Reconnects after a Matter Server restart and logs what
+changed in the meantime.
+
+```sh
+python3 tools/matter_watch.py --url ws://homeassistant.local:5580/ws --node 39 \
+    --cluster 0x117CFC01 --interval 300 --log liljebagge.jsonl
+```
