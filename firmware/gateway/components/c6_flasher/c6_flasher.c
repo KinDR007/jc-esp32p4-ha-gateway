@@ -350,7 +350,9 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
     snap_header_t hdr = {0};
     memcpy(hdr.magic, SNAP_MAGIC, 4);
     strlcpy(hdr.bundle, from->entry.name, sizeof(hdr.bundle));
-    int slot = snapshot_pick_slot(hdr.bundle, &hdr.generation);
+    uint32_t generation;
+    int slot = snapshot_pick_slot(hdr.bundle, &generation);
+    hdr.generation = generation;
     uint32_t base = slot * slot_size(part);
 
     uint32_t data_off = SNAP_DATA_OFFSET, total = 0;
@@ -560,5 +562,48 @@ done:
     } else {
         ESP_LOGE(TAG, "%s", s_progress.last_error);
     }
+    return err;
+}
+
+static uint32_t s_flash_size;
+
+uint32_t c6_flash_size(void)
+{
+    return s_flash_size;
+}
+
+esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
+{
+    session_t *s = calloc(1, sizeof(session_t));
+    uint8_t *buf = malloc(FLASH_BLOCK);
+    esp_err_t err;
+
+    if (!s || !buf) {
+        free(s);
+        free(buf);
+        return ESP_ERR_NO_MEM;
+    }
+    s_progress.busy = true;
+    progress(0, "reading C6 flash");
+    err = session_open(s);
+    if (err == ESP_OK) {
+        if (esp_loader_flash_detect_size(&s->loader, &s_flash_size) != ESP_LOADER_SUCCESS) {
+            s_flash_size = 4 * 1024 * 1024;
+        }
+        ESP_LOGI(TAG, "C6 flash %lu kB", (unsigned long)s_flash_size / 1024);
+        for (uint32_t addr = 0; addr < s_flash_size && err == ESP_OK; addr += FLASH_BLOCK) {
+            if (esp_loader_flash_read(&s->loader, buf, addr, FLASH_BLOCK) != ESP_LOADER_SUCCESS) {
+                err = ESP_FAIL;
+                break;
+            }
+            err = sink(ctx, buf, FLASH_BLOCK);
+            s_progress.percent = (int)((uint64_t)(addr + FLASH_BLOCK) * 100 / s_flash_size);
+        }
+        session_close(s);
+    }
+    free(buf);
+    free(s);
+    progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "backup done" : "backup failed");
+    s_progress.busy = false;
     return err;
 }

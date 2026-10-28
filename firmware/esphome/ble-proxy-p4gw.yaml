@@ -1,0 +1,119 @@
+# ESPHome Bluetooth proxy role of the P4 gateway (Guition JC-ESP32P4-M3-DEV).
+# Built for the gateway partition table and flashed by the gateway into its "esphome" slot
+# (System -> ESPHome image in the gateway UI). Never flash it over USB on its own.
+# No ESPHome OTA: its target would be the next slot, which is the gateway's.
+substitutions:
+  fw_version: "1.0.0"
+
+esphome:
+  name: ble-proxy-p4gw
+  friendly_name: BLE Proxy P4
+  name_add_mac_suffix: true
+  min_version: 2026.10.0
+  project:
+    name: home.p4gw-ble-proxy
+    version: ${fw_version}
+  includes:
+    - p4gw_return.h
+  on_boot:
+    priority: 600
+    then:
+      - lambda: p4gw::confirm_boot();
+
+esp32:
+  variant: esp32p4
+  flash_size: 16MB
+  cpu_frequency: 360MHz
+  # The tested board reports chip revision v1.3; remove for v3.x boards (and in the gateway).
+  engineering_sample: true
+  partitions: ../partitions.csv
+  framework:
+    type: esp-idf
+
+psram:
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+safe_mode:
+
+ethernet:
+  type: IP101
+  mdc_pin: GPIO31
+  mdio_pin: GPIO52
+  power_pin: GPIO51
+  clk:
+    mode: CLK_EXT_IN
+    pin: GPIO50
+  phy_addr: 1
+
+esp32_hosted:
+  type: sdio
+  variant: ESP32C6
+  active_high: true
+  reset_pin: GPIO54
+  clk_pin: GPIO18
+  cmd_pin: GPIO19
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+  slot: 1
+  sdio_frequency: 40MHz
+  use_psram: true
+
+esp32_ble_tracker:
+  scan_parameters:
+    # Ethernet only, the radio is free for continuous scanning.
+    interval: 320ms
+    window: 300ms
+    active: true
+
+bluetooth_proxy:
+  active: true
+  cache_services: true
+
+select:
+  - platform: template
+    id: gateway_role
+    name: Gateway role
+    icon: mdi:swap-horizontal
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - Thread border router
+      - Thread router
+      - Zigbee coordinator
+      - Zigbee router
+    initial_option: Thread border router
+
+button:
+  - platform: template
+    name: Return to gateway
+    icon: mdi:router-network
+    entity_category: config
+    on_press:
+      - lambda: |-
+          if (p4gw::return_to_gateway(p4gw::role_from_option(id(gateway_role).current_option()))) {
+            App.safe_reboot();
+          } else {
+            ESP_LOGE("p4gw", "no gateway image found");
+          }
+  - platform: restart
+    name: Restart
+
+sensor:
+  - platform: uptime
+    name: Uptime
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: IP address
+      entity_category: diagnostic

@@ -75,6 +75,12 @@ static void apply_role(gw_role_t role)
         gw_set_maintenance("the ESPHome image failed to boot, upload a working one or pick another role");
         return;
     }
+    char flashed[16];
+    if (!gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed)) && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
+        /* First start: the C6 still has its factory firmware, which cannot be downloaded again. */
+        gw_set_maintenance("first start: back up the C6 factory firmware (System tab), then pick a role");
+        return;
+    }
     if (!ensure_c6(gw_role_c6_bundle(role))) {
         return;
     }
@@ -147,6 +153,7 @@ void app_main(void)
     init_mdns(st->hostname);
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
+    gw_mqtt_start();
 
     if (boot_loop) {
         gw_set_maintenance("repeated crashes during start, role %s not started", gw_role_name(st->desired));

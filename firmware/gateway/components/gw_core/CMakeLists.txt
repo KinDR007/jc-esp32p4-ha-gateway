@@ -1,8 +1,8 @@
-idf_component_register(SRCS "gw_api.c" "gw_boot.c" "gw_config.c" "gw_eth.c" "gw_http.c" "gw_log.c"
+idf_component_register(SRCS "gw_api.c" "gw_boot.c" "gw_config.c" "gw_eth.c" "gw_http.c" "gw_log.c" "gw_mqtt.c"
                        INCLUDE_DIRS "include"
                        REQUIRES esp_http_server esp_netif json
                        PRIV_REQUIRES app_update c6_flasher esp_driver_tsens esp_eth esp_partition
-                                     espcoredump mbedtls nvs_flash spi_flash esp_timer lwip)
+                                     espcoredump mbedtls mqtt nvs_flash spi_flash esp_timer lwip)
 
 # The web UI is a single HTML file, served gzipped from flash.
 idf_build_get_property(python PYTHON)

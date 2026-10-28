@@ -29,6 +29,16 @@ void gw_api_set_role_status(cJSON *(*provider)(void))
     s_role_status = provider;
 }
 
+cJSON *gw_api_role_status(void)
+{
+    return s_role_status ? s_role_status() : NULL;
+}
+
+bool gw_api_temperature(float *celsius)
+{
+    return s_temp && temperature_sensor_get_celsius(s_temp, celsius) == ESP_OK;
+}
+
 static const char *reset_reason_name(esp_reset_reason_t reason)
 {
     switch (reason) {
@@ -94,7 +104,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(heap, "internal_largest", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(heap, "psram_free", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     float temp;
-    if (s_temp && temperature_sensor_get_celsius(s_temp, &temp) == ESP_OK) {
+    if (gw_api_temperature(&temp)) {
         cJSON_AddNumberToObject(json, "temperature_c", (int)(temp * 10) / 10.0);
     }
 
@@ -117,6 +127,7 @@ static esp_err_t status_get(httpd_req_t *req)
     char bundle[16];
     gw_config_get_str(GW_KEY_C6_BUNDLE, bundle, sizeof(bundle));
     cJSON_AddStringToObject(c6, "bundle", bundle);
+    cJSON_AddBoolToObject(c6, "adopted", gw_config_get_u8(GW_KEY_C6_ADOPTED, 0));
     c6fw_dir_t *dir = malloc(sizeof(*dir));
     cJSON *images = cJSON_AddArrayToObject(c6, "images");
     if (dir && c6fw_read_dir(dir) == ESP_OK) {
@@ -202,6 +213,7 @@ static esp_err_t role_post(httpd_req_t *req)
     }
     gw_config_set_u8(GW_KEY_ROLE, role);
     gw_config_set_u8(GW_KEY_C6_TRIES, 0);
+    gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     ESP_LOGW(TAG, "role switch to %s requested", gw_role_name(role));
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "role", gw_role_name(role));
@@ -396,6 +408,32 @@ static esp_err_t snapshot_get(httpd_req_t *req)
     return err == ESP_OK ? httpd_resp_send_chunk(req, NULL, 0) : err;
 }
 
+static esp_err_t http_sink(void *ctx, const void *data, size_t len)
+{
+    return httpd_resp_send_chunk(ctx, data, len);
+}
+
+/* Full C6 flash dump, only while no role uses the C6 UART. */
+static esp_err_t c6_backup_get(httpd_req_t *req)
+{
+    if (gw_state()->active != GW_ROLE_NONE) {
+        return gw_http_send_error(req, 409, "only in maintenance mode (no active role)");
+    }
+    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress()->busy) {
+        return gw_http_send_error(req, 409, "C6 busy");
+    }
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"c6_flash_backup.bin\"");
+    esp_err_t err = c6_read_flash(http_sink, req);
+    xSemaphoreGive(s_upload_lock);
+    if (err != ESP_OK) {
+        /* Headers are gone already; an aborted transfer is the error signal. */
+        ESP_LOGE(TAG, "C6 backup failed: %s", esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    return httpd_resp_send_chunk(req, NULL, 0);
+}
+
 static esp_err_t settings_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -577,6 +615,7 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/ota/c6fw", HTTP_POST, c6fw_upload);
     gw_http_register("/api/c6/reflash", HTTP_POST, c6_reflash_post);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_GET, snapshot_get);
+    gw_http_register("/api/c6/backup", HTTP_GET, c6_backup_get);
     gw_http_register("/api/tools/ping", HTTP_POST, ping_post);
     gw_http_register("/api/coredump", HTTP_GET, coredump_get);
     gw_http_register("/api/coredump", HTTP_DELETE, coredump_delete);

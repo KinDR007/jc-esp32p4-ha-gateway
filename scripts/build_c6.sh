@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build one or all C6 co-processor firmwares into build/c6/<name>/.
-# Usage: build_c6.sh [ot_rcp|zigbee_ncp|esp_hosted|all]
+# Usage: build_c6.sh [ot_rcp|zigbee_ncp|zigbee_router|esp_hosted|all]
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 
@@ -9,6 +9,7 @@ src_of() {
         ot_rcp) echo "$IDF_PATH/examples/openthread/ot_rcp" ;;
         zigbee_ncp) echo "$ROOT_DIR/third_party/esp-coordinator" ;;
         esp_hosted) echo "$ROOT_DIR/third_party/esp-hosted-mcu/slave" ;;
+        zigbee_router) echo "$ROOT_DIR/firmware/c6/zigbee_router" ;;
         *) echo "unknown firmware: $1" >&2; return 1 ;;
     esac
 }
@@ -28,7 +29,9 @@ build_one() {
     fi
     local defaults="$out/src/sdkconfig.defaults"
     [ -f "$out/src/sdkconfig.defaults.esp32c6" ] && defaults="$defaults;$out/src/sdkconfig.defaults.esp32c6"
-    defaults="$defaults;$ROOT_DIR/firmware/c6/$name/sdkconfig.overlay"
+    if [ "$src" != "$ROOT_DIR/firmware/c6/$name" ]; then
+        defaults="$defaults;$ROOT_DIR/firmware/c6/$name/sdkconfig.overlay"
+    fi
     rm -f "$out/sdkconfig"
     idf.py -C "$out/src" -B "$out/build" -DIDF_TARGET=esp32c6 \
         -DSDKCONFIG="$out/sdkconfig" -DSDKCONFIG_DEFAULTS="$defaults" build
@@ -36,7 +39,7 @@ build_one() {
 
 target=${1:-all}
 if [ "$target" = all ]; then
-    for n in ot_rcp zigbee_ncp esp_hosted; do build_one "$n"; done
+    for n in ot_rcp zigbee_ncp zigbee_router esp_hosted; do build_one "$n"; done
 else
     build_one "$target"
 fi

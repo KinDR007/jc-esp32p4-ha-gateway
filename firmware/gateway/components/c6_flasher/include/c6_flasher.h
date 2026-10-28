@@ -77,6 +77,12 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name);
 esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation);
 esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_t len);
 
+/* Streams the whole C6 flash (backup of the factory firmware). The C6 restarts afterwards. */
+typedef esp_err_t (*c6_sink_t)(void *ctx, const void *data, size_t len);
+esp_err_t c6_read_flash(c6_sink_t sink, void *ctx);
+/* Detected C6 flash size, valid after c6_read_flash() started. */
+uint32_t c6_flash_size(void);
+
 const c6_progress_t *c6_progress(void);
 
 #ifdef __cplusplus

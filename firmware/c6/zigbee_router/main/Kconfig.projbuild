@@ -1,0 +1,33 @@
+# Same Zigbee options as the esp-zigbee-sdk examples; esp-zigbee-lib reads them.
+menu "Zigbee"
+
+    config ZB_ENABLED
+        bool "Zigbee Enable"
+        default n
+
+    choice ZB_DEVICE_TYPE
+        prompt "Configure the Zigbee device type"
+        depends on ZB_ENABLED
+        default ZB_ZCZR
+
+        config ZB_ZCZR
+            bool "Zigbee Coordinator or Router device"
+
+        config ZB_ZED
+            bool "Zigbee End Device"
+    endchoice
+
+    choice ZB_RADIO_TYPE
+        prompt "Configure the Zigbee radio type"
+        depends on ZB_ENABLED
+        default ZB_RADIO_NATIVE
+
+        config ZB_RADIO_NATIVE
+            bool "Native 15.4 radio"
+
+        config ZB_RADIO_SPINEL_UART
+            bool "Connect to 15.4 radio via Radio Spinel UART"
+            select OPENTHREAD_SPINEL_ONLY
+    endchoice
+
+endmenu

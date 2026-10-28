@@ -41,6 +41,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_C6_SHA "c6_sha"      /* blob[32], its sha256 */
 #define GW_KEY_C6_FORCE "c6_force"  /* u8, reflash on next boot (RCP failure) */
 #define GW_KEY_C6_TRIES "c6_tries"  /* u8, consecutive flash attempts */
+#define GW_KEY_C6_ADOPTED "c6_ok"   /* u8, the user allowed overwriting the C6 factory firmware */
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 
@@ -101,6 +102,11 @@ cJSON *gw_http_read_json(httpd_req_t *req);
 esp_err_t gw_api_register(void);
 /* The running role adds its summary to /api/status under "role_status". */
 void gw_api_set_role_status(cJSON *(*provider)(void));
+cJSON *gw_api_role_status(void);
+bool gw_api_temperature(float *celsius);
+
+/* Optional MQTT link with Home Assistant discovery, configured via /api/mqtt. */
+esp_err_t gw_mqtt_start(void);
 
 #define GW_JSON_STR(obj, key) (cJSON_IsString(cJSON_GetObjectItem((obj), (key))) ? cJSON_GetObjectItem((obj), (key))->valuestring : NULL)
 

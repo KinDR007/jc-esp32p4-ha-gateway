@@ -1,1 +1,718 @@
-<!doctype html><title>p4gw</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P4 Gateway</title>
+<style>
+:root {
+  --bg: #f4f6f9; --panel: #ffffff; --panel-2: #f0f2f6; --text: #18202b; --muted: #5d6878;
+  --border: #dde2ea; --accent: #2563eb; --accent-text: #ffffff; --ok: #138a4c; --warn: #b26a00;
+  --bad: #c62828; --code: #eef1f6; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1318; --panel: #171c23; --panel-2: #1e252e; --text: #e6eaf0; --muted: #96a1b0;
+    --border: #2a323d; --accent: #4f8cff; --accent-text: #0b0e12; --ok: #34c77b; --warn: #f0a63a;
+    --bad: #ff6b6b; --code: #10151b; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--border); }
+.bar { max-width: 1180px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 650; font-size: 16px; }
+.brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.spacer { flex: 1; }
+nav { max-width: 1180px; margin: 0 auto; padding: 0 12px; display: flex; gap: 2px; overflow-x: auto; }
+nav button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted);
+  padding: 9px 12px; font: inherit; cursor: pointer; white-space: nowrap; }
+nav button.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+.card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+.card + .card, .grid + .card, .card + .grid, main > * + *, #thread-status > * + * { margin-top: 14px; }
+.grid > .card { margin-top: 0; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 99px;
+  background: var(--panel-2); border: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+.ok-text { color: var(--ok); } .warn-text { color: var(--warn); } .bad-text { color: var(--bad); }
+.muted { color: var(--muted); }
+.alert { border-radius: 8px; padding: 10px 12px; border: 1px solid var(--warn); color: var(--text);
+  background: color-mix(in srgb, var(--warn) 10%, var(--panel)); margin-bottom: 14px; }
+.alert.bad { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); }
+button.btn, a.btn, label.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  background: var(--panel-2); color: var(--text); padding: 6px 12px; border-radius: 7px; font: inherit;
+  cursor: pointer; text-decoration: none; }
+button.btn:hover, label.btn:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row + .row { margin-top: 8px; }
+input[type=text], input[type=password], input[type=number], textarea, select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 9px; font: inherit; min-width: 0; }
+textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+label.field { display: grid; gap: 4px; margin-bottom: 10px; }
+label.field span { color: var(--muted); font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.log { height: 420px; white-space: pre; overflow: auto; }
+.roles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.role { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--panel); display: flex; flex-direction: column; gap: 8px; }
+.role.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.role h4 { margin: 0; font-size: 15px; }
+.role p { margin: 0; color: var(--muted); flex: 1; }
+.progress { height: 8px; border-radius: 99px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--border); }
+.progress > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+ol.steps { padding-left: 20px; margin: 6px 0; } ol.steps li { margin: 6px 0; }
+.hidden { display: none !important; }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+#toast.show { opacity: .95; }
+dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--text); max-width: 420px; width: calc(100% - 32px); }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">P4 Gateway <small id="hdr-host"></small></div>
+    <span class="pill" id="hdr-role"><span class="dot"></span><span>…</span></span>
+    <span class="pill" id="hdr-eth"><span class="dot"></span><span>Ethernet</span></span>
+    <div class="spacer"></div>
+    <span class="muted" id="hdr-uptime"></span>
+  </div>
+  <nav id="tabs"></nav>
+</header>
+<main id="main"></main>
+<div id="toast"></div>
+<dialog id="login">
+  <form method="dialog" id="login-form">
+    <h3 style="margin-top:0">Sign in</h3>
+    <p class="muted">The gateway is password protected (user <code>admin</code>).</p>
+    <label class="field"><span>Password</span><input type="password" id="login-pass" autocomplete="current-password"></label>
+    <div class="row"><button class="btn primary" value="ok">Sign in</button></div>
+  </form>
+</dialog>
+<dialog id="confirm">
+  <form method="dialog">
+    <h3 style="margin-top:0" id="confirm-title"></h3>
+    <p id="confirm-text"></p>
+    <div class="row"><button class="btn primary" value="yes">Continue</button><button class="btn" value="no">Cancel</button></div>
+  </form>
+</dialog>
+<script>
+'use strict';
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+let auth = null;
+try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */ }
+
+const ROLES = {
+  thread_br: { name: 'Thread border router', group: 'Thread', desc: 'OpenThread border router on Ethernet for Matter-over-Thread. Home Assistant OTBR integration via REST.' },
+  thread_router: { name: 'Thread router', group: 'Thread', desc: 'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.' },
+  zigbee_coordinator: { name: 'Zigbee coordinator', group: 'Zigbee', desc: 'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.' },
+  zigbee_router: { name: 'Zigbee router', group: 'Zigbee', desc: 'Standalone Zigbee router (range extender) that joins your existing Zigbee network.' },
+  esphome: { name: 'ESPHome BLE proxy', group: 'Bluetooth', desc: 'Reboots into the ESPHome Bluetooth proxy image; the C6 runs esp-hosted. Return via the ESPHome device in HA.' },
+};
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({}, opts.headers || {});
+  if (auth) headers.Authorization = 'Basic ' + auth;
+  if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
+  const res = await fetch(path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers, body: opts.body });
+  if (res.status === 401) { await login(); return api(path, opts); }
+  const type = res.headers.get('Content-Type') || '';
+  const data = type.includes('json') ? await res.json() : await res.text();
+  if (!res.ok) throw new Error((data && data.error) || res.statusText);
+  return opts.raw ? { data, res } : data;
+}
+
+let loginPromise = null;
+function login() {
+  if (loginPromise) return loginPromise;
+  loginPromise = new Promise(resolve => {
+    const dlg = $('#login');
+    dlg.onclose = () => {
+      auth = btoa('admin:' + $('#login-pass').value);
+      try { sessionStorage.setItem('auth', auth); } catch (e) { /* storage blocked */ }
+      loginPromise = null;
+      resolve();
+    };
+    dlg.showModal();
+  });
+  return loginPromise;
+}
+
+function confirmDialog(title, text) {
+  return new Promise(resolve => {
+    const dlg = $('#confirm');
+    $('#confirm-title').textContent = title;
+    $('#confirm-text').textContent = text;
+    dlg.onclose = () => resolve(dlg.returnValue === 'yes');
+    dlg.returnValue = 'no';
+    dlg.showModal();
+  });
+}
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+const fmtUptime = s => {
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return (d ? d + 'd ' : '') + (h || d ? h + 'h ' : '') + m + 'm';
+};
+const fmtBytes = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b > 1024 ? (b / 1024).toFixed(0) + ' kB' : b + ' B';
+const dl = pairs => '<dl>' + pairs.filter(p => p && p[1] !== undefined && p[1] !== null && p[1] !== '')
+  .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('') + '</dl>';
+const pill = (cls, text) => `<span class="pill"><span class="dot ${cls}"></span>${esc(text)}</span>`;
+
+let status = null;
+let tab = 'overview';
+try { tab = localStorage.getItem('tab') || tab; } catch (e) { /* storage blocked */ }
+
+const TABS = [
+  ['overview', 'Overview'], ['role', 'Role'], ['thread', 'Thread'], ['zigbee', 'Zigbee'],
+  ['ha', 'Home Assistant'], ['tools', 'Tools'], ['system', 'System'],
+];
+
+function renderTabs() {
+  $('#tabs').innerHTML = TABS.map(([id, label]) => `<button data-tab="${id}" class="${id === tab ? 'active' : ''}">${label}</button>`).join('');
+}
+$('#tabs').addEventListener('click', e => {
+  const id = e.target.dataset.tab;
+  if (!id) return;
+  tab = id;
+  try { localStorage.setItem('tab', tab); } catch (err) { /* storage blocked */ }
+  renderTabs();
+  render(true);
+});
+
+function ip() { return status?.eth?.ipv4 || status?.hostname + '.local'; }
+function activeRole() { return status?.role?.active || 'none'; }
+function isThread() { return activeRole().startsWith('thread'); }
+function isZigbee() { return activeRole().startsWith('zigbee'); }
+
+function renderHeader() {
+  if (!status) return;
+  $('#hdr-host').textContent = status.hostname;
+  const r = status.role, maint = r.maintenance;
+  $('#hdr-role').innerHTML = `<span class="dot ${maint ? 'bad' : 'ok'}"></span><span>${esc(ROLES[r.active]?.name || 'Maintenance')}</span>`;
+  const e = status.eth;
+  $('#hdr-eth').innerHTML = `<span class="dot ${e.link ? 'ok' : 'bad'}"></span><span>${e.link ? (e.speed || '') + ' Mb/s' : 'link down'}</span>`;
+  $('#hdr-uptime').textContent = 'up ' + fmtUptime(status.uptime_s);
+}
+
+function maintenanceBanner() {
+  const r = status.role;
+  const flash = status.c6.flash;
+  let html = '';
+  if (flash.busy) {
+    html += `<div class="alert"><b>Flashing the C6:</b> ${esc(flash.stage)}<div class="progress" style="margin-top:8px"><div style="width:${flash.percent}%"></div></div></div>`;
+  }
+  if (r.maintenance) html += `<div class="alert bad"><b>Maintenance mode:</b> ${esc(r.maintenance)}</div>`;
+  if (!status.auth) html += `<div class="alert">No password set. Anyone on the LAN can switch roles and read the Thread network key. Set one under <b>System</b>.</div>`;
+  return html;
+}
+
+/* ---------------- views ---------------- */
+
+const views = {};
+
+views.overview = () => {
+  const s = status, e = s.eth, h = s.heap, r = s.role, rs = s.role_status || {};
+  const roleInfo = isThread() ? [['Mode', esc(rs.mode)], ['Phase', esc(rs.phase)], ['Thread role', esc(rs.role)], ['Network', esc(rs.network_name)], ['Channel', esc(rs.channel)]]
+    : isZigbee() ? (rs.mode === 'coordinator'
+      ? [['Host', rs.client_connected ? pill('ok', rs.client) : pill('warn', 'not connected')], ['TCP port', rs.tcp_port], ['Frames rx/tx', `${rs.frames_rx} / ${rs.frames_tx}`], ['UART errors', rs.uart_errors]]
+      : [['Router', rs.router ? esc(rs.router.state) : pill('warn', 'no status from C6')], ['Status age', rs.router_status_age_s >= 0 ? rs.router_status_age_s.toFixed(0) + ' s' : '']])
+    : [];
+  return maintenanceBanner() + `<div class="grid">
+    <div class="card"><h3>Role</h3>${dl([
+      ['Active', `<b>${esc(ROLES[r.active]?.name || 'none (maintenance)')}</b>`],
+      ['Selected', esc(ROLES[r.desired]?.name || r.desired)],
+      ['Stable', r.stable ? pill('ok', 'yes') : pill('warn', 'starting')], ...roleInfo])}</div>
+    <div class="card"><h3>Network</h3>${dl([
+      ['Link', e.link ? pill('ok', `${e.speed} Mb/s ${e.full_duplex ? 'full' : 'half'} duplex`) : pill('bad', 'down')],
+      ['IPv4', esc(e.ipv4)], ['Gateway', esc(e.gateway)], ['IPv6', (e.ipv6 || []).map(esc).join('<br>')],
+      ['MAC', esc(e.mac)], ['Hostname', esc(s.hostname) + '.local'], ['Link changes', e.link_changes]])}</div>
+    <div class="card"><h3>System</h3>${dl([
+      ['Firmware', esc(s.version)], ['ESP-IDF', esc(s.idf)], ['Chip revision', 'v' + (s.chip_revision / 100).toFixed(2)],
+      ['Uptime', fmtUptime(s.uptime_s)], ['Last reset', esc(s.reset_reason)],
+      ['Temperature', s.temperature_c !== undefined ? s.temperature_c + ' °C' : ''],
+      ['Heap (internal)', `${fmtBytes(h.internal_free)} free, min ${fmtBytes(h.internal_min)}`],
+      ['PSRAM free', fmtBytes(h.psram_free)]])}</div>
+    <div class="card"><h3>C6 co-processor</h3>${dl([
+      ['Running', esc(s.c6.bundle || 'unknown')],
+      ['Images', (s.c6.images || []).map(i => `${esc(i.name)} <span class="muted">${esc(i.version)}</span>`).join('<br>') || '<span class="bad-text">none, upload c6fw.bin</span>'],
+      ['Last flash error', esc(s.c6.flash.last_error)]])}</div>
+  </div>`;
+};
+
+views.role = () => {
+  const active = activeRole(), desired = status.role.desired;
+  const esphome = status.slots.find(x => x.label === 'esphome');
+  const cards = Object.entries(ROLES).map(([id, r]) => {
+    const disabled = id === 'esphome' && !esphome?.version;
+    return `<div class="role ${id === active ? 'active' : ''}">
+      <div class="row"><span class="pill">${r.group}</span>${id === active ? pill('ok', 'active') : id === desired ? pill('warn', 'selected') : ''}</div>
+      <h4>${r.name}</h4><p>${r.desc}${disabled ? '<br><span class="warn-text">Upload an ESPHome image under System first.</span>' : ''}</p>
+      <div><button class="btn ${id === active ? '' : 'primary'}" data-role="${id}" ${id === active || disabled ? 'disabled' : ''}>${id === active ? 'Running' : 'Switch'}</button></div>
+    </div>`;
+  }).join('');
+  return maintenanceBanner() + `<div class="card"><h3>Select role</h3>
+    <p class="muted">Switching restarts the gateway and reflashes the C6 when the role needs different radio firmware (about 30 s).
+    Zigbee network data is saved before leaving a Zigbee role and restored when you come back. The Thread network is stored on the P4 and survives switching.</p>
+    <div class="roles">${cards}</div></div>`;
+};
+
+views.thread = () => {
+  if (!isThread()) return `<div class="card"><p class="muted">Thread is not the active role.</p></div>`;
+  return `<div id="thread-status"><div class="card muted">Loading…</div></div>
+  <div class="grid">
+    <div class="card"><h3>Network dataset</h3>
+      <div id="dataset" class="muted">Loading…</div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="ds-reveal">Show TLVs and key</button><button class="btn" id="ds-copy">Copy TLVs</button></div>
+      <label class="field" style="margin-top:12px"><span>Apply dataset (hex TLVs from Home Assistant, joins that network)</span>
+        <textarea id="ds-tlvs" rows="3" placeholder="0e080000000000010000…"></textarea></label>
+      <button class="btn primary" id="ds-apply">Apply dataset</button>
+    </div>
+    <div class="card"><h3>OpenThread CLI</h3>
+      <div class="row">
+        ${['state', 'dataset active', 'neighbor table', 'router table', 'child table', 'netdata show', 'srp server host', 'srp server service', 'br omrprefix', 'nat64 state', 'counters mac', 'rcp version'].map(c => `<button class="btn" data-cli="${c}">${c}</button>`).join('')}
+      </div>
+      <div class="row" style="margin-top:10px"><input type="text" id="cli-cmd" placeholder="ping ff03::1" style="flex:1">
+        <input type="number" id="cli-wait" value="800" min="100" max="15000" style="width:90px" title="wait ms"><button class="btn primary" id="cli-run">Run</button></div>
+      <pre id="cli-out" style="max-height:360px">—</pre>
+    </div>
+  </div>`;
+};
+
+async function loadThread() {
+  const box = $('#thread-status');
+  if (!box) return;
+  try {
+    const t = await api('/api/thread/status');
+    const br = t.border_router;
+    const role = t.role || 'disabled';
+    const roleCls = ['leader', 'router'].includes(role) ? 'ok' : role === 'child' ? 'warn' : 'bad';
+    box.innerHTML = `<div class="grid">
+      <div class="card"><h3>Thread</h3>${dl([
+        ['Mode', esc(t.mode === 'border_router' ? 'Border router' : 'Router')], ['Phase', esc(t.phase)],
+        ['Device role', pill(roleCls, role)], ['Network', esc(t.network_name)], ['Channel', t.channel],
+        ['PAN ID', esc(t.pan_id)], ['Ext PAN ID', esc(t.ext_pan_id)], ['RLOC16', esc(t.rloc16)],
+        ['Partition', t.partition_id], ['Leader router', t.leader_router_id], ['Mesh-local prefix', esc(t.mesh_local_prefix)],
+        ['RCP', esc(t.rcp_version)], ['RCP failures', t.rcp_failures]])}</div>
+      ${br ? `<div class="card"><h3>Border routing</h3>${dl([
+        ['Routing manager', pill(br.routing === 'running' ? 'ok' : 'warn', br.routing)],
+        ['OMR prefix', esc(br.omr_prefix)], ['On-link prefix', esc(br.on_link_prefix)],
+        ['NAT64', pill(br.nat64 === 'active' ? 'ok' : 'warn', br.nat64)],
+        ['Border agent', br.border_agent ? pill('ok', 'active') : pill('warn', 'inactive')],
+        ['SRP server', pill(br.srp_server === 'running' ? 'ok' : 'warn', br.srp_server)],
+        ['SRP hosts / services', `${br.srp_hosts} / ${br.srp_services}`], ['REST API', `http://${esc(ip())}:${t.rest_port}`]])}</div>` : ''}
+      <div class="card"><h3>MAC counters</h3>${dl(Object.entries(t.mac_counters || {}).map(([k, v]) => [k.replace(/_/g, ' '), v]))}</div>
+    </div>
+    <div class="card"><h3>Neighbors (${(t.neighbors || []).length})</h3><div class="table-wrap"><table>
+      <tr><th>Type</th><th>RLOC16</th><th>Ext address</th><th>Avg RSSI</th><th>Last RSSI</th><th>LQI in</th><th>Age</th><th>Frame err</th></tr>
+      ${(t.neighbors || []).map(n => `<tr><td>${esc(n.type)}</td><td>${esc(n.rloc16)}</td><td><code>${esc(n.ext_address)}</code></td>
+        <td class="${n.avg_rssi < -85 ? 'bad-text' : n.avg_rssi < -75 ? 'warn-text' : ''}">${n.avg_rssi} dBm</td><td>${n.last_rssi} dBm</td>
+        <td>${n.lqi_in}</td><td>${n.age_s} s</td><td>${n.frame_error_pct.toFixed(1)} %</td></tr>`).join('') || '<tr><td colspan="8" class="muted">none</td></tr>'}
+    </table></div></div>
+    <div class="card"><h3>Routers (${(t.routers || []).length})</h3><div class="table-wrap"><table>
+      <tr><th>ID</th><th>RLOC16</th><th>Next hop</th><th>Path cost</th><th>LQ in / out</th><th>Link</th></tr>
+      ${(t.routers || []).map(r => `<tr><td>${r.id}</td><td>${esc(r.rloc16)}</td><td>${r.next_hop}</td><td>${r.path_cost}</td>
+        <td>${r.lq_in} / ${r.lq_out}</td><td>${r.link ? pill('ok', 'yes') : '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">none</td></tr>'}
+    </table></div></div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="alert">${esc(e.message)}</div>`;
+  }
+}
+
+let datasetTlvs = '';
+async function loadDataset(reveal) {
+  const box = $('#dataset');
+  if (!box) return;
+  try {
+    const d = await api('/api/thread/dataset' + (reveal ? '?reveal=1' : ''));
+    if (d.tlvs) datasetTlvs = d.tlvs;
+    box.innerHTML = dl([['Network name', esc(d.network_name)], ['Channel', d.channel], ['PAN ID', esc(d.pan_id)],
+      ['Ext PAN ID', esc(d.ext_pan_id)], ['Network key', `<code>${esc(d.network_key)}</code>`],
+      ['TLVs', d.tlvs ? `<code style="word-break:break-all">${esc(d.tlvs)}</code>` : '<span class="muted">hidden</span>']]);
+  } catch (e) {
+    box.innerHTML = `<span class="warn-text">${esc(e.message)}</span>`;
+  }
+}
+
+async function runCli(cmd) {
+  const out = $('#cli-out');
+  out.textContent = '> ' + cmd + '\n…';
+  try {
+    const r = await api('/api/thread/cli', { json: { cmd, wait_ms: +$('#cli-wait').value || 800 } });
+    out.textContent = '> ' + cmd + '\n' + (r.output || '(no output)');
+  } catch (e) {
+    out.textContent = '> ' + cmd + '\nerror: ' + e.message;
+  }
+}
+
+views.zigbee = () => {
+  if (!isZigbee()) return `<div class="card"><p class="muted">Zigbee is not the active role.</p></div>` + snapshotCard();
+  const z = status.role_status || {};
+  if (z.mode === 'coordinator') {
+    return `<div class="grid"><div class="card"><h3>Coordinator bridge</h3>${dl([
+      ['Host', z.client_connected ? pill('ok', z.client) : pill('warn', 'waiting for Zigbee2MQTT')],
+      ['Session', z.session_s !== undefined ? fmtUptime(z.session_s) : ''], ['TCP endpoint', `tcp://${esc(ip())}:${z.tcp_port}`],
+      ['Sessions', z.sessions], ['UART', z.uart_baud + ' Bd'],
+      ['Frames C6 → host', z.frames_rx], ['Frames host → C6', z.frames_tx],
+      ['Bytes rx / tx', `${fmtBytes(z.rx_bytes)} / ${fmtBytes(z.tx_bytes)}`],
+      ['Last traffic', z.last_rx_s >= 0 ? z.last_rx_s.toFixed(1) + ' s ago' : 'never'],
+      ['Dropped (no host)', fmtBytes(z.dropped_bytes)], ['UART errors', z.uart_errors], ['C6 resets', z.c6_resets]])}
+      <div class="row" style="margin-top:12px"><button class="btn danger" id="zb-reset">Reset C6 (drops the host connection)</button></div></div>
+      ${snapshotCard()}</div>`;
+  }
+  const r = z.router || {};
+  return `<div class="grid"><div class="card"><h3>Zigbee router</h3>${z.router ? dl([
+      ['State', pill(r.joined ? 'ok' : 'warn', r.state || (r.joined ? 'joined' : 'not joined'))],
+      ['PAN ID', esc(r.pan_id)], ['Ext PAN ID', esc(r.ext_pan_id)], ['Channel', esc(r.channel)],
+      ['Short address', esc(r.short_addr)], ['IEEE address', esc(r.ieee)], ['Parent / neighbors', esc(r.neighbors)],
+      ['Permit join', r.permit_join ? pill('ok', 'open') : 'closed'], ['Firmware', esc(r.version)],
+      ['Status age', z.router_status_age_s.toFixed(0) + ' s']]) : '<p class="warn-text">No status from the C6 router yet.</p>'}
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" data-zr="steer">Join network (steer)</button>
+      <button class="btn" data-zr="permit">Permit join 180 s</button>
+      <button class="btn" data-zr="status">Refresh</button>
+      <button class="btn danger" data-zr="leave">Leave network</button>
+      <button class="btn danger" data-zr="factory_reset">Factory reset</button>
+    </div></div>${snapshotCard()}</div>`;
+};
+
+function snapshotCard() {
+  const snaps = status.c6.snapshots || [];
+  return `<div class="card"><h3>Zigbee network backups</h3>
+    <p class="muted">Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.</p>
+    ${snaps.length ? `<table><tr><th>Firmware</th><th>Size</th><th>Generation</th><th></th></tr>${snaps.map(s =>
+      `<tr><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td><button class="btn" data-snap="${esc(s.bundle)}">Download</button></td></tr>`).join('')}</table>`
+      : '<p class="muted">No snapshot yet.</p>'}</div>`;
+}
+
+views.ha = () => {
+  const r = activeRole(), host = ip(), rs = status.role_status || {};
+  const steps = {
+    thread_br: `<h3>Thread border router → Home Assistant</h3><ol class="steps">
+      <li><b>Settings → Devices &amp; services → Add integration → OpenThread Border Router</b>, URL:<pre>http://${esc(host)}:${rs.rest_port || 8081}</pre>(no trailing slash).</li>
+      <li><b>Settings → Devices &amp; services → Thread → Configure</b>: the network <code>${esc(rs.network_name || '…')}</code> appears; mark it <b>preferred</b> (menu ⋮ → <i>Use as preferred network</i>).</li>
+      <li>Already have a Thread network in HA (another border router)? Join it instead of running two networks: in HA open the preferred network's info (ⓘ), copy the <b>active dataset TLVs</b> and paste them in <b>Thread → Apply dataset</b> on this page.</li>
+      <li>Phone: send the credentials to the phone with the Companion app (Android: <i>Settings → Companion app → Troubleshooting → Sync Thread credentials</i>; iOS: <i>Settings → Companion App → Debugging → Sync Thread credentials</i>).</li>
+      <li>Matter: install the <b>Matter Server</b> add-on / integration, then <i>Settings → Devices → Add device → Matter</i> and scan the device code.</li>
+      <li>Network requirements: IPv6 enabled on the HA host and on the LAN, router advertisements accepted (HA OS does this; for Docker or a VM host set <code>net.ipv6.conf.&lt;if&gt;.accept_ra=2</code> and <code>accept_ra_rt_info_max_plen=64</code>), no multicast filtering between HA and this gateway (check IGMP/MLD snooping on managed switches).</li></ol>`,
+    thread_router: `<h3>Thread router → existing network</h3><ol class="steps">
+      <li>In HA: <b>Settings → Devices &amp; services → Thread → Configure</b>, open the info (ⓘ) of the preferred network and copy the <b>active dataset TLVs</b> (hex). From an OTBR shell: <code>ot-ctl dataset active -x</code>.</li>
+      <li>Paste them in <b>Thread → Apply dataset</b> on this page. The router attaches within a minute; state becomes <i>child</i> then <i>router</i>.</li>
+      <li>Nothing to add in HA: the router extends the mesh. It shows up in the network topology of your border router.</li></ol>`,
+    zigbee_coordinator: `<h3>Zigbee coordinator → Zigbee2MQTT (recommended)</h3><ol class="steps">
+      <li>Zigbee2MQTT <code>configuration.yaml</code> (or the add-on <i>Configuration → serial</i>):<pre>serial:
+  port: tcp://${esc(host)}:${rs.tcp_port || 6638}
+  adapter: zboss
+advanced:
+  transmit_power: 20</pre></li>
+      <li>Restart Zigbee2MQTT. On this page the bridge shows the host as connected and the frame counters move.</li>
+      <li>Keep Zigbee2MQTT's own coordinator backup enabled; this gateway additionally keeps a copy of the coordinator NVRAM (Zigbee tab).</li></ol>
+      <h3>ZHA (experimental)</h3><ol class="steps">
+      <li>ZHA has no built-in radio type for this ZBOSS firmware. Install the <code>zha-zboss-esp</code> custom component (HACS), then <b>Add integration → Zigbee Home Automation</b>, radio type <b>ZBOSS</b>, path <code>socket://${esc(host)}:${rs.tcp_port || 6638}</code>.</li>
+      <li>Only one host may use the coordinator. A new TCP connection replaces the old one.</li></ol>`,
+    zigbee_router: `<h3>Zigbee router → existing network</h3><ol class="steps">
+      <li>Open joining in your Zigbee host: Zigbee2MQTT <i>Permit join (All)</i>, or ZHA <i>Add device</i>.</li>
+      <li>Here: <b>Zigbee → Join network (steer)</b>. The router retries steering every 30 s until it joins.</li>
+      <li>It appears as a router / range extender. To move it to another network: <b>Leave network</b>, then steer again.</li></ol>`,
+    esphome: `<h3>ESPHome BLE proxy</h3><p>This page is not available while ESPHome runs.</p>`,
+    none: `<h3>Maintenance</h3><p>No role is running. Pick one under <b>Role</b>.</p>`,
+  };
+  return `<div class="card">${steps[r] || steps.none}</div>
+  <div class="card"><h3>ESPHome BLE proxy role</h3><ol class="steps">
+    <li>Upload the ESPHome image (<code>dist/esphome.bin</code>) under <b>System → Firmware</b>, then switch the role.</li>
+    <li>HA discovers the node via mDNS (<i>ESPHome</i> integration). Enter the API encryption key from the ESPHome secrets.</li>
+    <li>To return: the ESPHome device exposes <b>Gateway role</b> and <b>Return to gateway</b> in HA.</li></ol></div>
+  <div class="card"><h3>MQTT (optional)</h3>
+    <p class="muted">Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).</p>
+    <div id="mqtt-box" class="muted">Loading…</div></div>`;
+};
+
+async function loadMqtt() {
+  const box = $('#mqtt-box');
+  if (!box) return;
+  try {
+    const m = await api('/api/mqtt');
+    box.classList.remove('muted');
+    box.innerHTML = `<div class="grid"><div>
+      <label class="field"><span>Broker URI</span><input type="text" id="mq-uri" value="${esc(m.uri)}" placeholder="mqtt://192.168.1.10:1883"></label>
+      <label class="field"><span>User</span><input type="text" id="mq-user" value="${esc(m.user)}" autocomplete="off"></label>
+      <label class="field"><span>Password ${m.password_set ? '(set, leave empty to keep)' : ''}</span><input type="password" id="mq-pass" autocomplete="new-password"></label>
+      <label class="field"><span>Discovery prefix</span><input type="text" id="mq-prefix" value="${esc(m.prefix)}"></label>
+      <div class="row"><label><input type="checkbox" id="mq-en" ${m.enabled ? 'checked' : ''}> Enabled</label><button class="btn primary" id="mq-save">Save</button></div>
+    </div><div>${dl([['Connection', m.connected ? pill('ok', 'connected') : m.enabled ? pill('bad', 'disconnected') : pill('', 'disabled')],
+      ['Last error', esc(m.last_error)], ['Base topic', `<code>${esc(m.base_topic)}</code>`], ['State publishes', m.publishes]])}</div></div>`;
+  } catch (e) {
+    box.textContent = e.message;
+  }
+}
+
+views.tools = () => `<div class="grid">
+  <div class="card"><h3>Ping</h3><div class="row"><input type="text" id="ping-host" placeholder="192.168.1.1 or fd00::1" style="flex:1">
+    <input type="number" id="ping-count" value="4" min="1" max="10" style="width:70px"><button class="btn primary" id="ping-run">Ping</button></div>
+    <pre id="ping-out">—</pre></div>
+  <div class="card"><h3>Diagnostics</h3><div class="row">
+    <a class="btn" href="/api/status" target="_blank">Status JSON</a>
+    ${isThread() ? '<a class="btn" href="/api/thread/status" target="_blank">Thread JSON</a>' : ''}
+    ${isZigbee() ? '<a class="btn" href="/api/zigbee/status" target="_blank">Zigbee JSON</a>' : ''}
+    <button class="btn" id="cd-get">Download core dump</button><button class="btn danger" id="cd-del">Erase core dump</button></div></div>
+</div>
+<div class="card"><h3>Log</h3><div class="row"><button class="btn" id="log-pause">Pause</button><button class="btn" id="log-clear">Clear</button>
+  <button class="btn" id="log-save">Download</button><input type="text" id="log-filter" placeholder="filter" style="flex:1"></div>
+  <pre class="log" id="log"></pre></div>`;
+
+views.system = () => {
+  const slots = status.slots.map(s => `<tr><td>${esc(s.label)}</td><td>${esc(s.project || '—')}</td><td>${esc(s.version || '')}</td>
+    <td>${esc(s.built || '')}</td><td>${esc(s.state || '')}</td><td>${s.running ? pill('ok', 'running') : ''}${s.boot && !s.running ? pill('warn', 'next boot') : ''}</td></tr>`).join('');
+  const upload = (id, label, hint) => `<div class="card"><h3>${label}</h3><p class="muted">${hint}</p>
+    <div class="row"><input type="file" id="${id}-file"><button class="btn primary" data-upload="${id}">Upload</button></div>
+    <div class="progress hidden" id="${id}-prog" style="margin-top:10px"><div></div></div></div>`;
+  return maintenanceBanner() + `<div class="card"><h3>Firmware slots</h3><div class="table-wrap"><table>
+    <tr><th>Slot</th><th>Project</th><th>Version</th><th>Built</th><th>State</th><th></th></tr>${slots}</table></div></div>
+  <div class="grid">
+    ${upload('gateway', 'Gateway firmware', 'p4gw.bin, written to the inactive slot; rolls back automatically if it does not start.')}
+    ${upload('esphome', 'ESPHome image', 'firmware.ota.bin of the ESPHome BLE proxy build for this board.')}
+    ${upload('c6fw', 'C6 firmware bundle', 'c6fw.bin from scripts/build_all.sh. The C6 is reflashed on the next start if its image changed.')}
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Settings</h3>
+      <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
+      <label class="field"><span>Web UI password (user admin, empty disables)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
+      <div class="row"><button class="btn primary" id="set-save">Save</button></div></div>
+    <div class="card"><h3>Maintenance</h3><div class="row">
+      <button class="btn" id="sys-reboot">Restart</button>
+      <button class="btn danger" id="sys-reflash">Reflash C6 now</button>
+      <button class="btn" id="c6-backup" ${activeRole() === 'none' ? '' : 'disabled'}>Back up C6 flash</button></div>
+      <p class="muted">Reflash rewrites the C6 with the image of the current role on the next start (use after an RCP or NCP failure).
+      The C6 backup reads its whole flash over JP1 (about 2 minutes) and works only in maintenance mode. Keep the first backup:
+      it is the only copy of the factory esp-hosted firmware.</p></div>
+  </div>`;
+};
+
+/* ---------------- actions ---------------- */
+
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  try {
+    if (t.dataset.role) {
+      const r = ROLES[t.dataset.role];
+      if (!await confirmDialog('Switch to ' + r.name + '?', 'The gateway restarts and may reflash the C6. Devices on the current network go offline until you switch back.')) return;
+      await api('/api/role', { json: { role: t.dataset.role } });
+      toast('Switching, the page reconnects automatically');
+      waitForRestart();
+    } else if (t.dataset.cli) {
+      runCli(t.dataset.cli);
+    } else if (t.id === 'cli-run') {
+      const cmd = $('#cli-cmd').value.trim();
+      if (cmd) runCli(cmd);
+    } else if (t.id === 'ds-reveal') {
+      loadDataset(true);
+    } else if (t.id === 'ds-copy') {
+      if (!datasetTlvs) await loadDataset(true);
+      await navigator.clipboard.writeText(datasetTlvs);
+      toast('Dataset TLVs copied');
+    } else if (t.id === 'ds-apply') {
+      const tlvs = $('#ds-tlvs').value.replace(/\s+/g, '');
+      if (!tlvs || !await confirmDialog('Apply dataset?', 'The gateway leaves its current Thread network and joins the one in the dataset.')) return;
+      const r = await api('/api/thread/dataset', { json: { tlvs } });
+      toast('Joining ' + r.network_name);
+      loadDataset(false);
+    } else if (t.id === 'zb-reset') {
+      if (!await confirmDialog('Reset the C6?', 'The Zigbee host loses its connection and has to reinitialise the coordinator.')) return;
+      await api('/api/zigbee/reset', { method: 'POST' });
+      toast('C6 reset');
+    } else if (t.dataset.zr) {
+      const cmd = t.dataset.zr;
+      if (['leave', 'factory_reset'].includes(cmd) && !await confirmDialog('Run ' + cmd + '?', 'The router leaves its Zigbee network.')) return;
+      await api('/api/zigbee/command', { json: { cmd } });
+      toast('Sent ' + cmd);
+    } else if (t.dataset.snap) {
+      download('/api/c6/zigbee-snapshot?bundle=' + encodeURIComponent(t.dataset.snap), t.dataset.snap + '_nvram.bin');
+    } else if (t.id === 'mq-save') {
+      const body = { uri: $('#mq-uri').value.trim(), user: $('#mq-user').value, prefix: $('#mq-prefix').value.trim(), enabled: $('#mq-en').checked };
+      if ($('#mq-pass').value) body.password = $('#mq-pass').value;
+      await api('/api/mqtt', { json: body });
+      toast('MQTT saved');
+      setTimeout(loadMqtt, 1500);
+    } else if (t.id === 'ping-run') {
+      $('#ping-out').textContent = '…';
+      const r = await api('/api/tools/ping', { json: { host: $('#ping-host').value.trim(), count: +$('#ping-count').value } });
+      $('#ping-out').textContent = `PING ${r.target}\n` + r.replies.map(x => x.timeout ? `seq ${x.seq}: timeout` : `seq ${x.seq}: ${x.ms} ms`).join('\n') + `\n${r.received}/${r.sent} received`;
+    } else if (t.id === 'c6-backup') {
+      toast('Reading the C6 flash, about 2 minutes…');
+      t.disabled = true;
+      try { await download('/api/c6/backup', status.hostname + '_c6_flash.bin'); toast('C6 backup saved'); } finally { t.disabled = false; }
+    } else if (t.id === 'cd-get') {
+      download('/api/coredump', 'coredump.elf');
+    } else if (t.id === 'cd-del') {
+      await api('/api/coredump', { method: 'DELETE' });
+      toast('Core dump erased');
+    } else if (t.id === 'log-pause') {
+      logPaused = !logPaused;
+      t.textContent = logPaused ? 'Resume' : 'Pause';
+    } else if (t.id === 'log-clear') {
+      logText = '';
+      renderLog();
+    } else if (t.id === 'log-save') {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([logText], { type: 'text/plain' }));
+      a.download = status.hostname + '.log';
+      a.click();
+    } else if (t.dataset.upload) {
+      await upload(t.dataset.upload);
+    } else if (t.id === 'set-save') {
+      const body = {};
+      if ($('#set-host').value.trim() !== status.hostname) body.hostname = $('#set-host').value.trim();
+      if ($('#set-pass').value) body.password = $('#set-pass').value;
+      await api('/api/settings', { json: body });
+      if (body.password) {
+        auth = btoa('admin:' + body.password);
+        try { sessionStorage.setItem('auth', auth); } catch (err) { /* storage blocked */ }
+      }
+      toast(body.hostname ? 'Saved, restart to apply the hostname' : 'Saved');
+    } else if (t.id === 'sys-reboot') {
+      if (!await confirmDialog('Restart?', 'The active role stops for about 10 s.')) return;
+      await api('/api/reboot', { method: 'POST' });
+      waitForRestart();
+    } else if (t.id === 'sys-reflash') {
+      if (!await confirmDialog('Reflash the C6?', 'The gateway restarts and rewrites the C6 firmware of the current role.')) return;
+      await api('/api/c6/reflash', { method: 'POST' });
+      waitForRestart();
+    }
+  } catch (err) {
+    toast('Error: ' + err.message);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'cli-cmd') $('#cli-run').click();
+});
+
+async function download(path, name) {
+  const res = await fetch(path, { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error || msg; } catch (e) { /* not JSON */ }
+    throw new Error(msg);
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(await res.blob());
+  a.download = name;
+  a.click();
+}
+
+function upload(kind) {
+  const file = $(`#${kind}-file`).files[0];
+  if (!file) { toast('Choose a file'); return; }
+  const prog = $(`#${kind}-prog`);
+  prog.classList.remove('hidden');
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ota/' + kind);
+    if (auth) xhr.setRequestHeader('Authorization', 'Basic ' + auth);
+    xhr.upload.onprogress = e => { prog.firstElementChild.style.width = (e.loaded / e.total * 100) + '%'; };
+    xhr.onload = () => {
+      let r = {};
+      try { r = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+      if (xhr.status !== 200) { reject(new Error(r.error || xhr.statusText)); return; }
+      toast(r.restarting ? 'Uploaded, restarting into the new firmware' : 'Uploaded ' + (r.version || ''));
+      if (r.restarting) waitForRestart();
+      resolve();
+    };
+    xhr.onerror = () => reject(new Error('upload failed'));
+    xhr.send(file);
+  });
+}
+
+let restarting = false;
+async function waitForRestart() {
+  restarting = true;
+  await new Promise(r => setTimeout(r, 4000));
+  for (let i = 0; i < 120; i++) {
+    try { status = await api('/api/status'); restarting = false; render(true); toast('Gateway is back'); return; } catch (e) { /* still down */ }
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  restarting = false;
+}
+
+/* ---------------- log ---------------- */
+
+let logSeq = 0, logText = '', logPaused = false;
+function renderLog() {
+  const box = $('#log');
+  if (!box) return;
+  const f = $('#log-filter')?.value.toLowerCase();
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+  box.textContent = f ? logText.split('\n').filter(l => l.toLowerCase().includes(f)).join('\n') : logText;
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+async function pollLog() {
+  if (tab !== 'tools' || logPaused || restarting) return;
+  try {
+    const { data, res } = await api('/api/logs?since=' + logSeq, { raw: true });
+    logSeq = +res.headers.get('X-Log-Seq') || logSeq;
+    if (data) {
+      logText = (logText + data.replace(/\x1b\[[0-9;]*m/g, '')).slice(-200000);
+      renderLog();
+    }
+  } catch (e) { /* retry next tick */ }
+}
+document.addEventListener('input', e => { if (e.target.id === 'log-filter') renderLog(); });
+
+/* ---------------- loop ---------------- */
+
+function render(full) {
+  if (!status) return;
+  renderHeader();
+  const main = $('#main');
+  /* Forms keep their input: only redraw passive tabs on every poll. */
+  if (full || ['overview', 'role', 'zigbee'].includes(tab)) {
+    main.innerHTML = views[tab]();
+    if (tab === 'thread') { loadThread(); loadDataset(false); }
+    if (tab === 'ha') loadMqtt();
+    if (tab === 'tools') renderLog();
+  } else if (tab === 'thread') {
+    loadThread();
+  }
+}
+
+async function poll() {
+  if (!restarting) {
+    try { status = await api('/api/status'); render(false); } catch (e) { $('#hdr-role').innerHTML = '<span class="dot bad"></span><span>offline</span>'; }
+  }
+  setTimeout(poll, status?.c6?.flash?.busy ? 1000 : 5000);
+}
+
+renderTabs();
+poll().then(() => render(true));
+setInterval(pollLog, 1500);
+</script>
+</body>
+</html>

@@ -7,3 +7,6 @@ sdkconfig.old
 third_party/
 backups/
 *.log
+firmware/esphome/secrets.yaml
+firmware/esphome/.esphome/
+dist/
