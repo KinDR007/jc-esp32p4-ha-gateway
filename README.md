@@ -146,7 +146,7 @@ router role only).
 | HA cannot reach Thread devices | IPv6 RA/RIO on the HA host, multicast snooping on switches |
 | Zigbee2MQTT cannot connect | only one TCP client at a time; *Zigbee* tab shows the current one |
 | ESPHome image does not boot | the gateway comes back (rollback) and shows the reason |
-| Restore C6 factory firmware | `esptool --chip esp32c6 write-flash 0 c6_flash_backup.bin` over a USB-UART adapter on JP1 20/22, IO9 (pin 24) to GND |
+| Restore C6 factory firmware | full backup: `esptool --chip esp32c6 write-flash 0 c6_flash_backup.bin` over USB-UART on JP1 20/22, IO9 (pin 24) to GND. The factory app can also be extracted from a P4 factory backup (embedded `network_adapter` image) |
 
 ## Licenses
 

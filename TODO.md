@@ -9,10 +9,11 @@
 - [x] Vlastní Zigbee router firmware pro C6, build OK
 - [x] build_all / flash / backup skripty, pinned závislosti
 
+- [x] Kompletní `dist/` (všechny 4 C6 balíky), záloha P4, první flash
+- [x] Automatické HW testy TC01–TC13 (tests/report-2026-10-28.md), 10/10 v regresi
+
 ## Čeká
-- [ ] Build `zigbee_ncp` (esp-coordinator) a `esp_hosted` (esp-hosted-mcu) a kompletní `dist/`
-- [ ] Záloha flash P4 (CH340 nestabilní nad 115200 Bd) a C6
-- [ ] Propojky JP1, první flash, test všech rolí na desce
-- [ ] Akceptační testy ze zadani.md (HA OTBR, Matter, NAT64, SRP, 7 dní stabilita)
-- [ ] Zigbee2MQTT přes TCP s ZBOSS adaptérem, přepnutí koordinátor -> Thread -> koordinátor bez ztráty sítě
+- [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
+- [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
+- [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin
 - [ ] Ověřit HA cestu k "active dataset TLVs" v aktuální verzi HA (text v UI)

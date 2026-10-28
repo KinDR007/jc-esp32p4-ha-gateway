@@ -26,8 +26,8 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 |---|---|---|---|
 | TC01 | První start | stav po USB flashi | role `none`, údržba žádá zálohu C6, Ethernet IPv4 + IPv6 link-local, v c6fw jsou 4 balíky |
 | TC02 | Pojistka zálohy C6 | `POST /api/role thread_br` bez zálohy | 409 `c6_backup_required`, C6 nedotčen |
-| TC03 | Záloha C6 přes JP1 | `GET /api/c6/backup` | celý flash C6, 0xE9 na 0x0, tabulka oddílů na 0x8000, uloženo do `backups/`, C6 označen jako zálohovaný |
-| TC04 | Thread border router | přepnutí na `thread_br` | C6 = `ot_rcp`, role leader/router do 90 s, border routing a SRP běží, OTBR REST `/node` a dataset na portu 8081, webové CLI odpovídá |
+| TC03 | Záloha C6 přes JP1 | `GET /api/c6/backup` (asi 210 s) | celý flash C6, 0xE9 na 0x0, tabulka oddílů na 0x8000, uloženo do `backups/c6_backup_<aplikace>_<čas>.bin`, C6 označen jako zálohovaný |
+| TC04 | Thread border router | přepnutí na `thread_br` | C6 = `ot_rcp`, role leader/router do 90 s, border routing běží, SRP/NAT64/Border Agent do 60 s (startují ~20 s po leaderovi), OTBR REST `/node` a dataset na portu 8081, webové CLI odpovídá |
 | TC05 | Zigbee koordinátor | přepnutí na `zigbee_coordinator`, reset C6, TCP klient na 6638 | C6 = `zigbee_ncp`, NCP po resetu vysílá (UART funguje), bez chyb UART, TCP klient se zaregistruje a odpojení se pozná |
 | TC06 | Zachování Zigbee sítě | koordinátor → Thread BR → koordinátor | při odchodu se uloží snapshot `zigbee_ncp`, Thread síť je beze změny, při návratu `restored 0x…` |
 | TC07 | Zigbee router | přepnutí na `zigbee_router` | C6 = `zigbee_router`, stavové řádky `@ZR` přichází do 40 s, příkazy se přijímají, snapshot koordinátora zůstává |
@@ -49,4 +49,4 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | M05 | Výpadek napájení | odpojit napájení v každé roli, po startu stejná role a síť |
 | M06 | Výpadek Ethernetu | odpojit kabel na 1 min, Thread BR a TCP most se obnoví |
 | M07 | Stabilita | 7 dní v roli Thread BR bez restartu (`uptime`, `reset_reason`) |
-| M08 | Obnova továrního C6 | `esptool --chip esp32c6 write-flash 0 backups/c6_factory_*.bin` přes USB-UART na JP1 20/22, IO9 (pin 24) na GND |
+| M08 | Obnova továrního C6 | tovární aplikace je v `backups/c6_factory_app_network_adapter.bin` (vyextrahovaná ze zálohy P4); zapsat na 0x10000 spolu s bootloaderem a tabulkou z buildu esp_hosted, např. přes USB-UART na JP1 20/22, IO9 (pin 24) na GND |
