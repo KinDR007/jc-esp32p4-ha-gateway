@@ -8,6 +8,10 @@
 - Map devices are identified through the Matter Server of Home Assistant (WebSocket, port 5580,
   set under Thread › Topology): name, vendor, product, device type, Matter node, firmware, serial
   number, matched by Thread MAC or IPv6 address. Formatted details on hover and a device table.
+- Home Assistant is found over mDNS (`/api/ha/discover`); the Matter Server setting moved to
+  System › Settings and defaults to the add-on on that host. The header shows who uses the
+  gateway: Zigbee2MQTT connected or not, for Thread the last OTBR REST contact (kept across
+  restarts). Test UI10.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
 

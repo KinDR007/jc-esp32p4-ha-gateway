@@ -122,6 +122,38 @@ static void apply_role(gw_role_t role)
     st->active = role;
 }
 
+/* Home Assistant instances in the LAN (mDNS _home-assistant._tcp): the web UI suggests the
+ * Matter Server on the same host. */
+static esp_err_t ha_discover_get(httpd_req_t *req)
+{
+    mdns_result_t *results = NULL;
+    cJSON *list = cJSON_CreateArray();
+    if (mdns_query_ptr("_home-assistant", "_tcp", 3000, 4, &results) == ESP_OK) {
+        for (mdns_result_t *r = results; r; r = r->next) {
+            cJSON *ha = cJSON_CreateObject();
+            cJSON_AddStringToObject(ha, "name", r->instance_name ? r->instance_name : "");
+            cJSON_AddNumberToObject(ha, "port", r->port);
+            char ip[48] = "";
+            for (mdns_ip_addr_t *a = r->addr; a; a = a->next) {
+                if (a->addr.type == ESP_IPADDR_TYPE_V4) {
+                    snprintf(ip, sizeof(ip), IPSTR, IP2STR(&a->addr.u_addr.ip4));
+                    break;
+                }
+            }
+            cJSON_AddStringToObject(ha, "ip", ip);
+            for (size_t i = 0; i < r->txt_count; i++) {
+                const char *key = r->txt[i].key, *value = r->txt[i].value;
+                if (value && (!strcmp(key, "version") || !strcmp(key, "internal_url") || !strcmp(key, "location_name"))) {
+                    cJSON_AddStringToObject(ha, key, value);
+                }
+            }
+            cJSON_AddItemToArray(list, ha);
+        }
+        mdns_query_results_free(results);
+    }
+    return gw_http_send_json(req, list);
+}
+
 static void init_mdns(const char *hostname)
 {
     ESP_ERROR_CHECK(mdns_init());
@@ -159,6 +191,7 @@ void app_main(void)
     init_mdns(st->hostname);
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
+    gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     netscan_init();
     sound_init();
     gw_mqtt_start();

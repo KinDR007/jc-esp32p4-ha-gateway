@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI09).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI10).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -261,6 +261,30 @@ await test('UI09', 'Network surroundings: the last scan shows channels, spectrum
     check(rows === unique, `Wi-Fi table: one row per BSSID (${rows})`);
   }
   check(await page.isDisabled('#ns-quick') === !d.quick_available, 'quick scan offered only when the role can run it');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI10', 'Home Assistant: header shows who uses the gateway, settings find HA and test the Matter Server', async () => {
+  const s = await page.evaluate(() => fetch('/api/status').then(r => r.json()));
+  await tab('overview');
+  await page.waitForTimeout(1500);
+  const peer = await page.$eval('#hdr-peer', e => ({ hidden: e.classList.contains('hidden'), text: e.innerText, title: e.title }));
+  const expect = ['thread_br', 'zigbee_coordinator'].includes(s.role.active);
+  check(peer.hidden === !expect, `header user pill ${expect ? 'shown' : 'hidden'} for ${s.role.active} (${peer.text}${peer.title ? ': ' + peer.title : ''})`);
+  await tab('system/settings');
+  await page.waitForFunction(() => !/Looking|Hledám/.test(document.querySelector('#ha-found')?.textContent || 'x'), null, { timeout: 15000 });
+  const found = await page.$$('[data-ha-ip]');
+  console.log(`  ${found.length} Home Assistant instance(s) found over mDNS`);
+  if (found.length) {
+    const before = await page.inputValue('#matter-url');
+    await found[0].click();
+    const url = await page.inputValue('#matter-url');
+    check(/^ws:\/\/[\d.]+:5580\/ws$/.test(url), `"Use" fills ${url}`);
+    await page.click('#matter-test');
+    await page.waitForFunction(() => !/^…$/.test(document.querySelector('#matter-test-out').textContent), null, { timeout: 20000 });
+    console.log(`  Matter Server test: ${await page.textContent('#matter-test-out')}`);
+    await page.fill('#matter-url', before); // not saved: leave the setting as it was
+  }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

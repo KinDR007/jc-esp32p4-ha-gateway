@@ -60,7 +60,7 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
   main { padding: 14px; }
   .brand small, #hdr-uptime { display: none; }
 }
-@media (max-width: 560px) { #hdr-eth, #hdr-role { display: none; } }
+@media (max-width: 560px) { #hdr-eth, #hdr-role, #hdr-peer { display: none; } }
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .grid > .wide { grid-column: 1 / -1; }
@@ -176,6 +176,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="brand"><span id="brand-icon"></span>P4 Gateway <small id="hdr-host"></small></div>
     <span class="pill" id="hdr-role"><span class="dot"></span><span>…</span></span>
     <span class="pill" id="hdr-eth"><span class="dot"></span><span>Ethernet</span></span>
+    <span class="pill hidden" id="hdr-peer"><span class="dot"></span><span></span></span>
     <div class="spacer"></div>
     <span class="muted" id="hdr-uptime"></span>
     <span class="prefs row">
@@ -251,7 +252,8 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
-  'Overview': 'Přehled', 'Information': 'Informace', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
+  'Overview': 'Přehled', 'Information': 'Informace', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
+  'Matter Server (WebSocket)': 'Matter Server (WebSocket)', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
   'Product': 'Produkt', 'Device type': 'Typ zařízení', 'Matter node': 'Uzel Matter', 'Topology': 'Topologie', 'Network map': 'Mapa sítě', 'Live': 'Živě', 'Events': 'Události',
   'ESP32-C6 radio': 'Rádio ESP32-C6', 'read at the next C6 flashing': 'načte se při příštím flashování C6', 'Refresh map': 'Obnovit mapu', 'Network surroundings': 'Síťové okolí', 'Scan': 'Sken', 'Recommendation': 'Doporučení',
   '2.4 GHz spectrum': 'Spektrum 2,4 GHz', 'IEEE 802.15.4 channels': 'Kanály IEEE 802.15.4', 'Thread and Zigbee networks': 'Sítě Thread a Zigbee',
@@ -931,6 +933,33 @@ function renderHeader() {
   const e = status.eth;
   $('#hdr-eth').innerHTML = `<span class="dot ${e.link ? 'ok' : 'bad'}"></span><span>${e.link ? (e.speed || '') + ' Mb/s' : 'link down'}</span>`;
   $('#hdr-uptime').textContent = 'up ' + fmtUptime(status.uptime_s);
+  /* who uses the gateway: Zigbee2MQTT keeps a TCP session; Home Assistant calls the OTBR REST API
+   * only now and then (start, Thread settings, dataset changes), so for Thread the last contact */
+  const rs = status.role_status || {}, peer = $('#hdr-peer');
+  let p = null;
+  if (activeRole() === 'zigbee_coordinator') {
+    p = rs.client_connected ? ['ok', 'Zigbee2MQTT', `${L('connected from', 'připojen z')} ${rs.client}`]
+      : ['bad', L('no Zigbee2MQTT', 'bez Zigbee2MQTT'), L('no host connected to the TCP port', 'k TCP portu není připojen žádný hostitel')];
+  } else if (activeRole() === 'thread_br') {
+    const age = haAge(rs);
+    if (!haFound) haDiscover().then(() => renderHeader());
+    /* "Home Assistant" only when the client is the instance found over mDNS */
+    const isHa = (haFound || []).some(h => h.ip === rs.rest_client);
+    const name = isHa ? 'Home Assistant' : 'OTBR REST';
+    p = age === null ? ['', 'Home Assistant', L('has not used the OTBR REST API yet', 'zatím nepoužil OTBR REST API')]
+      : [age < 7 * 86400 ? 'ok' : 'warn', name, `OTBR REST: ${rs.rest_client} · ${age === Infinity ? '' : L('last contact ' + fmtUptime(age) + ' ago', 'naposledy před ' + fmtUptime(age))}`];
+  }
+  peer.classList.toggle('hidden', !p);
+  if (p) {
+    peer.innerHTML = `<span class="dot ${p[0]}"></span><span data-notr>${esc(p[1])}</span>`;
+    peer.title = p[2];
+  }
+}
+/* seconds since Home Assistant last called the OTBR REST API, null when never */
+function haAge(rs) {
+  if (rs.rest_client_age_s !== undefined) return rs.rest_client_age_s;
+  if (rs.rest_client_at && status.time) return Math.max(0, status.time - rs.rest_client_at);
+  return rs.rest_client ? Infinity : null;
 }
 
 function maintenanceBanner() {
@@ -999,9 +1028,8 @@ views['thread/info'] = () => isThread() ? `<div id="thread-status"><div class="c
 /* the map sits outside #thread-status, which the status poll redraws every few seconds */
 views['thread/topology'] = () => isThread() ? `<div class="card">${h3('graph-outline', 'Network map')}
     <div class="row"><button class="btn" id="topo-refresh">${ic('restart')}Refresh map</button><span id="topo-state" class="muted"></span></div>
-    <div class="row" style="margin-top:8px"><span class="muted">Matter Server${tip('Matter Server')}</span>
-      <input type="text" id="matter-url" value="${esc(status.matter_url || '')}" placeholder="ws://homeassistant.local:5580/ws" style="flex:1;max-width:360px">
-      <button class="btn" id="matter-save">${ic('check')}Save</button><span id="matter-state" class="muted"></span></div>
+    <div class="row" style="margin-top:8px"><span class="muted">Matter Server${tip('Matter Server')}</span><span id="matter-state" class="muted"></span>
+      <a href="#system/settings" class="muted">${L('change in System › Settings', 'změnit v Systém › Nastavení')}</a></div>
     <div id="topo-map" class="muted" style="margin-top:10px">Loading…</div></div>
   <div class="card" style="margin-top:16px">${h3('lan-connect', 'Devices in the network')}<div class="table-wrap" id="topo-devices"><p class="muted">Loading…</p></div></div>
   <div id="thread-status" style="margin-top:16px"><div class="card muted">Loading…</div></div>` : notThread();
@@ -1594,14 +1622,41 @@ function matterMatch(index, dev) {
   const ips = new Set((dev.ip6 || []).map(ip6Norm));
   return index.find(m => (dev.ext && m.ext === dev.ext) || m.ip6.some(ip => ips.has(ip))) || null;
 }
+/* Home Assistant instances found over mDNS (cached for the page) */
+let haFound = null;
+async function haDiscover(force) {
+  if (!haFound || force) {
+    /* one entry per host: Home Assistant answers on every interface */
+    try { haFound = [...new Map((await api('/api/ha/discover')).map(h => [h.ip + h.name, h])).values()]; } catch (e) { haFound = []; }
+  }
+  return haFound;
+}
+async function loadHaFound() {
+  const list = await haDiscover(true);
+  const box = $('#ha-found');
+  if (!box) return;
+  const rs = status.role_status || {}, age = activeRole() === 'thread_br' ? haAge(rs) : null;
+  box.innerHTML = (list.length ? list.map(h => `<div class="row"><span>${ic('home-assistant')} <b data-notr>${esc(h.location_name || h.name)}</b>
+      <span class="muted">${esc(h.ip)}${h.version ? ' · ' + esc(h.version) : ''}</span></span>
+      ${h.ip ? `<button class="btn" data-ha-ip="${esc(h.ip)}">${L('Use for the Matter Server', 'Použít pro Matter Server')}</button>` : ''}</div>`).join('')
+    : L('No Home Assistant found over mDNS.', 'Přes mDNS nenalezen žádný Home Assistant.')) +
+    (age !== null ? `<div class="muted" style="margin-top:6px">OTBR REST: ${esc(rs.rest_client)} · ${age === Infinity ? '' : L('last contact ' + fmtUptime(age) + ' ago', 'naposledy před ' + fmtUptime(age))}</div>` : '');
+}
+
+/* the saved Matter Server, or the add-on on the Home Assistant host found over mDNS */
+async function matterUrl() {
+  if (status.matter_url) return { url: status.matter_url, auto: false };
+  const ha = (await haDiscover()).find(h => h.ip);
+  return ha ? { url: `ws://${ha.ip}:5580/ws`, auto: true } : { url: '', auto: false };
+}
 async function matterLoad() {
-  const url = status.matter_url;
+  const { url, auto } = await matterUrl();
   if (!url) return null;
   if (matterCache.url === url && Date.now() - matterCache.at < 60000) return matterCache;
   try {
-    matterCache = { url, at: Date.now(), nodes: matterIndex(await matterFetch(url)), error: '' };
+    matterCache = { url, auto, at: Date.now(), nodes: matterIndex(await matterFetch(url)), error: '' };
   } catch (e) {
-    matterCache = { url, at: Date.now(), nodes: null, error: e.message };
+    matterCache = { url, auto, at: Date.now(), nodes: null, error: e.message };
   }
   return matterCache;
 }
@@ -1682,8 +1737,9 @@ async function loadTopology() {
         links: `${L('link quality to the parent', 'kvalita linky k rodiči')} ${c.lq}` });
     });
   }
-  $('#matter-state').innerHTML = !status.matter_url ? L('not set: names come only from Thread diagnostics', 'nenastaveno: názvy jen z diagnostiky Thread')
-    : matter.error ? `<span class="warn-text">${esc(matter.error)}</span>` : `${matter.nodes.length} ${L('Matter nodes', 'uzlů Matter')}, ${matched} ${L('found in the map', 'nalezeno v mapě')}`;
+  $('#matter-state').innerHTML = !matter ? L('not set and no Home Assistant found: names only from Thread diagnostics', 'nenastaveno a Home Assistant nenalezen: názvy jen z diagnostiky Thread')
+    : `<code>${esc(matter.url)}</code>${matter.auto ? ' ' + L('(found automatically)', '(nalezeno automaticky)') : ''} · ` +
+      (matter.error ? `<span class="warn-text">${esc(matter.error)}</span>` : `${matter.nodes.length} ${L('Matter nodes', 'uzlů Matter')}, ${matched} ${L('found in the map', 'nalezeno v mapě')}`);
   $('#topo-state').textContent = ` ${ids.length} ${L('routers', 'routerů')}, ${kids} ${L('end devices', 'koncových zařízení')} · ${d.ms} ms` +
     (d.error ? ` · ${L('some routers did not answer', 'některé routery neodpověděly')}` : '');
   const W = 900, H = 640, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 110;
@@ -1922,7 +1978,14 @@ async function loadNetscan() {
     <td>${esc(a.auth)}</td><td>802.11${esc(a.phy)}</td></tr>`).join('')}</table>`;
 }
 
-views['system/settings'] = () => `<div class="grid"><div class="card">${h3('cog-outline', 'Settings')}
+views['system/settings'] = () => `<div class="grid"><div class="card">${h3('home-assistant', 'Home Assistant and Matter')}
+    <div id="ha-found" class="muted">${L('Looking for Home Assistant…', 'Hledám Home Assistant…')}</div>
+    <label class="field" style="margin-top:12px"><span>Matter Server (WebSocket)${tip('Matter Server')}</span>
+      <input type="text" id="matter-url" value="${esc(status.matter_url || '')}" placeholder="ws://homeassistant.local:5580/ws"></label>
+    <div class="row"><button class="btn primary" id="matter-save">${ic('check')}Save</button><button class="btn" id="matter-test">${ic('play')}Test</button>
+      <span id="matter-test-out" class="muted"></span></div>
+    <p class="muted">${L('Empty: the map uses the Matter Server add-on on the Home Assistant host found in the network.', 'Prázdné: mapa použije doplněk Matter Server na hostiteli Home Assistant nalezeném v síti.')}</p></div>
+  <div class="card">${h3('cog-outline', 'Settings')}
     <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
     <label class="field"><span>New web UI password (user admin)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
     <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button>
@@ -2055,7 +2118,17 @@ document.addEventListener('click', async e => {
       status.matter_url = $('#matter-url').value.trim();
       matterCache.at = 0;
       toast(L('Saved', 'Uloženo'));
-      loadTopology();
+    } else if (t.dataset.haIp) {
+      $('#matter-url').value = `ws://${t.dataset.haIp}:5580/ws`;
+    } else if (t.id === 'matter-test') {
+      const url = $('#matter-url').value.trim() || (await matterUrl()).url;
+      $('#matter-test-out').textContent = '…';
+      try {
+        const nodes = await matterFetch(url);
+        $('#matter-test-out').innerHTML = `<span class="ok-text">${L('OK', 'OK')}: ${nodes.length} ${L('Matter nodes', 'uzlů Matter')}</span> <code>${esc(url)}</code>`;
+      } catch (err) {
+        $('#matter-test-out').innerHTML = `<span class="warn-text">${esc(err.message)}</span>`;
+      }
     } else if (t.id === 'ns-quick') {
       await api('/api/net/scan', { json: { mode: 'quick' } });
       toast(L('Quick scan running (about 15 s)', 'Rychlý sken běží (asi 15 s)'));
@@ -2227,6 +2300,7 @@ function render(full) {
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
     if (route() === 'system/netscan') loadNetscan();
+    if (route() === 'system/settings') loadHaFound();
     if (tab === 'sound') {
       loadSound(); loadSoundConfig().catch(err => toast('Error: ' + err.message));
       if (!soundTimer) soundTimer = setInterval(() => { loadSound(); loadScoresAndLog(); if (sndTick % 10 === 0 && sndCfg && !$('#ev-dlg').open) api('/api/sound/events').then(c => { sndCfg = c; renderEvents(); }).catch(() => {}); }, 1000);

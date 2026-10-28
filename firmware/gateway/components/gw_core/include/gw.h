@@ -43,6 +43,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_C6_TRIES "c6_tries"  /* u8, consecutive flash attempts */
 #define GW_KEY_C6_ADOPTED "c6_ok"   /* u8, the user allowed overwriting the C6 factory firmware */
 #define GW_KEY_RCP_TEL_OFF "rcp_tel_off" /* str, RCP version that hung on the telemetry request */
+#define GW_KEY_HA_SEEN "ha_seen"       /* blob gw_ha_seen_t, last client of the OTBR REST API */
 #define GW_KEY_MATTER_URL "matter_url" /* str, Matter Server WebSocket for device names in the Thread map */
 #define GW_KEY_FAIL_RST "fail_rst"   /* u8, the last software restart was a recovery from a failure */
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
@@ -123,6 +124,12 @@ bool gw_api_temperature(float *celsius);
 #define GW_C6_TELEMETRY_MAX 256
 #define GW_C6_TELEMETRY_SPINEL_PROP 0x3cf0 /* P4GW_SPINEL_PROP_TELEMETRY of the C6 side */
 void gw_c6_telemetry_set(const char *json);
+
+/* Last Home Assistant contact over the OTBR REST API, kept across restarts. */
+typedef struct {
+    char ip[48];
+    int64_t unix_time; /* 0 when the clock was not set yet */
+} gw_ha_seen_t;
 
 /* Optional MQTT link with Home Assistant discovery, configured via /api/mqtt. */
 esp_err_t gw_mqtt_start(void);

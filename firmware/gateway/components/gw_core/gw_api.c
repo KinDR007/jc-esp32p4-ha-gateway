@@ -2,6 +2,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "c6_flasher.h"
 #include "driver/temperature_sensor.h"
@@ -220,6 +221,8 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "idf", app->idf_ver);
     cJSON_AddStringToObject(json, "built", app->date);
     cJSON_AddStringToObject(json, "built_time", app->time);
+    time_t now = time(NULL);
+    cJSON_AddNumberToObject(json, "time", now > 1700000000 ? (double)now : 0);
     char matter_url[128];
     gw_config_get_str(GW_KEY_MATTER_URL, matter_url, sizeof(matter_url));
     cJSON_AddStringToObject(json, "matter_url", matter_url);

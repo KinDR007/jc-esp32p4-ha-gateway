@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_br_web.h"
 #include "esp_check.h"
@@ -19,6 +20,7 @@
 #include "esp_timer.h"
 #include "esp_vfs_eventfd.h"
 #include "freertos/semphr.h"
+#include "lwip/sockets.h"
 #include "freertos/task.h"
 #include "gw.h"
 #include "netscan.h"
@@ -731,11 +733,79 @@ static esp_err_t status_get(httpd_req_t *req)
 }
 
 /* Summary for /api/status; the full detail comes from /api/thread/status. */
+/* Last client of the REST API (Home Assistant OTBR integration): shown in the header and used to
+ * suggest the Matter Server address (the add-on runs on the same host). */
+static portMUX_TYPE s_rest_mux = portMUX_INITIALIZER_UNLOCKED;
+static char s_rest_client[48];
+static int64_t s_rest_client_us;
+
+esp_err_t esp_br_web_client_open(httpd_handle_t hd, int sockfd)
+{
+    struct sockaddr_storage peer;
+    socklen_t len = sizeof(peer);
+    char ip[48] = "";
+    if (getpeername(sockfd, (struct sockaddr *)&peer, &len) == 0) {
+        if (peer.ss_family == AF_INET6) {
+            const struct sockaddr_in6 *a = (const struct sockaddr_in6 *)&peer;
+            /* IPv4 clients reach the dual-stack socket as ::ffff:a.b.c.d */
+            if (IN6_IS_ADDR_V4MAPPED(&a->sin6_addr)) {
+                inet_ntop(AF_INET, &a->sin6_addr.s6_addr[12], ip, sizeof(ip));
+            } else {
+                inet_ntop(AF_INET6, &a->sin6_addr, ip, sizeof(ip));
+            }
+        } else if (peer.ss_family == AF_INET) {
+            inet_ntop(AF_INET, &((const struct sockaddr_in *)&peer)->sin_addr, ip, sizeof(ip));
+        }
+    }
+    if (ip[0]) {
+        portENTER_CRITICAL(&s_rest_mux);
+        strlcpy(s_rest_client, ip, sizeof(s_rest_client));
+        s_rest_client_us = esp_timer_get_time();
+        portEXIT_CRITICAL(&s_rest_mux);
+        /* keep it across restarts: written when the address changes or once an hour */
+        static gw_ha_seen_t saved;
+        static bool loaded;
+        if (!loaded) {
+            gw_config_get_blob(GW_KEY_HA_SEEN, &saved, sizeof(saved));
+            loaded = true;
+        }
+        time_t now = time(NULL);
+        if (strcmp(saved.ip, ip) != 0 || (now > 1700000000 && now - saved.unix_time > 3600)) {
+            strlcpy(saved.ip, ip, sizeof(saved.ip));
+            saved.unix_time = now > 1700000000 ? now : 0;
+            gw_config_set_blob(GW_KEY_HA_SEEN, &saved, sizeof(saved));
+        }
+    }
+    return ESP_OK; /* anything else would close the connection */
+}
+
+static void add_rest_client(cJSON *json)
+{
+    char ip[48];
+    int64_t at;
+    portENTER_CRITICAL(&s_rest_mux);
+    strlcpy(ip, s_rest_client, sizeof(ip));
+    at = s_rest_client_us;
+    portEXIT_CRITICAL(&s_rest_mux);
+    if (ip[0]) {
+        cJSON_AddStringToObject(json, "rest_client", ip);
+        cJSON_AddNumberToObject(json, "rest_client_age_s", (double)((esp_timer_get_time() - at) / 1000000));
+        return;
+    }
+    gw_ha_seen_t saved;
+    if (gw_config_get_blob(GW_KEY_HA_SEEN, &saved, sizeof(saved)) && saved.ip[0]) {
+        /* not seen since this start: the last contact before it */
+        cJSON_AddStringToObject(json, "rest_client", saved.ip);
+        cJSON_AddNumberToObject(json, "rest_client_at", (double)saved.unix_time);
+    }
+}
+
 static cJSON *thread_summary(void)
 {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "mode", s_border_router ? "border_router" : "router");
     cJSON_AddStringToObject(json, "phase", s_phase);
+    add_rest_client(json);
     if (s_started && esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
         otInstance *ot = esp_openthread_get_instance();
         cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(otThreadGetDeviceRole(ot)));

@@ -96,9 +96,16 @@ python3 tools/matter_watch.py --url ws://homeassistant.local:5580/ws --node 39 \
 
 ## Thread network map: device names
 
-Thread › Topology shows the mesh. To see which device is which, enter the Matter Server WebSocket
-(`ws://homeassistant.local:5580/ws`) in the map card; port 5580 has to be exposed in the Matter
-Server add-on (Configuration → Network). The browser reads the nodes from it and matches them with
+Thread › Topology shows the mesh. To see which device is which, the map reads the Matter Server
+add-on over its WebSocket (port 5580, has to be exposed in the add-on: Configuration → Network).
+Without a setting the gateway uses the Home Assistant host it finds over mDNS
+(`ws://<HA IP>:5580/ws`); System › Settings shows the instance found, lets you set another address
+and test the connection. The browser reads the nodes from it and matches them with
 the map by Thread MAC or IPv6 address; Home Assistant shows the same node ID in the device info of
 the Matter integration. Devices that are not Matter (other border routers) show what they report
 over Thread diagnostics, often only the vendor.
+
+The header shows who uses the gateway: in the Zigbee coordinator role whether Zigbee2MQTT is
+connected (it keeps a TCP session); in the Thread border router role when Home Assistant last
+called the OTBR REST API. Home Assistant does that only at its start, in the Thread settings and on
+dataset changes, so the pill tells the last contact, not a live connection.

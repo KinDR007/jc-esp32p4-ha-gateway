@@ -1,3 +1,4 @@
+diff -ruN CMakeLists.txt
 --- CMakeLists.txt
 +++ CMakeLists.txt
 @@ -6,12 +6,10 @@
@@ -14,9 +15,18 @@
  )
  
 -spiffs_create_partition_image(web_storage ${CMAKE_CURRENT_SOURCE_DIR}/frontend FLASH_IN_PROJECT)
+diff -ruN include/esp_br_web.h
 --- include/esp_br_web.h
 +++ include/esp_br_web.h
-@@ -35,6 +35,13 @@
+@@ -10,6 +10,7 @@
+ #include <stddef.h>
+ 
+ #include "esp_event.h"
++#include "esp_http_server.h"
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -35,6 +36,19 @@
   */
  void esp_br_web_start(char *base_path);
  
@@ -27,14 +37,36 @@
 + */
 +void esp_br_web_start_server(char *base_path);
 +
++/**
++ * @brief Called for every new connection to the web server (REST API). Weak default does nothing;
++ *        must return ESP_OK, otherwise the connection is closed. P4 gateway patch.
++ */
++esp_err_t esp_br_web_client_open(httpd_handle_t hd, int sockfd);
++
  /** Size of an ePSKc TAP string buffer: 8 digits + checksum digit + '\0' */
  #define ESP_BR_EPSKC_TAP_LEN 10
  
+diff -ruN src/esp_br_web.c
 --- src/esp_br_web.c
 +++ src/esp_br_web.c
-@@ -1373,6 +1373,10 @@
+@@ -1340,6 +1340,12 @@
+ {
+     heap_caps_free(ptr);
+ }
++
++/* P4 gateway: called for every new REST/web connection, the application overrides it. */
++__attribute__((weak)) esp_err_t esp_br_web_client_open(httpd_handle_t hd, int sockfd)
++{
++    return ESP_OK;
++}
+ #endif
+ 
+ /*-----------------------------------------------------
+@@ -1372,7 +1378,12 @@
+     config.uri_match_fn = httpd_uri_match_wildcard;
      config.stack_size = 8 * 1024;
      config.max_open_sockets = 7;
++    config.open_fn = esp_br_web_client_open; /* P4 gateway: shows who uses the REST API */
      config.lru_purge_enable = true;
 +#ifdef ESP_BR_WEB_PORT
 +    config.server_port = ESP_BR_WEB_PORT;
@@ -43,7 +75,7 @@
      s_server.port = config.server_port;
  
      esp_br_web_api_init();
-@@ -1509,6 +1513,11 @@
+@@ -1509,6 +1520,11 @@
  }
  #endif
  
