@@ -25,6 +25,7 @@ static const char *TAG = "zr";
 #define STEER_RETRY_MS 30000
 #define STATUS_INTERVAL_MS 10000
 #define PERMIT_JOIN_S 180
+#define LINK_BAUD 460800 /* CONFIG_GW_C6_UART_BAUD of the gateway */
 
 static volatile bool s_joined;
 static volatile bool s_steering;
@@ -206,6 +207,8 @@ void app_main(void)
 
     /* stdout keeps working through the driver once it is installed. */
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0));
+    /* The default console runs at 115200; the P4 link uses its runtime rate. */
+    ESP_ERROR_CHECK(uart_set_baudrate(UART_NUM_0, LINK_BAUD));
     uart_vfs_dev_use_driver(UART_NUM_0);
 
     xTaskCreate(zigbee_task, "zigbee", 8192, NULL, 5, NULL);

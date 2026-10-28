@@ -345,9 +345,32 @@ static esp_err_t esphome_upload_inner(httpd_req_t *req)
                       false);
 }
 
-static esp_err_t part_sink(void *ctx, uint32_t offset, const void *data, size_t len)
+typedef struct {
+    const esp_partition_t *part;
+    uint32_t erase_len;
+    bool erased;
+} c6fw_sink_t;
+
+/* Checks the directory header before erasing, so a wrong file keeps the stored bundles. */
+static esp_err_t c6fw_sink(void *arg, uint32_t offset, const void *data, size_t len)
 {
-    return esp_partition_write(ctx, offset, data, len);
+    c6fw_sink_t *ctx = arg;
+    if (!ctx->erased) {
+        uint32_t format;
+        if (offset != 0 || len < 8 || memcmp(data, C6FW_DIR_MAGIC, 4) != 0) {
+            return ESP_ERR_INVALID_VERSION;
+        }
+        memcpy(&format, (const uint8_t *)data + 4, sizeof(format));
+        if (format != C6FW_FORMAT_VERSION) {
+            return ESP_ERR_INVALID_VERSION;
+        }
+        esp_err_t err = esp_partition_erase_range(ctx->part, 0, ctx->erase_len);
+        if (err != ESP_OK) {
+            return err;
+        }
+        ctx->erased = true;
+    }
+    return esp_partition_write(ctx->part, offset, data, len);
 }
 
 static esp_err_t c6fw_upload_inner(httpd_req_t *req)
@@ -356,16 +379,16 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
     if (!part || req->content_len == 0 || req->content_len > part->size) {
         return gw_http_send_error(req, 413, "image does not fit the c6fw partition");
     }
-    esp_err_t err = esp_partition_erase_range(part, 0, (req->content_len + 0xfff) & ~0xfff);
-    if (err == ESP_OK) {
-        err = receive_body(req, part_sink, (void *)part);
-    }
+    c6fw_sink_t ctx = {.part = part, .erase_len = (req->content_len + 0xfff) & ~0xfff};
+    esp_err_t err = receive_body(req, c6fw_sink, &ctx);
     if (err == ESP_OK) {
         err = c6fw_verify_all();
     }
     if (err != ESP_OK) {
-        /* Never leave a half-written image that parses as valid. */
-        esp_partition_erase_range(part, 0, 0x1000);
+        if (ctx.erased) {
+            /* Never leave a half-written image that parses as valid. */
+            esp_partition_erase_range(part, 0, 0x1000);
+        }
         return gw_http_send_error(req, 400, esp_err_to_name(err));
     }
     /* The boot sequence compares bundle hashes and reflashes the C6 if its bundle changed. */
