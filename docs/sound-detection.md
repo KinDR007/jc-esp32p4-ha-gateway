@@ -1,7 +1,8 @@
 # Detekce zvukových událostí mikrofonem desky (analýza, 2026-10-28)
 
 Stav: fáze 1 (audio základ) a 2 (YAMNet na zařízení) hotové a ověřené na desce, viz
-[Výsledky fáze 1–2](#výsledky-fáze-12-2026-10-28). Fáze 3–5 čekají na potvrzení.
+[Výsledky fáze 1–2](#výsledky-fáze-12-2026-10-28). Fáze 3 je navržená níže, čeká na potvrzení.
+Seznam všech detekovatelných zvuků: [sound-classes.md](sound-classes.md).
 
 ## Cíl
 
@@ -181,6 +182,146 @@ Rozhodnutí uživatele: model YAMNet, detekovat vše co model umí, učicí rež
 | Komprimovaný zápis do C6 přes jeho ROM loader dával špatná data | rozbalení na P4 (tinfl na haldě, kontrola MD5), zápis nekomprimovaně |
 | Restart z UI v první minutě po aktualizaci vrátil starou verzi | restart vyžádaný přes API nejdřív potvrdí běžící verzi |
 | Role Thread router přepsala síť border routeru | border router si ukládá vlastní dataset (`br_dataset`), test TC16 |
+
+## Fáze 3: personalizace detekcí a předávání do HA (návrh k potvrzení)
+
+### Výchozí stav
+
+- Model hodnotí vždy všech 521 tříd najednou. Seznam je v [sound-classes.md](sound-classes.md).
+  Tříd je hodně a nejsou všechny užitečné: 145 je hudba (žánry, nástroje) a 21 popisuje akustické
+  prostředí („Inside, small room“, „Silence“), takže nejde o události.
+- Model nepozná, odkud zvuk pochází. Řeč z televize je pro něj také „Speech“ a letadlo v reklamě je
+  „Aircraft“. Personalizace tedy musí řešit dvě věci: co mě vůbec zajímá a co je v tomto bytě šum.
+
+### Dvouúrovňový model: třídy → události
+
+1. **Třídy (521, úroveň modelu):** v UI jako strom podle ontologie AudioSet, tedy 7 kategorií a asi
+   40 podskupin. U každé položky je zaškrtávátko, fulltextové hledání a živé skóre („co právě
+   slyším“). Odškrtnutá třída se nikdy nehlásí, např. letadla, hudební žánry nebo „Inside, small room“.
+2. **Události (desítky, úroveň HA):** pojmenovaná skupina tříd s vlastním prahem a časováním.
+   Do Home Assistant jdou jen události, nikdy 521 surových tříd. Příklad: `dog_bark` = Dog, Bark, Yip,
+   Howl, Bow-wow, Growling, Whimper (dog). Událost má:
+   - `id` (stabilní, z něj vzniká `unique_id` v HA; přejmenování nerozbije automatizace)
+   - název
+   - třídy
+   - práh skóre
+   - minimální trvání: kolik oken po 0,48 s za sebou musí práh překročit
+   - dobu doznění: jak dlouho po posledním zásahu událost trvá
+   - cooldown: minimální odstup dvou událostí
+   - druh: „impulzní“ (zvonek, sklo, štěkot) nebo „trvalá“ (řeč, voda teče, vysavač)
+3. **Předvolby** (jedním klikem, dál upravitelné):
+
+| Předvolba | Události |
+|---|---|
+| Domácnost (výchozí) | speech, shout_scream, laughter, baby_cry, cough_sneeze, snoring, dog_bark, cat, doorbell, knock, door, glass_break, smoke_alarm, alarm_siren, phone_ring, water_running, toilet_flush, vacuum, appliance (mikrovlnka, mixér, fén) |
+| Bezpečnost | glass_break, smoke_alarm, alarm_siren, shout_scream, door, knock, dog_bark, gunshot_explosion |
+| Zvířata | dog_bark, dog_whimper, cat, bird |
+| Vše | jedna událost na každou třídu kromě hudby a prostředí (pro ladění) |
+
+4. **Výchozí vyloučení:** kategorie „Channel, environment and background“, „Silence“, hudební žánry a
+   většina „Onomatopoeia“ jsou ve výchozím stavu odškrtnuté.
+5. **Ladění z provozu:** UI ukáže log posledních detekcí, tedy čas, událost, třídu, skóre a hlasitost.
+   U každého záznamu půjde jedním klikem „tuto třídu ignorovat“ nebo „zvýšit práh“. Tak se
+   personalizace dělá podle toho, co skutečně zní v bytě, ne podle odhadu předem.
+6. **Potlačení zdrojů (volitelné):** pravidlo „ignoruj `speech`, když je současně Television, Radio
+   nebo Music nad prahem“ omezí falešnou řeč z TV. Úplné řešení to není, YAMNet TV od člověka spolehlivě
+   nerozliší.
+
+Konfigurace se uloží jako JSON v NVS (desítky událostí se vejdou do jednotek kB). V UI bude export a
+import. Naučené zvuky z fáze 4 budou jen další události stejného tvaru.
+
+### Detekční logika (na zařízení)
+
+- Skóre události je maximum skóre jejích povolených tříd v daném okně.
+- **Začátek:** skóre ≥ práh v N oknech za sebou. Pro impulzní zvuky stačí 1, pro trvalé 2–3 okna
+  (zhruba 1–1,5 s).
+- **Konec:** po dobu doznění žádné okno nad `práh − 0,1` (hystereze).
+- **Cooldown:** po skončení se událost stejného typu hlásí nejdřív za X s, např. zvonek 30 s.
+  Brání to záplavě notifikací při štěkání.
+- **Výchozí prahy:** kalibrace na desce ukázala čisté zvuky v rozsahu 0,6–1,0 a ticho pod 0,3.
+  Výchozí práh bude 0,5 a v UI půjde nastavit. Frigate používá 0,8, ale na float modelu.
+
+### Předávání do Home Assistant: varianty
+
+| Mechanismus (MQTT discovery) | Co v HA vznikne | Vhodné pro | Omezení |
+|---|---|---|---|
+| **`event` entita** | `event.p4gw_dog_bark`, stav = čas poslední události, atributy (třída, skóre, hlasitost) | impulzní zvuky, historie v logbooku, automatizace „když nastane“ | žádný stav „probíhá“ |
+| **`binary_sensor`** s doběhem | `binary_sensor.p4gw_speech` on/off | trvalé zvuky, podmínky („když běží vysavač“), triggery s `for:` („štěká déle než 2 min“), dashboardy | u krátkých zvuků jen krátký puls |
+| **`device_trigger`** | trigger „P4 gateway: Dog bark detected“ v editoru automatizací (Zařízení → spouštěč) | nejpohodlnější tvorba automatizací v UI | bez entity a bez historie |
+| `sensor` „poslední zvuk“ | text + atributy | přehled na dashboardu | pro automatizace nevhodný |
+| vlastní integrace HA | cokoliv | – | zbytečná práce, MQTT stačí |
+
+**Doporučení:** pro každou povolenou událost publikovat **`event` entitu + `binary_sensor` +
+`device_trigger`** z jedné discovery. Uživatel v HA použije, co se mu hodí, a nepotřebné entity
+v HA vypne.
+- Payload na `p4gw/<host>/sound/<event_id>`:
+  `{"event_type": "detected", "class": "Bark", "score": 0.82, "level_db": -41.7, "duration_s": 2.4}`
+- Stav `binary_sensor`: `p4gw/<host>/sound/<event_id>/state` = ON/OFF
+- Při přidání nebo odebrání události se discovery publikuje znovu. Odebraná událost pošle prázdnou
+  retained konfiguraci, takže entita z HA zmizí.
+
+### Příklady automatizací (HA)
+
+```yaml
+# Zvonek -> notifikace a TTS
+trigger:
+  - platform: state
+    entity_id: event.p4gw_doorbell
+action:
+  - service: notify.mobile_app_telefon
+    data: {message: "Zvoní zvonek"}
+
+# Pes štěká déle než 2 minuty, nikdo není doma
+trigger:
+  - platform: state
+    entity_id: binary_sensor.p4gw_dog_bark
+    to: "on"
+    for: "00:02:00"
+condition:
+  - condition: state
+    entity_id: zone.home
+    state: "0"
+action:
+  - service: notify.mobile_app_telefon
+    data: {message: "Pes štěká už 2 minuty"}
+
+# Kouřový hlásič -> kritická notifikace, rozbití skla při zapnutém alarmu -> siréna
+trigger:
+  - platform: state
+    entity_id: event.p4gw_smoke_alarm
+  - platform: state
+    entity_id: event.p4gw_glass_break
+    id: glass
+condition:
+  - condition: or
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.id != 'glass' }}"
+      - condition: state
+        entity_id: alarm_control_panel.dum
+        state: armed_away
+action:
+  - service: notify.mobile_app_telefon
+    data: {message: "{{ trigger.to_state.attributes.class }} ({{ trigger.to_state.attributes.score }})"}
+```
+
+Plán: v UI brány u každé události tlačítko „zkopírovat šablonu automatizace“.
+
+### Rozsah implementace fáze 3
+
+- Firmware:
+  - modul událostí: konfigurace, detekční logika a MQTT discovery pro event, binary_sensor a device_trigger
+  - API `GET/PUT /api/sound/events`, `GET /api/sound/classes` (strom s živými skóre), `GET /api/sound/log`
+- UI, záložka Sound:
+  - strom tříd s vyhledáváním a předvolbami
+  - editor událostí
+  - log detekcí s rychlými akcemi
+  - šablony automatizací
+- Testy:
+  - TC17: konfigurace událostí přežije restart a odškrtnutá třída se nehlásí
+  - TC18: discovery v MQTT a payloady událostí (kontrola přes broker)
+  - TC19: přehraný zvuk vyvolá událost v HA
+- Odhad: 1 den práce a test na desce s brokerem 192.168.88.27.
 
 ## Zdroje
 
