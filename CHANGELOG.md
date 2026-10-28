@@ -1,12 +1,13 @@
 # Changelog
 
-## Unreleased
+## v1.2 (2026-10-28)
 
 - Web UI redesign: left menu with sub pages (Information / Diagnostics / Settings pattern, Tools
   merged into System), two tiles per row with one label column width, roles grouped per function
   (Thread, Zigbee, ESPHome), deep links `#section/page`, drawer menu on phones, wider tiles, Material
   Design Icons embedded as SVG (`tools/web/gen_icons.mjs`), explanation tooltips (ⓘ) for values,
   network devices, roles and actions in Czech and English. Browser test UI08.
+- `tools/matter_watch.py`: watches Matter attribute changes through Home Assistant.
 - Network surroundings (System): quick 802.15.4 scan in the Thread roles and a full scan with
   Wi-Fi through a new C6 scanner image; 2.4 GHz spectrum, channel ratings and recommendations for
   new Thread, Zigbee and Wi-Fi networks. SNTP for scan times. Tests TC20, UI09.
@@ -18,8 +19,7 @@
   recognition on could trip the task watchdog), patch changes now reconfigure the build.
 - Detailed hardware info: P4 CPU load per core, temperature min/max, flash/PSRAM/NVS usage, MAC,
   build fingerprint; C6 MAC, chip revision, flash size and flash count (read from its bootloader
-  at the next flashing). The C6 radio firmwares do not report the C6 temperature.
-
+  at the next flashing).
 - Web UI in Czech and English (picked from the browser language, switch in the header) and a
   light / dark / system theme switch. Browser tests UI06–UI07.
 - Household preset: clap, repeated clapping and finger snap events.
