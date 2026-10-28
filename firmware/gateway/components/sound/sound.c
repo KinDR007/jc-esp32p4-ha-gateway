@@ -22,6 +22,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "sound_events.h"
 #include "sound_mel.h"
 #include "sound_model.h"
 
@@ -304,6 +305,7 @@ static void infer_task(void *arg)
         window_peak_db = -120.0f;
         if (!s.infer_enabled || !sound_model_ready() || !loud) {
             s.skipped++;
+            sound_events_update(NULL, s.level_db, esp_timer_get_time());
             continue;
         }
         memcpy(patch, history, MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float));
@@ -322,6 +324,7 @@ static void infer_task(void *arg)
                 }
             }
         }
+        sound_events_update(scores, s.level_db, esp_timer_get_time());
         xSemaphoreTake(s_lock, portMAX_DELAY);
         memcpy(s.top, top, sizeof(top));
         s.top_us = esp_timer_get_time();
@@ -354,7 +357,6 @@ static esp_err_t start(void)
     ESP_RETURN_ON_FALSE(s.ring, ESP_ERR_NO_MEM, TAG, "ring");
     s.floor_db = 0;
     mel_init();
-    load_class_names();
     ESP_RETURN_ON_ERROR(audio_open(), TAG, "audio");
     ESP_RETURN_ON_FALSE(xTaskCreatePinnedToCore(capture_task, "snd_cap", 4096, NULL, CAPTURE_PRIO, NULL, CORE) == pdPASS,
                         ESP_ERR_NO_MEM, TAG, "capture task");
@@ -376,9 +378,9 @@ static cJSON *status_json(void)
     cJSON_AddNumberToObject(json, "gain_db", s.gain_db);
     cJSON_AddNumberToObject(json, "gate_db", s.gate_db);
     if (s.running) {
-        cJSON_AddNumberToObject(json, "level_db", roundf(s.level_db * 10) / 10);
-        cJSON_AddNumberToObject(json, "peak_db", roundf(s.peak_db * 10) / 10);
-        cJSON_AddNumberToObject(json, "floor_db", roundf(s.floor_db * 10) / 10);
+        cJSON_AddNumberToObject(json, "level_db", round((double)(s.level_db) * 10) / 10.0);
+        cJSON_AddNumberToObject(json, "peak_db", round((double)(s.peak_db) * 10) / 10.0);
+        cJSON_AddNumberToObject(json, "floor_db", round((double)(s.floor_db) * 10) / 10.0);
         cJSON_AddNumberToObject(json, "seconds", samples_total() / (double)RATE);
         cJSON_AddNumberToObject(json, "read_errors", s.read_errors);
     }
@@ -393,10 +395,10 @@ static cJSON *status_json(void)
     cJSON_AddNumberToObject(inf, "runs", s.runs);
     cJSON_AddNumberToObject(inf, "skipped_quiet", s.skipped);
     cJSON_AddNumberToObject(inf, "late_resyncs", s.late);
-    cJSON_AddNumberToObject(inf, "last_ms", roundf(s.last_ms * 10) / 10);
-    cJSON_AddNumberToObject(inf, "avg_ms", roundf(s.avg_ms * 10) / 10);
-    cJSON_AddNumberToObject(inf, "max_ms", roundf(s.max_ms * 10) / 10);
-    cJSON_AddNumberToObject(inf, "cpu_pct", roundf(s.cpu_pct * 10) / 10);
+    cJSON_AddNumberToObject(inf, "last_ms", round((double)(s.last_ms) * 10) / 10.0);
+    cJSON_AddNumberToObject(inf, "avg_ms", round((double)(s.avg_ms) * 10) / 10.0);
+    cJSON_AddNumberToObject(inf, "max_ms", round((double)(s.max_ms) * 10) / 10.0);
+    cJSON_AddNumberToObject(inf, "cpu_pct", round((double)(s.cpu_pct) * 10) / 10.0);
     if (s.top_us) {
         cJSON_AddNumberToObject(inf, "top_age_s", (esp_timer_get_time() - s.top_us) / 1e6);
         cJSON *top = cJSON_AddArrayToObject(inf, "top");
@@ -404,7 +406,7 @@ static cJSON *status_json(void)
             cJSON *t = cJSON_CreateObject();
             cJSON_AddNumberToObject(t, "index", s.top[k].index);
             cJSON_AddStringToObject(t, "name", class_name(s.top[k].index));
-            cJSON_AddNumberToObject(t, "score", roundf(s.top[k].score * 1000) / 1000);
+            cJSON_AddNumberToObject(t, "score", round((double)(s.top[k].score) * 1000) / 1000.0);
             cJSON_AddItemToArray(top, t);
         }
     }
@@ -554,13 +556,14 @@ static void mqtt_discovery(void)
 {
     if (s.running) {
         gw_mqtt_entity("sensor", "sound_level", "Sound level", "{{ value_json.sound_level }}", level_extra);
+        sound_events_mqtt_discovery();
     }
 }
 
 static void mqtt_state(cJSON *state)
 {
     if (s.running) {
-        cJSON_AddNumberToObject(state, "sound_level", roundf(s.level_db * 10) / 10);
+        cJSON_AddNumberToObject(state, "sound_level", round((double)(s.level_db) * 10) / 10.0);
     }
 }
 
@@ -575,6 +578,8 @@ esp_err_t sound_init(void)
     gw_http_register("/api/sound/clip", HTTP_GET, clip_get);
     gw_http_register("/api/ota/model", HTTP_POST, model_upload);
     gw_mqtt_set_extension(mqtt_discovery, mqtt_state);
+    load_class_names();
+    sound_events_init(class_name);
     if (!gw_config_get_u8(KEY_ENABLED, 0)) {
         return ESP_OK;
     }

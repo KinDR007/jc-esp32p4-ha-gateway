@@ -54,6 +54,7 @@ bool gw_config_get_str(const char *key, char *out, size_t len);
 esp_err_t gw_config_set_str(const char *key, const char *value);
 bool gw_config_get_blob(const char *key, void *out, size_t len);
 esp_err_t gw_config_set_blob(const char *key, const void *value, size_t len);
+esp_err_t gw_config_blob_size(const char *key, size_t *len);
 esp_err_t gw_config_erase(const char *key);
 
 /* ---- runtime state ---- */
@@ -116,6 +117,9 @@ void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state))
 /* One retained discovery config; value_template reads the shared state topic, extra adds fields. */
 void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
                     void (*extra)(cJSON *cfg));
+/* Publishes a discovery config (unique_id, availability and device are added); cfg is consumed.
+ * cfg NULL removes the entity. component "device_automation" for device triggers. */
+void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg);
 bool gw_mqtt_connected(void);
 /* Publishes to <base>/<suffix>, QoS 1. */
 void gw_mqtt_publish(const char *suffix, const char *payload, bool retain);

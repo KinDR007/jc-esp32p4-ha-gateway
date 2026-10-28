@@ -108,6 +108,11 @@ bool gw_config_get_blob(const char *key, void *out, size_t len)
     return nvs_get_blob(s_nvs, key, out, &size) == ESP_OK && size == len;
 }
 
+esp_err_t gw_config_blob_size(const char *key, size_t *len)
+{
+    return nvs_get_blob(s_nvs, key, NULL, len);
+}
+
 esp_err_t gw_config_set_blob(const char *key, const void *value, size_t len)
 {
     esp_err_t err = nvs_set_blob(s_nvs, key, value, len);

@@ -90,6 +90,37 @@ const char *gw_mqtt_base_topic(void)
     return s_base;
 }
 
+void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
+{
+    gw_state_t *st = gw_state();
+    char buf[160];
+
+    if (!gw_mqtt_connected()) {
+        cJSON_Delete(cfg);
+        return;
+    }
+    snprintf(buf, sizeof(buf), "%s/%s/%s/%s/config", s_prefix, component, st->hostname, object_id);
+    if (!cfg) {
+        /* Empty retained config removes the entity from Home Assistant. */
+        esp_mqtt_client_publish(s_client, buf, "", 0, 1, 1);
+        return;
+    }
+    char id[96];
+    snprintf(id, sizeof(id), "%s_%s", st->hostname, object_id);
+    if (strcmp(component, "device_automation") != 0) {
+        cJSON_AddStringToObject(cfg, "unique_id", id);
+        cJSON_AddStringToObject(cfg, "object_id", id);
+        char avail[96];
+        topic(avail, sizeof(avail), "availability");
+        cJSON_AddStringToObject(cfg, "availability_topic", avail);
+    }
+    cJSON_AddItemToObject(cfg, "device", device_json());
+    char *payload = cJSON_PrintUnformatted(cfg);
+    cJSON_Delete(cfg);
+    esp_mqtt_client_publish(s_client, buf, payload, 0, 1, 1);
+    cJSON_free(payload);
+}
+
 void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
                            void (*extra)(cJSON *))
 {

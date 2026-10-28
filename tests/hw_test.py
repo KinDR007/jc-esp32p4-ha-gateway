@@ -440,13 +440,91 @@ def tc16_thread_dataset_isolation():
     check(t['network_name'] == br_net, f'border router back on {br_net}')
 
 
+def _events_config():
+    cfg = http('GET', '/api/sound/events')[1]
+    return {'preset': cfg['preset'], 'exclude': cfg['exclude'],
+            'events': [{k: v for k, v in e.items() if k not in ('active', 'count', 'last_ago_s')} for e in cfg['events']]}
+
+
+def tc17_sound_events_config():
+    """Sound events: validation, save, survives a restart; the original configuration is restored."""
+    original = _events_config()
+    try:
+        bad = [({'events': [{'id': 'Bad Id', 'classes': [0]}]}, 'invalid id'),
+               ({'events': [{'id': 'a', 'classes': [999]}]}, 'class out of range'),
+               ({'events': [{'id': 'a', 'classes': [0]}, {'id': 'a', 'classes': [1]}]}, 'duplicate id')]
+        for body, what in bad:
+            code, r = http('PUT', '/api/sound/events', body)
+            check(code == 400, f'{what} rejected ({r.get("error") if isinstance(r, dict) else r})')
+        cfg = json.loads(json.dumps(original))
+        cfg['events'].append({'id': 'tc17_test', 'name': 'TC17 test', 'kind': 'impulse', 'threshold': 0.7,
+                              'windows': 2, 'hold_s': 4, 'cooldown_s': 15, 'classes': [69, 70], 'suppress': [0]})
+        cfg['exclude'] = sorted(set(cfg['exclude']) | {300})
+        code, r = http('PUT', '/api/sound/events', cfg)
+        check(code == 200 and any(e['id'] == 'tc17_test' for e in r['events']), 'event added')
+        http('POST', '/api/reboot', {})
+        wait_restart(status()['role']['desired'])
+        after = _events_config()
+        ev = next((e for e in after['events'] if e['id'] == 'tc17_test'), None)
+        check(ev and ev['threshold'] == 0.7 and ev['classes'] == [69, 70] and ev['suppress'] == [0] and
+              ev['windows'] == 2 and ev['cooldown_s'] == 15, 'event survived the restart unchanged')
+        check(300 in after['exclude'], 'exclusion survived the restart')
+        code, r = http('POST', '/api/sound/events/preset', {'preset': 'minimal'})
+        check(code == 200 and [e['id'] for e in r['events']] ==
+              ['doorbell', 'knock', 'smoke_alarm', 'alarm_siren', 'glass_break'], 'preset applied')
+    finally:
+        code, _ = http('PUT', '/api/sound/events', original)
+        check(code == 200, 'original configuration restored')
+
+
+def tc18_sound_events_detection():
+    """Played cat sound raises the cat event; with Cat ignored it does not (needs --play)."""
+    if not ARGS.play:
+        raise Fail('skipped: run with --play next to the board')
+    import subprocess
+    clip = os.path.join(ROOT, 'tools/yamnet/data/events/1-34094-A-5.wav')
+    if not os.path.exists(clip):
+        raise Fail('missing ESC-50 cat clip, run tools/yamnet fetch (data/events)')
+    original = _events_config()
+
+    def cat_count():
+        return next(e for e in http('GET', '/api/sound/events')[1]['events'] if e['id'] == 'cat')['count']
+
+    try:
+        cfg = json.loads(json.dumps(original))
+        if not any(e['id'] == 'cat' for e in cfg['events']):
+            cfg['events'].append({'id': 'cat', 'name': 'Cat', 'kind': 'impulse', 'threshold': 0.5, 'windows': 1,
+                                  'hold_s': 5, 'cooldown_s': 0, 'classes': [76, 77, 78, 79, 80]})
+        for e in cfg['events']:
+            if e['id'] == 'cat':
+                e['cooldown_s'] = 0
+                e['enabled'] = True
+        cfg['exclude'] = [c for c in cfg['exclude'] if c != 76]
+        http('PUT', '/api/sound/events', cfg)
+        time.sleep(8)
+        before = cat_count()
+        subprocess.run(['afplay', clip])
+        time.sleep(8)
+        check(cat_count() > before, 'cat event raised')
+        cfg['exclude'] = sorted(set(cfg['exclude']) | {76, 77, 78, 79, 80})
+        http('PUT', '/api/sound/events', cfg)
+        time.sleep(8)
+        before = cat_count()
+        subprocess.run(['afplay', clip])
+        time.sleep(8)
+        check(cat_count() == before, 'no cat event while the cat sounds are ignored')
+    finally:
+        http('PUT', '/api/sound/events', original)
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
     ('TC07', tc07_zigbee_router), ('TC08', tc08_thread_router), ('TC09', tc09_esphome_roundtrip),
     ('TC10', tc10_ota_rollback_slots), ('TC11', tc11_auth), ('TC12', tc12_invalid_uploads),
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
-    ('TC16', tc16_thread_dataset_isolation),
+    ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
+    ('TC18', tc18_sound_events_detection),
 ]
 
 

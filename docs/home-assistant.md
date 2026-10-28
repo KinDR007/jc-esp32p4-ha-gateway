@@ -55,5 +55,29 @@ HA discovers the node (ESPHome integration); enter the API key from
 Broker in the gateway UI (Home Assistant tab). Entities via MQTT discovery: active role, role
 select, maintenance reason, uptime, chip temperature, heap, Ethernet, IP, C6 firmware, Thread state,
 Zigbee host connection, restart button, sound level (dBFS, when the microphone is on).
-Base topic `p4gw/<hostname>/`. Sound events (speech, dog, doorbell, ...) as MQTT `event` entities
-are planned (phase 3 in [sound-detection.md](sound-detection.md)).
+Base topic `p4gw/<hostname>/`.
+
+## Sound events (MQTT)
+
+Configured in the gateway UI, Sound tab (presets, per-event classes and timing, ignored sounds).
+Every enabled event creates in Home Assistant (`<host>` = hostname with `_`):
+
+| Entity | Use |
+|---|---|
+| `event.<host>_snd_<id>` | fires once per occurrence; attributes `class`, `score`, `level_db` |
+| `binary_sensor.<host>_snd_<id>_active` | on while the sound lasts (plus hold time); conditions, `for:` triggers |
+| device trigger "sound <name>" | Automations → trigger → Device → P4 gateway |
+
+The Sound tab copies a ready automation for each event ("HA automation"). Example:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.p4gw_e30a08_snd_doorbell
+actions:
+  - action: notify.notify
+    data:
+      message: "Doorbell ({{ trigger.to_state.attributes.score }})"
+```
+
+Deleting or disabling an event removes its entities from Home Assistant.

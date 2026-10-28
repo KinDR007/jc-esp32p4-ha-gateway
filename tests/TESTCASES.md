@@ -42,6 +42,8 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC13 | Vynucený reflash C6 | `POST /api/c6/reflash` | po restartu běží stejná role, v logu `C6 now runs` |
 | TC14 | Zvuková služba | zapnout mikrofon a rozpoznávání | zachytávání bez chyb, model načten, inference pod 150 ms, CPU jádra 1 pod 40 %, klip WAV 2 s |
 | TC15 | Rozpoznávání zvuků (`--play`) | `say` a ESC-50 štěkot z reproduktoru počítače u desky | Speech ≥ 0,6, Dog nebo Bark ≥ 0,5 |
+| TC17 | Konfigurace událostí | neplatné ID / třída / duplicita, nová událost a výjimka, restart, předvolba | 400 pro chyby, vše přežije restart, předvolba použita, původní konfigurace obnovena |
+| TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
 | TC16 | Oddělené Thread sítě rolí | router se připojí do testovací sítě, pak zpět na BR | border router zůstane ve své síti |
 
 ## Ruční testy (mimo automat)

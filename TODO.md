@@ -16,8 +16,9 @@
 - [x] Oddělené datasety Thread rolí (TC16), komprimované C6 balíky, potvrzení obrazu při restartu z UI
 
 ## Čeká
-- [ ] **Vrátit bránu do Thread sítě `MyHome284238473`** (dataset z HA → UI Thread → Apply dataset); testy ji přesunuly do testovací sítě
-- [ ] Zvuk fáze 3: MQTT `event` entity (řeč, pes, zvonek, alarmy, ...), výběr detekcí a prahy v UI
+- [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)
+- [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18
+- [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
 - [ ] Zvuk fáze 4: učicí režim (vzorky v oddílu `sounds`, profily embedding + tónové)
 - [ ] Zvuk fáze 5: ladění falešných poplachů, 24h test se zapnutou detekcí
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)

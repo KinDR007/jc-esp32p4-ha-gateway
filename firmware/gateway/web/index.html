@@ -108,6 +108,27 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="row"><button class="btn primary" value="ok">Sign in</button></div>
   </form>
 </dialog>
+<dialog id="ev-dlg" style="max-width:640px">
+  <form method="dialog" id="ev-form">
+    <h3 style="margin-top:0" id="ev-title">Event</h3>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <label class="field"><span>ID (entity name in HA)</span><input type="text" id="ev-id" pattern="[a-z0-9_]{1,23}" required></label>
+      <label class="field"><span>Name</span><input type="text" id="ev-name" maxlength="47"></label>
+      <label class="field"><span>Kind</span><select id="ev-kind"><option value="impulse">impulse (one event per occurrence)</option><option value="continuous">continuous (on while it lasts)</option></select></label>
+      <label class="field"><span>Device class</span><select id="ev-dc"><option value="">none</option><option value="doorbell">doorbell</option></select></label>
+      <label class="field"><span>Threshold <b id="ev-thr-v"></b></span><input type="range" id="ev-thr" min="0.1" max="1" step="0.05"></label>
+      <label class="field"><span>Windows to start (0.48 s each)</span><input type="number" id="ev-win" min="1" max="20"></label>
+      <label class="field"><span>Hold after last hit (s)</span><input type="number" id="ev-hold" min="1" max="600"></label>
+      <label class="field"><span>Cooldown between events (s)</span><input type="number" id="ev-cool" min="0" max="3600"></label>
+    </div>
+    <label class="field"><span>Sounds that trigger it</span><div id="ev-classes" class="row"></div>
+      <input type="text" id="ev-add" list="class-names" placeholder="add a sound (type to search)"></label>
+    <label class="field"><span>Ignore while any of these is heard (e.g. Television for speech)</span><div id="ev-suppress" class="row"></div>
+      <input type="text" id="ev-add-sup" list="class-names" placeholder="add a sound"></label>
+    <datalist id="class-names"></datalist>
+    <div class="row"><button class="btn primary" value="save">Save</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
+  </form>
+</dialog>
 <dialog id="confirm">
   <form method="dialog">
     <h3 style="margin-top:0" id="confirm-title"></h3>
@@ -488,9 +509,147 @@ views.sound = () => `<div class="grid">
     <div class="row" style="margin-top:10px"><input type="file" id="model-file"><button class="btn" data-upload="model">Upload model</button></div>
     <div class="progress hidden" id="model-prog" style="margin-top:10px"><div></div></div></div>
 </div>
-<div class="card"><h3>Heard now</h3><div id="snd-top" class="muted">Recognition is off or nothing above the gate yet.</div></div>`;
+<div class="card"><h3>Heard now</h3><div id="snd-top" class="muted">Recognition is off or nothing above the gate yet.</div></div>
+<div class="card"><h3>Events sent to Home Assistant</h3>
+  <div class="row"><select id="ev-preset"></select><button class="btn" id="ev-preset-apply">Apply preset</button>
+    <button class="btn primary" id="ev-new">Add event</button><button class="btn" id="ev-export">Export</button>
+    <label class="btn">Import<input type="file" id="ev-import" accept=".json" hidden></label></div>
+  <p class="muted">Each event becomes an event entity, a binary sensor (on while the sound lasts) and a device trigger in Home Assistant (MQTT).</p>
+  <div class="table-wrap" id="ev-table"></div></div>
+<div class="card"><h3>Detection log</h3><p class="muted">Recent events and strong sounds no event covers. Use it to personalise: ignore what is noise in this home, add what matters.</p>
+  <div class="table-wrap" id="snd-log"></div></div>
+<div class="card"><h3>All sounds (521) <span class="muted" id="cls-summary"></span></h3>
+  <div class="row"><input type="text" id="cls-search" placeholder="search, e.g. dog, door, alarm" style="flex:1"><button class="btn primary" id="cls-save">Save selection</button></div>
+  <p class="muted">Unticked sounds are never reported, whatever the events say. The bar shows the live score.</p>
+  <div id="cls-tree"></div></div>`;
 
 let soundTimer = null;
+let sndClasses = null, sndCfg = null, sndExclude = new Set(), sndDirty = false, sndTick = 0, editIdx = -1, editEv = null;
+
+const clsName = i => sndClasses?.[i]?.[1] ?? '#' + i;
+
+async function loadSoundConfig() {
+  if (!sndClasses) {
+    sndClasses = await api('/api/sound/classes');
+    $('#class-names').innerHTML = sndClasses.map(c => `<option value="${esc(c[1])}">`).join('');
+  }
+  sndCfg = await api('/api/sound/events');
+  if (!sndDirty) sndExclude = new Set(sndCfg.exclude);
+  $('#ev-preset').innerHTML = sndCfg.presets.map(p => `<option value="${p.key}" ${p.key === sndCfg.preset ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  renderEvents();
+  if (!$('#cls-tree').dataset.built) renderTree();
+}
+
+function renderEvents() {
+  const rows = sndCfg.events.map((e, i) => `<tr>
+    <td><input type="checkbox" data-ev-toggle="${i}" ${e.enabled ? 'checked' : ''}></td>
+    <td><b>${esc(e.name)}</b><br><span class="muted">${esc(e.id)}</span></td>
+    <td>${e.kind}</td><td>${e.threshold}</td>
+    <td title="${esc(e.classes.map(clsName).join(', '))}">${e.classes.length}</td>
+    <td>${e.active ? pill('ok', 'now') : ''}</td><td>${e.count || 0}</td>
+    <td>${e.last_ago_s !== undefined ? fmtUptime(e.last_ago_s) + ' ago' : ''}</td>
+    <td><button class="btn" data-ev-edit="${i}">Edit</button> <button class="btn" data-ev-yaml="${i}">HA automation</button> <button class="btn danger" data-ev-del="${i}">Delete</button></td></tr>`).join('');
+  $('#ev-table').innerHTML = `<table><tr><th>On</th><th>Event</th><th>Kind</th><th>Threshold</th><th>Sounds</th><th>Active</th><th>Count</th><th>Last</th><th></th></tr>${rows}</table>`;
+}
+
+function renderTree() {
+  const tops = new Map();
+  sndClasses.forEach(([i, name, top, group]) => {
+    if (!tops.has(top)) tops.set(top, new Map());
+    const g = tops.get(top);
+    if (!g.has(group)) g.set(group, []);
+    g.get(group).push([i, name]);
+  });
+  const row = ([i, name]) => `<label class="cls-row" data-name="${esc(name.toLowerCase())}" style="display:flex;gap:8px;align-items:center;padding:2px 0">
+    <input type="checkbox" data-cls="${i}" ${sndExclude.has(i) ? '' : 'checked'}><span style="flex:1">${esc(name)}</span>
+    <span class="progress" style="width:80px;height:6px"><div id="cs-${i}"></div></span></label>`;
+  let html = '';
+  for (const [top, groups] of tops) {
+    const n = [...groups.values()].reduce((a, v) => a + v.length, 0);
+    html += `<details class="cls-top"><summary><b>${esc(top)}</b> <span class="muted">${n}</span> <button class="btn" data-cls-all="${esc(top)}">all</button> <button class="btn" data-cls-none="${esc(top)}">none</button></summary><div style="padding-left:16px">`;
+    for (const [group, items] of groups) {
+      html += group === '-' ? items.map(row).join('') : `<details><summary>${esc(group)} <span class="muted">${items.length}</span></summary><div style="padding-left:16px">${items.map(row).join('')}</div></details>`;
+    }
+    html += '</div></details>';
+  }
+  $('#cls-tree').innerHTML = html;
+  $('#cls-tree').dataset.built = '1';
+  updateClsSummary();
+}
+
+function updateClsSummary() {
+  $('#cls-summary').textContent = `${521 - sndExclude.size} reported, ${sndExclude.size} ignored${sndDirty ? ' (unsaved)' : ''}`;
+}
+
+async function loadScoresAndLog() {
+  try {
+    const sc = await api('/api/sound/scores');
+    sc.scores.forEach((v, i) => { const el = document.getElementById('cs-' + i); if (el) el.style.width = v + '%'; });
+  } catch (e) { /* sound off */ }
+  if (sndTick++ % 3) return;
+  try {
+    const log = await api('/api/sound/log');
+    $('#snd-log').innerHTML = log.length ? `<table><tr><th>When</th><th>Event</th><th>Sound</th><th>Score</th><th>Level</th><th>Duration</th><th></th></tr>${log.map(l => `<tr>
+      <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? esc(l.event) : '<span class="muted">no event</span>'}</td><td>${esc(l.class_name)}</td>
+      <td>${(l.score * 100).toFixed(0)} %</td><td>${l.level_db} dB</td><td>${l.ongoing ? pill('ok', 'ongoing') : l.duration_s ? l.duration_s + ' s' : ''}</td>
+      <td><button class="btn" data-log-ignore="${l.class}">Ignore sound</button>
+      ${l.event ? `<button class="btn" data-log-raise="${esc(l.event)}">Raise threshold</button>` : `<button class="btn" data-log-new="${l.class}">Create event</button>`}</td></tr>`).join('')}</table>` : '<p class="muted">Nothing yet.</p>';
+  } catch (e) { /* ignore */ }
+}
+
+async function putEvents(cfg) {
+  sndCfg = await api('/api/sound/events', { method: 'PUT', body: JSON.stringify({ preset: 'custom', exclude: [...sndExclude], events: cfg.events.map(({ active, count, last_ago_s, ...e }) => e) }), headers: { 'Content-Type': 'application/json' } });
+  sndDirty = false;
+  sndExclude = new Set(sndCfg.exclude);
+  renderEvents();
+  updateClsSummary();
+  toast('Saved, Home Assistant entities updated');
+}
+
+function chips(id, list) {
+  $('#' + id).innerHTML = list.map(i => `<span class="pill">${esc(clsName(i))} <a href="#" data-chip-del="${id}:${i}">×</a></span>`).join('') || '<span class="muted">none</span>';
+}
+
+function openEditor(idx, template) {
+  editIdx = idx;
+  editEv = JSON.parse(JSON.stringify(idx >= 0 ? sndCfg.events[idx] : template));
+  $('#ev-title').textContent = idx >= 0 ? 'Edit event' : 'New event';
+  $('#ev-id').value = editEv.id; $('#ev-id').readOnly = idx >= 0;
+  $('#ev-name').value = editEv.name; $('#ev-kind').value = editEv.kind; $('#ev-dc').value = editEv.device_class || '';
+  $('#ev-thr').value = editEv.threshold; $('#ev-thr-v').textContent = editEv.threshold;
+  $('#ev-win').value = editEv.windows; $('#ev-hold').value = editEv.hold_s; $('#ev-cool').value = editEv.cooldown_s;
+  chips('ev-classes', editEv.classes); chips('ev-suppress', editEv.suppress);
+  $('#ev-dlg').returnValue = '';
+  $('#ev-dlg').showModal();
+}
+
+$('#ev-dlg').addEventListener('close', async () => {
+  if ($('#ev-dlg').returnValue !== 'save') return;
+  Object.assign(editEv, { id: $('#ev-id').value.trim(), name: $('#ev-name').value.trim(), kind: $('#ev-kind').value,
+    device_class: $('#ev-dc').value, threshold: +$('#ev-thr').value, windows: +$('#ev-win').value,
+    hold_s: +$('#ev-hold').value, cooldown_s: +$('#ev-cool').value });
+  if (!editEv.device_class) delete editEv.device_class;
+  const events = sndCfg.events.slice();
+  if (editIdx >= 0) events[editIdx] = editEv; else events.push(editEv);
+  try { await putEvents({ events }); } catch (err) { toast('Error: ' + err.message); }
+});
+
+function addChip(inputId, listKey, chipId) {
+  const name = $('#' + inputId).value;
+  const c = sndClasses.find(x => x[1] === name);
+  if (!c) return;
+  if (!editEv[listKey].includes(c[0])) editEv[listKey].push(c[0]);
+  $('#' + inputId).value = '';
+  chips(chipId, editEv[listKey]);
+}
+
+function automationYaml(e) {
+  const host = status.hostname.replace(/-/g, '_');
+  const trig = e.kind === 'continuous'
+    ? `  - trigger: state\n    entity_id: binary_sensor.${host}_snd_${e.id}_active\n    to: "on"\n    for: "00:00:30"`
+    : `  - trigger: state\n    entity_id: event.${host}_snd_${e.id}`;
+  return `alias: "Sound: ${e.name}"\ntriggers:\n${trig}\nconditions: []\nactions:\n  - action: notify.notify\n    data:\n      message: "${e.name}: {{ state_attr('event.${host}_snd_${e.id}', 'class') }}"\nmode: single\n`;
+}
 async function loadSound() {
   if (tab !== 'sound') { clearInterval(soundTimer); soundTimer = null; return; }
   let st;
@@ -529,6 +688,26 @@ async function soundConfig(body) {
 
 document.addEventListener('change', e => {
   const id = e.target.id;
+  if (e.target.dataset.cls !== undefined) {
+    const i = +e.target.dataset.cls;
+    if (e.target.checked) sndExclude.delete(i); else sndExclude.add(i);
+    sndDirty = true; updateClsSummary(); return;
+  }
+  if (e.target.dataset.evToggle !== undefined) {
+    const events = sndCfg.events.slice();
+    events[+e.target.dataset.evToggle].enabled = e.target.checked;
+    putEvents({ events }).catch(err => toast('Error: ' + err.message));
+    return;
+  }
+  if (id === 'ev-add') { addChip('ev-add', 'classes', 'ev-classes'); return; }
+  if (id === 'ev-add-sup') { addChip('ev-add-sup', 'suppress', 'ev-suppress'); return; }
+  if (id === 'ev-thr') { $('#ev-thr-v').textContent = e.target.value; return; }
+  if (id === 'ev-import') {
+    const f = e.target.files[0];
+    if (f) f.text().then(t => { const c = JSON.parse(t); sndExclude = new Set(c.exclude || []); sndDirty = false; return putEvents(c); }).then(() => renderTree()).catch(err => toast('Error: ' + err.message));
+    e.target.value = '';
+    return;
+  }
   if (id === 'snd-en') soundConfig({ enabled: e.target.checked }).catch(err => toast('Error: ' + err.message));
   else if (id === 'snd-ai') soundConfig({ inference: e.target.checked }).catch(err => toast('Error: ' + err.message));
   else if (id === 'snd-gain') soundConfig({ gain_db: +e.target.value }).catch(err => toast('Error: ' + err.message));
@@ -641,6 +820,45 @@ document.addEventListener('click', async e => {
       toast('Reading the C6 flash, about 2 minutes…');
       t.disabled = true;
       try { await download('/api/c6/backup', status.hostname + '_c6_flash.bin'); toast('C6 backup saved'); } finally { t.disabled = false; }
+    } else if (t.id === 'ev-preset-apply') {
+      if (!await confirmDialog('Apply preset?', 'Replaces all events and the sound selection. Removed events disappear from Home Assistant.')) return;
+      sndCfg = await api('/api/sound/events/preset', { json: { preset: $('#ev-preset').value } });
+      sndExclude = new Set(sndCfg.exclude); sndDirty = false; renderEvents(); renderTree(); toast('Preset applied');
+    } else if (t.id === 'ev-new') {
+      openEditor(-1, { id: '', name: '', kind: 'impulse', threshold: 0.5, windows: 1, hold_s: 3, cooldown_s: 30, classes: [], suppress: [], enabled: true });
+    } else if (t.dataset.evEdit !== undefined) {
+      openEditor(+t.dataset.evEdit);
+    } else if (t.dataset.evDel !== undefined) {
+      const ev = sndCfg.events[+t.dataset.evDel];
+      if (!await confirmDialog('Delete ' + ev.name + '?', 'Its entities disappear from Home Assistant; automations using them stop working.')) return;
+      await putEvents({ events: sndCfg.events.filter((_, i) => i !== +t.dataset.evDel) });
+    } else if (t.dataset.evYaml !== undefined) {
+      await navigator.clipboard.writeText(automationYaml(sndCfg.events[+t.dataset.evYaml]));
+      toast('Automation YAML copied (Settings → Automations → ⋮ → Edit in YAML)');
+    } else if (t.id === 'ev-export') {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify({ exclude: [...sndExclude], events: sndCfg.events.map(({ active, count, last_ago_s, ...e }) => e) }, null, 2)], { type: 'application/json' }));
+      a.download = status.hostname + '_sound_events.json';
+      a.click();
+    } else if (t.id === 'cls-save') {
+      await putEvents(sndCfg);
+    } else if (t.dataset.clsAll || t.dataset.clsNone) {
+      e.preventDefault();
+      const top = t.dataset.clsAll || t.dataset.clsNone;
+      sndClasses.filter(c => c[2] === top).forEach(c => { if (t.dataset.clsAll) sndExclude.delete(c[0]); else sndExclude.add(c[0]); });
+      document.querySelectorAll('[data-cls]').forEach(cb => { cb.checked = !sndExclude.has(+cb.dataset.cls); });
+      sndDirty = true; updateClsSummary();
+    } else if (t.dataset.logIgnore !== undefined) {
+      sndExclude.add(+t.dataset.logIgnore);
+      await putEvents(sndCfg);
+      const cb = document.querySelector(`[data-cls="${t.dataset.logIgnore}"]`); if (cb) cb.checked = false;
+    } else if (t.dataset.logRaise) {
+      const events = sndCfg.events.slice();
+      const ev = events.find(x => x.id === t.dataset.logRaise);
+      if (ev) { ev.threshold = Math.min(1, Math.round((ev.threshold + 0.1) * 100) / 100); await putEvents({ events }); }
+    } else if (t.dataset.logNew !== undefined) {
+      const c = +t.dataset.logNew;
+      openEditor(-1, { id: clsName(c).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 23), name: clsName(c), kind: 'impulse', threshold: 0.5, windows: 1, hold_s: 3, cooldown_s: 30, classes: [c], suppress: [], enabled: true });
     } else if (t.id === 'snd-clip') {
       const res = await fetch('/api/sound/clip?seconds=5', { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
       if (!res.ok) throw new Error((await res.json()).error || res.statusText);
@@ -694,6 +912,16 @@ document.addEventListener('click', async e => {
   } catch (err) {
     toast('Error: ' + err.message);
   }
+});
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-chip-del]');
+  if (!a) return;
+  e.preventDefault();
+  const [id, i] = a.dataset.chipDel.split(':');
+  const key = id === 'ev-classes' ? 'classes' : 'suppress';
+  editEv[key] = editEv[key].filter(x => x !== +i);
+  chips(id, editEv[key]);
 });
 
 document.addEventListener('keydown', e => {
@@ -769,7 +997,14 @@ async function pollLog() {
     }
   } catch (e) { /* retry next tick */ }
 }
-document.addEventListener('input', e => { if (e.target.id === 'log-filter') renderLog(); });
+document.addEventListener('input', e => {
+  if (e.target.id === 'log-filter') renderLog();
+  if (e.target.id === 'cls-search') {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.cls-row').forEach(r => { r.style.display = !q || r.dataset.name.includes(q) ? 'flex' : 'none'; });
+    document.querySelectorAll('#cls-tree details').forEach(d => { d.open = !!q && [...d.querySelectorAll('.cls-row')].some(r => r.style.display !== 'none'); });
+  }
+});
 
 /* ---------------- loop ---------------- */
 
@@ -783,7 +1018,10 @@ function render(full) {
     if (tab === 'thread') { loadThread(); loadDataset(false); }
     if (tab === 'ha') loadMqtt();
     if (tab === 'tools') renderLog();
-    if (tab === 'sound') { loadSound(); if (!soundTimer) soundTimer = setInterval(loadSound, 1000); }
+    if (tab === 'sound') {
+      loadSound(); loadSoundConfig().catch(err => toast('Error: ' + err.message));
+      if (!soundTimer) soundTimer = setInterval(() => { loadSound(); loadScoresAndLog(); if (sndTick % 10 === 0 && sndCfg && !$('#ev-dlg').open) api('/api/sound/events').then(c => { sndCfg = c; renderEvents(); }).catch(() => {}); }, 1000);
+    }
   } else if (tab === 'thread') {
     loadThread();
   }

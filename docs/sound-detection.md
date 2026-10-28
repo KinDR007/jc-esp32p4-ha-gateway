@@ -1,7 +1,8 @@
 # Detekce zvukových událostí mikrofonem desky (analýza, 2026-10-28)
 
 Stav: fáze 1 (audio základ) a 2 (YAMNet na zařízení) hotové a ověřené na desce, viz
-[Výsledky fáze 1–2](#výsledky-fáze-12-2026-10-28). Fáze 3 je navržená níže, čeká na potvrzení.
+[Výsledky fáze 1–2](#výsledky-fáze-12-2026-10-28). Fáze 3 (personalizace a události v HA) je implementovaná a otestovaná na desce
+([výsledky](#výsledky-fáze-3-2026-10-28)).
 Seznam všech detekovatelných zvuků: [sound-classes.md](sound-classes.md).
 
 ## Cíl
@@ -183,7 +184,7 @@ Rozhodnutí uživatele: model YAMNet, detekovat vše co model umí, učicí rež
 | Restart z UI v první minutě po aktualizaci vrátil starou verzi | restart vyžádaný přes API nejdřív potvrdí běžící verzi |
 | Role Thread router přepsala síť border routeru | border router si ukládá vlastní dataset (`br_dataset`), test TC16 |
 
-## Fáze 3: personalizace detekcí a předávání do HA (návrh k potvrzení)
+## Fáze 3: personalizace detekcí a předávání do HA
 
 ### Výchozí stav
 
@@ -306,6 +307,42 @@ action:
 ```
 
 Plán: v UI brány u každé události tlačítko „zkopírovat šablonu automatizace“.
+
+### Výsledky fáze 3 (2026-10-28)
+
+Implementováno podle návrhu výše:
+- Firmware `sound_events.c`:
+  - konfigurace v NVS, předvolby `household`, `security`, `animals` a `minimal` (`tools/yamnet/gen_presets.py`)
+  - detekce s okny, hysterezí, doběhem, cooldownem a potlačením
+  - log 64 detekcí včetně tříd bez události
+  - pro každou povolenou událost MQTT entity `event`, `binary_sensor` (třída `sound`) a `device_trigger`
+  - smazaná nebo vypnutá událost se z HA odebere
+- API:
+  - `GET/PUT /api/sound/events`, `POST /api/sound/events/preset`
+  - `GET /api/sound/classes`, `/api/sound/scores`, `/api/sound/log`
+- UI, záložka Sound:
+  - tabulka událostí (zapnutí, editor, smazání, šablona automatizace HA, export a import JSON)
+  - log detekcí s akcemi „Ignore sound“, „Raise threshold“ a „Create event“
+  - strom 521 zvuků s vyhledáváním a živým skóre
+- Entity v HA, `<host>` je hostname s `_` místo `-`:
+  - `event.<host>_snd_<id>` (atributy `event_type`, `class`, `score`, `level_db`)
+  - `binary_sensor.<host>_snd_<id>_active`
+  - device trigger „sound <název>“
+
+Test přehráváním klipů ESC-50 z reproduktoru Macu vedle desky:
+
+| Zvuk | Výsledek |
+|---|---|
+| zaklepání, splachování, kočka | správná událost (`knock` 0,53, `toilet_flush` 0,99, `cat` 0,98) |
+| budík | `phone_ring` a `doorbell` (podobný zvuk) |
+| vysavač | v logu bez události jako Aircraft/Helicopter 0,9: typický případ pro „Ignore sound“ |
+| rozbité sklo | nepoznáno (přes reproduktor notebooku Rub/Filing) |
+| pláč, kýchnutí | falešně `speech`; pro řeč je vhodné zvýšit práh nebo přidat potlačení |
+
+Přehrávání z reproduktoru notebooku zkresluje. Reálné zvuky v bytě je potřeba doladit podle logu
+(fáze 5). Automatické testy TC14, TC15, TC17 a TC18 prošly
+([výsledky](../tests/results/2026-10-28-phase3/)). Stranu Home Assistant (entity a události
+v HA) je potřeba ověřit v HA, protože broker 192.168.88.27 vyžaduje přihlášení.
 
 ### Rozsah implementace fáze 3
 

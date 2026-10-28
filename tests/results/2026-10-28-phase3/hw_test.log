@@ -1,0 +1,31 @@
+TC14 Sound service: microphone captures, YAMNet loads and runs within the CPU budget.
+  11:58:20 ok: capturing, level -62.6 dBFS, floor -65.3
+  11:58:20 ok: model loaded in 444 ms
+  11:58:20 ok: inference 60.9 ms avg, 123.2 ms max
+  11:58:55 ok: CPU 13.4 % of core 1, still enabled
+  11:58:55 ok: 2 s WAV clip
+TC14 PASS (35 s) 
+
+TC15 Recognition of sounds played by this computer's speaker (needs --play, board within earshot).
+  11:59:10 ok: speech 1.00
+  11:59:25 ok: dog 0.85, bark 0.73
+TC15 PASS (30 s) 
+
+TC17 Sound events: validation, save, survives a restart; the original configuration is restored.
+  11:59:25 ok: invalid id rejected (event 0: id must be a-z, 0-9, _ (max 23))
+  11:59:25 ok: class out of range rejected (event a: class indexes 0-520)
+  11:59:25 ok: duplicate id rejected (duplicate event id a)
+  11:59:25 ok: event added
+  11:59:38 back after restart: active=thread_br c6=ot_rcp uptime=9s
+  11:59:38 ok: event survived the restart unchanged
+  11:59:38 ok: exclusion survived the restart
+  11:59:38 ok: preset applied
+  11:59:38 ok: original configuration restored
+TC17 PASS (12 s) 
+
+TC18 Played cat sound raises the cat event; with Cat ignored it does not (needs --play).
+  12:00:00 ok: cat event raised
+  12:00:22 ok: no cat event while the cat sounds are ignored
+TC18 PASS (44 s) 
+
+Summary: TC14 PASS, TC15 PASS, TC17 PASS, TC18 PASS
