@@ -87,6 +87,16 @@ uint32_t c6_flash_size(void);
 
 const c6_progress_t *c6_progress(void);
 
+/* C6 chip data read from its ROM bootloader at the last flashing or backup, kept in NVS. */
+typedef struct {
+    bool known;
+    uint8_t mac[6];
+    uint16_t revision; /* major * 100 + minor */
+    uint32_t flash_size;
+    uint32_t flashes; /* successful bundle flashes since the data was first read */
+} c6_chip_t;
+const c6_chip_t *c6_chip_info(void);
+
 #ifdef __cplusplus
 }
 #endif

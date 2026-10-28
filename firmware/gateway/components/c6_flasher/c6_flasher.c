@@ -10,6 +10,7 @@
 #include "esp_heap_caps.h"
 #include "esp_loader.h"
 #include "esp_log.h"
+#include "nvs.h"
 #include "esp_partition.h"
 #include "esp_rom_crc.h"
 #include "freertos/FreeRTOS.h"
@@ -214,6 +215,58 @@ typedef struct {
     esp32_port_t port;
 } session_t;
 
+/* ---------------------------------------------------------------- chip info */
+
+#define CHIP_NVS_NS "c6chip"
+static c6_chip_t s_chip;
+static bool s_chip_loaded;
+
+static void chip_info_save(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(CHIP_NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_blob(h, "info", &s_chip, sizeof(s_chip));
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+const c6_chip_t *c6_chip_info(void)
+{
+    if (!s_chip_loaded) {
+        nvs_handle_t h;
+        size_t len = sizeof(s_chip);
+        if (nvs_open(CHIP_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+            if (nvs_get_blob(h, "info", &s_chip, &len) != ESP_OK || len != sizeof(s_chip)) {
+                memset(&s_chip, 0, sizeof(s_chip));
+            }
+            nvs_close(h);
+        }
+        s_chip_loaded = true;
+    }
+    return &s_chip;
+}
+
+/* MAC, revision and flash size while the ROM bootloader is connected; failures only leave old data. */
+static void chip_info_read(session_t *s)
+{
+    c6_chip_info();
+    uint8_t mac[6];
+    uint16_t rev;
+    uint32_t size;
+    if (esp_loader_read_mac(&s->loader, mac) == ESP_LOADER_SUCCESS) {
+        memcpy(s_chip.mac, mac, sizeof(mac));
+        s_chip.known = true;
+    }
+    if (esp_loader_get_chip_revision(&s->loader, &rev) == ESP_LOADER_SUCCESS) {
+        s_chip.revision = rev;
+    }
+    if (esp_loader_flash_detect_size(&s->loader, &size) == ESP_LOADER_SUCCESS) {
+        s_chip.flash_size = size;
+    }
+    chip_info_save();
+}
+
 static esp_err_t session_open(session_t *s)
 {
     memset(s, 0, sizeof(*s));
@@ -244,6 +297,7 @@ static esp_err_t session_open(session_t *s)
     if (esp_loader_change_transmission_rate(&s->loader, FLASH_BAUD) != ESP_LOADER_SUCCESS) {
         ESP_LOGW(TAG, "staying at 115200 Bd");
     }
+    chip_info_read(s);
     return ESP_OK;
 }
 
@@ -629,6 +683,9 @@ done:
     progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
     s_progress.busy = false;
     if (err == ESP_OK) {
+        c6_chip_info();
+        s_chip.flashes++;
+        chip_info_save();
         ESP_LOGI(TAG, "C6 now runs %s (%s)", entry->name, entry->version);
     } else {
         ESP_LOGE(TAG, "%s", s_progress.last_error);

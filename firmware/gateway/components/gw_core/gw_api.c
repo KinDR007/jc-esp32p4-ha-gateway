@@ -1,3 +1,4 @@
+#include <math.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,11 +12,14 @@
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_ota_ops.h"
+#include "esp_psram.h"
 #include "esp_timer.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "nvs.h"
 #include "ping/ping_sock.h"
 
 static const char *TAG = "gw_api";
@@ -34,6 +38,97 @@ void gw_api_set_role_status(cJSON *(*provider)(void))
 cJSON *gw_api_role_status(void)
 {
     return s_role_status ? s_role_status() : NULL;
+}
+
+/* Hardware sampled every 2 s: CPU load per core from the FreeRTOS idle counters, P4 temperature range. */
+#define HW_SAMPLE_US (2 * 1000 * 1000)
+static struct {
+    float load[portNUM_PROCESSORS];
+    float temp_min, temp_max;
+    uint64_t idle[portNUM_PROCESSORS];
+    int64_t at_us;
+} s_hw = {.temp_min = 1000, .temp_max = -1000};
+
+static void hw_sample(void *arg)
+{
+    float t;
+    if (gw_api_temperature(&t)) {
+        s_hw.temp_min = t < s_hw.temp_min ? t : s_hw.temp_min;
+        s_hw.temp_max = t > s_hw.temp_max ? t : s_hw.temp_max;
+    }
+#if CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+    int64_t now = esp_timer_get_time();
+    for (int c = 0; c < portNUM_PROCESSORS; c++) {
+        uint64_t idle = ulTaskGetIdleRunTimeCounterForCore(c);
+        if (s_hw.at_us) {
+            float busy = 100.0f - 100.0f * (float)(idle - s_hw.idle[c]) / (float)(now - s_hw.at_us);
+            s_hw.load[c] = busy < 0 ? 0 : busy > 100 ? 100 : busy;
+        }
+        s_hw.idle[c] = idle;
+    }
+    s_hw.at_us = now;
+#endif
+}
+
+static cJSON *hw_json(void)
+{
+    cJSON *hw = cJSON_CreateObject();
+    esp_chip_info_t chip;
+    esp_chip_info(&chip);
+    cJSON_AddNumberToObject(hw, "cpu_mhz", CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
+    cJSON_AddNumberToObject(hw, "cores", chip.cores);
+#if CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+    cJSON *load = cJSON_AddArrayToObject(hw, "cpu_load");
+    for (int c = 0; c < portNUM_PROCESSORS; c++) {
+        cJSON_AddItemToArray(load, cJSON_CreateNumber(round(s_hw.load[c] * 10) / 10.0));
+    }
+#endif
+    cJSON_AddNumberToObject(hw, "tasks", uxTaskGetNumberOfTasks());
+    if (s_hw.temp_max >= s_hw.temp_min) {
+        cJSON_AddNumberToObject(hw, "temp_min_c", round(s_hw.temp_min * 10) / 10.0);
+        cJSON_AddNumberToObject(hw, "temp_max_c", round(s_hw.temp_max * 10) / 10.0);
+    }
+    uint32_t flash = 0;
+    esp_flash_get_size(NULL, &flash);
+    cJSON_AddNumberToObject(hw, "flash_size", flash);
+    cJSON_AddNumberToObject(hw, "psram_size", esp_psram_get_size());
+    cJSON_AddNumberToObject(hw, "psram_min", heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(hw, "psram_largest", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(hw, "internal_total", heap_caps_get_total_size(MALLOC_CAP_INTERNAL));
+    uint8_t mac[6];
+    char buf[65];
+    if (esp_efuse_mac_get_default(mac) == ESP_OK) {
+        snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        cJSON_AddStringToObject(hw, "mac_base", buf);
+    }
+    esp_app_get_elf_sha256(buf, 17);
+    cJSON_AddStringToObject(hw, "elf_sha256", buf);
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    cJSON_AddStringToObject(hw, "app_slot", run ? run->label : "");
+    nvs_stats_t nvs;
+    if (nvs_get_stats(NULL, &nvs) == ESP_OK) {
+        cJSON *n = cJSON_AddObjectToObject(hw, "nvs");
+        cJSON_AddNumberToObject(n, "used", nvs.used_entries);
+        cJSON_AddNumberToObject(n, "total", nvs.total_entries);
+        cJSON_AddNumberToObject(n, "namespaces", nvs.namespace_count);
+    }
+    return hw;
+}
+
+static cJSON *c6_chip_json(void)
+{
+    const c6_chip_t *c = c6_chip_info();
+    cJSON *j = cJSON_CreateObject();
+    if (c->known) {
+        char buf[18];
+        snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x", c->mac[0], c->mac[1], c->mac[2], c->mac[3], c->mac[4],
+                 c->mac[5]);
+        cJSON_AddStringToObject(j, "mac", buf);
+        cJSON_AddNumberToObject(j, "revision", c->revision);
+        cJSON_AddNumberToObject(j, "flash_size", c->flash_size);
+    }
+    cJSON_AddNumberToObject(j, "flashes", c->flashes);
+    return j;
 }
 
 bool gw_api_temperature(float *celsius)
@@ -94,6 +189,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "version", app->version);
     cJSON_AddStringToObject(json, "idf", app->idf_ver);
     cJSON_AddStringToObject(json, "built", app->date);
+    cJSON_AddStringToObject(json, "built_time", app->time);
     cJSON_AddNumberToObject(json, "chip_revision", chip.revision);
     cJSON_AddNumberToObject(json, "uptime_s", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddStringToObject(json, "reset_reason", reset_reason_name(esp_reset_reason()));
@@ -143,6 +239,7 @@ static esp_err_t status_get(httpd_req_t *req)
     }
     free(dir);
     const c6_progress_t *p = c6_progress();
+    cJSON_AddItemToObject(c6, "chip", c6_chip_json());
     cJSON *prog = cJSON_AddObjectToObject(c6, "flash");
     cJSON_AddBoolToObject(prog, "busy", p->busy);
     cJSON_AddNumberToObject(prog, "percent", p->percent);
@@ -161,6 +258,7 @@ static esp_err_t status_get(httpd_req_t *req)
         }
     }
 
+    cJSON_AddItemToObject(json, "hw", hw_json());
     if (s_role_status) {
         cJSON_AddItemToObject(json, "role_status", s_role_status());
     }
@@ -698,6 +796,12 @@ esp_err_t gw_api_register(void)
     temperature_sensor_config_t temp_cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
     if (temperature_sensor_install(&temp_cfg, &s_temp) == ESP_OK) {
         temperature_sensor_enable(s_temp);
+    }
+    const esp_timer_create_args_t hw_timer = {.callback = hw_sample, .name = "hw_sample"};
+    esp_timer_handle_t timer;
+    if (esp_timer_create(&hw_timer, &timer) == ESP_OK) {
+        hw_sample(NULL);
+        esp_timer_start_periodic(timer, HW_SAMPLE_US);
     }
 
     gw_http_register("/api/status", HTTP_GET, status_get);
