@@ -58,15 +58,17 @@ Volné UART linky pro Spinel mezi nimi nejsou. Header JP1 ale vyvádí C6 UART0,
 
 | JP1 pin | Signál | JP1 pin | Signál |
 |---|---|---|---|
-| 11 | P4 GPIO4 | 18 | C6_U0RXD |
-| 13 | P4 GPIO5 | 20 | C6_U0TXD |
-| 15 | P4 GPIO20 | 22 | C6_IO9 (BOOT, pull-up 5k1) |
-| | | 24 | C6_CHIP_PU (= P4 GPIO54) |
+| 13 | P4 GPIO4 | 20 | C6_U0RXD |
+| 15 | P4 GPIO5 | 22 | C6_U0TXD |
+| 17 | P4 GPIO20 | 24 | C6_IO9 (BOOT, pull-up 5k1) |
+| | | 26 | C6_CHIP_PU (= P4 GPIO54) |
+
+Popisky sítí ve schématu leží nad vodičem, ke kterému patří. Pozor: pin 18 je VCC3V3, pin 16 GND.
 
 **Navržené zapojení (3 propojky na JP1, bez pájení):**
-- P4 GPIO4 (UART TX) → C6_U0RXD (JP1 11 → 18)
-- P4 GPIO5 (UART RX) ← C6_U0TXD (JP1 13 → 20)
-- P4 GPIO20 → C6_IO9 (JP1 15 → 22), aby P4 uměl C6 uvést do bootloaderu a aktualizovat RCP
+- P4 GPIO4 (UART TX) → C6_U0RXD (JP1 13 → 20)
+- P4 GPIO5 (UART RX) ← C6_U0TXD (JP1 15 → 22)
+- P4 GPIO20 → C6_IO9 (JP1 17 → 24), aby P4 uměl C6 uvést do bootloaderu a aktualizovat RCP
 
 C6 EN ovládá P4 přes GPIO54 uvnitř modulu, propojku nepotřebuje. Výběr GPIO4/5 odpovídá
 výchozímu nastavení esp-thread-br pro P4. GPIO20 není strapping pin.

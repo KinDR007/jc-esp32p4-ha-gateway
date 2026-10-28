@@ -46,9 +46,12 @@ Three jumpers on header JP1 (no soldering), see [zadani.md](zadani.md) and [docs
 
 | From | To | Purpose |
 |---|---|---|
-| JP1 11 (P4 GPIO4, TX) | JP1 18 (C6 U0RXD) | UART P4 -> C6 |
-| JP1 13 (P4 GPIO5, RX) | JP1 20 (C6 U0TXD) | UART C6 -> P4 |
-| JP1 15 (P4 GPIO20) | JP1 22 (C6 IO9, BOOT) | P4 can put the C6 into its bootloader |
+| JP1 13 (P4 GPIO4, TX) | JP1 20 (C6 U0RXD) | UART P4 -> C6 |
+| JP1 15 (P4 GPIO5, RX) | JP1 22 (C6 U0TXD) | UART C6 -> P4 |
+| JP1 17 (P4 GPIO20) | JP1 24 (C6 IO9, BOOT) | P4 can put the C6 into its bootloader |
+
+Pin 1 is VCC3V3, odd pins in one row, even pins in the other. Mind pin 18 (VCC3V3)
+and pin 16 (GND) next to the targets; check pin 1 with a multimeter (3.3 V) before wiring.
 
 C6 reset (CHIP_PU) is P4 GPIO54 inside the module. The ESPHome role uses the internal SDIO lines
 instead and ignores the jumpers.
@@ -138,12 +141,12 @@ router role only).
 
 | Symptom | Check |
 |---|---|
-| Maintenance: "C6 bootloader not responding" | JP1 jumpers 11-18, 13-20, 15-22 |
+| Maintenance: "C6 bootloader not responding" | JP1 jumpers 13-20, 15-22, 17-24 |
 | Thread RCP failures counting up | *System -> Reflash C6 now*; antenna / IPEX connector |
 | HA cannot reach Thread devices | IPv6 RA/RIO on the HA host, multicast snooping on switches |
 | Zigbee2MQTT cannot connect | only one TCP client at a time; *Zigbee* tab shows the current one |
 | ESPHome image does not boot | the gateway comes back (rollback) and shows the reason |
-| Restore C6 factory firmware | `esptool --chip esp32c6 write-flash 0 c6_flash_backup.bin` over a USB-UART adapter on JP1 18/20, IO9 to GND |
+| Restore C6 factory firmware | `esptool --chip esp32c6 write-flash 0 c6_flash_backup.bin` over a USB-UART adapter on JP1 20/22, IO9 (pin 24) to GND |
 
 ## Licenses
 

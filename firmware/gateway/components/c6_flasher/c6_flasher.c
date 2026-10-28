@@ -226,7 +226,7 @@ static esp_err_t session_open(session_t *s)
     esp_loader_error_t err = esp_loader_connect(&s->loader, &args);
     if (err != ESP_LOADER_SUCCESS) {
         esp_loader_deinit(&s->loader);
-        ESP_LOGE(TAG, "C6 bootloader not responding (%d): check JP1 jumpers 11-18, 13-20, 15-22", err);
+        ESP_LOGE(TAG, "C6 bootloader not responding (%d): check JP1 jumpers 13-20, 15-22, 17-24", err);
         return ESP_ERR_TIMEOUT;
     }
     if (esp_loader_get_target(&s->loader) != ESP32C6_CHIP) {

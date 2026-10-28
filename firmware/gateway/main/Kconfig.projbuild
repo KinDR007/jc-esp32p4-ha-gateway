@@ -21,11 +21,11 @@ menu "P4 gateway"
         default 1
 
     config GW_C6_UART_TX
-        int "P4 GPIO to C6 U0RXD (JP1 11 -> 18)"
+        int "P4 GPIO to C6 U0RXD (JP1 13 -> 20)"
         default 4
 
     config GW_C6_UART_RX
-        int "P4 GPIO from C6 U0TXD (JP1 13 -> 20)"
+        int "P4 GPIO from C6 U0TXD (JP1 15 -> 22)"
         default 5
 
     config GW_C6_UART_BAUD
@@ -37,7 +37,7 @@ menu "P4 gateway"
         default 54
 
     config GW_C6_BOOT_GPIO
-        int "P4 GPIO driving C6 IO9 / BOOT (JP1 15 -> 22)"
+        int "P4 GPIO driving C6 IO9 / BOOT (JP1 17 -> 24)"
         default 20
 
     config GW_ETH_PHY_RST_GPIO
