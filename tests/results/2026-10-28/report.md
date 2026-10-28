@@ -6,7 +6,7 @@ zigbee_router 1.0.0, esp_hosted 2.12.13; ESPHome 2026.10.1. Automat: `tests/hw_t
 
 ## Výsledek
 
-Finální regrese TC04–TC13: **10/10 PASS** (`build/hw_test_final2.log`). TC01–TC03 prošly
+Finální regrese TC04–TC13: **10/10 PASS** ([hw_test_final2.log](hw_test_final2.log)). TC01–TC03 prošly
 v prvním běhu po čistém flashi. Za celé testování 38 restartů, všechny záměrné
 (SW_CPU_RESET při přepnutí role nebo OTA), žádný pád, watchdog ani core dump.
 

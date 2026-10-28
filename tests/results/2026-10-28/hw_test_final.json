@@ -1,0 +1,62 @@
+[
+  {
+    "id": "TC04",
+    "result": "FAIL",
+    "detail": "SRP server running",
+    "seconds": 31
+  },
+  {
+    "id": "TC05",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC06",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 42
+  },
+  {
+    "id": "TC07",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 29
+  },
+  {
+    "id": "TC08",
+    "result": "FAIL",
+    "detail": "no dataset from TC04 to apply",
+    "seconds": 15
+  },
+  {
+    "id": "TC09",
+    "result": "FAIL",
+    "detail": "switch to esphome accepted",
+    "seconds": 0
+  },
+  {
+    "id": "TC10",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 106
+  },
+  {
+    "id": "TC11",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC12",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 20
+  },
+  {
+    "id": "TC13",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 13
+  }
+]

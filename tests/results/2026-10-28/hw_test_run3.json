@@ -1,0 +1,14 @@
+[
+  {
+    "id": "TC10",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 108
+  },
+  {
+    "id": "TC12",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 20
+  }
+]

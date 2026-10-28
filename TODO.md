@@ -10,7 +10,7 @@
 - [x] build_all / flash / backup skripty, pinned závislosti
 
 - [x] Kompletní `dist/` (všechny 4 C6 balíky), záloha P4, první flash
-- [x] Automatické HW testy TC01–TC13 (tests/report-2026-10-28.md), 10/10 v regresi
+- [x] Automatické HW testy TC01–TC13 (tests/results/2026-10-28/report.md), 10/10 v regresi
 
 ## Čeká
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)

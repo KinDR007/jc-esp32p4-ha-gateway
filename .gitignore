@@ -10,3 +10,4 @@ backups/
 firmware/esphome/secrets.yaml
 firmware/esphome/.esphome/
 dist/
+!tests/results/**/*.log

@@ -35,7 +35,7 @@ Varianty, které jsem zamítl:
 ## Hardware
 
 Deska: JC-ESP32P4-M3-DEV, modul JC-ESP32P4-M3 (ESP32-P4NRW32, 16 MB flash, 32 MB PSRAM, C6 uvnitř
-modulu). Schéma je v [docs/](docs/), zdroj
+modulu). Schéma je v [schematics/](schematics/), zdroj
 [makergo1024/JC-ESP32P4-M3-DEV-v3.2](https://github.com/makergo1024/JC-ESP32P4-M3-DEV-v3.2/tree/main/5-Schematic).
 
 ### Ethernet (IP101, ověřeno ze schématu a ESPHome konfigurace)

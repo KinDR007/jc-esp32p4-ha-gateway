@@ -1,0 +1,53 @@
+TC01 First start keeps the factory C6 and reports maintenance.
+  07:55:47 ok: no role active on first start
+  07:55:47 ok: maintenance asks for a C6 backup
+  07:55:47 ok: Ethernet up with IPv4
+  07:55:47 ok: IPv6 link-local present
+  07:55:47 ok: all C6 bundles present (['esp_hosted', 'ot_rcp', 'zigbee_ncp', 'zigbee_router'])
+TC01 PASS (0 s) 
+
+TC02 A UART role is refused until the C6 is backed up or the backup is skipped.
+  07:55:47 ok: role switch refused with c6_backup_required
+TC02 PASS (0 s) 
+
+TC03 Full C6 flash dump over JP1 (also proves the jumpers and the ROM loader link).
+  07:59:19 ok: backup HTTP 200 (got 200 )
+  07:59:19 ok: backup size 4194304 B
+  07:59:19 ok: image header magic 0xE9 at offset 0 (C6 bootloader)
+  07:59:19 ok: partition table magic at 0x8000
+  07:59:19 saved /Users/jiribetunak/Projects/Home Asistant/otbr_p4/backups/c6_factory_192.168.88.243.bin
+  07:59:19 backup took 212 s
+TC03 ERROR (217 s) TimeoutError: timed out
+
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+TC04 ERROR (30 s) TimeoutError: timed out
+
+TC05 Zigbee coordinator: C6 gets zigbee_ncp, TCP bridge accepts a client, NCP answers after reset.
+TC05 ERROR (30 s) TimeoutError: timed out
+
+TC06 Leaving and re-entering the coordinator saves and restores its network data.
+TC06 ERROR (30 s) TimeoutError: timed out
+
+TC07 Zigbee router: C6 gets the router firmware and reports status over the line protocol.
+TC07 ERROR (30 s) TimeoutError: timed out
+
+TC08 Thread router: idle without dataset, joins after the dataset is applied.
+TC08 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+TC09 ESPHome: gateway hands over, BLE proxy scans, Return to gateway brings back thread_br.
+TC09 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+TC10 Gateway OTA: new image goes to the other slot and confirms itself after 60 s.
+TC10 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+TC11 Password protects the API; it can be removed again.
+TC11 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+TC12 Broken uploads are rejected and do not damage the stored images.
+TC12 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+TC13 Forced C6 reflash from the UI restores the current role's firmware.
+TC13 ERROR (0 s) ConnectionResetError: [Errno 54] Connection reset by peer
+
+Summary: TC01 PASS, TC02 PASS, TC03 ERROR, TC04 ERROR, TC05 ERROR, TC06 ERROR, TC07 ERROR, TC08 ERROR, TC09 ERROR, TC10 ERROR, TC11 ERROR, TC12 ERROR, TC13 ERROR
+exit 1

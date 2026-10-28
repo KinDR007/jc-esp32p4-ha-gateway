@@ -8,7 +8,7 @@ přepínají role, flashují C6 a zapisují slot gateway.
 python3 tests/hw_test.py --list
 # celý běh (TC09 potřebuje aioesphomeapi, proto Python z ESPHome venv)
 KEY=$(sed -n 's/^api_encryption_key: "\(.*\)"/\1/p' firmware/esphome/secrets.yaml)
-../esphome/ble_proxy/.venv/bin/python tests/hw_test.py --host <ip> --esphome-key "$KEY" --report build/hw_test.json
+../esphome/ble_proxy/.venv/bin/python tests/hw_test.py --host <ip> --esphome-key "$KEY" --report tests/results/<datum>/hw_test.json
 # jen vybrané
 python3 tests/hw_test.py --host <ip> --only TC04 TC05
 ```

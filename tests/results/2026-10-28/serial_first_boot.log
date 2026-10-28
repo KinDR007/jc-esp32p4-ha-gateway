@@ -1,0 +1,68 @@
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x30f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x10f4
+load:0x4ff29ed0,len:0xbe8
+load:0x4ff2cbd0,len:0x3330
+entry 0x4ff29ed0
+I (332) hex_psram: vendor id    : 0x0d (AP)
+I (332) hex_psram: Latency      : 0x01 (Fixed)
+I (332) hex_psram: DriveStr.    : 0x00 (25 Ohm)
+I (333) hex_psram: dev id       : 0x03 (generation 4)
+I (338) hex_psram: density      : 0x07 (256 Mbit)
+I (342) hex_psram: good-die     : 0x06 (Pass)
+I (346) hex_psram: SRF          : 0x02 (Slow Refresh)
+I (351) hex_psram: BurstType    : 0x00 ( Wrap)
+I (355) hex_psram: BurstLen     : 0x03 (2048 Byte)
+I (360) hex_psram: BitMode      : 0x01 (X16 Mode)
+I (364) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)
+I (369) hex_psram: DriveStrength: 0x00 (1/1)
+I (373) MSPI Timing: Enter psram timing tuning
+I (545) esp_psram: Found 32MB PSRAM device
+I (546) esp_psram: Speed: 200MHz
+I (546) hex_psram: psram CS IO is dedicated
+I (546) cpu_start: Multicore app
+I (1454) esp_psram: SPI SRAM memory test OK
+I (1463) cpu_start: GPIO 38 and 37 are used as console UART I/O pins
+I (1464) cpu_start: Pro cpu start user code
+I (1464) cpu_start: cpu freq: 360000000 Hz
+I (1466) app_init: Application information:
+I (1470) app_init: Project name:     p4gw
+I (1474) app_init: App version:      6e3e676-dirty
+I (1478) app_init: Compile time:     Oct 28 2026 07:25:17
+I (1483) app_init: ELF file SHA256:  00abb053a...
+I (1488) app_init: ESP-IDF:          v5.5.5
+I (1492) efuse_init: Min chip rev:     v0.1
+I (1496) efuse_init: Max chip rev:     v1.99 
+I (1500) efuse_init: Chip rev:         v1.3
+I (1504) heap_init: Initializing. RAM available for dynamic allocation:
+I (1510) heap_init: At 4FF248B0 len 00016710 (89 KiB): RETENT_RAM
+I (1516) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM
+I (1521) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM
+I (1526) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM
+I (1532) heap_init: At 30100090 len 00001F70 (7 KiB): SPM
+I (1537) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator
+W (1544) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig
+I (1557) spi_flash: detected chip: generic
+I (1560) spi_flash: flash io: dio
+I (1564) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (1570) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (1576) esp_core_dump_flash: Init core dump to flash
+I (1581) esp_core_dump_flash: Found partition 'coredump' @ f30000 262144 bytes
+I (00:00:00.125) main_task: Started on CPU0
+I (1596) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations
+I (00:00:00.137) main_task: Calling app_main()
+I (00:00:00.160) main: p4gw-e30a08, desired role thread_br
+I (00:00:00.160) gw_boot: reset reason 1, unstable boot 1/4
+I (00:00:00.202) esp_eth.netif.netif_glue: 30:ed:a0:e3:0a:08
+I (00:00:00.202) esp_eth.netif.netif_glue: ethernet attached to netif
+I (00:00:02.304) gw_eth: link up
+I (00:00:02.304) mdns_mem: mDNS task will be created from internal RAM
+I (00:00:02.306) gw_http: web UI on port 80
+I (00:00:02.307) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C
+E (00:00:02.313) gw_config: maintenance mode: first start: back up the C6 factory firmware (System tab), then pick a role
+I (00:00:04.159) gw_eth: IPv6 fe80:0000:0000:0000:32ed:a0ff:fee3:0a08
+I (00:00:10.159) gw_eth: IPv6 fdb7:6a25:8fd1:48c2:32ed:a0ff:fee3:0a08
+I (00:00:10.825) esp_netif_handlers: eth ip: 192.168.88.243, mask: 255.255.255.0, gw: 192.168.88.1
+I (00:00:10.825) gw_eth: IPv4 192.168.88.243
