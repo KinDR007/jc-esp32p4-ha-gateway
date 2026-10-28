@@ -129,6 +129,14 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="row"><button class="btn primary" value="save">Save</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
   </form>
 </dialog>
+<dialog id="copy-dlg" style="max-width:640px">
+  <form method="dialog">
+    <h3 style="margin-top:0" id="copy-title"></h3>
+    <textarea id="copy-text" rows="12" readonly></textarea>
+    <p class="muted" id="copy-hint"></p>
+    <div class="row"><button class="btn primary" type="button" id="copy-btn">Copy</button><button class="btn" value="close">Close</button></div>
+  </form>
+</dialog>
 <dialog id="confirm">
   <form method="dialog">
     <h3 style="margin-top:0" id="confirm-title"></h3>
@@ -188,6 +196,28 @@ function confirmDialog(title, text) {
     dlg.returnValue = 'no';
     dlg.showModal();
   });
+}
+
+/* navigator.clipboard exists only in secure contexts (HTTPS, localhost); the gateway serves
+ * plain HTTP, so fall back to selecting a textarea and execCommand('copy'). */
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall back */ }
+  }
+  const ta = $('#copy-text');
+  ta.value = text;
+  ta.focus();
+  ta.select();
+  try { return document.execCommand('copy'); } catch (e) { return false; }
+}
+
+async function showCopy(title, text, hint) {
+  $('#copy-title').textContent = title;
+  $('#copy-text').value = text;
+  $('#copy-hint').textContent = hint || '';
+  $('#copy-dlg').showModal();
+  const ok = await copyText(text);
+  toast(ok ? 'Copied to the clipboard' : 'Select the text and copy it (Ctrl/Cmd+C)');
 }
 
 function toast(msg) {
@@ -787,8 +817,7 @@ document.addEventListener('click', async e => {
       loadDataset(true);
     } else if (t.id === 'ds-copy') {
       if (!datasetTlvs) await loadDataset(true);
-      await navigator.clipboard.writeText(datasetTlvs);
-      toast('Dataset TLVs copied');
+      await showCopy('Thread dataset TLVs', datasetTlvs, 'Contains the network key, keep it private.');
     } else if (t.id === 'ds-apply') {
       const tlvs = $('#ds-tlvs').value.replace(/\s+/g, '');
       if (!tlvs || !await confirmDialog('Apply dataset?', 'The gateway leaves its current Thread network and joins the one in the dataset.')) return;
@@ -820,6 +849,8 @@ document.addEventListener('click', async e => {
       toast('Reading the C6 flash, about 2 minutes…');
       t.disabled = true;
       try { await download('/api/c6/backup', status.hostname + '_c6_flash.bin'); toast('C6 backup saved'); } finally { t.disabled = false; }
+    } else if (t.id === 'copy-btn') {
+      toast(await copyText($('#copy-text').value) ? 'Copied to the clipboard' : 'Select the text and copy it (Ctrl/Cmd+C)');
     } else if (t.id === 'ev-preset-apply') {
       if (!await confirmDialog('Apply preset?', 'Replaces all events and the sound selection. Removed events disappear from Home Assistant.')) return;
       sndCfg = await api('/api/sound/events/preset', { json: { preset: $('#ev-preset').value } });
@@ -833,8 +864,9 @@ document.addEventListener('click', async e => {
       if (!await confirmDialog('Delete ' + ev.name + '?', 'Its entities disappear from Home Assistant; automations using them stop working.')) return;
       await putEvents({ events: sndCfg.events.filter((_, i) => i !== +t.dataset.evDel) });
     } else if (t.dataset.evYaml !== undefined) {
-      await navigator.clipboard.writeText(automationYaml(sndCfg.events[+t.dataset.evYaml]));
-      toast('Automation YAML copied (Settings → Automations → ⋮ → Edit in YAML)');
+      const ev = sndCfg.events[+t.dataset.evYaml];
+      await showCopy('Automation: ' + ev.name, automationYaml(ev),
+        'Home Assistant: Settings → Automations & scenes → Create automation → ⋮ → Edit in YAML, paste, save.');
     } else if (t.id === 'ev-export') {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify({ exclude: [...sndExclude], events: sndCfg.events.map(({ active, count, last_ago_s, ...e }) => e) }, null, 2)], { type: 'application/json' }));

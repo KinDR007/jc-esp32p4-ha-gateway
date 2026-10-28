@@ -46,6 +46,27 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
 | TC16 | Oddělené Thread sítě rolí | router se připojí do testovací sítě, pak zpět na BR | border router zůstane ve své síti |
 
+## UI testy (prohlížeč)
+
+Automat: [ui/ui_test.mjs](ui/ui_test.mjs), Chrome ovládaný přes `playwright-core` (nainstalovaný
+Google Chrome, žádný stažený prohlížeč). Běží proti desce přes obyčejné HTTP, tedy ve stejném
+nezabezpečeném kontextu jako uživatel, kde některá API prohlížeče chybí (např. schránka).
+
+```sh
+npm --prefix tests/ui ci
+node tests/ui/ui_test.mjs --host <ip> [--password <heslo>]
+# změna UI před flashem nebo kontrola, že test na staré stránce selže:
+node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
+```
+
+| ID | Co ověřuje | Očekávaný výsledek |
+|---|---|---|
+| UI01 | všechny záložky | žádná chybová hláška ani nezachycená výjimka JS |
+| UI02 | Sound → „HA automation“ u každé události | otevře se dialog se šablonou, entity `event.`/`binary_sensor.<host>_snd_<id>`, žádná chyba |
+| UI03 | editor události | otevře se s daty, „Cancel“ nic nezmění |
+| UI04 | hledání ve stromu zvuků | „aircraft“ zobrazí jen odpovídající zvuky |
+| UI05 | Thread → „Copy TLVs“ (role Thread) | dialog s hex datasetem, žádná chyba |
+
 ## Ruční testy (mimo automat)
 
 | ID | Co | Jak |
