@@ -1,0 +1,57 @@
+--- CMakeLists.txt
++++ CMakeLists.txt
+@@ -6,12 +6,10 @@
+ endif()
+ 
+ idf_component_register(
+-    SRC_DIRS src
++    SRCS src/esp_br_web.c src/esp_br_web_api.c src/esp_br_web_base.c
+     INCLUDE_DIRS include
+     PRIV_INCLUDE_DIRS private_include
+     PRIV_REQUIRES ${requires}
+     EMBED_FILES "favicon.ico"
+-    EMBED_TXTFILES "frontend/wifi_configuration.html"
+ )
+ 
+-spiffs_create_partition_image(web_storage ${CMAKE_CURRENT_SOURCE_DIR}/frontend FLASH_IN_PROJECT)
+--- include/esp_br_web.h
++++ include/esp_br_web.h
+@@ -35,6 +35,13 @@
+  */
+ void esp_br_web_start(char *base_path);
+ 
++/**
++ * @brief Start the web server now instead of waiting for the next IP event.
++ *
++ * @param[in] base_path The base path of the web server's static files
++ */
++void esp_br_web_start_server(char *base_path);
++
+ /** Size of an ePSKc TAP string buffer: 8 digits + checksum digit + '\0' */
+ #define ESP_BR_EPSKC_TAP_LEN 10
+ 
+--- src/esp_br_web.c
++++ src/esp_br_web.c
+@@ -1373,6 +1373,10 @@
+     config.stack_size = 8 * 1024;
+     config.max_open_sockets = 7;
+     config.lru_purge_enable = true;
++#ifdef ESP_BR_WEB_PORT
++    config.server_port = ESP_BR_WEB_PORT;
++    config.ctrl_port = ESP_HTTPD_DEF_CTRL_PORT + 1;
++#endif
+     s_server.port = config.server_port;
+ 
+     esp_br_web_api_init();
+@@ -1509,6 +1513,11 @@
+ }
+ #endif
+ 
++void esp_br_web_start_server(char *base_path)
++{
++    start_web_server(base_path);
++}
++
+ void esp_br_web_start(char *base_path)
+ {
+     ESP_ERROR_CHECK(mdns_register_hostname_changed_callback(mdns_hostname_changed_callback, NULL));

@@ -1,0 +1,5 @@
+# Pinned third-party sources, fetched into third_party/ by scripts/fetch_deps.sh.
+# name            url                                              commit                                    note
+esp-thread-br     https://github.com/espressif/esp-thread-br.git   1f5af46d0ccb22fe01465ba6d16a33b276c20c1b  main after v1.3, REST aligned with ot-br-posix 0.6.0
+esp-coordinator   https://github.com/tostmann/esp-coordinator.git  f38f42bd4feb69304d5228fe69737b83e1d2e9fe  v1.5.79, ZBOSS NCP for C6
+esp-hosted-mcu    https://github.com/espressif/esp-hosted-mcu.git  dd0176e5fc959d79b306f6677a2f878123c58e9a  v2.12.13, matches ESPHome 2026.10 esp_hosted

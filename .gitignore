@@ -4,3 +4,6 @@ managed_components/
 sdkconfig
 sdkconfig.old
 *.bin
+third_party/
+backups/
+*.log

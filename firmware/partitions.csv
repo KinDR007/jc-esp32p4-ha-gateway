@@ -1,0 +1,12 @@
+# P4 flash layout (16 MB), shared by the gateway and the ESPHome role image.
+# Do not change offsets on deployed boards: the gateway and ESPHome locate each other by them.
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x14000
+otadata,  data, ota,      0x1d000,  0x2000
+phy_init, data, phy,      0x1f000,  0x1000
+gw_a,     app,  ota_0,    0x20000,  0x300000
+gw_b,     app,  ota_1,    0x320000, 0x300000
+esphome,  app,  ota_2,    0x620000, 0x400000
+c6fw,     data, 0x40,     0xa20000, 0x500000
+c6data,   data, 0x41,     0xf20000, 0x10000
+coredump, data, coredump, 0xf30000, 0x40000

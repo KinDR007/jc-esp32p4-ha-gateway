@@ -1,0 +1,51 @@
+menu "P4 gateway"
+
+    config GW_HOSTNAME_PREFIX
+        string "Hostname prefix (the last 3 MAC bytes are appended)"
+        default "p4gw"
+
+    config GW_DEFAULT_ROLE
+        string "Role used on first boot (thread_br, thread_router, zigbee_coordinator, zigbee_router)"
+        default "thread_br"
+
+    config GW_OTBR_REST_PORT
+        int "OTBR REST API port (Home Assistant OTBR integration)"
+        default 8081
+
+    config GW_ZIGBEE_TCP_PORT
+        int "Zigbee NCP TCP port (Zigbee2MQTT / ZHA)"
+        default 6638
+
+    config GW_C6_UART_PORT
+        int "UART to the C6 (shared by RCP, NCP and the flasher)"
+        default 1
+
+    config GW_C6_UART_TX
+        int "P4 GPIO to C6 U0RXD (JP1 11 -> 18)"
+        default 4
+
+    config GW_C6_UART_RX
+        int "P4 GPIO from C6 U0TXD (JP1 13 -> 20)"
+        default 5
+
+    config GW_C6_UART_BAUD
+        int "Runtime baud rate (ot_rcp and zigbee_ncp are built for it)"
+        default 460800
+
+    config GW_C6_RESET_GPIO
+        int "P4 GPIO driving C6 CHIP_PU (inside the module)"
+        default 54
+
+    config GW_C6_BOOT_GPIO
+        int "P4 GPIO driving C6 IO9 / BOOT (JP1 15 -> 22)"
+        default 20
+
+    config GW_ETH_PHY_RST_GPIO
+        int "IP101 reset GPIO"
+        default 51
+
+    config GW_ETH_PHY_ADDR
+        int "IP101 PHY address"
+        default 1
+
+endmenu

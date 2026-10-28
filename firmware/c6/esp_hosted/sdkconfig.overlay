@@ -1,0 +1,2 @@
+# esp-hosted co-processor over SDIO for the ESPHome BLE proxy role (esp32_hosted, slot 1, 4-bit).
+CONFIG_ESP_SDIO_HOST_INTERFACE=y
