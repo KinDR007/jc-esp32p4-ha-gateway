@@ -15,13 +15,21 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "mbedtls/sha256.h"
+#include "miniz.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "c6_flasher";
 
+/* MD5 of esp-serial-flasher (private header; struct MD5Context comes with esp_loader.h). */
+void MD5Init(struct MD5Context *context);
+void MD5Update(struct MD5Context *context, unsigned char const *buf, unsigned len);
+void MD5Final(unsigned char digest[16], struct MD5Context *context);
+
 #define C6FW_SUBTYPE 0x40
 #define C6DATA_SUBTYPE 0x41
 #define FLASH_BLOCK 4096
+/* Compressed blocks as esptool sends them to a ROM loader (no stub): larger ones corrupt. */
+#define DEFLATE_BLOCK 1024
 #define FLASH_BAUD 460800
 #define SNAP_MAGIC "C6SN"
 #define SNAP_MAX 4
@@ -279,40 +287,58 @@ typedef struct {
     uint32_t base;
 } part_reader_t;
 
-/* Compressed write: the ROM loader inflates; the result is checked against the plain md5. */
-static esp_err_t write_deflate(session_t *s, const c6fw_segment_t *seg, const part_reader_t *r, int pct_from,
-                               int pct_to)
-{
-    uint8_t *buf = heap_caps_malloc(FLASH_BLOCK, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, TAG, "no mem");
-    esp_loader_flash_deflate_cfg_t cfg = {
-        .offset = seg->addr,
-        .image_size = seg->size,
-        .compressed_size = seg->stored_size,
-        .block_size = FLASH_BLOCK,
-    };
-    esp_err_t ret = ESP_OK;
+typedef struct {
+    const uint8_t *data;
+} mem_reader_t;
 
-    if (esp_loader_flash_deflate_start(&s->loader, &cfg) != ESP_LOADER_SUCCESS) {
-        ret = ESP_FAIL;
-        goto out;
+static uint32_t fill_from_memory(void *ctx, uint32_t pos, uint8_t *buf, uint32_t n)
+{
+    memcpy(buf, ((mem_reader_t *)ctx)->data + pos, n);
+    return n;
+}
+
+/*
+ * Bundles are stored zlib-compressed; the P4 inflates a segment into PSRAM, checks its MD5 and
+ * writes it uncompressed (the C6 ROM loader's own inflate produced wrong data here).
+ */
+static esp_err_t inflate_segment(const c6fw_segment_t *seg, const part_reader_t *r, uint8_t **out)
+{
+    uint8_t *packed = heap_caps_malloc(seg->stored_size, MALLOC_CAP_SPIRAM);
+    uint8_t *plain = heap_caps_malloc(seg->size, MALLOC_CAP_SPIRAM);
+    esp_err_t err = packed && plain ? ESP_OK : ESP_ERR_NO_MEM;
+
+    if (err == ESP_OK) {
+        err = esp_partition_read(r->part, r->base, packed, seg->stored_size);
     }
-    for (uint32_t pos = 0; pos < seg->stored_size; pos += FLASH_BLOCK) {
-        uint32_t n = seg->stored_size - pos < FLASH_BLOCK ? seg->stored_size - pos : FLASH_BLOCK;
-        if (esp_partition_read(r->part, r->base + pos, buf, n) != ESP_OK ||
-            esp_loader_flash_deflate_write(&s->loader, &cfg, buf, n) != ESP_LOADER_SUCCESS) {
-            ret = ESP_FAIL;
-            goto out;
+    if (err == ESP_OK) {
+        /* The decompressor state is ~11 KB: on the heap, not on the caller's stack. */
+        tinfl_decompressor *inflator = heap_caps_malloc(sizeof(tinfl_decompressor), MALLOC_CAP_SPIRAM);
+        size_t in_len = seg->stored_size, out_len = seg->size;
+        err = ESP_ERR_NO_MEM;
+        if (inflator) {
+            tinfl_init(inflator);
+            tinfl_status st = tinfl_decompress(inflator, packed, &in_len, plain, plain, &out_len,
+                                               TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+            err = st == TINFL_STATUS_DONE && out_len == seg->size ? ESP_OK : ESP_ERR_INVALID_SIZE;
+            free(inflator);
         }
-        s_progress.percent = pct_from + (int)((int64_t)(pct_to - pct_from) * (pos + n) / seg->stored_size);
     }
-    if (esp_loader_flash_deflate_finish(&s->loader, &cfg) != ESP_LOADER_SUCCESS ||
-        esp_loader_flash_verify_known_md5(&s->loader, seg->addr, seg->size, seg->md5) != ESP_LOADER_SUCCESS) {
-        ret = ESP_ERR_INVALID_CRC;
+    if (err == ESP_OK) {
+        uint8_t digest[16];
+        struct MD5Context md5;
+        MD5Init(&md5);
+        MD5Update(&md5, plain, seg->size);
+        MD5Final(digest, &md5);
+        err = memcmp(digest, seg->md5, sizeof(digest)) == 0 ? ESP_OK : ESP_ERR_INVALID_CRC;
     }
-out:
-    free(buf);
-    return ret;
+    free(packed);
+    if (err != ESP_OK) {
+        free(plain);
+        plain = NULL;
+        ESP_LOGE(TAG, "inflate 0x%lx: %s", (unsigned long)seg->addr, esp_err_to_name(err));
+    }
+    *out = plain;
+    return err;
 }
 
 static uint32_t fill_from_partition(void *ctx, uint32_t pos, uint8_t *buf, uint32_t n)
@@ -568,15 +594,22 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
             part_reader_t r = {.part = part, .base = entry->offset + seg->data_off};
             int from_pct = 10 + (int)(80LL * done_bytes / total);
             int to_pct = 10 + (int)(80LL * (done_bytes + seg->size) / total);
-            for (int attempt = 0; attempt < 3; attempt++) {
-                err = (seg->flags & C6FW_SEG_DEFLATE)
-                          ? write_deflate(s, seg, &r, from_pct, to_pct)
-                          : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
+            uint8_t *plain = NULL;
+            mem_reader_t mem = {0};
+            if (seg->flags & C6FW_SEG_DEFLATE) {
+                err = inflate_segment(seg, &r, &plain);
+                mem.data = plain;
+            }
+            for (int attempt = 0; attempt < 3 && err == ESP_OK; attempt++) {
+                err = plain ? write_region(s, seg->addr, seg->size, fill_from_memory, &mem, from_pct, to_pct)
+                            : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
                 if (err == ESP_OK) {
                     break;
                 }
                 ESP_LOGW(TAG, "write 0x%lx failed (%s), retry", (unsigned long)seg->addr, esp_err_to_name(err));
+                err = attempt < 2 ? ESP_OK : err;
             }
+            free(plain);
             done_bytes += seg->size;
         }
     }

@@ -32,7 +32,10 @@ void gw_boot_mark_stable(void)
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t state;
 
-    if (esp_ota_get_state_partition(running, &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY) {
+    /* Only while the running image is also the boot image: the call acts on the boot partition,
+     * which after an upload is the new, never started image. */
+    if (running == esp_ota_get_boot_partition() && esp_ota_get_state_partition(running, &state) == ESP_OK &&
+        state == ESP_OTA_IMG_PENDING_VERIFY) {
         ESP_LOGI(TAG, "new image confirmed");
         esp_ota_mark_app_valid_cancel_rollback();
     }
@@ -63,6 +66,17 @@ static void restart_task(void *arg)
 
 void gw_restart_later(uint32_t delay_ms)
 {
+    /* A requested restart proves the new image runs well enough to serve requests; without
+     * this, a restart within the first minute after an update would roll it back. */
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t state;
+    /* Only while the running image is also the boot image: the call acts on the boot partition,
+     * which after an upload is the new, never started image. */
+    if (running == esp_ota_get_boot_partition() && esp_ota_get_state_partition(running, &state) == ESP_OK &&
+        state == ESP_OTA_IMG_PENDING_VERIFY) {
+        esp_ota_mark_app_valid_cancel_rollback();
+        ESP_LOGI(TAG, "image confirmed before the requested restart");
+    }
     ESP_LOGW(TAG, "restart in %lu ms", (unsigned long)delay_ms);
     xTaskCreate(restart_task, "restart", 2048, (void *)(uintptr_t)delay_ms, 20, NULL);
 }

@@ -20,7 +20,8 @@ def main():
     kernels = [s for s in symbols if '_s8_' in s and 'w8a16' not in s]
     model = onnx.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out/yamnet_p4.onnx'))
     # RequantizeLinear is used by the tensor runtime itself, not only by graph nodes.
-    ops = sorted({n.op_type for n in model.graph.node} | {'RequantizeLinear'})
+    # Constant nodes are folded into their consumers by the ESP-DL export.
+    ops = sorted(({n.op_type for n in model.graph.node} - {'Constant'}) | {'RequantizeLinear'})
     lines = ['# esp-dl compile-time op/kernel selection for the YAMNet int8 model (firmware/gateway/components/sound).',
              '# Ops from the exported graph; kernels: every int8 (s8) kernel, so any int8 conv shape still has one.',
              '# Regenerate the kernel list after an esp-dl update: tools/yamnet/gen_compile_req.py.',

@@ -14,6 +14,7 @@
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "gw.h"
 #include "ping/ping_sock.h"
 
@@ -268,6 +269,9 @@ esp_err_t gw_http_receive(httpd_req_t *req, gw_sink_fn sink, void *ctx)
             err = sink(ctx, received, buf, fill);
         }
         received += fill;
+        /* Flash writes stall both cores; a long upload must still let the idle tasks run
+         * (task watchdog), whichever core this unpinned task is on. */
+        vTaskDelay(1);
     }
     free(buf);
     return err;

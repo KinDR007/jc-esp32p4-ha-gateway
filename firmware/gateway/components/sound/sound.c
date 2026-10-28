@@ -50,6 +50,7 @@ static const char *TAG = "sound";
 #define INFER_PRIO 2
 #define CPU_LIMIT_PCT 60          /* of one core, averaged over CPU_WINDOW_US */
 #define CPU_WINDOW_US (30 * 1000000LL)
+#define MAX_LAG_SAMPLES RATE      /* older audio is dropped instead of caught up */
 
 extern const char class_map_start[] asm("_binary_yamnet_class_map_csv_start");
 extern const char class_map_end[] asm("_binary_yamnet_class_map_csv_end");
@@ -73,7 +74,7 @@ static struct {
     /* inference */
     char model_error[96];
     uint32_t model_load_ms;
-    uint32_t runs, skipped;
+    uint32_t runs, skipped, late;
     float last_ms, avg_ms, max_ms;
     float cpu_pct;
     top_t top[TOP_N];
@@ -266,10 +267,12 @@ static void infer_task(void *arg)
 
     while (true) {
         uint64_t total = samples_total();
-        if (total - next_frame * MEL_HOP > RING - RATE) {
-            /* Fell behind by almost the whole ring: restart from the present. */
-            next_frame = total / MEL_HOP;
+        if (total - next_frame * MEL_HOP > MAX_LAG_SAMPLES + MEL_PATCH_FRAMES * MEL_HOP) {
+            /* Behind real time (flash writes stall both cores): rebuild the history from the
+             * newest audio instead of catching up back-to-back, which would starve IDLE1. */
+            next_frame = total / MEL_HOP - MEL_PATCH_FRAMES;
             frames = since_patch = 0;
+            s.late++;
         }
         if (next_frame * MEL_HOP + MEL_WINDOW > total) {
             vTaskDelay(pdMS_TO_TICKS(40));
@@ -287,10 +290,15 @@ static void infer_task(void *arg)
         since_patch++;
         window_peak_db = fmaxf(window_peak_db, s.level_db);
         busy_us += esp_timer_get_time() - start;
+        if (frames % 16 == 0) {
+            vTaskDelay(1); /* keep IDLE1 alive while catching up */
+        }
 
         if (frames < MEL_PATCH_FRAMES || since_patch < MEL_PATCH_HOP) {
             continue;
         }
+        /* Let the idle task (task watchdog) run between patches whatever the backlog. */
+        vTaskDelay(1);
         since_patch = 0;
         bool loud = window_peak_db >= s.gate_db;
         window_peak_db = -120.0f;
@@ -384,6 +392,7 @@ static cJSON *status_json(void)
     cJSON_AddBoolToObject(inf, "enabled", s.infer_enabled);
     cJSON_AddNumberToObject(inf, "runs", s.runs);
     cJSON_AddNumberToObject(inf, "skipped_quiet", s.skipped);
+    cJSON_AddNumberToObject(inf, "late_resyncs", s.late);
     cJSON_AddNumberToObject(inf, "last_ms", roundf(s.last_ms * 10) / 10);
     cJSON_AddNumberToObject(inf, "avg_ms", roundf(s.avg_ms * 10) / 10);
     cJSON_AddNumberToObject(inf, "max_ms", roundf(s.max_ms * 10) / 10);

@@ -19,8 +19,15 @@ import yamnet_torch as yt
 from validate import load_16k
 
 
+LOGIT_CLIP = 16.0  # sigmoid(+-16) is 0/1 within 1e-7
+
+
 class Export(torch.nn.Module):
-    """Logits instead of sigmoid scores: the sigmoid runs in float on the device."""
+    """Logits instead of sigmoid scores: the sigmoid runs in float on the device.
+
+    Float logits span about -611..+51 (rare classes are very negative), which gives a per-tensor
+    power-of-2 int8 step of 4 and scores of only 0.02 or 0.5. Clipping to +-16 gives a step of 0.125.
+    """
 
     def __init__(self, model):
         super().__init__()
@@ -28,7 +35,7 @@ class Export(torch.nn.Module):
 
     def forward(self, x):
         emb = self.model.embedding(x)
-        return self.model.logits(emb), emb
+        return torch.clamp(self.model.logits(emb), -LOGIT_CLIP, LOGIT_CLIP), emb
 
 
 def calibration_patches(paths):

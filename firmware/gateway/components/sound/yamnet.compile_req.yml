@@ -3,6 +3,7 @@
 # Regenerate the kernel list after an esp-dl update: tools/yamnet/gen_compile_req.py.
 kernel_abi: 1
 ops:
+  - Clip
   - Conv
   - Gemm
   - ReduceMean
