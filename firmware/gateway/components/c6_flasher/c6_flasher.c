@@ -584,8 +584,13 @@ esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
         return ESP_ERR_NO_MEM;
     }
     s_progress.busy = true;
+    s_progress.last_error[0] = '\0';
     progress(0, "reading C6 flash");
     err = session_open(s);
+    if (err != ESP_OK) {
+        snprintf(s_progress.last_error, sizeof(s_progress.last_error),
+                 "C6 bootloader not responding, check JP1 jumpers");
+    }
     if (err == ESP_OK) {
         if (esp_loader_flash_detect_size(&s->loader, &s_flash_size) != ESP_LOADER_SUCCESS) {
             s_flash_size = 4 * 1024 * 1024;
@@ -593,6 +598,8 @@ esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
         ESP_LOGI(TAG, "C6 flash %lu kB", (unsigned long)s_flash_size / 1024);
         for (uint32_t addr = 0; addr < s_flash_size && err == ESP_OK; addr += FLASH_BLOCK) {
             if (esp_loader_flash_read(&s->loader, buf, addr, FLASH_BLOCK) != ESP_LOADER_SUCCESS) {
+                snprintf(s_progress.last_error, sizeof(s_progress.last_error), "C6 flash read failed at 0x%lx",
+                         (unsigned long)addr);
                 err = ESP_FAIL;
                 break;
             }

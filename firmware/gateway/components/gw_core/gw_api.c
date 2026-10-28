@@ -408,9 +408,21 @@ static esp_err_t snapshot_get(httpd_req_t *req)
     return err == ESP_OK ? httpd_resp_send_chunk(req, NULL, 0) : err;
 }
 
-static esp_err_t http_sink(void *ctx, const void *data, size_t len)
+typedef struct {
+    httpd_req_t *req;
+    size_t sent;
+} backup_ctx_t;
+
+static esp_err_t http_sink(void *arg, const void *data, size_t len)
 {
-    return httpd_resp_send_chunk(ctx, data, len);
+    backup_ctx_t *ctx = arg;
+    if (ctx->sent == 0) {
+        /* Headers only once the C6 answered, so a failed connect still gets a proper error. */
+        httpd_resp_set_type(ctx->req, "application/octet-stream");
+        httpd_resp_set_hdr(ctx->req, "Content-Disposition", "attachment; filename=\"c6_flash_backup.bin\"");
+    }
+    ctx->sent += len;
+    return httpd_resp_send_chunk(ctx->req, data, len);
 }
 
 /* Full C6 flash dump, only while no role uses the C6 UART. */
@@ -422,13 +434,15 @@ static esp_err_t c6_backup_get(httpd_req_t *req)
     if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress()->busy) {
         return gw_http_send_error(req, 409, "C6 busy");
     }
-    httpd_resp_set_type(req, "application/octet-stream");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"c6_flash_backup.bin\"");
-    esp_err_t err = c6_read_flash(http_sink, req);
+    backup_ctx_t ctx = {.req = req};
+    esp_err_t err = c6_read_flash(http_sink, &ctx);
     xSemaphoreGive(s_upload_lock);
     if (err != ESP_OK) {
-        /* Headers are gone already; an aborted transfer is the error signal. */
         ESP_LOGE(TAG, "C6 backup failed: %s", esp_err_to_name(err));
+        if (ctx.sent == 0) {
+            return gw_http_send_error(req, 503, c6_progress()->last_error);
+        }
+        /* Mid-transfer: an aborted download is the error signal. */
         return ESP_FAIL;
     }
     return httpd_resp_send_chunk(req, NULL, 0);
