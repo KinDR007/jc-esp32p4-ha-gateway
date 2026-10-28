@@ -178,7 +178,15 @@ def tc04_thread_br():
     t = wait_until('Thread leader', leader, 90)
     check(True, f'Thread role {t["role"]}, network {t["network_name"]}, channel {t["channel"]}, RCP {t["rcp_version"]}')
     check(t['border_router']['routing'] == 'running', 'border routing running')
-    check(t['border_router']['srp_server'] == 'running', 'SRP server running')
+
+    def br_services():
+        code, t = http('GET', '/api/thread/status')
+        br = t.get('border_router', {})
+        return br if br.get('srp_server') == 'running' and br.get('nat64') == 'active' and br.get('border_agent') else None
+
+    # SRP, NAT64 and the border agent come up some 20 s after the node becomes leader.
+    wait_until('SRP server, NAT64 and border agent', br_services, 60)
+    check(True, 'SRP server running, NAT64 active, border agent active')
     code, node = http('GET', '/node', port=8081)
     check(code == 200 and isinstance(node, dict), f'OTBR REST /node on port 8081 ({code})')
     code, ds = http('GET', '/node/dataset/active', port=8081)

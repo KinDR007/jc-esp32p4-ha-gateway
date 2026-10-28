@@ -346,6 +346,9 @@ static esp_err_t app_upload(httpd_req_t *req, const esp_partition_t *target, boo
     if (err == ESP_OK) {
         err = esp_ota_get_partition_description(target, &desc);
     }
+    if (err == ESP_ERR_OTA_ROLLBACK_INVALID_STATE) {
+        return gw_http_send_error(req, 409, "the running gateway image is not confirmed yet, retry in a minute");
+    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "upload to %s: %s", target->label, esp_err_to_name(err));
         return gw_http_send_error(req, 400, esp_err_to_name(err));
