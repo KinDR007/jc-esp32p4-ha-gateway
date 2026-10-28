@@ -66,7 +66,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI03 | editor události | otevře se s daty, „Cancel“ nic nezmění |
 | UI04 | hledání ve stromu zvuků | „aircraft“ zobrazí jen odpovídající zvuky |
 | UI05 | Thread → „Copy TLVs“ (role Thread) | dialog s hex datasetem, žádná chyba |
-| UI06 | jazyk CZ, všechny záložky, pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název, volba přežije reload, EN vrátí původní texty |
+| UI06 | jazyk CZ, všechny záložky, pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
 | UI07 | vzhled světlý / tmavý / systém | `data-theme` a barva pozadí se mění, volba přežije reload, „systém“ sleduje nastavení OS |
 
 ## Ruční testy (mimo automat)

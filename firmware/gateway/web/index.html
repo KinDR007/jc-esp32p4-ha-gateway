@@ -842,6 +842,12 @@ async function loadSoundConfig() {
 /* Czech name only for display; ids, HA entities and automations keep the English name. */
 const evName = e => (lang === 'cs' && e.name_cs) || e.name;
 
+/* "Heard now": in Czech, a class that belongs to an event is labelled with the event's Czech name. */
+function heardName(t) {
+  const names = [...new Set((sndCfg?.events || []).filter(e => e.enabled && e.name_cs && e.classes.includes(t.index)).map(evName))];
+  return lang === 'cs' && names.length ? `${esc(names.join(', '))} <span class="muted">${esc(t.name)}</span>` : esc(t.name);
+}
+
 function renderEvents() {
   const rows = sndCfg.events.map((e, i) => `<tr>
     <td><input type="checkbox" data-ev-toggle="${i}" ${e.enabled ? 'checked' : ''}></td>
@@ -975,7 +981,7 @@ async function loadSound() {
     ['Inference', inf.runs ? `${inf.avg_ms} ms avg, ${inf.max_ms} ms max, last ${inf.last_ms} ms` : ''],
     ['CPU (core 1)', inf.runs ? inf.cpu_pct + ' %' : ''],
     ['Runs / skipped quiet', `${inf.runs} / ${inf.skipped_quiet}`]]);
-  $('#snd-top').innerHTML = inf.top ? `<table>${inf.top.map(t => `<tr><td data-notr>${esc(t.name)}</td><td style="width:50%"><div class="progress"><div style="width:${t.score * 100}%"></div></div></td><td>${(t.score * 100).toFixed(0)} %</td></tr>`).join('')}</table>
+  $('#snd-top').innerHTML = inf.top ? `<table>${inf.top.map(t => `<tr><td data-notr>${heardName(t)}</td><td style="width:50%"><div class="progress"><div style="width:${t.score * 100}%"></div></div></td><td>${(t.score * 100).toFixed(0)} %</td></tr>`).join('')}</table>
     <p class="muted">${inf.top_age_s.toFixed(0)} s ago</p>` : 'Recognition is off or nothing above the gate yet.';
 }
 
