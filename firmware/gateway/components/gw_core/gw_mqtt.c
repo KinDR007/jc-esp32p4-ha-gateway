@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_app_desc.h"
@@ -61,6 +62,70 @@ static cJSON *device_json(void)
 }
 
 /* One retained discovery config per entity; HA builds the device from them. */
+/* Listener of other components (Zigbee2MQTT): subscribes on every connect, gets whole messages. */
+#define LISTENER_MAX_MSG (768 * 1024)
+static gw_mqtt_listener_t s_listener;
+static char *s_rx_buf, s_rx_topic[160];
+static size_t s_rx_len;
+
+void gw_mqtt_set_listener(const gw_mqtt_listener_t *listener)
+{
+    s_listener = *listener;
+}
+
+esp_err_t gw_mqtt_subscribe(const char *filter)
+{
+    if (!s_client || !s_connected) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return esp_mqtt_client_subscribe(s_client, filter, 0) >= 0 ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t gw_mqtt_unsubscribe(const char *filter)
+{
+    if (!s_client || !s_connected) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return esp_mqtt_client_unsubscribe(s_client, filter) >= 0 ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t gw_mqtt_publish_to(const char *full_topic, const char *payload)
+{
+    if (!s_client || !s_connected) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return esp_mqtt_client_publish(s_client, full_topic, payload, 0, 1, 0) >= 0 ? ESP_OK : ESP_FAIL;
+}
+
+/* A message can arrive in several chunks (bigger than the client buffer): put it together in PSRAM. */
+static void listener_data(esp_mqtt_event_handle_t e)
+{
+    if (!s_listener.on_message) {
+        return;
+    }
+    if (e->current_data_offset == 0) {
+        free(s_rx_buf);
+        s_rx_buf = NULL;
+        if (e->total_data_len > LISTENER_MAX_MSG || e->topic_len >= (int)sizeof(s_rx_topic)) {
+            ESP_LOGW(TAG, "dropping %d B message on %.*s", e->total_data_len, e->topic_len, e->topic);
+            return;
+        }
+        s_rx_buf = heap_caps_malloc(e->total_data_len + 1, MALLOC_CAP_SPIRAM);
+        snprintf(s_rx_topic, sizeof(s_rx_topic), "%.*s", e->topic_len, e->topic);
+        s_rx_len = e->total_data_len;
+    }
+    if (!s_rx_buf || e->current_data_offset + e->data_len > (int)s_rx_len) {
+        return;
+    }
+    memcpy(s_rx_buf + e->current_data_offset, e->data, e->data_len);
+    if (e->current_data_offset + e->data_len == (int)s_rx_len) {
+        s_rx_buf[s_rx_len] = '\0';
+        s_listener.on_message(s_rx_topic, s_rx_buf, s_rx_len);
+        free(s_rx_buf);
+        s_rx_buf = NULL;
+    }
+}
+
 static void (*s_ext_discovery)(void);
 static void (*s_ext_state)(cJSON *state);
 
@@ -323,13 +388,19 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         esp_mqtt_client_subscribe(s_client, buf, 1);
         publish_discovery();
         publish_state();
+        if (s_listener.on_connect) {
+            s_listener.on_connect();
+        }
         break;
     case MQTT_EVENT_DISCONNECTED:
         s_connected = false;
         ESP_LOGW(TAG, "disconnected");
         break;
     case MQTT_EVENT_DATA:
-        handle_command(event->topic, event->topic_len, event->data, event->data_len);
+        if (event->current_data_offset == 0 && event->topic_len) {
+            handle_command(event->topic, event->topic_len, event->data, event->data_len);
+        }
+        listener_data(event);
         break;
     case MQTT_EVENT_ERROR:
         if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {

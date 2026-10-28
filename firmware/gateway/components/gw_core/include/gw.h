@@ -146,6 +146,17 @@ bool gw_mqtt_connected(void);
 void gw_mqtt_publish(const char *suffix, const char *payload, bool retain);
 const char *gw_mqtt_base_topic(void);
 
+/* One listener for topics outside the gateway's own (Zigbee2MQTT). on_connect runs after every
+ * (re)connect to subscribe; on_message gets whole messages, also those split into chunks. */
+typedef struct {
+    void (*on_connect)(void);
+    void (*on_message)(const char *topic, const char *data, size_t len);
+} gw_mqtt_listener_t;
+void gw_mqtt_set_listener(const gw_mqtt_listener_t *listener);
+esp_err_t gw_mqtt_subscribe(const char *filter);
+esp_err_t gw_mqtt_unsubscribe(const char *filter);
+esp_err_t gw_mqtt_publish_to(const char *full_topic, const char *payload);
+
 #define GW_JSON_STR(obj, key) (cJSON_IsString(cJSON_GetObjectItem((obj), (key))) ? cJSON_GetObjectItem((obj), (key))->valuestring : NULL)
 
 #ifdef __cplusplus

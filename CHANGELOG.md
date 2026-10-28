@@ -14,6 +14,11 @@
   restarts). Test UI10.
 - C6 flashing progress in the header on every page (pill with percentage, strip along the
   header) instead of a banner on some pages. Test UI11.
+- Zigbee › Network and devices through Zigbee2MQTT on the gateway's MQTT broker (found
+  automatically, the instance using this gateway preferred): network map with LQI, all devices with
+  model, power, LQI, last seen and state, permit join (whole network or via a router), rename,
+  remove, interview, OTA check and update. Works in every role. MQTT messages of any size; JSON in
+  PSRAM. Tests TC22, UI12.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
 

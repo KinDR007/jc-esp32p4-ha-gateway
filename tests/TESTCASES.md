@@ -45,6 +45,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC17 | Konfigurace událostí | neplatné ID / třída / duplicita, nová událost a výjimka, restart, předvolba | 400 pro chyby, vše přežije restart, předvolba použita, původní konfigurace obnovena |
 | TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
 | TC20 | Síťové okolí | rychlý sken v roli Thread BR, pak úplný sken (restart, skenovací firmware C6) | rychlý: 16 kanálů, vlastní Thread síť nalezena, bez výpadku RCP; úplný: skener odpoví, 16 kanálů, Wi-Fi bez duplicit, vlastní PAN v provozu; role a Thread síť po skenu zpět |
+| TC22 | Zigbee síť přes Zigbee2MQTT | `GET /api/zigbee/net`, zavření připojování | instance nalezena na brokeru, seznam zařízení s koordinátorem, Zigbee2MQTT odpoví na operaci, neznámá operace 400 |
 | TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |
 | TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
 
@@ -72,6 +73,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI04 | hledání ve stromu zvuků | „aircraft“ zobrazí jen odpovídající zvuky |
 | UI05 | Thread → „Copy TLVs“ (role Thread) | dialog s hex datasetem, žádná chyba |
 | UI06 | jazyk CZ, všechny záložky (i všechny položky menu přeložené), pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
+| UI12 | Zigbee › Síť a zařízení (je-li Zigbee2MQTT) | instance, všechna zařízení v tabulce, detail po najetí, mapa s uzly, je-li uložená |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; po skončení zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |
 | UI09 | Systém › Síťové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |

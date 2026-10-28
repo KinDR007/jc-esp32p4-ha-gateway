@@ -661,6 +661,22 @@ def tc21_thread_topology():
     check(code == 200, 'a second discovery right after works too')
 
 
+def tc22_zigbee_net():
+    """Zigbee network through Zigbee2MQTT: instance found on the broker, devices, an operation answered."""
+    code, d = http('GET', '/api/zigbee/net')
+    if code != 200 or not d.get('mqtt'):
+        raise Fail('skipped: MQTT not connected')
+    d = wait_until('Zigbee2MQTT instance', lambda: (lambda d: d if d.get('base') and d.get('devices') else None)(
+        http('GET', '/api/zigbee/net')[1]), 60, 3)
+    inst = next(i for i in d['instances'] if i['base'] == d['base'])
+    check(True, f'Zigbee2MQTT {inst.get("version")} at {d["base"]}, coordinator {inst.get("coordinator")}, {len(d["devices"])} devices')
+    check(any(x['type'] == 'Coordinator' for x in d['devices']), 'device list includes the coordinator')
+    code, r = http('POST', '/api/zigbee/net/request', {'action': 'permit_join', 'time': 0}, timeout=40)
+    check(code == 200 and r.get('status') == 'ok', f'permit join closed, answered by Zigbee2MQTT ({r.get("status")})')
+    code, r = http('POST', '/api/zigbee/net/request', {'action': 'format'})
+    check(code == 400, 'unknown action refused')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -669,7 +685,7 @@ TESTS = [
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
-    ('TC21', tc21_thread_topology),
+    ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net),
 ]
 
 

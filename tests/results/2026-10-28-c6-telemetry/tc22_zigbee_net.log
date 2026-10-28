@@ -1,0 +1,8 @@
+TC22 Zigbee network through Zigbee2MQTT: instance found on the broker, devices, an operation answered.
+  20:00:35 ok: Zigbee2MQTT 2.14.2 at zigbee2mqtt, coordinator ZStack3x0, 77 devices
+  20:00:35 ok: device list includes the coordinator
+  20:00:35 ok: permit join closed, answered by Zigbee2MQTT (ok)
+  20:00:35 ok: unknown action refused
+TC22 PASS (1 s) 
+
+Summary: TC22 PASS

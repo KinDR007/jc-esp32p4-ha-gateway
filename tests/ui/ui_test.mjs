@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI11).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI12).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -54,7 +54,7 @@ if (args.password) {
 const toastText = () => page.textContent('#toast');
 // every page of the left menu (section/sub page)
 const ROUTES = ['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/info', 'zigbee/diag',
-  'zigbee/backups', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
+  'zigbee/backups', 'zigbee/network', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
   'system/info', 'system/firmware', 'system/diag', 'system/netscan', 'system/settings', 'system/maint'];
 const tab = async route => {
   const [sec] = route.split('/');
@@ -307,6 +307,28 @@ await test('UI11', 'C6 flashing: progress in the header on every page, gone when
   await page.waitForFunction(() => document.querySelector('#hdr-flash').classList.contains('hidden'), null, { timeout: 15000 });
   check(await page.$eval('#flash-strip', e => getComputedStyle(e).display) === 'none', 'pill and strip gone after flashing');
   await page.unroute(`${base}api/status`);
+});
+
+await test('UI12', 'Zigbee network: Zigbee2MQTT instance, devices with details, map when one is stored', async () => {
+  const d = await page.evaluate(() => fetch('/api/zigbee/net').then(r => r.json()));
+  if (!d.base) {
+    console.log('  skipped: no Zigbee2MQTT on the MQTT broker');
+    return;
+  }
+  await tab('zigbee/network');
+  await page.waitForSelector('#zdev table', { timeout: 20000 });
+  const rows = await page.$$eval('#zdev tr[data-znode]', r => r.length);
+  check(rows === d.devices.length, `${rows} devices listed (${d.devices.length} in Zigbee2MQTT)`);
+  check((await page.textContent('#z2m-info')).includes(d.base), `instance ${d.base} shown`);
+  const row = await page.$('#zdev tr[data-znode]:nth-child(3)');
+  await row.scrollIntoViewIfNeeded();
+  const bb = await row.boundingBox();
+  await page.mouse.move(bb.x + 40, bb.y + bb.height / 2);
+  await page.waitForTimeout(300);
+  check(/IEEE/.test(await page.textContent('#nodebox')), 'device details on hover');
+  await page.mouse.move(2, 2);
+  if (d.map) check(await page.$$eval('#zmap svg .zn', n => n.length) === d.map.nodes.length, `map with ${d.map.nodes.length} nodes`);
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
 await browser.close();

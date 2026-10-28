@@ -129,6 +129,19 @@ code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 #nodebox td { padding: 2px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
 [data-node] { cursor: pointer; }
 .topo { width: 100%; max-height: 640px; display: block; }
+.zmap { max-height: 760px; }
+td.zact { white-space: normal; min-width: 96px; }
+td.zact .btn { padding: 4px 6px; margin: 1px 0; }
+.zmap .zl { stroke-width: 1.2; stroke-opacity: .28; }
+.zmap .zl.child { stroke-width: 1.6; stroke-opacity: .55; }
+.zmap .zl.ok { stroke: var(--ok); } .zmap .zl.warn { stroke: var(--warn); } .zmap .zl.bad { stroke: var(--bad); }
+.zmap.focus .zl { stroke-opacity: .05; }
+.zmap.focus .zl.hi { stroke-opacity: 1; stroke-width: 2.5; }
+.zmap .zn circle { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2; }
+.zmap .zn.coord circle, .zmap .zn.own circle { fill: var(--accent); }
+.zmap .zn.end circle { stroke: var(--muted); fill: var(--muted); }
+.zmap .zn.off circle { fill: var(--panel); stroke-dasharray: 3 3; }
+[data-znode] { cursor: pointer; }
 .topo text { font: 11px system-ui, sans-serif; fill: var(--muted); }
 .topo .topo-link { stroke-width: 2.5; stroke-opacity: .7; }
 .topo .topo-link.ok { stroke: var(--ok); } .topo .topo-link.warn { stroke: var(--warn); } .topo .topo-link.bad { stroke: var(--bad); }
@@ -239,6 +252,15 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="row"><button class="btn primary" type="button" id="copy-btn">Copy</button><button class="btn" value="close">Close</button></div>
   </form>
 </dialog>
+<dialog id="zb-dlg">
+  <form method="dialog">
+    <h3 style="margin-top:0" id="zb-dlg-title"></h3>
+    <p id="zb-dlg-text"></p>
+    <label class="field hidden" id="zb-dlg-field"><span id="zb-dlg-label"></span><input type="text" id="zb-dlg-input"></label>
+    <label class="hidden" id="zb-dlg-check"><input type="checkbox" id="zb-dlg-box"> <span id="zb-dlg-boxlabel"></span></label>
+    <div class="row" style="margin-top:12px"><button class="btn primary" value="ok">OK</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
+  </form>
+</dialog>
 <dialog id="confirm">
   <form method="dialog">
     <h3 style="margin-top:0" id="confirm-title"></h3>
@@ -260,7 +282,9 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
-  'Overview': 'Přehled', 'Information': 'Informace', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
+  'Overview': 'Přehled', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Zigbee2MQTT': 'Zigbee2MQTT',
+  'Request a new map': 'Vyžádat novou mapu', 'Zigbee devices': 'Zigbee zařízení', 'Base topic': 'Základní topic', 'Coordinator': 'Koordinátor',
+  'Adapter': 'Adaptér', 'Last seen': 'Naposledy viděno', 'Power': 'Napájení', 'LQI': 'LQI', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
   'Matter Server (WebSocket)': 'Matter Server (WebSocket)', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
   'Product': 'Produkt', 'Device type': 'Typ zařízení', 'Matter node': 'Uzel Matter', 'Topology': 'Topologie', 'Network map': 'Mapa sítě', 'Live': 'Živě', 'Events': 'Události',
   'ESP32-C6 radio': 'Rádio ESP32-C6', 'read at the next C6 flashing': 'načte se při příštím flashování C6', 'Refresh map': 'Obnovit mapu', 'Network surroundings': 'Síťové okolí', 'Scan': 'Sken', 'Recommendation': 'Doporučení',
@@ -733,6 +757,11 @@ const TIPS = {
   'Reflash C6 now': ['Rewrites the C6 with the firmware of the current role. Use after repeated radio failures.', 'Přepíše C6 firmwarem aktuální role. Použijte po opakovaných výpadcích rádia.'],
   'Back up C6 flash': ['Reads the whole 4 MB C6 flash to a file. Works only in maintenance mode.', 'Přečte celou 4MB flash C6 do souboru. Funguje jen v režimu údržby.'],
   'Matter Server': ['WebSocket of the Matter Server add-on (Home Assistant), e.g. ws://homeassistant.local:5580/ws. Port 5580 has to be exposed in the add-on (Configuration, Network). Gives vendor, product, name, serial number and device type of each Matter device; they are matched with the map by Thread MAC or IPv6 address.', 'WebSocket doplňku Matter Server (Home Assistant), např. ws://homeassistant.local:5580/ws. Port 5580 musí být v doplňku zpřístupněný (Konfigurace, Síť). Dodá výrobce, produkt, název, sériové číslo a typ každého zařízení Matter; s mapou se párují podle MAC Thread nebo IPv6 adresy.'],
+  'Zigbee map': ['Zigbee2MQTT asks every router for its neighbour table (it takes several minutes in a large network) and sends the map; the gateway keeps the last one.', 'Zigbee2MQTT se zeptá každého routeru na tabulku sousedů (ve velké síti to trvá několik minut) a pošle mapu; brána si drží poslední.'],
+  'Z2M coordinator': ['Coordinator adapter of this Zigbee2MQTT and its firmware. "this gateway" when Zigbee2MQTT uses this gateway as its coordinator.', 'Koordinátor tohoto Zigbee2MQTT a jeho firmware. „tato brána“, když Zigbee2MQTT používá jako koordinátor tuto bránu.'],
+  'Z2M adapter': ['Serial port setting of Zigbee2MQTT; tcp:// for a network adapter like this gateway.', 'Nastavení sériového portu Zigbee2MQTT; tcp:// pro síťový adaptér jako tato brána.'],
+  'LQI': ['Link quality 0–255 as Zigbee2MQTT reports it: from 120 good, 60–120 usable, below 60 weak.', 'Kvalita linky 0–255 podle Zigbee2MQTT: od 120 dobrá, 60–120 použitelná, pod 60 slabá.'],
+  'Last seen': ['When Zigbee2MQTT last heard from the device (needs last_seen enabled in Zigbee2MQTT).', 'Kdy Zigbee2MQTT naposledy slyšel zařízení (potřebuje zapnuté last_seen v Zigbee2MQTT).'],
   'Matter node': ['Node ID in the Matter Server; Home Assistant shows it in the device info of the Matter integration.', 'ID uzlu v Matter Serveru; Home Assistant ho ukazuje v informacích o zařízení integrace Matter.'],
   // network surroundings
   'Quick scan': ['Energy scan, beacon request and Thread discovery on channels 11–26 through the running Thread role. Only in Thread roles.', 'Měření energie, dotaz na beacony a hledání Thread sítí na kanálech 11–26 přes běžící roli Thread. Jen v rolích Thread.'],
@@ -854,7 +883,7 @@ const NAV = [
     { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' }, { id: 'settings', label: 'Settings', icon: 'cog-outline' }] },
   { id: 'zigbee', label: 'Zigbee', icon: 'zigbee', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
-    { id: 'backups', label: 'Network backups', icon: 'backup-restore' }] },
+    { id: 'backups', label: 'Network backups', icon: 'backup-restore' }, { id: 'network', label: 'Network and devices', icon: 'graph-outline' }] },
   { id: 'sound', label: 'Sound', icon: 'waveform', subs: [
     { id: 'live', label: 'Live', icon: 'ear-hearing' }, { id: 'events', label: 'Events', icon: 'bell-ring-outline' },
     { id: 'log', label: 'Detection log', icon: 'history' }, { id: 'classes', label: 'Sound selection', icon: 'playlist-check' }] },
@@ -1507,6 +1536,7 @@ document.addEventListener('change', e => {
     putEvents({ events }).catch(err => toast('Error: ' + err.message));
     return;
   }
+  if (id === 'z2m-base') { api('/api/zigbee/net/base', { json: { base: e.target.value } }).then(() => loadZigbeeNet(true)).catch(err => toast('Error: ' + err.message)); return; }
   if (id === 'ev-add') { addChip('ev-add', 'classes', 'ev-classes'); return; }
   if (id === 'ev-add-sup') { addChip('ev-add-sup', 'suppress', 'ev-suppress'); return; }
   if (id === 'ev-thr') { $('#ev-thr-v').textContent = e.target.value; return; }
@@ -1797,6 +1827,227 @@ async function loadTopology() {
   $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', 'Thread role', 'RLOC16', 'Matter node', 'Firmware'].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr data-node="${key}">
     <td data-notr><b>${esc(v.name || v.fallback)}</b></td><td data-notr>${esc(v.matter?.vendor || v.vendor || '')}</td><td data-notr>${esc(v.matter?.product || v.model || '')}</td>
     <td>${esc(v.matter?.types.join(', ') || '')}</td><td>${esc(v.role)}</td><td>${esc(v.rloc16 || '')}</td><td>${v.matter ? v.matter.node : ''}</td><td data-notr>${esc(v.matter?.sw || v.sw || '')}</td></tr>`).join('')}</table>`;
+}
+
+/* ---------------- Zigbee network (through Zigbee2MQTT) ----------------
+ * The gateway relays what Zigbee2MQTT publishes on the MQTT broker: instances, devices with their
+ * state, the network map on request, and operations answered by Zigbee2MQTT. */
+views['zigbee/network'] = () => `<div class="grid">
+  <div class="card">${h3('zigbee', 'Zigbee2MQTT')}<div id="z2m-info" class="muted">Loading…</div></div>
+  <div class="card">${h3('lan-pending', 'Permit join')}<div id="z2m-join" class="muted">Loading…</div></div>
+  <div class="card wide">${h3('graph-outline', 'Network map')}
+    <div class="row"><button class="btn" id="zmap-refresh">${ic('restart')}Request a new map</button>${tip('Zigbee map')}<span id="zmap-state" class="muted"></span></div>
+    <div id="zmap" class="muted" style="margin-top:10px">Loading…</div></div>
+  <div class="card wide">${h3('lan-connect', 'Zigbee devices')}
+    <div class="row"><input type="text" id="zdev-filter" placeholder="filter" style="flex:1;max-width:320px"><span id="zdev-count" class="muted"></span></div>
+    <div class="table-wrap" id="zdev"></div></div>
+</div>`;
+
+let z2m = null, zInfo = new Map();
+const zLqiCls = q => q >= 120 ? 'ok' : q >= 60 ? 'warn' : 'bad';
+function zAgo(v, now) {
+  if (v === undefined || v === null) return '';
+  const t = typeof v === 'number' ? v / 1000 : Date.parse(v) / 1000;
+  if (!t || !now) return '';
+  return L(fmtUptime(Math.max(0, now - t)) + ' ago', 'před ' + fmtUptime(Math.max(0, now - t)));
+}
+function zDevice(d, st, own) {
+  const s = st[d.name] || st[d.ieee] || {};
+  return { ...d, lqi: s.lqi, last_seen: s.last_seen, availability: s.availability, battery: s.battery, update: s.update, own: d.ieee === own };
+}
+const zPower = p => !p ? '' : /^Mains/.test(p) ? L('mains', 'síť') : p === 'Battery' ? L('battery', 'baterie') : p === 'DC Source' ? 'DC' : p;
+/* this gateway in the Zigbee network: our router (router role) or the coordinator Zigbee2MQTT reaches over TCP here */
+function zOwnIeee(d) {
+  const rs = status.role_status || {};
+  if (activeRole() === 'zigbee_router' && rs.router?.ieee) return '0x' + rs.router.ieee;
+  const inst = d?.instances.find(i => i.base === d.base);
+  return inst?.this_gateway ? inst.coordinator_ieee : null;
+}
+function zTypeText(t) { return t === 'Coordinator' ? L('coordinator', 'koordinátor') : t === 'Router' ? 'router' : L('end device', 'koncové zařízení'); }
+
+async function loadZigbeeNet(full) {
+  if (route() !== 'zigbee/network') return;
+  let d;
+  try { d = await api('/api/zigbee/net'); } catch (e) { return; }
+  if (!$('#z2m-info')) return;
+  z2m = d;
+  const inst = d.instances.find(i => i.base === d.base);
+  $('#z2m-info').classList.remove('muted');
+  $('#z2m-info').innerHTML = !d.mqtt ? `<span class="warn-text">${L('MQTT is not connected: set it up under Home Assistant › MQTT.', 'MQTT není připojené: nastavte ho v Home Assistant › MQTT.')}</span>`
+    : !inst ? L('No Zigbee2MQTT found on the MQTT broker.', 'Na MQTT brokeru nenalezen žádný Zigbee2MQTT.')
+    : (d.instances.length > 1 ? `<label class="field"><span>${L('Instance', 'Instance')}</span><select id="z2m-base">${d.instances.map(i => `<option ${i.base === d.base ? 'selected' : ''}>${esc(i.base)}</option>`).join('')}</select></label>` : '') +
+      dl([['Base topic', `<code>${esc(inst.base)}</code>`], ['Version', esc(inst.version)],
+        ['Coordinator', `${esc(inst.coordinator || '')} <span class="muted">${esc(inst.coordinator_fw || '')}</span>${inst.this_gateway ? ' ' + pill('ok', L('this gateway', 'tato brána')) : ''}`, 'Z2M coordinator'],
+        ['Adapter', `<code>${esc(inst.serial || '')}</code>`, 'Z2M adapter'], ['Channel', inst.channel], ['PAN ID', inst.pan_id !== undefined ? '0x' + inst.pan_id.toString(16).padStart(4, '0') : ''],
+        ['Ext PAN ID', esc(inst.epid || '')], ['Devices', d.devices.length]]);
+  const end = inst?.permit_join_end ? inst.permit_join_end / 1000 : inst?.permit_join_timeout ? d.now + inst.permit_join_timeout : 0;
+  const left = inst?.permit_join && end && d.now ? Math.max(0, Math.round(end - d.now)) : 0;
+  $('#z2m-join').classList.remove('muted');
+  $('#z2m-join').innerHTML = !inst ? '' : `<div>${inst.permit_join ? pill('warn', L('open', 'otevřeno') + (left ? ` · ${left} s` : '')) : pill('', L('closed', 'zavřeno'))}</div>
+    <div class="row" style="margin-top:10px"><select id="zjoin-via"><option value="">${L('whole network', 'celá síť')}</option>${d.devices.filter(x => x.type === 'Router').sort((a, b) => a.name.localeCompare(b.name)).map(x => `<option value="${esc(x.name)}">${L('via', 'přes')} ${esc(x.name)}</option>`).join('')}</select>
+      <button class="btn primary" id="zjoin-open">${ic('lan-pending')}${L('Permit join 254 s', 'Povolit připojení 254 s')}</button>
+      <button class="btn" id="zjoin-close" ${inst.permit_join ? '' : 'disabled'}>${ic('close')}${L('Close', 'Zavřít')}</button></div>
+    <p class="muted">${L('New devices pair through Zigbee2MQTT; they show up in the table below.', 'Nová zařízení se párují přes Zigbee2MQTT; objeví se v tabulce níže.')}</p>`;
+  const st = d.states || {};
+  const own = zOwnIeee(d);
+  const devs = d.devices.map(x => zDevice(x, st, own));
+  zInfo = new Map(devs.map(x => [x.ieee, x]));
+  renderZDevices(devs, d.now);
+  $('#zmap-state').textContent = d.map_running ? L(' Zigbee2MQTT is collecting the map, this can take several minutes…', ' Zigbee2MQTT sestavuje mapu, může to trvat i několik minut…')
+    : d.map_error ? ' ' + d.map_error : d.map ? ` ${L('map from', 'mapa z')} ${d.map.at ? new Date(d.map.at * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '?'}` : '';
+  $('#zmap-refresh').disabled = d.map_running || !inst;
+  if (d.map && (full || $('#zmap').dataset.at !== String(d.map.at))) renderZMap(d.map, devs);
+  else if (!d.map) $('#zmap').innerHTML = L('No map yet: request one (Zigbee2MQTT asks every router for its neighbours).', 'Zatím bez mapy: vyžádejte ji (Zigbee2MQTT se zeptá každého routeru na sousedy).');
+  clearTimeout(loadZigbeeNet.timer);
+  loadZigbeeNet.timer = setTimeout(() => loadZigbeeNet(false), d.map_running ? 5000 : 15000);
+}
+
+function renderZDevices(devs, now) {
+  const q = ($('#zdev-filter')?.value || '').toLowerCase();
+  const order = { Coordinator: 0, Router: 1, EndDevice: 2 };
+  const list = devs.filter(x => !q || [x.name, x.vendor, x.model, x.description, x.ieee].join(' ').toLowerCase().includes(q))
+    .sort((a, b) => (order[a.type] ?? 3) - (order[b.type] ?? 3) || a.name.localeCompare(b.name));
+  $('#zdev-count').textContent = `${list.length} / ${devs.length}`;
+  $('#zdev').innerHTML = `<table><tr>${['Device', 'Model', 'Type', 'Power', 'LQI', 'Last seen', 'State'].map(th).join('')}<th></th></tr>${list.map(x => `<tr data-znode="${esc(x.ieee)}">
+    <td data-notr><b>${esc(x.name)}</b>${x.own ? ' ' + pill('ok', L('this gateway', 'tato brána')) : ''}</td>
+    <td data-notr style="white-space:normal;min-width:220px">${esc([x.vendor, x.model].filter(Boolean).join(' '))}<div class="muted">${esc(x.description || '')}</div></td>
+    <td>${esc(zTypeText(x.type))}</td><td>${esc(zPower(x.power))}${x.battery !== undefined ? ` · ${x.battery} %` : ''}</td>
+    <td>${x.lqi !== undefined ? `<span class="${zLqiCls(x.lqi)}-text">${x.lqi}</span>` : ''}</td><td>${zAgo(x.last_seen, now)}</td>
+    <td>${x.availability === 'offline' ? pill('bad', L('offline', 'nedostupné')) : x.availability === 'online' ? pill('ok', 'online') : ''}${x.update === 'available' ? ' ' + pill('warn', L('update', 'aktualizace')) : ''}${x.interview && x.interview !== 'SUCCESSFUL' ? ' ' + pill('warn', x.interview.toLowerCase()) : ''}</td>
+    <td class="zact">${x.type === 'Coordinator' ? '' : `<button class="btn" data-zact="rename" data-zdev="${esc(x.name)}" title="${L('Rename', 'Přejmenovat')}">${ic('pencil-outline')}</button>
+      <button class="btn" data-zact="interview" data-zdev="${esc(x.name)}" title="${L('Interview again', 'Znovu načíst zařízení')}">${ic('restart')}</button>
+      ${x.ota ? `<button class="btn" data-zact="${x.update === 'available' ? 'ota_update' : 'ota_check'}" data-zdev="${esc(x.name)}" title="${x.update === 'available' ? L('Install the update', 'Nainstalovat aktualizaci') : L('Check for an update', 'Zkontrolovat aktualizaci')}">${ic('download')}</button>` : ''}
+      <button class="btn danger" data-zact="remove" data-zdev="${esc(x.name)}" title="${L('Remove', 'Odebrat')}">${ic('delete-outline')}</button>`}</td></tr>`).join('')}</table>`;
+}
+
+/* Coordinator in the middle, routers on a ring, end devices next to their parent. Links between
+ * routers in the colour of their LQI; hovering a device highlights its own links. */
+function renderZMap(map, devs) {
+  const box = $('#zmap');
+  box.dataset.at = String(map.at);
+  const byIeee = new Map(devs.map(x => [x.ieee, x]));
+  const nodes = map.nodes.map(n => ({ ...n, dev: byIeee.get(n.ieee) }));
+  const coord = nodes.find(n => n.type === 'Coordinator');
+  const routers = nodes.filter(n => n.type === 'Router').sort((a, b) => a.name.localeCompare(b.name));
+  const ends = nodes.filter(n => n.type === 'EndDevice');
+  const W = 1000, H = 760, cx = W / 2, cy = H / 2, R = 270;
+  const pos = new Map();
+  if (coord) pos.set(coord.ieee, { x: cx, y: cy, a: 0 });
+  routers.forEach((n, i) => { const a = -Math.PI / 2 + 2 * Math.PI * i / Math.max(1, routers.length); pos.set(n.ieee, { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a }); });
+  /* parent of an end device: the link where it is the child (relationship 1) */
+  const parent = new Map();
+  map.links.forEach(l => { if (l.rel === 1 && !parent.has(l.s)) parent.set(l.s, l.t); });
+  const perParent = new Map();
+  ends.forEach(n => { const p = parent.get(n.ieee) || coord?.ieee; perParent.set(p, (perParent.get(p) || []).concat(n)); });
+  for (const [p, list] of perParent) {
+    const pp = pos.get(p) || { x: cx, y: cy, a: 0 };
+    const base = p === coord?.ieee ? Math.PI / 2 : pp.a;
+    list.forEach((n, i) => {
+      const a = base + (i - (list.length - 1) / 2) * 0.16, d = p === coord?.ieee ? 90 + 14 * (i % 3) : 62 + 14 * (i % 2);
+      pos.set(n.ieee, { x: pp.x + d * Math.cos(a), y: pp.y + d * Math.sin(a), a });
+    });
+  }
+  const pairs = new Map();
+  map.links.forEach(l => {
+    if (!pos.has(l.s) || !pos.has(l.t) || l.s === l.t) return;
+    const key = [l.s, l.t].sort().join('|');
+    const isChild = l.rel === 1 || l.rel === 0;
+    const e = pairs.get(key) || { a: l.s, b: l.t, lqi: 0, child: false };
+    e.lqi = Math.max(e.lqi, l.lqi || 0);
+    e.child = e.child || isChild;
+    pairs.set(key, e);
+  });
+  let edges = '', dots = '';
+  for (const e of pairs.values()) {
+    const p1 = pos.get(e.a), p2 = pos.get(e.b);
+    edges += `<line class="zl ${zLqiCls(e.lqi)} ${e.child ? 'child' : ''}" data-a="${e.a}" data-b="${e.b}" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"/>`;
+  }
+  for (const n of nodes) {
+    const p = pos.get(n.ieee);
+    if (!p) continue;
+    const off = n.dev?.availability === 'offline' || n.failed;
+    const label = n.dev?.own ? L('this gateway', 'tato brána') : (n.dev?.name || n.name || '').slice(0, 14);
+    if (n.type === 'EndDevice') {
+      dots += `<g class="zn end ${off ? 'off' : ''}" data-znode="${n.ieee}" tabindex="0"><circle cx="${p.x}" cy="${p.y}" r="6"/></g>`;
+    } else {
+      const r = n.type === 'Coordinator' ? 20 : 12;
+      const right = Math.cos(p.a) >= 0;
+      dots += `<g class="zn ${n.type === 'Coordinator' ? 'coord' : 'router'} ${off ? 'off' : ''} ${n.dev?.own ? 'own' : ''}" data-znode="${n.ieee}" tabindex="0"><circle cx="${p.x}" cy="${p.y}" r="${r}"/>
+        <text x="${n.type === 'Coordinator' ? p.x : p.x + (right ? 16 : -16)}" y="${n.type === 'Coordinator' ? p.y + 36 : p.y + 4}" text-anchor="${n.type === 'Coordinator' ? 'middle' : right ? 'start' : 'end'}">${esc(label)}</text></g>`;
+    }
+  }
+  const failed = nodes.filter(n => n.failed).length;
+  box.classList.remove('muted');
+  box.innerHTML = `<svg class="topo zmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zigbee network map">${edges}${dots}</svg>
+    <p class="muted">${L(`${nodes.length} devices, ${pairs.size} links${failed ? `, ${failed} routers did not answer` : ''}. Large node: coordinator, ring: routers, small: end devices next to their parent (hollow = offline). Line colour = LQI (green ≥ 120, orange ≥ 60, red lower). Hover a device to highlight its links.`,
+      `${nodes.length} zařízení, ${pairs.size} linek${failed ? `, ${failed} routerů neodpovědělo` : ''}. Velký uzel: koordinátor, kruh: routery, malé: koncová zařízení u rodiče (prázdné = nedostupné). Barva čáry = LQI (zelená ≥ 120, oranžová ≥ 60, červená méně). Najetím na zařízení zvýrazníte jeho linky.`)}</p>`;
+}
+
+/* details box of a Zigbee device (map or table) */
+function zBox(ieee) {
+  const x = zInfo.get(ieee);
+  if (!x) return '';
+  const rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== '') rows.push(`<tr><th>${k}</th><td>${v}</td></tr>`); };
+  add(L('Vendor', 'Výrobce'), esc(x.vendor || x.manufacturer || ''));
+  add(L('Model', 'Model'), esc([x.model, x.model_id && x.model_id !== x.model ? `(${x.model_id})` : ''].filter(Boolean).join(' ')));
+  add(L('Description', 'Popis'), esc(x.description || ''));
+  add(L('Type', 'Typ'), esc(zTypeText(x.type)));
+  add(L('Gateway', 'Brána'), x.own ? L('this gateway', 'tato brána') : '');
+  add(L('Power', 'Napájení'), esc((x.power || '') + (x.battery !== undefined ? ` · ${x.battery} %` : '')));
+  add('LQI', x.lqi !== undefined ? `<span class="${zLqiCls(x.lqi)}-text">${x.lqi}</span>` : '');
+  add(L('Last seen', 'Naposledy viděno'), zAgo(x.last_seen, z2m?.now));
+  add(L('State', 'Stav'), esc(x.availability || ''));
+  add('IEEE', `<code>${esc(x.ieee)}</code>`);
+  add(L('Network address', 'Síťová adresa'), x.nwk !== undefined ? '0x' + x.nwk.toString(16).padStart(4, '0') : '');
+  add(L('Firmware', 'Firmware'), esc([x.sw, x.date_code].filter(Boolean).join(' · ')));
+  add(L('Interview', 'Načtení zařízení'), esc(x.interview || ''));
+  add('OTA', x.ota ? (x.update === 'available' ? L('update available', 'k dispozici aktualizace') : L('supported', 'podporováno')) : '');
+  return `<div class="nb-title">${esc(x.name)}</div><table>${rows.join('')}</table>`;
+}
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-znode]');
+  if (!el) return;
+  const box = $('#nodebox');
+  box.innerHTML = zBox(el.dataset.znode);
+  if (!box.innerHTML) return;
+  box.style.display = 'block';
+  const w = box.offsetWidth, h = box.offsetHeight;
+  box.style.left = Math.max(8, Math.min(innerWidth - w - 8, e.clientX + 14)) + 'px';
+  box.style.top = Math.max(8, Math.min(innerHeight - h - 8, e.clientY + 14)) + 'px';
+  const svg = el.closest('svg.zmap');
+  if (svg) {
+    svg.classList.add('focus');
+    svg.querySelectorAll('.zl').forEach(l => l.classList.toggle('hi', l.dataset.a === el.dataset.znode || l.dataset.b === el.dataset.znode));
+  }
+});
+document.addEventListener('mouseout', e => {
+  const el = e.target.closest('[data-znode]');
+  if (!el) return;
+  $('#nodebox').style.display = 'none';
+  el.closest('svg.zmap')?.classList.remove('focus');
+});
+
+/* small form dialog: resolves with {input, check} or null */
+function zDialog(title, text, input, check) {
+  return new Promise(resolve => {
+    const dlg = $('#zb-dlg');
+    $('#zb-dlg-title').textContent = title;
+    $('#zb-dlg-text').textContent = text;
+    $('#zb-dlg-field').classList.toggle('hidden', input === undefined);
+    $('#zb-dlg-input').value = input || '';
+    $('#zb-dlg-check').classList.toggle('hidden', !check);
+    $('#zb-dlg-box').checked = false;
+    $('#zb-dlg-boxlabel').textContent = check || '';
+    dlg.returnValue = 'cancel';
+    dlg.onclose = () => resolve(dlg.returnValue === 'ok' ? { input: $('#zb-dlg-input').value.trim(), check: $('#zb-dlg-box').checked } : null);
+    dlg.showModal();
+  });
+}
+async function zRequest(body) {
+  const r = await api('/api/zigbee/net/request', { json: body });
+  if (r.status === 'error') throw new Error(r.error || 'Zigbee2MQTT error');
+  return r;
 }
 
 /* ---------------- network surroundings ----------------
@@ -2125,6 +2376,41 @@ document.addEventListener('click', async e => {
       audio.src = URL.createObjectURL(await res.blob());
       audio.classList.remove('hidden');
       audio.play().catch(() => {});
+    } else if (t.id === 'zmap-refresh') {
+      await api('/api/zigbee/net/map', { method: 'POST' });
+      toast(L('Map requested: Zigbee2MQTT needs up to a few minutes', 'Mapa vyžádána: Zigbee2MQTT potřebuje až několik minut'));
+      loadZigbeeNet(false);
+    } else if (t.id === 'zjoin-open' || t.id === 'zjoin-close') {
+      const via = $('#zjoin-via').value;
+      await zRequest({ action: 'permit_join', time: t.id === 'zjoin-open' ? 254 : 0, ...(via ? { device: via } : {}) });
+      toast(t.id === 'zjoin-open' ? L('Joining open for 254 s', 'Připojování otevřeno na 254 s') : L('Joining closed', 'Připojování zavřeno'));
+      setTimeout(() => loadZigbeeNet(false), 1500);
+    } else if (t.dataset.zact) {
+      const dev = t.dataset.zdev, act = t.dataset.zact;
+      if (act === 'rename') {
+        const r = await zDialog(L('Rename', 'Přejmenovat'), L('New name in Zigbee2MQTT (Home Assistant entities are renamed too).', 'Nový název v Zigbee2MQTT (přejmenují se i entity v Home Assistant).'), dev);
+        if (!r || !r.input || r.input === dev) return;
+        await zRequest({ action: 'rename', device: dev, to: r.input });
+        toast(L('Renamed', 'Přejmenováno'));
+      } else if (act === 'remove') {
+        const r = await zDialog(L(`Remove ${dev}?`, `Odebrat ${dev}?`), L('The device leaves the network and disappears from Zigbee2MQTT and Home Assistant.', 'Zařízení opustí síť a zmizí ze Zigbee2MQTT i z Home Assistant.'), undefined,
+          L('Force (the device does not answer; it may stay joined)', 'Vynutit (zařízení neodpovídá; může zůstat v síti)'));
+        if (!r) return;
+        await zRequest({ action: 'remove', device: dev, force: r.check });
+        toast(L('Removed', 'Odebráno'));
+      } else if (act === 'interview') {
+        toast(L('Interviewing, wake a battery device up now', 'Načítám zařízení, bateriové teď probuďte'));
+        const r = await zRequest({ action: 'interview', device: dev });
+        toast(r.status === 'ok' ? L('Interview done', 'Načtení dokončeno') : L('Sent, no answer yet', 'Odesláno, zatím bez odpovědi'));
+      } else if (act === 'ota_check') {
+        const r = await zRequest({ action: 'ota_check', device: dev });
+        toast(r.data?.update_available || r.data?.updateAvailable ? L('Update available', 'Aktualizace je k dispozici') : r.status === 'ok' ? L('No update', 'Bez aktualizace') : L('Sent, no answer yet', 'Odesláno, zatím bez odpovědi'));
+      } else if (act === 'ota_update') {
+        if (!await confirmDialog(L(`Update ${dev}?`, `Aktualizovat ${dev}?`), L('The update takes several minutes; the device may restart.', 'Aktualizace trvá několik minut; zařízení se může restartovat.'))) return;
+        await zRequest({ action: 'ota_update', device: dev });
+        toast(L('Update started', 'Aktualizace spuštěna'));
+      }
+      setTimeout(() => loadZigbeeNet(false), 1500);
     } else if (t.id === 'topo-refresh') {
       matterCache.at = 0;
       loadTopology();
@@ -2286,6 +2572,7 @@ async function pollLog() {
 }
 document.addEventListener('input', e => {
   if (e.target.id === 'log-filter') renderLog();
+  if (e.target.id === 'zdev-filter' && z2m) renderZDevices([...zInfo.values()], z2m.now);
   if (e.target.id === 'cls-search') {
     const q = e.target.value.trim().toLowerCase();
     document.querySelectorAll('.cls-row').forEach(r => { r.style.display = !q || r.dataset.name.includes(q) ? 'flex' : 'none'; });
@@ -2316,6 +2603,7 @@ function render(full) {
     if (route() === 'system/diag') renderLog();
     if (route() === 'system/netscan') loadNetscan();
     if (route() === 'system/settings') loadHaFound();
+    if (route() === 'zigbee/network') loadZigbeeNet(true);
     if (tab === 'sound') {
       loadSound(); loadSoundConfig().catch(err => toast('Error: ' + err.message));
       if (!soundTimer) soundTimer = setInterval(() => { loadSound(); loadScoresAndLog(); if (sndTick % 10 === 0 && sndCfg && !$('#ev-dlg').open) api('/api/sound/events').then(c => { sndCfg = c; renderEvents(); }).catch(() => {}); }, 1000);

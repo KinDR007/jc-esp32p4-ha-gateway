@@ -109,3 +109,18 @@ The header shows who uses the gateway: in the Zigbee coordinator role whether Zi
 connected (it keeps a TCP session); in the Thread border router role when Home Assistant last
 called the OTBR REST API. Home Assistant does that only at its start, in the Thread settings and on
 dataset changes, so the pill tells the last contact, not a live connection.
+
+## Zigbee network and devices
+
+Zigbee › Network and devices reads Zigbee2MQTT over the MQTT broker the gateway is connected to
+(Home Assistant › MQTT): every instance announces itself on `<base>/bridge/info`; the one whose
+serial port is this gateway is picked first, others can be chosen. It works in every role, also
+for a Zigbee network on another adapter.
+
+- Devices: name, vendor and model, type, power, LQI, last seen (needs `last_seen` enabled in
+  Zigbee2MQTT), availability, update state.
+- Map: on request; Zigbee2MQTT asks every router for its neighbours, which takes several minutes in
+  a network with dozens of routers.
+- Operations go to Zigbee2MQTT (`bridge/request/...`) and show its answer: permit join for 254 s
+  (whole network or via a router), rename (Home Assistant entities too), remove (optionally
+  forced), interview, OTA check and update.

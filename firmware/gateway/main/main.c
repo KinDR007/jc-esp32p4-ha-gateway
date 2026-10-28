@@ -1,8 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "c6_flasher.h"
+#include "cJSON.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
@@ -11,6 +14,7 @@
 #include "gw.h"
 #include "mdns.h"
 #include "netscan.h"
+#include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
 #include "sound.h"
@@ -162,8 +166,17 @@ static void init_mdns(const char *hostname)
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
 }
 
+/* JSON trees in PSRAM: Zigbee2MQTT device lists and Thread maps are far bigger than internal RAM allows. */
+static void *json_malloc(size_t size)
+{
+    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : malloc(size);
+}
+
 void app_main(void)
 {
+    cJSON_Hooks hooks = {.malloc_fn = json_malloc, .free_fn = free};
+    cJSON_InitHooks(&hooks);
     gw_state_t *st = gw_state();
 
     ESP_ERROR_CHECK(gw_config_init());
@@ -193,6 +206,7 @@ void app_main(void)
     ESP_ERROR_CHECK(gw_api_register());
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     netscan_init();
+    zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
     gw_mqtt_start();
 

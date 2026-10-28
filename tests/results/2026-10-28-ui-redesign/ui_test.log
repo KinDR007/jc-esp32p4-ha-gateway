@@ -8,6 +8,7 @@ UI01 every tab renders without script errors or error toasts
   ok: zigbee/info: opened, no error toast
   ok: zigbee/diag: opened, no error toast
   ok: zigbee/backups: opened, no error toast
+  ok: zigbee/network: opened, no error toast
   ok: sound/live: opened, no error toast
   ok: sound/events: opened, no error toast
   ok: sound/log: opened, no error toast
@@ -40,8 +41,7 @@ UI04 Sound: search filters the tree of all sounds
 UI04 PASS
 
 UI05 Thread: "Copy TLVs" shows the dataset (border router or router role only)
-  ok: no error toast (Copied to the clipboard)
-  ok: dataset TLVs shown (222 hex chars)
+  skipped: no Thread role active
 UI05 PASS
 
 UI06 Language: Czech translates every tab, keeps sound names, English restores the original
@@ -56,6 +56,7 @@ UI06 Language: Czech translates every tab, keeps sound names, English restores t
   ok: zigbee/info: no error toast
   ok: zigbee/diag: no error toast
   ok: zigbee/backups: no error toast
+  ok: zigbee/network: no error toast
   ok: sound/live: no error toast
   ok: sound/events: no error toast
   ok: sound events page translated
@@ -113,7 +114,7 @@ UI09 Network surroundings: the last scan shows channels, spectrum and a recommen
 UI09 PASS
 
 UI10 Home Assistant: header shows who uses the gateway, settings find HA and test the Matter Server
-  ok: header user pill shown for thread_br (OTBR REST: OTBR REST: 192.168.88.189 · last contact 15m ago)
+  ok: header user pill hidden for zigbee_router ()
   1 Home Assistant instance(s) found over mDNS
   ok: "Use" fills ws://192.168.88.201:5580/ws
   Matter Server test: OK: 11 Matter nodes ws://192.168.88.201:5580/ws
@@ -128,4 +129,11 @@ UI11 C6 flashing: progress in the header on every page, gone when it ends
   ok: pill and strip gone after flashing
 UI11 PASS
 
-Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS, UI09 PASS, UI10 PASS, UI11 PASS
+UI12 Zigbee network: Zigbee2MQTT instance, devices with details, map when one is stored
+  ok: 77 devices listed (77 in Zigbee2MQTT)
+  ok: instance zigbee2mqtt shown
+  ok: device details on hover
+  ok: no uncaught script errors 
+UI12 PASS
+
+Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS, UI09 PASS, UI10 PASS, UI11 PASS, UI12 PASS
