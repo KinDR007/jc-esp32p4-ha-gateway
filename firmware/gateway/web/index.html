@@ -125,6 +125,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="grid" style="grid-template-columns:1fr 1fr">
       <label class="field"><span>ID (entity name in HA)</span><input type="text" id="ev-id" pattern="[a-z0-9_]{1,23}" required></label>
       <label class="field"><span>Name</span><input type="text" id="ev-name" maxlength="47"></label>
+      <label class="field"><span>Czech name (web UI and HA attribute only)</span><input type="text" id="ev-name-cs" maxlength="47"></label>
       <label class="field"><span>Kind</span><select id="ev-kind"><option value="impulse">impulse (one event per occurrence)</option><option value="continuous">continuous (on while it lasts)</option></select></label>
       <label class="field"><span>Device class</span><select id="ev-dc"><option value="">none</option><option value="doorbell">doorbell</option></select></label>
       <label class="field"><span>Threshold <b id="ev-thr-v"></b></span><input type="range" id="ev-thr" min="0.1" max="1" step="0.05"></label>
@@ -253,7 +254,7 @@ const CS = {
   'Unticked sounds are never reported, whatever the events say. The bar shows the live score.': 'Neoznačené zvuky se nikdy nehlásí, ať události říkají cokoli. Pruh ukazuje živé skóre.',
   'New event': 'Nová událost', 'Edit event': 'Upravit událost', 'ID (entity name in HA)': 'ID (název entity v HA)', 'Name': 'Název',
   'impulse (one event per occurrence)': 'impulz (jedna událost na výskyt)', 'continuous (on while it lasts)': 'trvalý (zapnuto, dokud trvá)',
-  'Device class': 'Třída zařízení', 'doorbell': 'zvonek', 'Windows to start (0.48 s each)': 'Oken pro spuštění (po 0,48 s)',
+  'Device class': 'Třída zařízení', 'Czech name (web UI and HA attribute only)': 'Český název (jen web UI a atribut v HA)', 'doorbell': 'zvonek', 'Windows to start (0.48 s each)': 'Oken pro spuštění (po 0,48 s)',
   'Hold after last hit (s)': 'Doběh po posledním zásahu (s)', 'Cooldown between events (s)': 'Odstup mezi událostmi (s)',
   'Sounds that trigger it': 'Zvuky, které ji spouští', 'add a sound (type to search)': 'přidat zvuk (pište pro hledání)',
   'Ignore while any of these is heard (e.g. Television for speech)': 'Ignorovat, když je slyšet některý z těchto (např. Television u řeči)',
@@ -838,10 +839,13 @@ async function loadSoundConfig() {
   if (!$('#cls-tree').dataset.built) renderTree();
 }
 
+/* Czech name only for display; ids, HA entities and automations keep the English name. */
+const evName = e => (lang === 'cs' && e.name_cs) || e.name;
+
 function renderEvents() {
   const rows = sndCfg.events.map((e, i) => `<tr>
     <td><input type="checkbox" data-ev-toggle="${i}" ${e.enabled ? 'checked' : ''}></td>
-    <td data-notr><b>${esc(e.name)}</b><br><span class="muted">${esc(e.id)}</span></td>
+    <td data-notr><b>${esc(evName(e))}</b><br><span class="muted">${evName(e) !== e.name ? esc(e.name) + ' · ' : ''}${esc(e.id)}</span></td>
     <td>${e.kind}</td><td>${e.threshold}</td>
     <td data-notr title="${esc(e.classes.map(clsName).join(', '))}">${e.classes.length}</td>
     <td>${e.active ? pill('ok', 'now') : ''}</td><td>${e.count || 0}</td>
@@ -888,7 +892,7 @@ async function loadScoresAndLog() {
   try {
     const log = await api('/api/sound/log');
     $('#snd-log').innerHTML = log.length ? `<table><tr><th>When</th><th>Event</th><th>Sound</th><th>Score</th><th>Level</th><th>Duration</th><th></th></tr>${log.map(l => `<tr>
-      <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? `<span data-notr>${esc(l.event)}</span>` : '<span class="muted">no event</span>'}</td><td data-notr>${esc(l.class_name)}</td>
+      <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? `<span data-notr>${esc(evName(sndCfg?.events.find(e => e.id === l.event) || { name: l.event }))}</span>` : '<span class="muted">no event</span>'}</td><td data-notr>${esc(l.class_name)}</td>
       <td>${(l.score * 100).toFixed(0)} %</td><td>${l.level_db} dB</td><td>${l.ongoing ? pill('ok', 'ongoing') : l.duration_s ? l.duration_s + ' s' : ''}</td>
       <td><button class="btn" data-log-ignore="${l.class}">Ignore sound</button>
       ${l.event ? `<button class="btn" data-log-raise="${esc(l.event)}">Raise threshold</button>` : `<button class="btn" data-log-new="${l.class}">Create event</button>`}</td></tr>`).join('')}</table>` : '<p class="muted">Nothing yet.</p>';
@@ -913,7 +917,7 @@ function openEditor(idx, template) {
   editEv = JSON.parse(JSON.stringify(idx >= 0 ? sndCfg.events[idx] : template));
   $('#ev-title').textContent = idx >= 0 ? 'Edit event' : 'New event';
   $('#ev-id').value = editEv.id; $('#ev-id').readOnly = idx >= 0;
-  $('#ev-name').value = editEv.name; $('#ev-kind').value = editEv.kind; $('#ev-dc').value = editEv.device_class || '';
+  $('#ev-name').value = editEv.name; $('#ev-name-cs').value = editEv.name_cs || ''; $('#ev-kind').value = editEv.kind; $('#ev-dc').value = editEv.device_class || '';
   $('#ev-thr').value = editEv.threshold; $('#ev-thr-v').textContent = editEv.threshold;
   $('#ev-win').value = editEv.windows; $('#ev-hold').value = editEv.hold_s; $('#ev-cool').value = editEv.cooldown_s;
   chips('ev-classes', editEv.classes); chips('ev-suppress', editEv.suppress);
@@ -923,7 +927,7 @@ function openEditor(idx, template) {
 
 $('#ev-dlg').addEventListener('close', async () => {
   if ($('#ev-dlg').returnValue !== 'save') return;
-  Object.assign(editEv, { id: $('#ev-id').value.trim(), name: $('#ev-name').value.trim(), kind: $('#ev-kind').value,
+  Object.assign(editEv, { id: $('#ev-id').value.trim(), name: $('#ev-name').value.trim(), name_cs: $('#ev-name-cs').value.trim(), kind: $('#ev-kind').value,
     device_class: $('#ev-dc').value, threshold: +$('#ev-thr').value, windows: +$('#ev-win').value,
     hold_s: +$('#ev-hold').value, cooldown_s: +$('#ev-cool').value });
   if (!editEv.device_class) delete editEv.device_class;

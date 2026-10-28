@@ -13,54 +13,55 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, 'firmware', 'gateway', 'components', 'sound', 'sound_presets.json')
 
+# name_cs: Czech name shown by the web UI and sent to HA as an attribute (entity names stay English)
 # kind: "impulse" (one event per occurrence) or "continuous" (on while it lasts)
 # threshold: score 0..1; windows: consecutive 0.48 s windows to start; hold_s: stays on after the
 # last hit; cooldown_s: no new event of this type for that long after one ended
 EVENTS = {
-    'speech': dict(name='Speech', kind='continuous', threshold=0.6, windows=2, hold_s=5, cooldown_s=0,
+    'speech': dict(name_cs='Řeč', name='Speech', kind='continuous', threshold=0.6, windows=2, hold_s=5, cooldown_s=0,
                    classes=['Speech', 'Child speech, kid speaking', 'Conversation', 'Narration, monologue'],
                    suppress=['Television', 'Radio', 'Music']),
-    'shout_scream': dict(name='Shout or scream', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
+    'shout_scream': dict(name_cs='Křik nebo jekot', name='Shout or scream', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
                          classes=['Shout', 'Bellow', 'Yell', 'Children shouting', 'Screaming']),
-    'laughter': dict(name='Laughter', kind='impulse', threshold=0.5, windows=2, hold_s=3, cooldown_s=60,
+    'laughter': dict(name_cs='Smích', name='Laughter', kind='impulse', threshold=0.5, windows=2, hold_s=3, cooldown_s=60,
                      classes=['Laughter', 'Baby laughter', 'Giggle', 'Snicker', 'Belly laugh', 'Chuckle, chortle']),
-    'baby_cry': dict(name='Baby crying', kind='continuous', threshold=0.5, windows=2, hold_s=10, cooldown_s=0,
+    'baby_cry': dict(name_cs='Pláč dítěte', name='Baby crying', kind='continuous', threshold=0.5, windows=2, hold_s=10, cooldown_s=0,
                      classes=['Baby cry, infant cry', 'Crying, sobbing']),
-    'cough_sneeze': dict(name='Cough or sneeze', kind='impulse', threshold=0.5, windows=1, hold_s=2, cooldown_s=30,
+    'cough_sneeze': dict(name_cs='Kašel nebo kýchnutí', name='Cough or sneeze', kind='impulse', threshold=0.5, windows=1, hold_s=2, cooldown_s=30,
                          classes=['Cough', 'Sneeze', 'Throat clearing']),
-    'snoring': dict(name='Snoring', kind='continuous', threshold=0.5, windows=3, hold_s=20, cooldown_s=0,
+    'snoring': dict(name_cs='Chrápání', name='Snoring', kind='continuous', threshold=0.5, windows=3, hold_s=20, cooldown_s=0,
                     classes=['Snoring']),
-    'dog_bark': dict(name='Dog barking', kind='continuous', threshold=0.5, windows=1, hold_s=10, cooldown_s=60,
+    'dog_bark': dict(name_cs='Štěkání psa', name='Dog barking', kind='continuous', threshold=0.5, windows=1, hold_s=10, cooldown_s=60,
                      classes=['Dog', 'Bark', 'Yip', 'Howl', 'Bow-wow', 'Growling', 'Whimper (dog)']),
-    'cat': dict(name='Cat', kind='impulse', threshold=0.5, windows=1, hold_s=5, cooldown_s=60,
+    'cat': dict(name_cs='Kočka', name='Cat', kind='impulse', threshold=0.5, windows=1, hold_s=5, cooldown_s=60,
                 classes=['Cat', 'Purr', 'Meow', 'Hiss', 'Caterwaul']),
-    'bird': dict(name='Bird', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=120,
+    'bird': dict(name_cs='Pták', name='Bird', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=120,
                  classes=['Bird', 'Bird vocalization, bird call, bird song', 'Chirp, tweet', 'Squawk', 'Pigeon, dove',
                           'Crow', 'Caw']),
-    'doorbell': dict(name='Doorbell', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
+    'doorbell': dict(name_cs='Zvonek u dveří', name='Doorbell', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
                      classes=['Doorbell', 'Ding-dong'], device_class='doorbell'),
-    'knock': dict(name='Knock', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=20, classes=['Knock']),
-    'door': dict(name='Door', kind='impulse', threshold=0.5, windows=1, hold_s=2, cooldown_s=10,
+    'knock': dict(name_cs='Klepání', name='Knock', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=20, classes=['Knock']),
+    'door': dict(name_cs='Dveře', name='Door', kind='impulse', threshold=0.5, windows=1, hold_s=2, cooldown_s=10,
                  classes=['Door', 'Slam', 'Sliding door']),
-    'glass_break': dict(name='Glass breaking', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
+    'glass_break': dict(name_cs='Rozbití skla', name='Glass breaking', kind='impulse', threshold=0.5, windows=1, hold_s=3, cooldown_s=30,
                         classes=['Shatter', 'Breaking', 'Smash, crash']),
-    'smoke_alarm': dict(name='Smoke or fire alarm', kind='continuous', threshold=0.4, windows=2, hold_s=10,
+    'smoke_alarm': dict(name_cs='Kouřový nebo požární hlásič', name='Smoke or fire alarm', kind='continuous', threshold=0.4, windows=2, hold_s=10,
                         cooldown_s=0, classes=['Smoke detector, smoke alarm', 'Fire alarm']),
-    'alarm_siren': dict(name='Alarm or siren', kind='continuous', threshold=0.5, windows=2, hold_s=10, cooldown_s=0,
+    'alarm_siren': dict(name_cs='Alarm nebo siréna', name='Alarm or siren', kind='continuous', threshold=0.5, windows=2, hold_s=10, cooldown_s=0,
                         classes=['Alarm', 'Siren', 'Civil defense siren', 'Buzzer', 'Alarm clock']),
-    'phone_ring': dict(name='Phone ringing', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=30,
+    'phone_ring': dict(name_cs='Zvonění telefonu', name='Phone ringing', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=30,
                        classes=['Telephone', 'Telephone bell ringing', 'Ringtone']),
-    'water_running': dict(name='Water running', kind='continuous', threshold=0.5, windows=3, hold_s=10, cooldown_s=0,
+    'water_running': dict(name_cs='Tekoucí voda', name='Water running', kind='continuous', threshold=0.5, windows=3, hold_s=10, cooldown_s=0,
                           classes=['Water tap, faucet', 'Sink (filling or washing)', 'Bathtub (filling or washing)']),
-    'toilet_flush': dict(name='Toilet flush', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=60,
+    'toilet_flush': dict(name_cs='Spláchnutí WC', name='Toilet flush', kind='impulse', threshold=0.5, windows=2, hold_s=5, cooldown_s=60,
                          classes=['Toilet flush']),
-    'vacuum': dict(name='Vacuum cleaner', kind='continuous', threshold=0.5, windows=3, hold_s=15, cooldown_s=0,
+    'vacuum': dict(name_cs='Vysavač', name='Vacuum cleaner', kind='continuous', threshold=0.5, windows=3, hold_s=15, cooldown_s=0,
                    classes=['Vacuum cleaner']),
-    'appliance': dict(name='Kitchen or bathroom appliance', kind='continuous', threshold=0.5, windows=2, hold_s=10,
+    'appliance': dict(name_cs='Kuchyňský nebo koupelnový spotřebič', name='Kitchen or bathroom appliance', kind='continuous', threshold=0.5, windows=2, hold_s=10,
                       cooldown_s=0, classes=['Microwave oven', 'Blender', 'Hair dryer']),
-    'gunshot_explosion': dict(name='Gunshot or explosion', kind='impulse', threshold=0.5, windows=1, hold_s=3,
+    'gunshot_explosion': dict(name_cs='Výstřel nebo výbuch', name='Gunshot or explosion', kind='impulse', threshold=0.5, windows=1, hold_s=3,
                               cooldown_s=30, classes=['Gunshot, gunfire', 'Machine gun', 'Explosion', 'Boom']),
-    'music': dict(name='Music', kind='continuous', threshold=0.6, windows=4, hold_s=30, cooldown_s=0, classes=['Music']),
+    'music': dict(name_cs='Hudba', name='Music', kind='continuous', threshold=0.6, windows=4, hold_s=30, cooldown_s=0, classes=['Music']),
 }
 
 # Not events: acoustic environment, silence, music details (a "Music" event can still be made).
@@ -102,8 +103,8 @@ def main():
             e['enabled'] = True
             events.append(e)
         out[key] = {'name': preset['name'], 'exclude': exclude, 'events': events}
-    with open(OUT, 'w') as f:
-        json.dump(out, f, separators=(',', ':'))
+    with open(OUT, 'w', encoding='utf-8') as f:
+        json.dump(out, f, separators=(',', ':'), ensure_ascii=False)
     print(f'{len(out)} presets, {len(EVENTS)} event types -> {os.path.relpath(OUT, ROOT)} ({os.path.getsize(OUT)} B)')
 
 

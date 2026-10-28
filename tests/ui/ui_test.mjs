@@ -143,6 +143,8 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
     if (id === 'sound') {
       check((await page.textContent('#main')).includes('Události posílané do Home Assistant'), 'sound tab content translated');
       check(await page.$$eval('.cls-row span[data-notr]', s => s.some(e => e.textContent === 'Speech')), 'sound class names stay untranslated');
+      const ev = (await page.evaluate(() => fetch('/api/sound/events').then(r => r.json()))).events.find(e => e.name_cs);
+      if (ev) check(await page.$$eval('#ev-table b', (b, n) => b.some(x => x.textContent === n), ev.name_cs), `event shown by its Czech name (${ev.name_cs})`);
     }
   }
   await page.reload();

@@ -64,7 +64,7 @@ Every enabled event creates in Home Assistant (`<host>` = hostname with `_`):
 
 | Entity | Use |
 |---|---|
-| `event.<host>_snd_<id>` | fires once per occurrence; attributes `class`, `score`, `level_db` |
+| `event.<host>_snd_<id>` | fires once per occurrence; attributes `class`, `score`, `level_db` and `name_cs` (Czech name of the event, when set) |
 | `binary_sensor.<host>_snd_<id>_active` | on while the sound lasts (plus hold time); conditions, `for:` triggers |
 | device trigger "sound <name>" | Automations → trigger → Device → P4 gateway |
 

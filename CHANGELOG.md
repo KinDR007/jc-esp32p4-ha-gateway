@@ -4,6 +4,8 @@
 
 - Web UI in Czech and English (picked from the browser language, switch in the header) and a
   light / dark / system theme switch. Browser tests UI06–UI07.
+- Sound events have an optional Czech name (`name_cs`): shown by the Czech web UI, sent to Home
+  Assistant as an event attribute; entity names and ids stay English.
 
 ## v1.1 (2026-10-28)
 

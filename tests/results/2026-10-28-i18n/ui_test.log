@@ -40,6 +40,7 @@ UI06 Language: Czech translates every tab, keeps sound names, English restores t
   ok: sound: no error toast
   ok: sound tab content translated
   ok: sound class names stay untranslated
+  ok: event shown by its Czech name (Řeč)
   ok: ha: no error toast
   ok: tools: no error toast
   ok: system: no error toast

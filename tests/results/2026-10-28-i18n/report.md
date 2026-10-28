@@ -9,4 +9,6 @@ prohlížeče, vzhled podle systému; obojí jde přepnout v hlavičce a prohlí
 |---|---|
 | UI test se stránkou z v1.1 (`--html`) | UI06 FAIL, UI07 FAIL (přepínače chybí), UI01–UI05 PASS |
 | UI test s novou stránkou na desce (OTA) | UI01–UI07 PASS ([ui_test.log](ui_test.log)) |
+| Český název události (`name_cs`) přes API na desce | uložená konfigurace z v1.1 dostala názvy z předvolby (19/19); prázdný `name_cs` ani přejmenovaná událost se nedoplní; vlastní název se uloží; konfigurace obnovena |
+| Atribut `name_cs` v HA | neověřeno, MQTT broker vyžaduje přihlášení |
 | Kontrola pokrytí (všechny záložky v češtině) | nepřeložené zůstávají jen hodnoty: adresy, verze, názvy sítí, čítače OpenThread |

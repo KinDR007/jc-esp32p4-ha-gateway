@@ -33,6 +33,7 @@ extern const char classes_end[] asm("_binary_sound_classes_json_end");
 typedef struct {
     char id[24];
     char name[48];
+    char name_cs[96]; /* optional Czech name: web UI and an HA attribute only */
     char device_class[16];
     bool enabled;
     bool continuous;
@@ -138,6 +139,26 @@ static double num(cJSON *obj, const char *key, double def, double lo, double hi)
     return d < lo ? lo : d > hi ? hi : d;
 }
 
+/* Czech name of the preset event with the same id and English name (configs saved before name_cs existed). */
+static void preset_name_cs(cJSON **presets, const sevent_t *x, char *out, size_t len)
+{
+    if (!*presets) {
+        *presets = cJSON_Parse(presets_start);
+    }
+    cJSON *p, *e;
+    cJSON_ArrayForEach(p, *presets)
+    {
+        cJSON_ArrayForEach(e, cJSON_GetObjectItem(p, "events"))
+        {
+            const char *id = GW_JSON_STR(e, "id"), *name = GW_JSON_STR(e, "name"), *cs = GW_JSON_STR(e, "name_cs");
+            if (id && name && cs && strcmp(id, x->id) == 0 && strcmp(name, x->name) == 0) {
+                strlcpy(out, cs, len);
+                return;
+            }
+        }
+    }
+}
+
 /* Parses into fresh buffers; nothing changes on error. */
 static esp_err_t parse_config(cJSON *root, sevent_t *ev, int *count, uint32_t *exclude, char *preset, char *err,
                               size_t err_len)
@@ -154,7 +175,8 @@ static esp_err_t parse_config(cJSON *root, sevent_t *ev, int *count, uint32_t *e
     const char *p = GW_JSON_STR(root, "preset");
     strlcpy(preset, p ? p : "custom", 24);
     int n = 0;
-    cJSON *e;
+    cJSON *e, *presets = NULL;
+    esp_err_t ret = ESP_OK;
     cJSON_ArrayForEach(e, events)
     {
         sevent_t *x = &ev[n];
@@ -162,16 +184,26 @@ static esp_err_t parse_config(cJSON *root, sevent_t *ev, int *count, uint32_t *e
         const char *id = GW_JSON_STR(e, "id"), *name = GW_JSON_STR(e, "name"), *kind = GW_JSON_STR(e, "kind");
         if (!valid_id(id)) {
             snprintf(err, err_len, "event %d: id must be a-z, 0-9, _ (max 23)", n);
-            return ESP_ERR_INVALID_ARG;
+            ret = ESP_ERR_INVALID_ARG;
+            break;
         }
-        for (int j = 0; j < n; j++) {
+        for (int j = 0; j < n && ret == ESP_OK; j++) {
             if (strcmp(ev[j].id, id) == 0) {
                 snprintf(err, err_len, "duplicate event id %s", id);
-                return ESP_ERR_INVALID_ARG;
+                ret = ESP_ERR_INVALID_ARG;
             }
+        }
+        if (ret != ESP_OK) {
+            break;
         }
         strlcpy(x->id, id, sizeof(x->id));
         strlcpy(x->name, name && name[0] ? name : id, sizeof(x->name));
+        cJSON *cs = cJSON_GetObjectItem(e, "name_cs");
+        if (cJSON_IsString(cs)) {
+            strlcpy(x->name_cs, cs->valuestring, sizeof(x->name_cs));
+        } else {
+            preset_name_cs(&presets, x, x->name_cs, sizeof(x->name_cs));
+        }
         const char *dc = GW_JSON_STR(e, "device_class");
         strlcpy(x->device_class, dc ? dc : "", sizeof(x->device_class));
         cJSON *en = cJSON_GetObjectItem(e, "enabled");
@@ -184,13 +216,15 @@ static esp_err_t parse_config(cJSON *root, sevent_t *ev, int *count, uint32_t *e
         if (!parse_classes(cJSON_GetObjectItem(e, "classes"), x->classes) ||
             !parse_classes(cJSON_GetObjectItem(e, "suppress"), x->suppress)) {
             snprintf(err, err_len, "event %s: class indexes 0-%d", id, SOUND_CLASSES - 1);
-            return ESP_ERR_INVALID_ARG;
+            ret = ESP_ERR_INVALID_ARG;
+            break;
         }
         x->log_slot = -1;
         n++;
     }
+    cJSON_Delete(presets);
     *count = n;
-    return ESP_OK;
+    return ret;
 }
 
 static cJSON *config_json(bool runtime)
@@ -205,6 +239,9 @@ static cJSON *config_json(bool runtime)
         cJSON *e = cJSON_CreateObject();
         cJSON_AddStringToObject(e, "id", x->id);
         cJSON_AddStringToObject(e, "name", x->name);
+        if (x->name_cs[0]) {
+            cJSON_AddStringToObject(e, "name_cs", x->name_cs);
+        }
         cJSON_AddStringToObject(e, "kind", x->continuous ? "continuous" : "impulse");
         if (x->device_class[0]) {
             cJSON_AddStringToObject(e, "device_class", x->device_class);
@@ -315,6 +352,9 @@ static void publish_event(const sevent_t *x, float level_db)
     cJSON_AddStringToObject(json, "class", s_class_name(x->peak_class));
     cJSON_AddNumberToObject(json, "score", round((double)(x->peak) * 100) / 100.0);
     cJSON_AddNumberToObject(json, "level_db", round((double)(level_db) * 10) / 10.0);
+    if (x->name_cs[0]) {
+        cJSON_AddStringToObject(json, "name_cs", x->name_cs);
+    }
     char *payload = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
     snprintf(t, sizeof(t), "sound/%s", x->id);

@@ -325,7 +325,10 @@ Implementováno podle návrhu výše:
   - log detekcí s akcemi „Ignore sound“, „Raise threshold“ a „Create event“
   - strom 521 zvuků s vyhledáváním a živým skóre
 - Entity v HA, `<host>` je hostname s `_` místo `-`:
-  - `event.<host>_snd_<id>` (atributy `event_type`, `class`, `score`, `level_db`)
+  - `event.<host>_snd_<id>` (atributy `event_type`, `class`, `score`, `level_db`, `name_cs`)
+  - `name_cs`: volitelný český název události. Web UI ho v češtině zobrazuje místo anglického názvu, do HA jde
+    jen jako atribut; ID, názvy entit a automatizace zůstávají anglicky. Předvolby ho mají vyplněný, starší
+    uložené události ho převezmou z předvolby se stejným ID a anglickým názvem.
   - `binary_sensor.<host>_snd_<id>_active`
   - device trigger „sound <název>“
 
