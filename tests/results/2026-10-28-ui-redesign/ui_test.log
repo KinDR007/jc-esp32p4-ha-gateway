@@ -73,6 +73,7 @@ UI06 Language: Czech translates every tab, keeps sound names, English restores t
   ok: system/netscan: no error toast
   ok: system/settings: no error toast
   ok: system/maint: no error toast
+  ok: menu fully translated
   ok: language kept after reload
   ok: English restores "Overview"
   ok: no Czech text left on the page
@@ -105,8 +106,8 @@ UI08 PASS
 UI09 Network surroundings: the last scan shows channels, spectrum and a recommendation
   ok: all 16 channels (11-26) rated
   ok: spectrum shows the 16 channels
-  ok: recommendation shown ( New Thread network19also 20 (92), 18 (91) New Zigbee networ…)
-  ok: Wi-Fi table: one row per BSSID (20)
+  ok: recommendation shown ( New Thread network19also 20 (92), 17 (90) New Zigbee networ…)
+  ok: Wi-Fi table: one row per BSSID (17)
   ok: quick scan offered only when the role can run it
   ok: no uncaught script errors 
 UI09 PASS

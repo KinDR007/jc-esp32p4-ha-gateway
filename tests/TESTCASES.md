@@ -45,6 +45,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC17 | Konfigurace událostí | neplatné ID / třída / duplicita, nová událost a výjimka, restart, předvolba | 400 pro chyby, vše přežije restart, předvolba použita, původní konfigurace obnovena |
 | TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
 | TC20 | Síťové okolí | rychlý sken v roli Thread BR, pak úplný sken (restart, skenovací firmware C6) | rychlý: 16 kanálů, vlastní Thread síť nalezena, bez výpadku RCP; úplný: skener odpoví, 16 kanálů, Wi-Fi bez duplicit, vlastní PAN v provozu; role a Thread síť po skenu zpět |
+| TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |
 | TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
 
 Jednotkový test filtru rámců (bez desky): `cc -std=c11 -Wall -Wextra -Werror -o /tmp/zb_filter_test tests/unit/zb_filter_test.c && /tmp/zb_filter_test`
@@ -70,7 +71,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI03 | editor události | otevře se s daty, „Cancel“ nic nezmění |
 | UI04 | hledání ve stromu zvuků | „aircraft“ zobrazí jen odpovídající zvuky |
 | UI05 | Thread → „Copy TLVs“ (role Thread) | dialog s hex datasetem, žádná chyba |
-| UI06 | jazyk CZ, všechny záložky, pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
+| UI06 | jazyk CZ, všechny záložky (i všechny položky menu přeložené), pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
 | UI09 | Systém › Síťové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |
 | UI08 | navigace a vysvětlivky | podsekce Thread v menu, ikony mají SVG, odkaz `#system/diag` po reloadu, starý `#tools` vede na Systém › Diagnostika, ⓘ u Teploty ukáže vysvětlení, na mobilu výsuvné menu (otevře se ☰, zavře výběrem) |
 | UI07 | vzhled světlý / tmavý / systém | `data-theme` a barva pozadí se mění, volba přežije reload, „systém“ sleduje nastavení OS |

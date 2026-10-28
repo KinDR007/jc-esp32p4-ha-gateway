@@ -643,6 +643,22 @@ def tc20_netscan():
     check(t2['network_name'] == t['network_name'], 'Thread network unchanged after the scan')
 
 
+def tc21_thread_topology():
+    """Thread network map: topology discovery returns this gateway and the routers it links to."""
+    switch('thread_br')
+    wait_until('Thread router role', lambda: (lambda t: t if t.get('role') in ('router', 'leader') else None)(
+        http('GET', '/api/thread/status')[1]), 180, 5)
+    code, d = http('GET', '/api/thread/topology', timeout=40)
+    check(code == 200 and d['routers'], f'{len(d.get("routers", []))} routers in {d.get("ms")} ms ({d.get("error") or "all answered"})')
+    me = [r for r in d['routers'] if r['this']]
+    check(len(me) == 1 and me[0]['br'], f'this gateway is in the map as border router R{me[0]["id"] if me else "?"}')
+    ids = {r['id'] for r in d['routers']}
+    linked = {l['id'] for l in me[0]['links']}
+    check(linked and linked <= ids | linked, f'its links: {sorted(linked)}')
+    code, d2 = http('GET', '/api/thread/topology', timeout=40)
+    check(code == 200, 'a second discovery right after works too')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -651,6 +667,7 @@ TESTS = [
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
+    ('TC21', tc21_thread_topology),
 ]
 
 

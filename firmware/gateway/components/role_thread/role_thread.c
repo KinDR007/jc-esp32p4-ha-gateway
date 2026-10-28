@@ -30,6 +30,7 @@
 #include "openthread/instance.h"
 #include "openthread/ip6.h"
 #include "openthread/link.h"
+#include "openthread/mesh_diag.h"
 #include "openthread/nat64.h"
 #include "openthread/srp_server.h"
 #include "openthread/thread.h"
@@ -428,6 +429,117 @@ static esp_err_t quick_scan(cJSON *result, char *err, size_t err_len)
     return ret;
 }
 
+/* ---- topology map (Thread > Topology) ---- */
+
+static SemaphoreHandle_t s_topo_busy;
+static SemaphoreHandle_t s_topo_done;
+static cJSON *s_topo_routers;
+static otError s_topo_error;
+
+static void add_ext(cJSON *obj, const char *key, const otExtAddress *ext)
+{
+    char buf[17];
+    hex_into(buf, ext->m8, sizeof(ext->m8));
+    cJSON_AddStringToObject(obj, key, buf);
+}
+
+/* Runs in the OpenThread task, once per router; error OT_ERROR_PENDING means more routers follow. */
+static void on_topology(otError error, otMeshDiagRouterInfo *r, void *ctx)
+{
+    if (r) {
+        char buf[8];
+        cJSON *n = cJSON_CreateObject();
+        snprintf(buf, sizeof(buf), "0x%04x", r->mRloc16);
+        cJSON_AddStringToObject(n, "rloc16", buf);
+        cJSON_AddNumberToObject(n, "id", r->mRouterId);
+        add_ext(n, "ext", &r->mExtAddress);
+        if (r->mVersion != OT_MESH_DIAG_VERSION_UNKNOWN) {
+            cJSON_AddNumberToObject(n, "version", r->mVersion);
+        }
+        cJSON_AddBoolToObject(n, "leader", r->mIsLeader);
+        cJSON_AddBoolToObject(n, "br", r->mIsBorderRouter);
+        cJSON_AddBoolToObject(n, "this", r->mIsThisDevice);
+        cJSON *links = cJSON_AddArrayToObject(n, "links");
+        for (int id = 0; id <= OT_NETWORK_MAX_ROUTER_ID; id++) {
+            if (r->mLinkQualities[id]) {
+                cJSON *l = cJSON_CreateObject();
+                cJSON_AddNumberToObject(l, "id", id);
+                cJSON_AddNumberToObject(l, "lq", r->mLinkQualities[id]);
+                cJSON_AddItemToArray(links, l);
+            }
+        }
+        cJSON *children = cJSON_AddArrayToObject(n, "children");
+        otMeshDiagChildInfo c;
+        while (r->mChildIterator && otMeshDiagGetNextChildInfo(r->mChildIterator, &c) == OT_ERROR_NONE) {
+            cJSON *ch = cJSON_CreateObject();
+            snprintf(buf, sizeof(buf), "0x%04x", c.mRloc16);
+            cJSON_AddStringToObject(ch, "rloc16", buf);
+            cJSON_AddNumberToObject(ch, "lq", c.mLinkQuality);
+            cJSON_AddBoolToObject(ch, "rx_on", c.mMode.mRxOnWhenIdle);
+            cJSON_AddBoolToObject(ch, "ftd", c.mMode.mDeviceType);
+            cJSON_AddBoolToObject(ch, "br", c.mIsBorderRouter);
+            cJSON_AddItemToArray(children, ch);
+        }
+        otMeshDiagTlvInfo tlv;
+        while (r->mTlvIterator && otMeshDiagGetNextTlvInfo(r->mTlvIterator, &tlv) == OT_ERROR_NONE) {
+            if (tlv.mType == OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_NAME && tlv.mData.mVendorName[0]) {
+                cJSON_AddStringToObject(n, "vendor", tlv.mData.mVendorName);
+            } else if (tlv.mType == OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_MODEL && tlv.mData.mVendorModel[0]) {
+                cJSON_AddStringToObject(n, "model", tlv.mData.mVendorModel);
+            } else if (tlv.mType == OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_SW_VERSION && tlv.mData.mVendorSwVersion[0]) {
+                cJSON_AddStringToObject(n, "sw", tlv.mData.mVendorSwVersion);
+            }
+        }
+        cJSON_AddItemToArray(s_topo_routers, n);
+    }
+    if (error != OT_ERROR_PENDING) {
+        s_topo_error = error;
+        xSemaphoreGive(s_topo_done);
+    }
+}
+
+static esp_err_t topology_get(httpd_req_t *req)
+{
+    if (!s_started) {
+        return gw_http_send_error(req, 409, "OpenThread not running");
+    }
+    if (xSemaphoreTake(s_topo_busy, 0) != pdTRUE) {
+        return gw_http_send_error(req, 409, "a topology discovery is running");
+    }
+    static const uint8_t extra[] = {OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_NAME, OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_MODEL,
+                                    OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_SW_VERSION};
+    const otMeshDiagDiscoverConfig cfg = {
+        .mDiscoverChildTable = true, .mExtraTlvTypes = extra, .mExtraTlvTypesLength = sizeof(extra)};
+    int64_t start = esp_timer_get_time();
+    cJSON *json = cJSON_CreateObject();
+    s_topo_routers = cJSON_AddArrayToObject(json, "routers");
+    xSemaphoreTake(s_topo_done, 0);
+    otError e = OT_ERROR_BUSY;
+    if (esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
+        /* routers far away in a busy mesh need more than the default 5 s */
+        otMeshDiagSetResponseTimeout(esp_openthread_get_instance(), 10000);
+        e = otMeshDiagDiscoverTopology(esp_openthread_get_instance(), &cfg, on_topology, NULL);
+        esp_openthread_lock_release();
+    }
+    if (e == OT_ERROR_NONE && xSemaphoreTake(s_topo_done, pdMS_TO_TICKS(30000)) != pdTRUE) {
+        /* stop the callbacks before the result is sent and freed */
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        otMeshDiagCancel(esp_openthread_get_instance());
+        esp_openthread_lock_release();
+        s_topo_error = OT_ERROR_RESPONSE_TIMEOUT;
+    } else if (e != OT_ERROR_NONE) {
+        s_topo_error = e;
+    }
+    if (s_topo_error != OT_ERROR_NONE) {
+        /* a router that does not answer leaves the map incomplete, the rest is still useful */
+        cJSON_AddStringToObject(json, "error", otThreadErrorToString(s_topo_error));
+    }
+    cJSON_AddNumberToObject(json, "ms", (double)((esp_timer_get_time() - start) / 1000));
+    s_topo_routers = NULL;
+    xSemaphoreGive(s_topo_busy);
+    return gw_http_send_json(req, json);
+}
+
 /* ---- status ---- */
 
 static cJSON *thread_status(void)
@@ -702,6 +814,9 @@ esp_err_t role_thread_start(bool border_router)
     gw_http_register("/api/thread/dataset", HTTP_GET, dataset_get);
     gw_http_register("/api/thread/dataset", HTTP_POST, dataset_post);
     gw_http_register("/api/thread/cli", HTTP_POST, cli_post);
+    s_topo_busy = xSemaphoreCreateMutex();
+    s_topo_done = xSemaphoreCreateBinary();
+    gw_http_register("/api/thread/topology", HTTP_GET, topology_get);
     gw_api_set_role_status(thread_summary);
     netscan_set_quick(quick_scan);
 

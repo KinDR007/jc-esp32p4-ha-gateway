@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Thread network map (Thread › Topology): routers with link quality between them, end devices,
+  leader and border routers, vendor/model where devices report it (OpenThread mesh diagnostics,
+  `/api/thread/topology`). Test TC21.
+- Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
+  v1.2; UI06 now checks that every menu item is translated.
+
 ## v1.2 (2026-10-28)
 
 - Web UI redesign: left menu with sub pages (Information / Diagnostics / Settings pattern, Tools

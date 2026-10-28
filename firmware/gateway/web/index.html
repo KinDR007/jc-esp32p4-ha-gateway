@@ -115,6 +115,18 @@ pre { background: var(--code); border: 1px solid var(--border); border-radius: 8
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .log { height: 420px; white-space: pre; overflow: auto; }
+.topo { width: 100%; max-height: 640px; display: block; }
+.topo text { font: 11px system-ui, sans-serif; fill: var(--muted); }
+.topo .topo-link { stroke-width: 2.5; stroke-opacity: .7; }
+.topo .topo-link.ok { stroke: var(--ok); } .topo .topo-link.warn { stroke: var(--warn); } .topo .topo-link.bad { stroke: var(--bad); }
+.topo .topo-node circle { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2; }
+.topo .topo-node.this circle { fill: var(--accent); }
+.topo .topo-node.this .id { fill: var(--accent-text); }
+.topo .topo-node.missing circle { stroke: var(--muted); stroke-dasharray: 3 3; }
+.topo .topo-node .id { font-weight: 700; fill: var(--text); font-size: 12px; }
+.topo .badge { fill: var(--warn); font-weight: 700; }
+.topo .topo-child { fill: var(--muted); stroke: var(--muted); stroke-width: 1.5; }
+.topo .topo-child.sleepy { fill: var(--panel); }
 .spectrum { width: 100%; height: auto; display: block; }
 .spectrum text { font: 11px system-ui, sans-serif; fill: var(--muted); }
 .spectrum .ap { fill: var(--accent); fill-opacity: .10; stroke: var(--accent); stroke-opacity: .55; }
@@ -231,7 +243,8 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
-  'Overview': 'Přehled', 'Information': 'Informace', 'Network surroundings': 'Síťové okolí', 'Scan': 'Sken', 'Recommendation': 'Doporučení',
+  'Overview': 'Přehled', 'Information': 'Informace', 'Topology': 'Topologie', 'Network map': 'Mapa sítě', 'Live': 'Živě', 'Events': 'Události',
+  'ESP32-C6 radio': 'Rádio ESP32-C6', 'read at the next C6 flashing': 'načte se při příštím flashování C6', 'Refresh map': 'Obnovit mapu', 'Network surroundings': 'Síťové okolí', 'Scan': 'Sken', 'Recommendation': 'Doporučení',
   '2.4 GHz spectrum': 'Spektrum 2,4 GHz', 'IEEE 802.15.4 channels': 'Kanály IEEE 802.15.4', 'Thread and Zigbee networks': 'Sítě Thread a Zigbee',
   'Wi-Fi networks': 'Sítě Wi-Fi', 'Quick scan': 'Rychlý sken', 'Full scan with Wi-Fi': 'Úplný sken s Wi-Fi', 'No scan yet.': 'Zatím bez skenu.',
   'Quick: Thread and Zigbee networks and channel noise through the running Thread role, without an outage (the radio leaves its channel for about 15 s). Full: also Wi-Fi; the C6 runs a scanner firmware, the role is off for about a minute.':
@@ -971,7 +984,12 @@ views.role = () => {
 };
 
 const notThread = () => `<div class="card"><p class="muted">Thread is not the active role.</p></div>`;
-views['thread/info'] = views['thread/topology'] = () => isThread() ? `<div id="thread-status"><div class="card muted">Loading…</div></div>` : notThread();
+views['thread/info'] = () => isThread() ? `<div id="thread-status"><div class="card muted">Loading…</div></div>` : notThread();
+/* the map sits outside #thread-status, which the status poll redraws every few seconds */
+views['thread/topology'] = () => isThread() ? `<div class="card">${h3('graph-outline', 'Network map')}
+    <div class="row"><button class="btn" id="topo-refresh">${ic('restart')}Refresh map</button><span id="topo-state" class="muted"></span></div>
+    <div id="topo-map" class="muted" style="margin-top:10px">Loading…</div></div>
+  <div id="thread-status" style="margin-top:16px"><div class="card muted">Loading…</div></div>` : notThread();
 views['thread/diag'] = () => !isThread() ? notThread() : `<div id="thread-status"><div class="card muted">Loading…</div></div>
   <div class="card">${h3('console', 'OpenThread CLI')}
     <div class="row">
@@ -1496,6 +1514,67 @@ views['system/firmware'] = () => {
   </div>`;
 };
 
+/* ---------------- Thread network map ----------------
+ * Routers on a circle by router ID, router links coloured by link quality (both directions known:
+ * the weaker one, dashed when only one side reports it), children as small nodes next to their
+ * parent (hollow = sleepy end device). Routers that others list but that did not answer are grey. */
+async function loadTopology() {
+  const box = $('#topo-map');
+  if (!box) return;
+  $('#topo-state').textContent = L(' discovering…', ' zjišťuji…');
+  $('#topo-refresh').disabled = true;
+  let d;
+  try { d = await api('/api/thread/topology'); } catch (e) {
+    if ($('#topo-map')) { $('#topo-map').innerHTML = `<span class="warn-text">${esc(e.message)}</span>`; $('#topo-refresh').disabled = false; $('#topo-state').textContent = ''; }
+    return;
+  }
+  if (!$('#topo-map')) return;
+  $('#topo-refresh').disabled = false;
+  const routers = new Map(d.routers.map(r => [r.id, r]));
+  d.routers.forEach(r => r.links.forEach(l => { if (!routers.has(l.id)) routers.set(l.id, { id: l.id, links: [], children: [], missing: true }); }));
+  const ids = [...routers.keys()].sort((a, b) => a - b);
+  const kids = d.routers.reduce((a, r) => a + r.children.length, 0);
+  $('#topo-state').textContent = ` ${ids.length} ${L('routers', 'routerů')}, ${kids} ${L('end devices', 'koncových zařízení')} · ${d.ms} ms` +
+    (d.error ? ` · ${L('some routers did not answer', 'některé routery neodpověděly')}` : '');
+  const W = 900, H = 640, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 110;
+  const pos = new Map(ids.map((id, i) => {
+    const a = -Math.PI / 2 + 2 * Math.PI * i / ids.length;
+    return [id, { x: ids.length > 1 ? cx + R * Math.cos(a) : cx, y: ids.length > 1 ? cy + R * Math.sin(a) : cy, a }];
+  }));
+  const lqCls = q => q >= 3 ? 'ok' : q === 2 ? 'warn' : 'bad';
+  let edges = '', nodes = '', children = '';
+  const seen = new Set();
+  for (const r of routers.values()) for (const l of r.links) {
+    const key = [Math.min(r.id, l.id), Math.max(r.id, l.id)].join('-');
+    if (seen.has(key) || !pos.has(l.id)) continue;
+    seen.add(key);
+    const back = routers.get(l.id).links.find(x => x.id === r.id);
+    const q = back ? Math.min(back.lq, l.lq) : l.lq;
+    const p1 = pos.get(r.id), p2 = pos.get(l.id);
+    edges += `<line class="topo-link ${lqCls(q)}" ${back ? '' : 'stroke-dasharray="5 5"'} x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"><title>R${r.id} ↔ R${l.id}: ${L('link quality', 'kvalita linky')} ${back ? `${l.lq} / ${back.lq}` : l.lq}</title></line>`;
+  }
+  for (const r of routers.values()) {
+    const p = pos.get(r.id);
+    r.children.forEach((c, i) => {
+      const spread = 0.22, a = p.a + (i - (r.children.length - 1) / 2) * spread, dist = ids.length > 1 ? 58 : 70 + 12 * i;
+      const x = p.x + dist * Math.cos(a), y = p.y + dist * Math.sin(a);
+      children += `<line class="topo-link ${lqCls(c.lq)}" x1="${p.x}" y1="${p.y}" x2="${x}" y2="${y}"/>
+        <circle class="topo-child ${c.rx_on ? '' : 'sleepy'}" cx="${x}" cy="${y}" r="6"><title>${c.rloc16} · ${c.rx_on ? L('end device, always on', 'koncové zařízení, stále zapnuté') : L('sleepy end device (battery)', 'spící koncové zařízení (baterie)')}${c.br ? ' · BR' : ''} · ${L('link quality', 'kvalita linky')} ${c.lq}</title></circle>`;
+    });
+    const label = r.missing ? L('no answer', 'bez odpovědi') : [r.vendor, r.model].filter(x => x && x !== 'RD:' && x !== 'Default').join(' ').slice(0, 22);
+    const info = r.missing ? '' : `${r.rloc16} · ${esc(r.ext)}${r.version ? ` · Thread v${r.version}` : ''}${r.vendor ? ` · ${esc(r.vendor)} ${esc(r.model || '')} ${esc(r.sw || '')}` : ''}`;
+    nodes += `<g class="topo-node ${r.this ? 'this' : ''} ${r.missing ? 'missing' : ''}"><circle cx="${p.x}" cy="${p.y}" r="18"/>
+      <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" class="id">${r.id}</text>
+      ${r.leader ? `<text x="${p.x + 15}" y="${p.y - 13}" class="badge">★</text>` : ''}${r.br ? `<text x="${p.x - 26}" y="${p.y - 13}" class="badge">BR</text>` : ''}
+      <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${r.this ? L('this gateway', 'tato brána') : esc(label)}</text>
+      <title>R${r.id}${r.leader ? ' · leader' : ''}${r.br ? ' · border router' : ''}${r.this ? ' · ' + L('this gateway', 'tato brána') : ''}\n${info}\n${r.links.length} ${L('router links', 'spojení s routery')}, ${r.children.length} ${L('end devices', 'koncových zařízení')}</title></g>`;
+  }
+  box.classList.remove('muted');
+  box.innerHTML = `<svg class="topo" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
+    <p class="muted">${L('Number = router ID, ★ leader, BR border router. Lines: green good, orange medium, red weak link; dashed = reported by one side only. Small nodes: end devices (hollow = sleepy). Hover for details.',
+      'Číslo = ID routeru, ★ leader, BR border router. Čáry: zelená dobrá, oranžová střední, červená slabá linka; přerušovaná = hlásí jen jedna strana. Malé body: koncová zařízení (prázdné = spící). Detaily v bublině po najetí myší.')}</p>`;
+}
+
 /* ---------------- network surroundings ----------------
  * The gateway stores the raw scan (quick: OpenThread scans of the Thread role; full: C6 scanner image
  * with Wi-Fi). The rating is computed here so it can be refined without new firmware. */
@@ -1815,6 +1894,8 @@ document.addEventListener('click', async e => {
       audio.src = URL.createObjectURL(await res.blob());
       audio.classList.remove('hidden');
       audio.play().catch(() => {});
+    } else if (t.id === 'topo-refresh') {
+      loadTopology();
     } else if (t.id === 'ns-quick') {
       await api('/api/net/scan', { json: { mode: 'quick' } });
       toast(L('Quick scan running (about 15 s)', 'Rychlý sken běží (asi 15 s)'));
@@ -1982,7 +2063,7 @@ function render(full) {
   if (full || PASSIVE.includes(route())) {
     if (full) renderNav();
     main.innerHTML = pageTitle() + views[route()]();
-    if (tab === 'thread') { loadThread(); if (sub === 'settings') loadDataset(false); }
+    if (tab === 'thread') { loadThread(); if (sub === 'settings') loadDataset(false); if (sub === 'topology') loadTopology(); }
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
     if (route() === 'system/netscan') loadNetscan();

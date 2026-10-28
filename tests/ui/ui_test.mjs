@@ -167,6 +167,18 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
       }
     }
   }
+  // every menu item and sub page has a Czech label (names of standards stay as they are)
+  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware'];
+  const english = [];
+  for (const sec of ['overview', 'role', 'thread', 'zigbee', 'sound', 'ha', 'system']) {
+    await page.click(`#side a[data-route="${sec}"]`);
+    await page.waitForTimeout(300);
+    for (const [route, text] of await page.$$eval('#side a', a => a.map(x => [x.dataset.route, x.textContent.trim()]))) {
+      const en = await page.evaluate(r => { const [s, sub] = r.split('/'); const n = NAV.find(x => x.id === s); return sub ? n.subs.find(x => x.id === sub).label : n.label; }, route);
+      if (text === en && !same.includes(en)) english.push(en);
+    }
+  }
+  check(english.length === 0, `menu fully translated${english.length ? ' (missing: ' + [...new Set(english)].join(', ') + ')' : ''}`);
   await page.reload();
   await page.waitForSelector('.card', { timeout: 20000 });
   check(await page.inputValue('#pref-lang') === 'cs', 'language kept after reload');
