@@ -332,6 +332,7 @@ await test('UI12', 'Zigbee network: Zigbee2MQTT instance, devices with details, 
     await hoverMapNode('#zmap svg .zn.router');
     check(/IEEE/.test(await page.textContent('#nodebox')), 'device details on hover over the map');
     check(await page.$$eval('#zmap svg.focus .zl.hi', l => l.length) > 0, 'links of the device highlighted');
+    check(await boxClearOf('#zmap svg.focus .zl.hi'), 'details box does not cover the highlighted links');
     await page.mouse.move(2, 2);
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
@@ -380,6 +381,7 @@ await test('UI14', 'Thread map: hovering a router highlights its links, the devi
   const hi = await page.$$eval('#topo-map svg.focus .topo-link.hi', l => l.length);
   const links = await page.$$eval('#topo-map svg .topo-link', l => l.length);
   check(links === 0 || hi > 0, `${hi} of ${links} links highlighted`);
+  check(await boxClearOf('#topo-map svg.focus .topo-link.hi'), 'details box does not cover the highlighted links');
   await page.mouse.move(2, 2);
   check(!await page.$('#topo-map svg.focus'), 'highlight gone after leaving the node');
   const row = await page.$('#topo-devices tr:nth-child(2)');
@@ -393,6 +395,17 @@ await test('UI14', 'Thread map: hovering a router highlights its links, the devi
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
+
+// the details box overlaps none of the highlighted links (on a screen wide enough for both)
+async function boxClearOf(sel) {
+  return page.evaluate(sel => {
+    const b = document.querySelector('#nodebox').getBoundingClientRect();
+    return [...document.querySelectorAll(sel)].every(l => {
+      const r = l.getBoundingClientRect();
+      return r.right < b.left || r.left > b.right || r.bottom < b.top || r.top > b.bottom;
+    });
+  }, sel);
+}
 
 async function hoverMapNode(sel) {
   const node = await page.$(sel);

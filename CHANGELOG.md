@@ -28,6 +28,8 @@
   (`/api/identify`), the Identify button of any device in Zigbee › Network and devices, or the
   Zigbee Identify cluster of the router (Zigbee2MQTT, Home Assistant). The board has no controllable
   LED.
+- Map details box no longer covers the map: it takes the free place beside the drawing or the
+  corner hiding the fewest devices and highlighted links (Thread and Zigbee map).
 - Thread map: hovering a device highlights its links, as in the Zigbee map. The device lists under
   the maps no longer open the details box (map only). Test UI14.
 - Fix: the Zigbee2MQTT device list sometimes did not arrive after a restart (retained message
