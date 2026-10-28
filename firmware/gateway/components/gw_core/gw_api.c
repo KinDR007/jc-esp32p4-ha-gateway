@@ -196,9 +196,18 @@ static esp_err_t role_post(httpd_req_t *req)
     }
     gw_role_t role;
     bool ok = gw_role_from_name(GW_JSON_STR(body, "role"), &role) && role != GW_ROLE_NONE;
+    bool skip_backup = cJSON_IsTrue(cJSON_GetObjectItem(body, "skip_backup"));
     cJSON_Delete(body);
     if (!ok) {
         return gw_http_send_error(req, 400, "unknown role");
+    }
+    char flashed[16];
+    bool factory_c6 = !gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed));
+    if (factory_c6 && role != GW_ROLE_ESPHOME && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
+        if (!skip_backup) {
+            return gw_http_send_error(req, 409, "c6_backup_required");
+        }
+        gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     }
     if (c6_progress()->busy) {
         return gw_http_send_error(req, 409, "C6 flashing in progress");
@@ -213,7 +222,6 @@ static esp_err_t role_post(httpd_req_t *req)
     }
     gw_config_set_u8(GW_KEY_ROLE, role);
     gw_config_set_u8(GW_KEY_C6_TRIES, 0);
-    gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     ESP_LOGW(TAG, "role switch to %s requested", gw_role_name(role));
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "role", gw_role_name(role));
@@ -437,7 +445,9 @@ static esp_err_t c6_backup_get(httpd_req_t *req)
     backup_ctx_t ctx = {.req = req};
     esp_err_t err = c6_read_flash(http_sink, &ctx);
     xSemaphoreGive(s_upload_lock);
-    if (err != ESP_OK) {
+    if (err == ESP_OK) {
+        gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
+    } else {
         ESP_LOGE(TAG, "C6 backup failed: %s", esp_err_to_name(err));
         if (ctx.sent == 0) {
             return gw_http_send_error(req, 503, c6_progress()->last_error);

@@ -524,7 +524,16 @@ document.addEventListener('click', async e => {
     if (t.dataset.role) {
       const r = ROLES[t.dataset.role];
       if (!await confirmDialog('Switch to ' + r.name + '?', 'The gateway restarts and may reflash the C6. Devices on the current network go offline until you switch back.')) return;
-      await api('/api/role', { json: { role: t.dataset.role } });
+      try {
+        await api('/api/role', { json: { role: t.dataset.role } });
+      } catch (err) {
+        if (err.message !== 'c6_backup_required') throw err;
+        if (!await confirmDialog('No C6 backup yet', 'This role overwrites the factory firmware of the C6, which cannot be downloaded again. Cancel and use System → Back up C6 flash first (needs the JP1 jumpers), or continue without a backup.')) {
+          tab = 'system'; renderTabs(); render(true);
+          return;
+        }
+        await api('/api/role', { json: { role: t.dataset.role, skip_backup: true } });
+      }
       toast('Switching, the page reconnects automatically');
       waitForRestart();
     } else if (t.dataset.cli) {

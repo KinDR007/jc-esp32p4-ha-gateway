@@ -76,12 +76,16 @@ static void apply_role(gw_role_t role)
         return;
     }
     char flashed[16];
-    if (!gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed)) && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
-        /* First start: the C6 still has its factory firmware, which cannot be downloaded again. */
-        gw_set_maintenance("first start: back up the C6 factory firmware (System tab), then pick a role");
+    bool factory_c6 = !gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed));
+    if (role == GW_ROLE_ESPHOME && factory_c6) {
+        /* The factory C6 firmware is esp-hosted already; ESPHome updates it over SDIO itself,
+         * so this role works without the JP1 jumpers. */
+        ESP_LOGI(TAG, "C6 keeps its factory esp-hosted firmware");
+    } else if (factory_c6 && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
+        /* The factory firmware cannot be downloaded again: never overwrite it before a backup. */
+        gw_set_maintenance("back up the C6 factory firmware first (System tab) or confirm skipping the backup");
         return;
-    }
-    if (!ensure_c6(gw_role_c6_bundle(role))) {
+    } else if (!ensure_c6(gw_role_c6_bundle(role))) {
         return;
     }
 
