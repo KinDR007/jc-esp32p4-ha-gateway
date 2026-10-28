@@ -653,22 +653,31 @@ static esp_err_t topology_get(httpd_req_t *req)
 
 /* ---- status ---- */
 
+/* The router joins with the stored dataset: "joining" until attached, again when detached. */
+static void add_phase(cJSON *json, otDeviceRole role)
+{
+    bool attached = role >= OT_DEVICE_ROLE_CHILD;
+    cJSON_AddStringToObject(json, "phase", !s_border_router && attached && strcmp(s_phase, "joining") == 0 ? "running" : s_phase);
+}
+
 static cJSON *thread_status(void)
 {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "mode", s_border_router ? "border_router" : "router");
-    cJSON_AddStringToObject(json, "phase", s_phase);
     cJSON_AddNumberToObject(json, "rcp_failures", s_rcp_failures);
     if (s_border_router) {
         cJSON_AddNumberToObject(json, "rest_port", CONFIG_GW_OTBR_REST_PORT);
     }
     if (!s_started || !esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
+        add_phase(json, OT_DEVICE_ROLE_DISABLED);
         return json;
     }
     otInstance *ot = esp_openthread_get_instance();
     char buf[64];
 
-    cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(otThreadGetDeviceRole(ot)));
+    otDeviceRole role = otThreadGetDeviceRole(ot);
+    add_phase(json, role);
+    cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(role));
     cJSON_AddStringToObject(json, "rcp_version", otGetRadioVersionString(ot));
     int8_t tx_power;
     if (otPlatRadioGetTransmitPower(ot, &tx_power) == OT_ERROR_NONE) {
@@ -852,14 +861,17 @@ static cJSON *thread_summary(void)
 {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "mode", s_border_router ? "border_router" : "router");
-    cJSON_AddStringToObject(json, "phase", s_phase);
     add_rest_client(json);
     if (s_started && esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
         otInstance *ot = esp_openthread_get_instance();
-        cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(otThreadGetDeviceRole(ot)));
+        otDeviceRole role = otThreadGetDeviceRole(ot);
+        add_phase(json, role);
+        cJSON_AddStringToObject(json, "role", otThreadDeviceRoleToString(role));
         cJSON_AddStringToObject(json, "network_name", otThreadGetNetworkName(ot));
         cJSON_AddNumberToObject(json, "channel", otLinkGetChannel(ot));
         esp_openthread_lock_release();
+    } else {
+        add_phase(json, OT_DEVICE_ROLE_DISABLED);
     }
     return json;
 }

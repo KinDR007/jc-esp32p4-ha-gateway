@@ -28,6 +28,7 @@
   (`/api/identify`), the Identify button of any device in Zigbee › Network and devices, or the
   Zigbee Identify cluster of the router (Zigbee2MQTT, Home Assistant). The board has no controllable
   LED.
+- Fix: the Thread router showed the phase "joining" for good; it shows "running" once attached.
 - Fix: a page redrawn on every status poll no longer drops the value being typed into its field.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
