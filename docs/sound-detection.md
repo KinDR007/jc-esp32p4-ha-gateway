@@ -214,7 +214,7 @@ Rozhodnutí uživatele: model YAMNet, detekovat vše co model umí, učicí rež
 
 | Předvolba | Události |
 |---|---|
-| Domácnost (výchozí) | speech, shout_scream, laughter, baby_cry, cough_sneeze, snoring, dog_bark, cat, doorbell, knock, door, glass_break, smoke_alarm, alarm_siren, phone_ring, water_running, toilet_flush, vacuum, appliance (mikrovlnka, mixér, fén) |
+| Domácnost (výchozí) | speech, shout_scream, laughter, baby_cry, cough_sneeze, snoring, dog_bark, cat, doorbell, knock, door, glass_break, smoke_alarm, alarm_siren, phone_ring, water_running, toilet_flush, vacuum, appliance (mikrovlnka, mixér, fén), clap (tlesknutí), clapping (opakované tleskání, aspoň 3 okna po sobě), finger_snap (luskání prsty) |
 | Bezpečnost | glass_break, smoke_alarm, alarm_siren, shout_scream, door, knock, dog_bark, gunshot_explosion |
 | Zvířata | dog_bark, dog_whimper, cat, bird |
 | Vše | jedna událost na každou třídu kromě hudby a prostředí (pro ladění) |

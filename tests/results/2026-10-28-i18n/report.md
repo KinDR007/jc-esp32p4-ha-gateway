@@ -13,3 +13,15 @@ prohlížeče, vzhled podle systému; obojí jde přepnout v hlavičce a prohlí
 | „Právě slyším“ v češtině | třída patřící do události ukazuje český název události; test na stránce před opravou FAIL, po ní PASS |
 | Atribut `name_cs` v HA | neověřeno, MQTT broker vyžaduje přihlášení |
 | Kontrola pokrytí (všechny záložky v češtině) | nepřeložené zůstávají jen hodnoty: adresy, verze, názvy sítí, čítače OpenThread |
+
+## Události tleskání a luskání
+
+Do předvolby Domácnost a do aktuální konfigurace desky přibyly `clap` (Tlesknutí), `clapping`
+(Opakované tleskání, aspoň 3 okna po 0,48 s) a `finger_snap` (Luskání prsty).
+
+| Kontrola | Výsledek |
+|---|---|
+| YAMNet (PyTorch) na nahrávkách tleskání z ESC-50 | Clapping 0,99–1,00 v nejsilnějším okně |
+| Tytéž nahrávky přehrané reproduktorem Macu k desce | nerozpoznáno (Typewriter, Coin), reproduktor zvuk tlesknutí nepřenese věrně |
+| Luskání | bez testovací nahrávky; syntetický klik model nepozná, nutné ověřit živě |
+| UI testy UI01–UI07 s 22 událostmi | PASS |

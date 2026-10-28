@@ -4,6 +4,7 @@
 
 - Web UI in Czech and English (picked from the browser language, switch in the header) and a
   light / dark / system theme switch. Browser tests UI06–UI07.
+- Household preset: clap, repeated clapping and finger snap events.
 - Sound events have an optional Czech name (`name_cs`): shown by the Czech web UI, sent to Home
   Assistant as an event attribute; entity names and ids stay English.
 

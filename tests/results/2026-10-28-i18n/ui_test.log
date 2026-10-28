@@ -11,8 +11,8 @@ UI01 every tab renders without script errors or error toasts
 UI01 PASS
 
 UI02 Sound: every "HA automation" button shows the automation for its entity
-  ok: 19 events listed
-  ok: all 19 automation dialogs open with a valid entity id and no error
+  ok: 22 events listed
+  ok: all 22 automation dialogs open with a valid entity id and no error
 UI02 PASS
 
 UI03 Sound: event editor opens with the event and cancels without changes

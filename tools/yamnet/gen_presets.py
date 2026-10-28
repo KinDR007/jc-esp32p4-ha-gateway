@@ -61,6 +61,12 @@ EVENTS = {
                       cooldown_s=0, classes=['Microwave oven', 'Blender', 'Hair dryer']),
     'gunshot_explosion': dict(name_cs='Výstřel nebo výbuch', name='Gunshot or explosion', kind='impulse', threshold=0.5, windows=1, hold_s=3,
                               cooldown_s=30, classes=['Gunshot, gunfire', 'Machine gun', 'Explosion', 'Boom']),
+    'clap': dict(name_cs='Tlesknutí', name='Clap', kind='impulse', threshold=0.5, windows=1, hold_s=2, cooldown_s=3,
+                 classes=['Clapping']),
+    'clapping': dict(name_cs='Opakované tleskání', name='Repeated clapping', kind='continuous', threshold=0.5, windows=3,
+                     hold_s=3, cooldown_s=0, classes=['Clapping', 'Applause']),
+    'finger_snap': dict(name_cs='Luskání prsty', name='Finger snap', kind='impulse', threshold=0.4, windows=1, hold_s=2,
+                        cooldown_s=3, classes=['Finger snapping']),
     'music': dict(name_cs='Hudba', name='Music', kind='continuous', threshold=0.6, windows=4, hold_s=30, cooldown_s=0, classes=['Music']),
 }
 
@@ -72,7 +78,7 @@ PRESETS = {
     'household': dict(name='Household', events=[
         'speech', 'shout_scream', 'laughter', 'baby_cry', 'cough_sneeze', 'snoring', 'dog_bark', 'cat', 'doorbell',
         'knock', 'door', 'glass_break', 'smoke_alarm', 'alarm_siren', 'phone_ring', 'water_running', 'toilet_flush',
-        'vacuum', 'appliance']),
+        'vacuum', 'appliance', 'clap', 'clapping', 'finger_snap']),
     'security': dict(name='Security', events=[
         'glass_break', 'smoke_alarm', 'alarm_siren', 'shout_scream', 'door', 'knock', 'dog_bark', 'gunshot_explosion']),
     'animals': dict(name='Animals', events=['dog_bark', 'cat', 'bird']),
