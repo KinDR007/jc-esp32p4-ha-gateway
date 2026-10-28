@@ -1,0 +1,88 @@
+diff -ruN CMakeLists.txt
+--- CMakeLists.txt
++++ CMakeLists.txt
+@@ -2,6 +2,9 @@
+ # in this exact order for cmake to work correctly
+ cmake_minimum_required(VERSION 3.16)
+ 
++# P4 gateway: shared C6 telemetry component.
++set(EXTRA_COMPONENT_DIRS $ENV{ROOT_DIR}/firmware/c6/common)
++
+ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+ project(esp-coordinator)
+ 
+diff -ruN main/main.cpp
+--- main/main.cpp
++++ main/main.cpp
+@@ -181,6 +181,8 @@
+ #endif
+ #endif  // CONFIG_IDF_TARGET_ESP32C6
+ 
++void p4gw_ncp_telemetry_start(void);
++
+ extern "C" void app_main(void)
+ {
+     // Reset-cause forensics (free under LOG_NONE): some boards' eFuses
+@@ -200,5 +202,6 @@
+ #endif
+ #endif  // CONFIG_IDF_TARGET_ESP32C6
+     ESP_ERROR_CHECK(app::init());
++    p4gw_ncp_telemetry_start();  // before app::start(): it runs the event loop and never returns
+     ESP_ERROR_CHECK(app::start());
+ }
+diff -ruN main/p4gw_ncp_telemetry.cpp
+--- main/p4gw_ncp_telemetry.cpp
++++ main/p4gw_ncp_telemetry.cpp
+@@ -0,0 +1,52 @@
++// P4 gateway: C6 telemetry (temperature, memory, uptime) for the gateway web UI.
++//
++// Every 30 s one ZBOSS low-level frame of its own packet type (P4GW_FRAME_TYPE) carries the
++// JSON from p4gw_telemetry. The P4 bridge removes these frames from the stream before it reaches
++// Zigbee2MQTT. The frame goes through transport::send like every other frame, so it is written
++// to the UART in one piece and never lands inside another frame.
++#include "transport.h"
++#include "utils.h"
++
++#include <cstring>
++
++#include "freertos/FreeRTOS.h"
++#include "freertos/task.h"
++#include "p4gw_telemetry.h"
++
++namespace {
++
++constexpr uint8_t P4GW_FRAME_TYPE = 0x7e;  // unused by ZBOSS NCP (API frames are 0x06)
++constexpr uint32_t FIRST_DELAY_MS = 10000;
++constexpr uint32_t INTERVAL_MS = 30000;
++constexpr size_t HEADER = 7;  // DE AD, packet_len, type, flags, header crc8
++
++void telemetry_task(void *)
++{
++    static uint8_t frame[HEADER + 2 + P4GW_TELEMETRY_MAX];
++    vTaskDelay(pdMS_TO_TICKS(FIRST_DELAY_MS));
++    while (true) {
++        size_t n = p4gw_telemetry_get(reinterpret_cast<char *>(frame + HEADER + 2), P4GW_TELEMETRY_MAX);
++        if (n) {
++            const uint16_t packet_len = 5 + 2 + n;  // same length rule as protocol::send_data
++            frame[0] = 0xde;
++            frame[1] = 0xad;
++            frame[2] = packet_len & 0xff;
++            frame[3] = packet_len >> 8;
++            frame[4] = P4GW_FRAME_TYPE;
++            frame[5] = 0;
++            frame[6] = utils::crc8(frame + 2, 4);
++            const uint16_t crc = utils::crc16(frame + HEADER + 2, n);
++            memcpy(frame + HEADER, &crc, sizeof(crc));
++            transport::send(frame, HEADER + 2 + n);
++        }
++        vTaskDelay(pdMS_TO_TICKS(INTERVAL_MS));
++    }
++}
++
++}  // namespace
++
++void p4gw_ncp_telemetry_start(void)
++{
++    p4gw_telemetry_start("zigbee_ncp");
++    xTaskCreate(telemetry_task, "p4gw_ncp_tel", 2048, nullptr, 2, nullptr);
++}

@@ -20,7 +20,9 @@
 - [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18
 - [x] Web UI v češtině a angličtině, přepínač vzhledu světlý / tmavý / systém (UI06–UI07)
 - [x] Přestavba web UI: levé menu s podsekcemi, ikony MDI, vysvětlivky, podrobné HW informace P4/C6 (UI08)
-- [ ] Ověřit načtení údajů o čipu C6 (MAC, revize, flash) při příštím flashování C6
+- [x] Údaje o čipu C6 z bootloaderu (MAC, revize, flash) ověřeny
+- [x] Telemetrie C6 (teplota, RAM, uptime) pro Thread RCP, Zigbee koordinátor a router, TC19
+- [ ] Ověřit pojistku startů a 3s pojistku telemetrie na skutečném selhání
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
 - [ ] Zvuk fáze 4: učicí režim (vzorky v oddílu `sounds`, profily embedding + tónové)
 - [ ] Zvuk fáze 5: ladění falešných poplachů, 24h test se zapnutou detekcí

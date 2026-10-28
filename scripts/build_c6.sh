@@ -26,6 +26,11 @@ build_one() {
     rsync -a --delete --exclude .git --exclude build --exclude managed_components \
         --exclude sdkconfig --exclude dependencies.lock "$src/" "$out/src/"
     proj="$out/src${sub:+/$sub}"
+    # Local changes to third-party sources (C6 telemetry): firmware/c6/<name>/patches/*.patch, -p0 in the project.
+    for p in "$ROOT_DIR/firmware/c6/$name"/patches/*.patch; do
+        [ -f "$p" ] || continue
+        patch -p0 -s -d "$proj" -i "$p" || { echo "failed to apply $p" >&2; return 1; }
+    done
     # The copy has no .git, so pin PROJECT_VER to the source revision instead of this repo's.
     if [ ! -f "$proj/version.txt" ]; then
         git -C "$src" describe --tags --always > "$proj/version.txt"

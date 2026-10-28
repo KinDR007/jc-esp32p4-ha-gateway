@@ -6,6 +6,12 @@
   merged into System), deep links `#section/page`, drawer menu on phones, wider tiles, Material
   Design Icons embedded as SVG (`tools/web/gen_icons.mjs`), explanation tooltips (ⓘ) for values,
   network devices, roles and actions in Czech and English. Browser test UI08.
+- C6 telemetry (temperature, free RAM, uptime, reset reason) from the Thread RCP, the Zigbee
+  coordinator and the Zigbee router, each over its own link; Zigbee2MQTT never sees it. Patched
+  ESP-IDF openthread component, ZBOSS frame filter with host unit test, test TC19.
+- Fixes: a recovery restart after an RCP failure no longer resets the boot loop guard (a C6 that
+  keeps failing reflashed endlessly), the web server stays on core 0 (an upload with sound
+  recognition on could trip the task watchdog), patch changes now reconfigure the build.
 - Detailed hardware info: P4 CPU load per core, temperature min/max, flash/PSRAM/NVS usage, MAC,
   build fingerprint; C6 MAC, chip revision, flash size and flash count (read from its bootloader
   at the next flashing). The C6 radio firmwares do not report the C6 temperature.

@@ -2,7 +2,8 @@
  * Standalone Zigbee router (range extender) for the C6 of the P4 gateway.
  *
  * UART0 (460800 Bd) carries a line protocol to the P4:
- *   C6 -> P4: "@ZR {json}" status lines every 10 s and after every state change
+ *   C6 -> P4: "@ZR {json}" status lines every 10 s and after every state change,
+ *             "@ZT {json}" telemetry (temperature, memory, uptime) every 30 s
  *   P4 -> C6: "status", "steer", "permit", "leave", "factory_reset"
  */
 #include <stdio.h>
@@ -18,12 +19,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "p4gw_telemetry.h"
 
 static const char *TAG = "zr";
 
 #define ENDPOINT 1
 #define STEER_RETRY_MS 30000
 #define STATUS_INTERVAL_MS 10000
+#define TELEMETRY_INTERVAL_MS 30000
 #define PERMIT_JOIN_S 180
 #define LINK_BAUD 460800 /* CONFIG_GW_C6_UART_BAUD of the gateway */
 
@@ -51,6 +54,15 @@ static void print_status(void)
            esp_zb_get_pan_id(), ext_hex, esp_zb_get_current_channel(), esp_zb_get_short_address(), ieee_hex,
            permit ? "true" : "false", esp_app_get_description()->version);
     fflush(stdout);
+}
+
+static void print_telemetry(void)
+{
+    char json[P4GW_TELEMETRY_MAX];
+    if (p4gw_telemetry_get(json, sizeof(json))) {
+        printf("@ZT %s\n", json);
+        fflush(stdout);
+    }
 }
 
 static void start_steering(uint8_t unused)
@@ -134,6 +146,8 @@ static void uart_task(void *arg)
     size_t len = 0;
     uint8_t c;
     TickType_t last_status = xTaskGetTickCount();
+    /* first telemetry right after the stack is up */
+    TickType_t last_telemetry = xTaskGetTickCount() - pdMS_TO_TICKS(TELEMETRY_INTERVAL_MS);
 
     while (!s_stack_ready) {
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -155,6 +169,10 @@ static void uart_task(void *arg)
             esp_zb_lock_acquire(portMAX_DELAY);
             print_status();
             esp_zb_lock_release();
+        }
+        if (xTaskGetTickCount() - last_telemetry >= pdMS_TO_TICKS(TELEMETRY_INTERVAL_MS)) {
+            last_telemetry = xTaskGetTickCount();
+            print_telemetry();
         }
     }
 }
@@ -204,6 +222,7 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_zb_platform_config(&platform));
+    p4gw_telemetry_start("zigbee_router");
 
     /* stdout keeps working through the driver once it is installed. */
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0));

@@ -680,12 +680,15 @@ done:
     bundle_free(&to);
     bundle_free(&from);
     free(s);
-    progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
-    s_progress.busy = false;
     if (err == ESP_OK) {
+        /* before busy clears: callers (and tests) treat busy == false as "flashing finished" */
         c6_chip_info();
         s_chip.flashes++;
         chip_info_save();
+    }
+    progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
+    s_progress.busy = false;
+    if (err == ESP_OK) {
         ESP_LOGI(TAG, "C6 now runs %s (%s)", entry->name, entry->version);
     } else {
         ESP_LOGE(TAG, "%s", s_progress.last_error);

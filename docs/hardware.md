@@ -71,6 +71,23 @@ Pin 26 stays unconnected: the P4 drives C6 CHIP_PU through GPIO54 inside the mod
 with a multimeter (3.3 V against GND, pin 2 shows 5 V) before wiring. The working wiring is
 confirmed by TC03 (full C6 flash read over JP1).
 
+## C6 telemetry
+
+Every C6 firmware of a gateway role reports temperature, free RAM, uptime and reset reason
+(`firmware/c6/common/p4gw_telemetry`, refreshed by its own task every 10 s). Delivery depends on
+the link the role already uses, without changing what the host sees:
+
+| Role | C6 → P4 | Notes |
+|---|---|---|
+| Thread (RCP) | spinel vendor property `0x3cf0`, read by the P4 every 30 s | needs the openthread patch on both sides (`firmware/patches/idf_openthread_telemetry.patch`, applied to a copy of the ESP-IDF component); an older RCP answers "not found". A request that does not finish in 3 s (RCP fails on it) turns telemetry off for that RCP image and restarts the P4. |
+| Zigbee coordinator (ZBOSS NCP) | ZBOSS low-level frame of type `0x7e` every 30 s | the P4 bridge removes these frames before the stream reaches Zigbee2MQTT (`role_zigbee/zb_filter.c`, host unit test `tests/unit/zb_filter_test.c`) |
+| Zigbee router | `@ZT {json}` line every 30 s | own line protocol |
+| ESPHome (esp-hosted) | none | the gateway UI does not run in that role |
+
+The RCP links newlib nano printf: telemetry code must not use `%llu` or float conversions (that
+crashed the first RCP builds). The router console runs at the link rate (460800 Bd), so C6 panics
+in that role appear in the P4 log as `c6:` lines.
+
 ## Radio limits
 
 The C6 has one 2.4 GHz radio. BLE scanning and a Thread/Zigbee router cannot run together

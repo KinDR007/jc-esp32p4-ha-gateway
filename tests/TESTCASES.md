@@ -44,6 +44,9 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC15 | Rozpoznávání zvuků (`--play`) | `say` a ESC-50 štěkot z reproduktoru počítače u desky | Speech ≥ 0,6, Dog nebo Bark ≥ 0,5 |
 | TC17 | Konfigurace událostí | neplatné ID / třída / duplicita, nová událost a výjimka, restart, předvolba | 400 pro chyby, vše přežije restart, předvolba použita, původní konfigurace obnovena |
 | TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
+| TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
+
+Jednotkový test filtru rámců (bez desky): `cc -std=c11 -Wall -Wextra -Werror -o /tmp/zb_filter_test tests/unit/zb_filter_test.c && /tmp/zb_filter_test`
 | TC16 | Oddělené Thread sítě rolí | router se připojí do testovací sítě, pak zpět na BR | border router zůstane ve své síti |
 
 ## UI testy (prohlížeč)

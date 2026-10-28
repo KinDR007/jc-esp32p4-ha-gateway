@@ -1,0 +1,42 @@
+diff -ruN CMakeLists.txt
+--- CMakeLists.txt
++++ CMakeLists.txt
+@@ -2,7 +2,12 @@
+ # in this exact order for cmake to work correctly
+ cmake_minimum_required(VERSION 3.16)
+ 
++# P4 gateway: patched openthread component (telemetry vendor property) and the shared C6 telemetry.
++include($ENV{ROOT_DIR}/firmware/cmake/patched_openthread.cmake)
++set(EXTRA_COMPONENT_DIRS ${P4GW_PATCHED_OPENTHREAD} $ENV{ROOT_DIR}/firmware/c6/common)
++
+ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+ # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
+-idf_build_set_property(MINIMAL_BUILD ON)
++# P4 gateway: the minimal set (main and its dependencies) plus the C6 telemetry component.
++set(COMPONENTS main p4gw_telemetry)
+ project(esp_ot_rcp)
+diff -ruN main/esp_ot_rcp.c
+--- main/esp_ot_rcp.c
++++ main/esp_ot_rcp.c
+@@ -39,6 +39,8 @@
+ #endif
+ #endif
+ 
++#include "p4gw_telemetry.h"
++
+ #define TAG "ot_esp_rcp"
+ 
+ extern void otAppNcpInit(otInstance *instance);
+@@ -53,6 +55,7 @@
+     };
+ 
+     ESP_ERROR_CHECK(nvs_flash_init());
++    p4gw_telemetry_start("ot_rcp"); /* P4 gateway: telemetry served over a vendor spinel property */
+     ESP_ERROR_CHECK(esp_event_loop_create_default());
+     ESP_ERROR_CHECK(esp_vfs_eventfd_register(&eventfd_config));
+ 
+diff -ruN version.txt
+--- version.txt
++++ version.txt
+@@ -0,0 +1 @@
++v5.5.5-p4gw.3

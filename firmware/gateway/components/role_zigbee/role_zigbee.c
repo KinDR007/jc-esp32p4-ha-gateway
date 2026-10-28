@@ -12,6 +12,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "zb_filter.h"
 #include "lwip/sockets.h"
 #include "sdkconfig.h"
 
@@ -100,14 +101,55 @@ static void close_client_locked(void)
     }
 }
 
+static zb_filter_t *s_filter; /* owned by uart_to_tcp_task, counters read by the status */
+
+static void on_telemetry(const char *json, void *ctx)
+{
+    gw_c6_telemetry_set(json);
+}
+
+/* Sends coordinator bytes (telemetry frames already removed) to the connected host. */
+static void forward_to_host(const uint8_t *buf, int len, uint8_t *prev)
+{
+    if (len <= 0) {
+        return;
+    }
+    s_stats.frames_rx += count_signatures(buf, len, prev);
+    xSemaphoreTake(s_client_lock, portMAX_DELAY);
+    if (s_client < 0) {
+        s_stats.dropped += len;
+    } else {
+        for (int sent = 0; sent < len;) {
+            int n = send(s_client, buf + sent, len - sent, 0);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EINTR) {
+                    vTaskDelay(1);
+                    continue;
+                }
+                ESP_LOGW(TAG, "send: errno %d", errno);
+                close_client_locked();
+                break;
+            }
+            sent += n;
+        }
+    }
+    xSemaphoreGive(s_client_lock);
+}
+
 static void uart_to_tcp_task(void *arg)
 {
     uint8_t *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_INTERNAL);
+    uint8_t *out = heap_caps_malloc(CHUNK + ZB_FILTER_OUT_EXTRA, MALLOC_CAP_INTERNAL);
+    zb_filter_t *filter = s_filter = heap_caps_malloc(sizeof(zb_filter_t), MALLOC_CAP_INTERNAL);
     uint8_t prev = 0;
     uart_event_t event;
 
+    zb_filter_init(filter, on_telemetry, NULL);
     while (true) {
-        if (xQueueReceive(s_uart_queue, &event, portMAX_DELAY) != pdTRUE) {
+        /* Bytes held back by the telemetry filter go out once the line is idle for 5 ms. */
+        TickType_t wait = zb_filter_pending(filter) ? pdMS_TO_TICKS(5) : portMAX_DELAY;
+        if (xQueueReceive(s_uart_queue, &event, wait) != pdTRUE) {
+            forward_to_host(out, zb_filter_flush(filter, out), &prev);
             continue;
         }
         if (event.type == UART_FIFO_OVF || event.type == UART_BUFFER_FULL) {
@@ -115,6 +157,7 @@ static void uart_to_tcp_task(void *arg)
             ESP_LOGW(TAG, "UART overflow (%d)", event.type);
             uart_flush_input(UART_PORT);
             xQueueReset(s_uart_queue);
+            zb_filter_init(filter, on_telemetry, NULL);
             continue;
         }
         if (event.type != UART_DATA) {
@@ -129,28 +172,8 @@ static void uart_to_tcp_task(void *arg)
             }
             avail -= len;
             s_stats.uart_rx += len;
-            s_stats.frames_rx += count_signatures(buf, len, &prev);
             s_stats.last_rx_us = esp_timer_get_time();
-
-            xSemaphoreTake(s_client_lock, portMAX_DELAY);
-            if (s_client < 0) {
-                s_stats.dropped += len;
-            } else {
-                for (int sent = 0; sent < len;) {
-                    int n = send(s_client, buf + sent, len - sent, 0);
-                    if (n < 0) {
-                        if (errno == EAGAIN || errno == EINTR) {
-                            vTaskDelay(1);
-                            continue;
-                        }
-                        ESP_LOGW(TAG, "send: errno %d", errno);
-                        close_client_locked();
-                        break;
-                    }
-                    sent += n;
-                }
-            }
-            xSemaphoreGive(s_client_lock);
+            forward_to_host(out, zb_filter_run(filter, buf, len, out), &prev);
         }
     }
 }
@@ -257,6 +280,8 @@ static void router_reader_task(void *arg)
                 strlcpy(s_router_status, line + 4, sizeof(s_router_status));
                 s_router_status_us = esp_timer_get_time();
                 xSemaphoreGive(s_router_lock);
+            } else if (len > 4 && strncmp(line, "@ZT ", 4) == 0) {
+                gw_c6_telemetry_set(line + 4);
             } else if (len > 0) {
                 ESP_LOGI("c6", "%s", line);
             }
@@ -320,6 +345,10 @@ static cJSON *zigbee_status(void)
         cJSON_AddNumberToObject(json, "frames_rx", s_stats.frames_rx);
         cJSON_AddNumberToObject(json, "frames_tx", s_stats.frames_tx);
         cJSON_AddNumberToObject(json, "dropped_bytes", s_stats.dropped);
+        if (s_filter) {
+            cJSON_AddNumberToObject(json, "telemetry_frames", s_filter->frames);
+            cJSON_AddNumberToObject(json, "telemetry_bad", s_filter->bad_frames);
+        }
         cJSON_AddNumberToObject(json, "last_rx_s", age_s(s_stats.last_rx_us));
         cJSON_AddNumberToObject(json, "last_tx_s", age_s(s_stats.last_tx_us));
     } else {

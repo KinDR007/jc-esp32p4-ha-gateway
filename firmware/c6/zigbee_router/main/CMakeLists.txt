@@ -1,2 +1,2 @@
 idf_component_register(SRCS "zigbee_router.c"
-                       PRIV_REQUIRES esp_driver_uart esp_app_format nvs_flash vfs esp_timer)
+                       PRIV_REQUIRES esp_driver_uart esp_app_format nvs_flash vfs esp_timer p4gw_telemetry)

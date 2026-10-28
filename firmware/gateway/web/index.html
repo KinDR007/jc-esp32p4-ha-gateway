@@ -214,8 +214,8 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
 const CS = {
   'Overview': 'Přehled', 'Information': 'Informace', 'CPU load': 'Zatížení CPU', 'Tasks': 'Úlohy', 'Flash': 'Flash', 'Base MAC': 'Základní MAC',
   'Internal used': 'Interní RAM využito', 'Largest block': 'Největší blok', 'PSRAM used': 'PSRAM využito', 'NVS': 'NVS', 'App slot': 'Slot aplikace',
-  'ELF SHA-256': 'ELF SHA-256', 'C6 MAC': 'MAC C6', 'C6 chip revision': 'Revize čipu C6', 'C6 flash': 'Flash C6', 'Flashes': 'Počet flashování',
-  'ESP32-C6 radio': 'Rádio ESP32-C6', 'read at the next C6 flashing': 'načte se při příštím flashování C6', 'not reported by the C6 firmware': 'firmware C6 ji nehlásí', 'Topology': 'Topologie', 'Live': 'Živě', 'Events': 'Události',
+  'ELF SHA-256': 'ELF SHA-256', 'C6 MAC': 'MAC C6', 'C6 memory': 'Paměť C6', 'C6 uptime': 'Doba běhu C6', 'C6 last reset': 'Poslední reset C6',
+  'not reported by this C6 firmware': 'tento firmware C6 ji nehlásí', 'C6 chip revision': 'Revize čipu C6', 'C6 flash': 'Flash C6', 'Flashes': 'Počet flashování',
   'Network backups': 'Zálohy sítí', 'Sound selection': 'Výběr zvuků', 'Guide': 'Návod', 'Memory': 'Paměť', 'Traffic': 'Provoz',
   'C6 link': 'Spojení s C6', 'Network membership': 'Členství v síti', 'Radio co-processor (RCP)': 'Rádiový koprocesor (RCP)',
   'Menu': 'Menu', 'Theme': 'Vzhled', 'MQTT': 'MQTT', 'ESPHome': 'ESPHome', 'Role': 'Role', 'Thread': 'Thread', 'Zigbee': 'Zigbee', 'Sound': 'Zvuk', 'Home Assistant': 'Home Assistant',
@@ -345,7 +345,7 @@ const CS = {
   'The gateway is password protected (user': 'Brána je chráněná heslem (uživatel',
 };
 const CS_RX = [
-  [/^core (\d+)$/, 'jádro $1'], [/^(\d+) \/ (\d+) entries, (\d+) namespaces$/, '$1 / $2 položek, $3 jmenných prostorů'],
+  [/^core (\d+)$/, 'jádro $1'], [/^\((\d+) s old\)$/, '(před $1 s)'], [/^(\d+) \/ (\d+) entries, (\d+) namespaces$/, '$1 / $2 položek, $3 jmenných prostorů'],
   [/^(.+) ago$/, 'před $1'], [/^up (.+)$/, 'běží $1'], [/^Error: (.*)$/, 'Chyba: $1'], [/^Switch to (.+)\?$/, 'Přepnout na $1?'],
   [/^Delete (.+)\?$/, 'Smazat $1?'], [/^Run (.+)\?$/, 'Spustit $1?'], [/^Sent (.+)$/, 'Odesláno: $1'], [/^Joining (.+)$/, 'Připojuji do $1'],
   [/^Uploaded(.*)$/, 'Nahráno$1'], [/^Automation: (.+)$/, 'Automatizace: $1'], [/^(\d+) reported, (\d+) ignored( \(unsaved\))?$/, (m, a, b, u) => `${a} hlášených, ${b} ignorovaných${u ? ' (neuloženo)' : ''}`],
@@ -543,7 +543,10 @@ const TIPS = {
   'Uptime': ['Time since the last start of the P4.', 'Doba od posledního startu P4.'],
   'Last reset': ['Why the P4 last started: power on, software restart, watchdog, panic…', 'Proč P4 naposledy startovala: zapnutí, softwarový restart, watchdog, pád…'],
   'Temperature': ['Internal temperature sensor of the P4 die, not the room temperature. Min/max since the start, sampled every 2 s.', 'Vnitřní teplotní senzor čipu P4, ne teplota místnosti. Min/max od startu, měřeno každé 2 s.'],
-  'C6 temperature': ['The radio firmwares (OpenThread RCP, ZBOSS NCP, esp-hosted) have no command to read the C6 temperature sensor.', 'Firmwary rádia (OpenThread RCP, ZBOSS NCP, esp-hosted) nemají příkaz pro čtení teplotního senzoru C6.'],
+  'C6 temperature': ['Internal temperature sensor of the C6 die, sent by the radio firmware every 30 s (Thread RCP, Zigbee coordinator and router). Older C6 images and esp-hosted do not report it.', 'Vnitřní teplotní senzor čipu C6, firmware rádia ho posílá každých 30 s (Thread RCP, Zigbee koordinátor i router). Starší firmwary C6 a esp-hosted ho nehlásí.'],
+  'C6 memory': ['Free RAM of the C6 now and the lowest value since its start.', 'Volná RAM C6 teď a nejnižší hodnota od jejího startu.'],
+  'C6 uptime': ['Time since the C6 last started. Shorter than the gateway uptime means the C6 was reset.', 'Doba od posledního startu C6. Kratší než doba běhu brány znamená, že C6 byla resetována.'],
+  'C6 last reset': ['Why the C6 last started: poweron (reset by the gateway), panic or watchdog point to a crash.', 'Proč C6 naposledy startovala: poweron (reset od brány), panic nebo watchdog znamenají pád.'],
   'CPU load': ['Busy time per core over the last 2 s (FreeRTOS idle time). Core 0 runs the gateway roles, core 1 the sound recognition.', 'Vytížení každého jádra za poslední 2 s (podle nečinnosti FreeRTOS). Jádro 0 obsluhuje role brány, jádro 1 rozpoznávání zvuku.'],
   'CPU': ['Cores and clock of the ESP32-P4 (RISC-V).', 'Jádra a takt ESP32-P4 (RISC-V).'],
   'Tasks': ['Number of FreeRTOS tasks running.', 'Počet běžících úloh FreeRTOS.'],
@@ -746,7 +749,7 @@ const temp = s => s.temperature_c === undefined ? '' : `${s.temperature_c} °C` 
 const cpuLoad = hw => (hw?.cpu_load || []).map((l, i) => `<div class="row">core ${i} ${meter(l)}</div>`).join('');
 /* C6 rows shared by the overview and System › Information */
 function c6Rows(s, full) {
-  const c = s.c6, chip = c.chip || {}, rs = s.role_status || {};
+  const c = s.c6, chip = c.chip || {}, rs = s.role_status || {}, tel = c.telemetry;
   const img = (c.images || []).find(i => i.name === c.bundle);
   const link = isThread() ? [['RCP failures', rs.rcp_failures ?? '']]
     : isZigbee() && rs.mode === 'coordinator' ? [['UART', rs.uart_baud ? rs.uart_baud + ' Bd' : ''], ['UART errors', rs.uart_errors], ['C6 resets', rs.c6_resets]]
@@ -755,9 +758,12 @@ function c6Rows(s, full) {
     ['Running', `<span data-notr>${esc(c.bundle || 'unknown')}</span>${img ? ` <span class="muted">${esc(img.version)}</span>` : ''}`, 'C6 running'],
     ...link,
     ['C6 MAC', chip.mac ? esc(chip.mac) : '<span class="muted">read at the next C6 flashing</span>'],
-    ['C6 chip revision', chip.mac ? rev(chip.revision) : ''], ['C6 flash', chip.flash_size ? fmtBytes(chip.flash_size) : ''],
-    ['Flashes', chip.flashes || ''],
-    ['Temperature', '<span class="muted">not reported by the C6 firmware</span>', 'C6 temperature'],
+    ['C6 chip revision', chip.mac ? rev(chip.revision) : tel?.rev !== undefined ? rev(tel.rev) : ''],
+    ['C6 flash', chip.flash_size ? fmtBytes(chip.flash_size) : ''], ['Flashes', chip.flashes || ''],
+    ['Temperature', tel?.temp_c != null ? `${tel.temp_c} °C` + (tel.age_s > 90 ? ` <span class="warn-text">(${tel.age_s} s old)</span>` : '')
+      : '<span class="muted">not reported by this C6 firmware</span>', 'C6 temperature'],
+    ['C6 memory', tel ? `${fmtBytes(tel.heap_free)} free, min ${fmtBytes(tel.heap_min)}` : ''],
+    ['C6 uptime', tel ? fmtUptime(tel.uptime_s) : ''], ['C6 last reset', tel ? esc(tel.reset) : ''],
     ...(full ? [['Images', (c.images || []).map(i => `<span data-notr>${esc(i.name)}</span> <span class="muted">${esc(i.version)}</span>`).join('<br>') || '<span class="bad-text">none, upload c6fw.bin</span>']] : []),
     ['Last flash error', esc(c.flash.last_error)]];
 }

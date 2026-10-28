@@ -16,6 +16,7 @@
 #include "esp_openthread_spinel.h"
 #include "esp_openthread_types.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "esp_vfs_eventfd.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -37,6 +38,7 @@
 static const char *TAG = "role_thread";
 
 #define CLI_BUF_SIZE 8192
+#define TELEMETRY_GUARD_US (3 * 1000 * 1000) /* a telemetry request normally takes a few ms */
 #define OT_LOCK_TIMEOUT pdMS_TO_TICKS(2000)
 
 static bool s_border_router;
@@ -153,7 +155,7 @@ static void on_rcp_failure(void)
     s_rcp_failures++;
     ESP_LOGE(TAG, "RCP failure, reflashing the C6 after restart");
     gw_config_set_u8(GW_KEY_C6_FORCE, 1);
-    esp_restart();
+    gw_restart_on_failure();
 }
 
 static otError apply_dataset(otInstance *instance, const otOperationalDatasetTlvs *tlvs)
@@ -220,6 +222,50 @@ static void start_router(otInstance *instance)
     }
 }
 
+static esp_timer_handle_t s_tel_guard;
+static char s_rcp_version[96];
+static bool s_tel_off;
+
+/*
+ * The telemetry request did not finish. When the RCP fails on a request, OpenThread recovers it and
+ * sends the request again, holding the OpenThread lock: the gateway would hang. Never ask this RCP
+ * image again and restart.
+ */
+static void telemetry_guard(void *arg)
+{
+    gw_config_set_str(GW_KEY_RCP_TEL_OFF, s_rcp_version);
+    ESP_LOGE(TAG, "RCP hangs on the telemetry request, telemetry off for \"%s\", restarting", s_rcp_version);
+    gw_restart_on_failure();
+}
+
+/* Telemetry of the C6 from a vendor spinel property; an RCP without it answers "not found". */
+static void read_rcp_telemetry(otInstance *instance)
+{
+    if (s_tel_off) {
+        return;
+    }
+    if (!s_rcp_version[0]) {
+        char off[sizeof(s_rcp_version)];
+        strlcpy(s_rcp_version, otGetRadioVersionString(instance), sizeof(s_rcp_version));
+        const esp_timer_create_args_t guard = {.callback = telemetry_guard, .name = "rcp_tel_guard"};
+        if ((gw_config_get_str(GW_KEY_RCP_TEL_OFF, off, sizeof(off)) && strcmp(off, s_rcp_version) == 0) ||
+            esp_timer_create(&guard, &s_tel_guard) != ESP_OK) {
+            ESP_LOGW(TAG, "C6 telemetry off for this RCP image");
+            s_tel_off = true;
+            return;
+        }
+    }
+    char buf[GW_C6_TELEMETRY_MAX];
+    size_t len = sizeof(buf) - 1;
+    esp_timer_start_once(s_tel_guard, TELEMETRY_GUARD_US);
+    esp_err_t err = esp_openthread_rcp_get_vendor_data(GW_C6_TELEMETRY_SPINEL_PROP, (uint8_t *)buf, &len);
+    esp_timer_stop(s_tel_guard);
+    if (err == ESP_OK) {
+        buf[len] = '\0';
+        gw_c6_telemetry_set(buf);
+    }
+}
+
 static void thread_task(void *arg)
 {
     esp_vfs_eventfd_config_t eventfd_config = {.max_fds = 3};
@@ -244,21 +290,22 @@ static void thread_task(void *arg)
         esp_openthread_lock_release();
         esp_br_web_start_server("/spiffs");
         snprintf(s_phase, sizeof(s_phase), "running");
-        s_started = true;
-        /* Follow dataset changes made by Home Assistant (REST) or the web UI. */
-        while (true) {
-            esp_openthread_lock_acquire(portMAX_DELAY);
-            save_br_dataset(instance);
-            esp_openthread_lock_release();
-            vTaskDelay(pdMS_TO_TICKS(30000));
-        }
     } else {
         esp_openthread_lock_acquire(portMAX_DELAY);
         start_router(instance);
         esp_openthread_lock_release();
     }
     s_started = true;
-    vTaskDelete(NULL);
+    /* Every 30 s: follow dataset changes made by Home Assistant (REST) or the web UI, read the C6 telemetry. */
+    while (true) {
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        if (s_border_router) {
+            save_br_dataset(instance);
+        }
+        read_rcp_telemetry(instance);
+        esp_openthread_lock_release();
+        vTaskDelay(pdMS_TO_TICKS(30000));
+    }
 }
 
 /* ---- status ---- */

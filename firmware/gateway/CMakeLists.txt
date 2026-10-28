@@ -11,6 +11,7 @@ endif()
 set(PATCHED_DIR ${CMAKE_BINARY_DIR}/patched_components)
 set(BR_SERVER_PATCH ${CMAKE_CURRENT_LIST_DIR}/patches/esp_ot_br_server.patch)
 file(SHA256 ${BR_SERVER_PATCH} patch_hash)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${BR_SERVER_PATCH})
 if(NOT EXISTS ${PATCHED_DIR}/esp_ot_br_server/.patched_${patch_hash})
     file(REMOVE_RECURSE ${PATCHED_DIR}/esp_ot_br_server)
     file(COPY ${BR_DIR}/components/esp_ot_br_server DESTINATION ${PATCHED_DIR})
@@ -23,8 +24,11 @@ if(NOT EXISTS ${PATCHED_DIR}/esp_ot_br_server/.patched_${patch_hash})
     file(TOUCH ${PATCHED_DIR}/esp_ot_br_server/.patched_${patch_hash})
 endif()
 
+include(${ROOT_DIR}/firmware/cmake/patched_openthread.cmake)
+
 set(EXTRA_COMPONENT_DIRS
     ${PATCHED_DIR}/esp_ot_br_server
+    ${P4GW_PATCHED_OPENTHREAD}
     $ENV{IDF_PATH}/examples/common_components/protocol_examples_common)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

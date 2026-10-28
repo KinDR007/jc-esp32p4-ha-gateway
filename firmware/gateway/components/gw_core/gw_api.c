@@ -115,6 +115,36 @@ static cJSON *hw_json(void)
     return hw;
 }
 
+static portMUX_TYPE s_c6_tel_mux = portMUX_INITIALIZER_UNLOCKED;
+static char s_c6_tel[GW_C6_TELEMETRY_MAX];
+static int64_t s_c6_tel_us;
+
+void gw_c6_telemetry_set(const char *json)
+{
+    portENTER_CRITICAL(&s_c6_tel_mux);
+    strlcpy(s_c6_tel, json, sizeof(s_c6_tel));
+    s_c6_tel_us = esp_timer_get_time();
+    portEXIT_CRITICAL(&s_c6_tel_mux);
+}
+
+/* Last telemetry with its age; NULL when the running C6 firmware sent none since the start. */
+static cJSON *c6_telemetry_json(void)
+{
+    char buf[GW_C6_TELEMETRY_MAX];
+    int64_t at;
+    portENTER_CRITICAL(&s_c6_tel_mux);
+    memcpy(buf, s_c6_tel, sizeof(buf));
+    at = s_c6_tel_us;
+    portEXIT_CRITICAL(&s_c6_tel_mux);
+    cJSON *j = at ? cJSON_Parse(buf) : NULL;
+    if (cJSON_IsObject(j)) {
+        cJSON_AddNumberToObject(j, "age_s", (double)((esp_timer_get_time() - at) / 1000000));
+        return j;
+    }
+    cJSON_Delete(j);
+    return NULL;
+}
+
 static cJSON *c6_chip_json(void)
 {
     const c6_chip_t *c = c6_chip_info();
@@ -240,6 +270,10 @@ static esp_err_t status_get(httpd_req_t *req)
     free(dir);
     const c6_progress_t *p = c6_progress();
     cJSON_AddItemToObject(c6, "chip", c6_chip_json());
+    cJSON *tel = c6_telemetry_json();
+    if (tel) {
+        cJSON_AddItemToObject(c6, "telemetry", tel);
+    }
     cJSON *prog = cJSON_AddObjectToObject(c6, "flash");
     cJSON_AddBoolToObject(prog, "busy", p->busy);
     cJSON_AddNumberToObject(prog, "percent", p->percent);

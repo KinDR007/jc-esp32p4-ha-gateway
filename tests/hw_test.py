@@ -123,6 +123,12 @@ def switch(role, skip_backup=False, timeout=240):
     return s
 
 
+def wait_thread_running(timeout=60):
+    """OpenThread starts a moment after the C6 flash finished: wait until the Thread API answers."""
+    return wait_until('OpenThread running', lambda: (lambda t: t if t.get('network_name') is not None or
+                      t.get('role') else None)(http('GET', '/api/thread/status')[1]), timeout)
+
+
 def logs_since(seq=0):
     req = urllib.request.Request(f'http://{ARGS.host}/api/logs?since={seq}')
     with urllib.request.urlopen(req, timeout=10) as res:
@@ -232,7 +238,7 @@ def tc06_zigbee_data_kept():
     snaps = {x['bundle']: x for x in status()['c6'].get('snapshots', [])}
     check('zigbee_ncp' in snaps, f'snapshot of zigbee_ncp saved ({snaps.get("zigbee_ncp")})')
     gen = snaps['zigbee_ncp']['generation']
-    code, t = http('GET', '/api/thread/status')
+    t = wait_thread_running()
     check(t.get('network_name') == CTX.get('network_name', t.get('network_name')),
           'Thread network unchanged after a Zigbee detour')
     switch('zigbee_coordinator')
@@ -264,7 +270,7 @@ def tc08_thread_router():
     """Thread router: idle without dataset, joins after the dataset is applied."""
     switch('thread_router')
     check(status()['c6']['bundle'] == 'ot_rcp', 'C6 runs ot_rcp')
-    code, t = http('GET', '/api/thread/status')
+    t = wait_thread_running()
     check(t['mode'] == 'router', 'router mode')
     if 'dataset' not in CTX:
         raise Fail('no dataset from TC04 to apply')
@@ -517,6 +523,91 @@ def tc18_sound_events_detection():
         http('PUT', '/api/sound/events', original)
 
 
+def _zboss_crc8_table():
+    """Header crc8 table of esp-coordinator, taken from the gateway filter source."""
+    import re
+    src = open(os.path.join(ROOT, 'firmware/gateway/components/role_zigbee/zb_filter.c')).read()
+    body = src.split('crc8_table[256] = {')[1].split('};')[0]
+    return [int(x, 16) for x in re.findall(r'0x[0-9a-f]{2}', body)]
+
+
+def _zboss_frames(data, table):
+    """Splits a ZBOSS NCP byte stream into frames: (type, flags, body); raises on a bad header crc."""
+    frames, i = [], 0
+    while True:
+        i = data.find(b'\xde\xad', i)
+        if i < 0 or len(data) - i < 7:
+            return frames
+        crc = 0
+        for b in data[i + 2:i + 6]:
+            crc = table[crc ^ b]
+        if crc != data[i + 6]:
+            raise Fail(f'bad ZBOSS header crc at offset {i}: {data[i:i + 7].hex()}')
+        total = data[i + 2] | data[i + 3] << 8
+        frames.append((data[i + 4], data[i + 5], data[i + 9:i + 2 + total]))
+        i += 2 + total
+
+
+def _zboss_request(command_id, tsn, table):
+    """ZBOSS NCP API request frame as zigbee-herdsman sends it (LL type 0x06, seq 1, single fragment)."""
+    hl = bytes([0, 0, command_id & 0xff, command_id >> 8, tsn])
+    crc16 = 0
+    for b in hl:
+        crc16 ^= b
+        for _ in range(8):
+            crc16 = (crc16 >> 1) ^ 0x8408 if crc16 & 1 else crc16 >> 1
+    length = 5 + 2 + len(hl)
+    hdr = bytes([length & 0xff, length >> 8, 0x06, 0xc4])
+    crc = 0
+    for b in hdr:
+        crc = table[crc ^ b]
+    return b'\xde\xad' + hdr + bytes([crc, crc16 & 0xff, crc16 >> 8]) + hl
+
+
+def _telemetry(fw, timeout=90):
+    return wait_until(f'{fw} telemetry', lambda: (lambda t: t if t and t.get('fw') == fw else None)(
+        status()['c6'].get('telemetry')), timeout)
+
+
+def tc19_c6_telemetry():
+    """C6 telemetry in every gateway role; the Zigbee host stream stays clean and answers requests."""
+    switch('thread_br')
+    failures = http('GET', '/api/thread/status')[1].get('rcp_failures')
+    t = _telemetry('ot_rcp')
+    check(t.get('temp_c') is not None and 0 < t['temp_c'] < 100 and t['heap_free'] > 0,
+          f'Thread RCP: {t["temp_c"]} °C, {t["heap_free"]} B free, up {t["uptime_s"]} s')
+    time.sleep(35)
+    check(http('GET', '/api/thread/status')[1].get('rcp_failures') == failures, 'no RCP failure while it is polled')
+
+    switch('zigbee_coordinator')
+    t = _telemetry('zigbee_ncp')
+    check(t.get('temp_c') is not None and t['heap_free'] > 0, f'Zigbee NCP: {t["temp_c"]} °C, {t["heap_free"]} B free')
+    table = _zboss_crc8_table()
+    with socket.create_connection((ARGS.host, 6638), timeout=5) as sock:
+        sock.sendall(_zboss_request(0x0001, 0x37, table))  # GET_MODULE_VERSION
+        sock.settimeout(1)
+        data, end = b'', time.time() + 35  # longer than the 30 s telemetry period
+        while time.time() < end:
+            try:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                data += chunk
+            except socket.timeout:
+                pass
+    frames = _zboss_frames(data, table)
+    check(all(f[0] != 0x7e for f in frames), f'no telemetry frame reached the host ({len(frames)} frames)')
+    resp = [f for f in frames if f[0] == 0x06 and len(f[2]) >= 7 and f[2][1] == 1 and f[2][2:4] == b'\x01\x00' and f[2][4] == 0x37]
+    check(resp and resp[0][2][5:7] == b'\x00\x00', f'NCP answered GET_MODULE_VERSION ({resp[0][2].hex() if resp else "none"})')
+    later = _telemetry('zigbee_ncp')
+    check(later['uptime_s'] >= t['uptime_s'], 'telemetry keeps coming while a host is connected')
+
+    switch('zigbee_router')
+    t = _telemetry('zigbee_router')
+    check(t.get('temp_c') is not None and t['heap_free'] > 0, f'Zigbee router: {t["temp_c"]} °C, {t["heap_free"]} B free')
+    switch('thread_br')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -524,7 +615,7 @@ TESTS = [
     ('TC10', tc10_ota_rollback_slots), ('TC11', tc11_auth), ('TC12', tc12_invalid_uploads),
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
-    ('TC18', tc18_sound_events_detection),
+    ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry),
 ]
 
 

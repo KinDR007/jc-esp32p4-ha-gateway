@@ -42,6 +42,8 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_C6_FORCE "c6_force"  /* u8, reflash on next boot (RCP failure) */
 #define GW_KEY_C6_TRIES "c6_tries"  /* u8, consecutive flash attempts */
 #define GW_KEY_C6_ADOPTED "c6_ok"   /* u8, the user allowed overwriting the C6 factory firmware */
+#define GW_KEY_RCP_TEL_OFF "rcp_tel_off" /* str, RCP version that hung on the telemetry request */
+#define GW_KEY_FAIL_RST "fail_rst"   /* u8, the last software restart was a recovery from a failure */
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
@@ -78,6 +80,9 @@ void gw_boot_mark_stable(void);
 esp_err_t gw_boot_select_esphome(void);
 /* Restarts after a short delay so pending HTTP responses get out. */
 void gw_restart_later(uint32_t delay_ms);
+/* Restart to recover from a failure (C6 radio lost). Counts as an unstable boot for gw_boot_loop_detected(),
+ * unlike a requested restart, so a failure that comes back after every start ends in maintenance mode. */
+void gw_restart_on_failure(void) __attribute__((noreturn));
 
 /* ---- Ethernet ---- */
 esp_err_t gw_eth_init(const char *hostname);
@@ -109,6 +114,14 @@ esp_err_t gw_api_register(void);
 void gw_api_set_role_status(cJSON *(*provider)(void));
 cJSON *gw_api_role_status(void);
 bool gw_api_temperature(float *celsius);
+
+/*
+ * Runtime telemetry of the C6 (one JSON object from firmware/c6/common/p4gw_telemetry), delivered by the
+ * role over its C6 link: spinel vendor property (Thread RCP), telemetry frame (Zigbee NCP), @ZT line (router).
+ */
+#define GW_C6_TELEMETRY_MAX 256
+#define GW_C6_TELEMETRY_SPINEL_PROP 0x3cf0 /* P4GW_SPINEL_PROP_TELEMETRY of the C6 side */
+void gw_c6_telemetry_set(const char *json);
 
 /* Optional MQTT link with Home Assistant discovery, configured via /api/mqtt. */
 esp_err_t gw_mqtt_start(void);

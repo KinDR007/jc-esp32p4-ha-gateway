@@ -1,0 +1,76 @@
+diff -ruN include/esp_openthread_spinel.h
+--- include/esp_openthread_spinel.h
++++ include/esp_openthread_spinel.h
+@@ -84,6 +84,18 @@
+  */
+ void esp_openthread_rcp_send_command(const char *input);
+ 
++/**
++ * @brief   Reads a vendor spinel property (raw data) from the RCP. P4 gateway patch.
++ *
++ * @note Call with the OpenThread lock held. An RCP without the property answers "not found" (ESP_FAIL),
++ *       as does a value longer than the buffer.
++ *
++ * @param[in]     key  Spinel property key in the vendor range.
++ * @param[out]    buf  Destination buffer.
++ * @param[in,out] len  Buffer size in, data length out.
++ */
++esp_err_t esp_openthread_rcp_get_vendor_data(uint32_t key, uint8_t *buf, size_t *len);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff -ruN src/ncp/esp_openthread_ncp.cpp
+--- src/ncp/esp_openthread_ncp.cpp
++++ src/ncp/esp_openthread_ncp.cpp
+@@ -137,6 +137,13 @@
+     OT_UNUSED_VARIABLE(aFrameTag);
+ }
+ 
++/* P4 gateway: vendor properties the application answers (C6 telemetry); returns the length and points
++ * *data at a buffer of the application, -1 = not handled. Runs in the OpenThread task: keep it small. */
++extern "C" __attribute__((weak)) int esp_openthread_ncp_vendor_get_hook(uint32_t key, const uint8_t **data)
++{
++    return -1;
++}
++
+ otError NcpBase::VendorGetPropertyHandler(spinel_prop_key_t aPropKey)
+ {
+     otError error = OT_ERROR_NONE;
+@@ -154,10 +161,13 @@
+         break;
+     }
+ 
+-    default:
+-        error = OT_ERROR_NOT_FOUND;
++    default: {
++        const uint8_t *data = nullptr;
++        int len = esp_openthread_ncp_vendor_get_hook(aPropKey, &data);
++        error = len >= 0 ? mEncoder.WriteData(data, len) : OT_ERROR_NOT_FOUND;
+         break;
+     }
++    }
+ 
+     return error;
+ }
+diff -ruN src/port/esp_openthread_radio_spinel.cpp
+--- src/port/esp_openthread_radio_spinel.cpp
++++ src/port/esp_openthread_radio_spinel.cpp
+@@ -220,6 +220,17 @@
+     s_radio.Set(SPINEL_PROP_VENDOR_ESP_SET_CONSOLE_CMD, SPINEL_DATATYPE_DATA_WLEN_S, input, strlen(input));
+ }
+ 
++extern "C" esp_err_t esp_openthread_rcp_get_vendor_data(uint32_t key, uint8_t *buf, size_t *len)
++{
++    /* Get() unpacks in place: the value is copied into buf, size is its capacity in and the length out. */
++    spinel_size_t size = *len;
++    if (s_radio.Get(static_cast<spinel_prop_key_t>(key), SPINEL_DATATYPE_DATA_S, buf, &size) != OT_ERROR_NONE) {
++        return ESP_FAIL;
++    }
++    *len = size;
++    return ESP_OK;
++}
++
+ void otPlatRadioGetIeeeEui64(otInstance *instance, uint8_t *ieee_eui64)
+ {
+     SuccessOrDie(s_radio.GetIeeeEui64(ieee_eui64));

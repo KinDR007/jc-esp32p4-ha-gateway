@@ -14,9 +14,13 @@ bool gw_boot_loop_detected(void)
 {
     uint8_t count = gw_config_get_u8(GW_KEY_BOOT_COUNT, 0);
     esp_reset_reason_t reason = esp_reset_reason();
+    bool failure = gw_config_get_u8(GW_KEY_FAIL_RST, 0);
 
-    /* A clean power-on or a requested restart is not a crash. */
-    if (reason == ESP_RST_POWERON || reason == ESP_RST_SW) {
+    if (failure) {
+        gw_config_set_u8(GW_KEY_FAIL_RST, 0);
+    }
+    /* A clean power-on or a requested restart is not a crash; a recovery restart is. */
+    if (reason == ESP_RST_POWERON || (reason == ESP_RST_SW && !failure)) {
         count = 0;
     }
     if (count < UINT8_MAX) {
@@ -56,6 +60,12 @@ esp_err_t gw_boot_select_esphome(void)
     }
     ESP_LOGI(TAG, "next boot: %s %s", desc.project_name, desc.version);
     return esp_ota_set_boot_partition(part);
+}
+
+void gw_restart_on_failure(void)
+{
+    gw_config_set_u8(GW_KEY_FAIL_RST, 1);
+    esp_restart();
 }
 
 static void restart_task(void *arg)

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "TC04",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 13
+  },
+  {
+    "id": "TC05",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC06",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 43
+  },
+  {
+    "id": "TC07",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 31
+  },
+  {
+    "id": "TC08",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 37
+  },
+  {
+    "id": "TC13",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 15
+  },
+  {
+    "id": "TC16",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 37
+  },
+  {
+    "id": "TC19",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 165
+  }
+]
