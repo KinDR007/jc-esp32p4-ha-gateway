@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Web UI in Czech and English (picked from the browser language, switch in the header) and a
+  light / dark / system theme switch. Browser tests UI06–UI07.
+
 ## v1.1 (2026-10-28)
 
 - Sound recognition with the onboard microphone: YAMNet int8 on the P4 (ESP-DL, about 60 ms per

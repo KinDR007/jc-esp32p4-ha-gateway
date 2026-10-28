@@ -1,0 +1,60 @@
+UI01 every tab renders without script errors or error toasts
+  ok: overview: no error toast
+  ok: role: no error toast
+  ok: thread: no error toast
+  ok: zigbee: no error toast
+  ok: sound: no error toast
+  ok: ha: no error toast
+  ok: tools: no error toast
+  ok: system: no error toast
+  ok: no uncaught script errors 
+UI01 PASS
+
+UI02 Sound: every "HA automation" button shows the automation for its entity
+  ok: 19 events listed
+  ok: all 19 automation dialogs open with a valid entity id and no error
+UI02 PASS
+
+UI03 Sound: event editor opens with the event and cancels without changes
+  ok: editor open
+  ok: event id filled
+  ok: configuration unchanged after cancel
+UI03 PASS
+
+UI04 Sound: search filters the tree of all sounds
+  ok: 3 matching sounds shown
+UI04 PASS
+
+UI05 Thread: "Copy TLVs" shows the dataset (border router or router role only)
+  ok: no error toast (Copied to the clipboard)
+  ok: dataset TLVs shown (222 hex chars)
+UI05 PASS
+
+UI06 Language: Czech translates every tab, keeps sound names, English restores the original
+  ok: html lang = cs
+  ok: Overview tab reads "Přehled"
+  ok: overview: no error toast
+  ok: role: no error toast
+  ok: thread: no error toast
+  ok: zigbee: no error toast
+  ok: sound: no error toast
+  ok: sound tab content translated
+  ok: sound class names stay untranslated
+  ok: ha: no error toast
+  ok: tools: no error toast
+  ok: system: no error toast
+  ok: language kept after reload
+  ok: English restores "Overview"
+  ok: no Czech text left on the page
+  ok: no uncaught script errors 
+UI06 PASS
+
+UI07 Theme: light, dark and system switch the page colours and persist
+  ok: light: data-theme=light (rgb(244, 246, 249))
+  ok: dark: different background (rgb(15, 19, 24))
+  ok: dark kept after reload
+  ok: system + light OS: no attribute, light background
+  ok: system + dark OS: dark background
+UI07 PASS
+
+Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS

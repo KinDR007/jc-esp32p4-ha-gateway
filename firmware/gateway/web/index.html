@@ -11,12 +11,19 @@
   --bad: #c62828; --code: #eef1f6; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f1318; --panel: #171c23; --panel-2: #1e252e; --text: #e6eaf0; --muted: #96a1b0;
     --border: #2a323d; --accent: #4f8cff; --accent-text: #0b0e12; --ok: #34c77b; --warn: #f0a63a;
-    --bad: #ff6b6b; --code: #10151b; --shadow: none;
+    --bad: #ff6b6b; --code: #10151b; --shadow: none; color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0f1318; --panel: #171c23; --panel-2: #1e252e; --text: #e6eaf0; --muted: #96a1b0;
+  --border: #2a323d; --accent: #4f8cff; --accent-text: #0b0e12; --ok: #34c77b; --warn: #f0a63a;
+  --bad: #ff6b6b; --code: #10151b; --shadow: none; color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
+.prefs select { padding: 3px 6px; font-size: 12px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -95,6 +102,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <span class="pill" id="hdr-eth"><span class="dot"></span><span>Ethernet</span></span>
     <div class="spacer"></div>
     <span class="muted" id="hdr-uptime"></span>
+    <span class="prefs row">
+      <select id="pref-lang" title="Language / Jazyk" data-notr><option value="cs">CZ</option><option value="en">EN</option></select>
+      <select id="pref-theme" title="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+    </span>
   </div>
   <nav id="tabs"></nav>
 </header>
@@ -150,6 +161,226 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 let auth = null;
 try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */ }
+
+
+/* ---------------- language and theme ----------------
+ * The UI is written in English. In Czech, a MutationObserver translates text nodes, placeholders and
+ * titles through CS (exact strings) and CS_RX (strings with variable parts); untranslated text stays
+ * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
+ * Elements with data-notr (and their content) are left alone: class names, user data, code. */
+const CS = {
+  'Overview': 'Přehled', 'Role': 'Role', 'Thread': 'Thread', 'Zigbee': 'Zigbee', 'Sound': 'Zvuk', 'Home Assistant': 'Home Assistant',
+  'Tools': 'Nástroje', 'System': 'Systém', 'Light': 'Světlý', 'Dark': 'Tmavý',
+  'Maintenance': 'Údržba', 'Ethernet': 'Ethernet', 'link down': 'bez linky', 'offline': 'nedostupná',
+  'Sign in': 'Přihlášení', 'Password': 'Heslo', 'Continue': 'Pokračovat', 'Cancel': 'Zrušit', 'Close': 'Zavřít', 'Copy': 'Kopírovat',
+  'Save': 'Uložit', 'Delete': 'Smazat', 'Edit': 'Upravit', 'Upload': 'Nahrát', 'Download': 'Stáhnout', 'Refresh': 'Obnovit',
+  'Restart': 'Restartovat', 'Run': 'Spustit', 'Ping': 'Ping', 'Clear': 'Vymazat', 'Pause': 'Pozastavit', 'Resume': 'Pokračovat',
+  'Export': 'Exportovat', 'Import': 'Importovat', 'Enabled': 'Zapnuto', 'yes': 'ano', 'none': 'žádné', 'all': 'vše',
+  'Loading…': 'Načítám…', 'Nothing yet.': 'Zatím nic.', 'filter': 'filtr', 'never': 'nikdy', 'hidden': 'skryto',
+  // overview
+  'Active': 'Aktivní', 'Selected': 'Vybraná', 'Stable': 'Stabilní', 'starting': 'startuje', 'Mode': 'Režim', 'Phase': 'Fáze',
+  'Thread role': 'Role v Thread', 'Network': 'Síť', 'Channel': 'Kanál', 'Host': 'Hostitel', 'TCP port': 'TCP port',
+  'Frames rx/tx': 'Rámce rx/tx', 'UART errors': 'Chyby UART', 'Router': 'Router', 'Status age': 'Stáří stavu',
+  'Link': 'Linka', 'IPv4': 'IPv4', 'Gateway': 'Brána', 'IPv6': 'IPv6', 'MAC': 'MAC', 'Hostname': 'Název', 'Link changes': 'Změny linky',
+  'Firmware': 'Firmware', 'ESP-IDF': 'ESP-IDF', 'Chip revision': 'Revize čipu', 'Uptime': 'Doba běhu', 'Last reset': 'Poslední reset',
+  'Temperature': 'Teplota', 'Heap (internal)': 'Heap (interní)', 'PSRAM free': 'Volná PSRAM', 'C6 co-processor': 'Koprocesor C6',
+  'Running': 'Běží', 'Images': 'Firmwary', 'Last flash error': 'Poslední chyba flashování', 'none (maintenance)': 'žádná (údržba)',
+  'none, upload c6fw.bin': 'žádné, nahrajte c6fw.bin', 'no status from C6 router': 'bez stavu z routeru C6',
+  'waiting for Zigbee2MQTT': 'čeká na Zigbee2MQTT', 'Maintenance mode:': 'Režim údržby:', 'Flashing the C6:': 'Flashování C6:',
+  'No password set. Anyone on the LAN can switch roles and read the Thread network key. Set one under': 'Heslo není nastavené. Kdokoli v LAN může přepínat role a číst klíč Thread sítě. Nastavte ho v záložce',
+  // roles
+  'Select role': 'Výběr role', 'Switch': 'Přepnout', 'active': 'aktivní', 'selected': 'vybraná',
+  'Switching restarts the gateway and reflashes the C6 when the role needs different radio firmware (about 30 s). Zigbee network data is saved before leaving a Zigbee role and restored when you come back. The Thread network is stored on the P4 and survives switching.':
+    'Přepnutí restartuje bránu a přeflashuje C6, pokud role potřebuje jiný firmware rádia (asi 30 s). Data Zigbee sítě se před odchodem ze Zigbee role uloží a po návratu obnoví. Thread síť je uložená v P4 a přepnutí přežije.',
+  'Thread border router': 'Thread border router', 'Thread router': 'Thread router', 'Zigbee coordinator': 'Zigbee koordinátor',
+  'Zigbee router': 'Zigbee router', 'ESPHome BLE proxy': 'ESPHome BLE proxy', 'Bluetooth': 'Bluetooth',
+  'OpenThread border router on Ethernet for Matter-over-Thread. Home Assistant OTBR integration via REST.': 'OpenThread border router na Ethernetu pro Matter-over-Thread. Integrace OTBR v Home Assistant přes REST.',
+  'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.': 'Rozšiřuje existující Thread síť (bez border routingu). Potřebuje dataset sítě z Home Assistant.',
+  'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.': 'Síťový koprocesor ZBOSS přes TCP pro Zigbee2MQTT (adapter zboss). Data sítě se při přepínání zachovají.',
+  'Standalone Zigbee router (range extender) that joins your existing Zigbee network.': 'Samostatný Zigbee router (zesilovač dosahu), který se připojí do vaší Zigbee sítě.',
+  'Reboots into the ESPHome Bluetooth proxy image; the C6 runs esp-hosted. Return via the ESPHome device in HA.': 'Restartuje do ESPHome Bluetooth proxy; C6 běží s esp-hosted. Návrat přes zařízení ESPHome v HA.',
+  'Upload an ESPHome image under System first.': 'Nejdřív nahrajte ESPHome image v záložce Systém.',
+  'No C6 backup yet': 'Chybí záloha C6',
+  'This role overwrites the factory firmware of the C6, which cannot be downloaded again. Cancel and use System → Back up C6 flash first (needs the JP1 jumpers), or continue without a backup.':
+    'Tato role přepíše tovární firmware C6, který už nejde znovu stáhnout. Zrušte a nejdřív použijte Systém → Záloha flash C6 (potřebuje propojky JP1), nebo pokračujte bez zálohy.',
+  'The gateway restarts and may reflash the C6. Devices on the current network go offline until you switch back.': 'Brána se restartuje a může přeflashovat C6. Zařízení v aktuální síti budou nedostupná, dokud se nepřepnete zpět.',
+  'Switching, the page reconnects automatically': 'Přepínám, stránka se sama znovu připojí', 'Gateway is back': 'Brána je zpět',
+  // thread
+  'Thread is not the active role.': 'Thread není aktivní role.', 'Device role': 'Role zařízení', 'PAN ID': 'PAN ID',
+  'Ext PAN ID': 'Ext PAN ID', 'RLOC16': 'RLOC16', 'Partition': 'Partition', 'Leader router': 'Leader router',
+  'Mesh-local prefix': 'Mesh-local prefix', 'RCP': 'RCP', 'RCP failures': 'Výpadky RCP', 'Border routing': 'Border routing',
+  'Routing manager': 'Routing manager', 'OMR prefix': 'OMR prefix', 'On-link prefix': 'On-link prefix', 'NAT64': 'NAT64',
+  'Border agent': 'Border agent', 'inactive': 'neaktivní', 'SRP server': 'SRP server', 'SRP hosts / services': 'SRP hostitelé / služby',
+  'REST API': 'REST API', 'MAC counters': 'Čítače MAC', 'Type': 'Typ', 'Ext address': 'Ext adresa', 'Avg RSSI': 'Prům. RSSI',
+  'Last RSSI': 'Posl. RSSI', 'LQI in': 'LQI in', 'Age': 'Stáří', 'Frame err': 'Chyby rámců', 'ID': 'ID', 'Next hop': 'Další skok',
+  'Path cost': 'Cena cesty', 'LQ in / out': 'LQ in / out', 'Network dataset': 'Dataset sítě', 'Network name': 'Název sítě',
+  'Network key': 'Klíč sítě', 'TLVs': 'TLV', 'Show TLVs and key': 'Zobrazit TLV a klíč', 'Copy TLVs': 'Kopírovat TLV',
+  'Apply dataset (hex TLVs from Home Assistant, joins that network)': 'Použít dataset (hex TLV z Home Assistant, připojí se do té sítě)',
+  'Apply dataset': 'Použít dataset', 'Apply dataset?': 'Použít dataset?',
+  'The gateway leaves its current Thread network and joins the one in the dataset.': 'Brána opustí současnou Thread síť a připojí se do sítě z datasetu.',
+  'OpenThread CLI': 'OpenThread CLI', 'Thread dataset TLVs': 'TLV datasetu Thread', 'Contains the network key, keep it private.': 'Obsahuje klíč sítě, nesdílejte ho.',
+  'child': 'child', 'sleepy child': 'sleepy child', 'router': 'router',
+  // zigbee
+  'Zigbee is not the active role.': 'Zigbee není aktivní role.', 'Coordinator bridge': 'Most koordinátoru', 'Session': 'Relace',
+  'TCP endpoint': 'TCP adresa', 'Sessions': 'Relace celkem', 'UART': 'UART', 'Frames C6 → host': 'Rámce C6 → hostitel',
+  'Frames host → C6': 'Rámce hostitel → C6', 'Bytes rx / tx': 'Bajty rx / tx', 'Last traffic': 'Poslední provoz',
+  'Dropped (no host)': 'Zahozeno (bez hostitele)', 'C6 resets': 'Resety C6', 'Reset C6 (drops the host connection)': 'Reset C6 (odpojí hostitele)',
+  'Reset the C6?': 'Resetovat C6?', 'The Zigbee host loses its connection and has to reinitialise the coordinator.': 'Zigbee hostitel ztratí spojení a musí koordinátor znovu inicializovat.',
+  'C6 reset': 'C6 resetován', 'State': 'Stav', 'Short address': 'Krátká adresa', 'IEEE address': 'IEEE adresa',
+  'Parent / neighbors': 'Rodič / sousedé', 'Permit join': 'Povolit připojení', 'open': 'otevřeno', 'closed': 'zavřeno',
+  'No status from the C6 router yet.': 'Router na C6 zatím nehlásí stav.', 'Join network (steer)': 'Připojit do sítě (steer)',
+  'Permit join 180 s': 'Povolit připojení 180 s', 'Leave network': 'Opustit síť', 'Factory reset': 'Tovární reset',
+  'The router leaves its Zigbee network.': 'Router opustí svou Zigbee síť.', 'Zigbee network backups': 'Zálohy Zigbee sítí',
+  'Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.': 'Ukládají se z C6 při každém odchodu ze Zigbee role a obnoví se po návratu.',
+  'Size': 'Velikost', 'Generation': 'Generace', 'No snapshot yet.': 'Zatím žádná záloha.',
+  // sound
+  'Microphone': 'Mikrofon', 'capturing': 'nahrává', 'restart to start': 'spustí se po restartu', 'off': 'vypnuto',
+  'Gain': 'Zesílení', 'Record last 5 s': 'Nahrát posledních 5 s', 'Audio stays on the device. Only the clip you request here leaves it.': 'Zvuk zůstává v zařízení. Ven jde jen klip, který si tady vyžádáte.',
+  'Sound recognition (YAMNet)': 'Rozpoznávání zvuků (YAMNet)', 'Recognition': 'Rozpoznávání', 'Run only above': 'Spouštět jen nad',
+  'Upload model': 'Nahrát model', 'Model': 'Model', 'loaded': 'načten', 'not loaded': 'nenačten', 'none, upload yamnet_p4.espdl': 'žádný, nahrajte yamnet_p4.espdl',
+  'Load time': 'Načtení', 'Error': 'Chyba', 'Inference': 'Inference', 'CPU (core 1)': 'CPU (jádro 1)', 'Runs / skipped quiet': 'Běhů / přeskočeno (ticho)',
+  'Heard now': 'Právě slyším', 'Recognition is off or nothing above the gate yet.': 'Rozpoznávání je vypnuté nebo zatím nic nepřekročilo práh.',
+  'Events sent to Home Assistant': 'Události posílané do Home Assistant', 'Apply preset': 'Použít předvolbu', 'Add event': 'Přidat událost',
+  'Each event becomes an event entity, a binary sensor (on while the sound lasts) and a device trigger in Home Assistant (MQTT).':
+    'Každá událost vytvoří v Home Assistant entitu event, binární senzor (zapnutý, dokud zvuk trvá) a spouštěč zařízení (MQTT).',
+  'On': 'Zap.', 'Event': 'Událost', 'Kind': 'Druh', 'Threshold': 'Práh', 'Sounds': 'Zvuky', 'Count': 'Počet', 'Last': 'Naposledy',
+  'now': 'teď', 'HA automation': 'Automatizace HA', 'impulse': 'impulz', 'continuous': 'trvalý',
+  'Detection log': 'Log detekcí', 'Recent events and strong sounds no event covers. Use it to personalise: ignore what is noise in this home, add what matters.':
+    'Poslední události a silné zvuky, které nepokrývá žádná událost. Podle něj personalizujte: ignorujte, co je u vás šum, přidejte, co je důležité.',
+  'When': 'Kdy', 'Score': 'Skóre', 'Level': 'Hladina', 'Duration': 'Trvání', 'no event': 'bez události', 'ongoing': 'probíhá',
+  'Ignore sound': 'Ignorovat zvuk', 'Raise threshold': 'Zvýšit práh', 'Create event': 'Vytvořit událost',
+  'All sounds (521)': 'Všechny zvuky (521)', 'Save selection': 'Uložit výběr', 'search, e.g. dog, door, alarm': 'hledat, např. dog, door, alarm',
+  'Unticked sounds are never reported, whatever the events say. The bar shows the live score.': 'Neoznačené zvuky se nikdy nehlásí, ať události říkají cokoli. Pruh ukazuje živé skóre.',
+  'New event': 'Nová událost', 'Edit event': 'Upravit událost', 'ID (entity name in HA)': 'ID (název entity v HA)', 'Name': 'Název',
+  'impulse (one event per occurrence)': 'impulz (jedna událost na výskyt)', 'continuous (on while it lasts)': 'trvalý (zapnuto, dokud trvá)',
+  'Device class': 'Třída zařízení', 'doorbell': 'zvonek', 'Windows to start (0.48 s each)': 'Oken pro spuštění (po 0,48 s)',
+  'Hold after last hit (s)': 'Doběh po posledním zásahu (s)', 'Cooldown between events (s)': 'Odstup mezi událostmi (s)',
+  'Sounds that trigger it': 'Zvuky, které ji spouští', 'add a sound (type to search)': 'přidat zvuk (pište pro hledání)',
+  'Ignore while any of these is heard (e.g. Television for speech)': 'Ignorovat, když je slyšet některý z těchto (např. Television u řeči)',
+  'add a sound': 'přidat zvuk', 'Apply preset?': 'Použít předvolbu?',
+  'Replaces all events and the sound selection. Removed events disappear from Home Assistant.': 'Nahradí všechny události i výběr zvuků. Odebrané události zmizí z Home Assistant.',
+  'Preset applied': 'Předvolba použita', 'Saved, Home Assistant entities updated': 'Uloženo, entity v Home Assistant aktualizovány',
+  'Its entities disappear from Home Assistant; automations using them stop working.': 'Její entity zmizí z Home Assistant; automatizace, které je používají, přestanou fungovat.',
+  'Home Assistant: Settings → Automations & scenes → Create automation → ⋮ → Edit in YAML, paste, save.': 'Home Assistant: Nastavení → Automatizace a scény → Vytvořit automatizaci → ⋮ → Upravit v YAML, vložit, uložit.',
+  'Copied to the clipboard': 'Zkopírováno do schránky', 'Select the text and copy it (Ctrl/Cmd+C)': 'Označte text a zkopírujte ho (Ctrl/Cmd+C)',
+  'Restart now?': 'Restartovat teď?', 'The microphone setting takes effect after a restart.': 'Nastavení mikrofonu se projeví po restartu.',
+  'Household': 'Domácnost', 'Security': 'Bezpečnost', 'Animals': 'Zvířata', 'Doorbell and alarms': 'Zvonek a alarmy',
+  'Human sounds': 'Lidské zvuky', 'Animal': 'Zvířata', 'Music': 'Hudba', 'Natural sounds': 'Přírodní zvuky', 'Sounds of things': 'Zvuky věcí',
+  'Source-ambiguous sounds': 'Zvuky nejasného původu', 'Channel, environment and background': 'Kanál, prostředí a pozadí',
+  // HA tab
+  'MQTT (optional)': 'MQTT (volitelné)', 'Broker URI': 'URI brokeru', 'User': 'Uživatel', 'Discovery prefix': 'Prefix discovery',
+  'Connection': 'Spojení', 'connected': 'připojeno', 'disconnected': 'odpojeno', 'disabled': 'vypnuto', 'Last error': 'Poslední chyba',
+  'Base topic': 'Základní topic', 'State publishes': 'Publikace stavu', 'MQTT saved': 'MQTT uloženo',
+  'Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).':
+    'Publikuje bránu do Home Assistant přes MQTT discovery: roli, stav a diagnostiku jako entity, výběr role a tlačítko restartu. Potřebuje integraci MQTT a broker (např. doplněk Mosquitto).',
+  // tools
+  'Diagnostics': 'Diagnostika', 'Status JSON': 'Stav JSON', 'Thread JSON': 'Thread JSON', 'Zigbee JSON': 'Zigbee JSON',
+  'Download core dump': 'Stáhnout core dump', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
+  // system
+  'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
+  'next boot': 'příští start', 'Gateway firmware': 'Firmware brány', 'ESPHome image': 'ESPHome image', 'C6 firmware bundle': 'Balík firmwaru C6',
+  'p4gw.bin, written to the inactive slot; rolls back automatically if it does not start.': 'p4gw.bin, zapíše se do neaktivního slotu; když nenaběhne, automaticky se vrátí předchozí.',
+  'firmware.ota.bin of the ESPHome BLE proxy build for this board.': 'firmware.ota.bin ze sestavení ESPHome BLE proxy pro tuto desku.',
+  'c6fw.bin from scripts/build_all.sh. The C6 is reflashed on the next start if its image changed.': 'c6fw.bin ze scripts/build_all.sh. C6 se při příštím startu přeflashuje, pokud se jeho image změnil.',
+  'Settings': 'Nastavení', 'Hostname (restart to apply)': 'Název (projeví se po restartu)', 'New web UI password (user admin)': 'Nové heslo web UI (uživatel admin)',
+  'Remove password': 'Odebrat heslo', 'Remove the password?': 'Odebrat heslo?', 'Password removed': 'Heslo odebráno',
+  'Anyone on the LAN can then switch roles and read the Thread network key.': 'Kdokoli v LAN pak může přepínat role a číst klíč Thread sítě.',
+  'Reflash C6 now': 'Přeflashovat C6 teď', 'Back up C6 flash': 'Záloha flash C6', 'Reflash the C6?': 'Přeflashovat C6?',
+  'The gateway restarts and rewrites the C6 firmware of the current role.': 'Brána se restartuje a přepíše firmware C6 aktuální role.',
+  'Restart?': 'Restartovat?', 'The active role stops for about 10 s.': 'Aktivní role se asi na 10 s zastaví.', 'Choose a file': 'Vyberte soubor',
+  'Reading the C6 flash, about 2 minutes…': 'Čtu flash C6, asi 2 minuty…', 'C6 backup saved': 'Záloha C6 uložena',
+  'running': 'běží', 'idle': 'nečinný', 'stopped': 'zastaven', 'valid': 'platný', 'invalid': 'neplatný', 'Border router': 'Border router',
+  'Password (set, leave empty to keep)': 'Heslo (nastavené, prázdné = ponechat)', '192.168.1.1 or fd00::1': '192.168.1.1 nebo fd00::1', 'wait ms': 'čekání ms',
+  'Reflash rewrites the C6 with the image of the current role on the next start (use after an RCP or NCP failure). The C6 backup reads its whole flash over JP1 (about 2 minutes) and works only in maintenance mode. Keep the first backup: it is the only copy of the factory esp-hosted firmware.':
+    'Přeflashování zapíše do C6 při příštím startu image aktuální role (použijte po selhání RCP nebo NCP). Záloha C6 přečte celou její flash přes JP1 (asi 2 minuty) a funguje jen v režimu údržby. První zálohu si nechte: je to jediná kopie továrního firmwaru esp-hosted.',
+  'The gateway is password protected (user': 'Brána je chráněná heslem (uživatel',
+};
+const CS_RX = [
+  [/^(.+) ago$/, 'před $1'], [/^up (.+)$/, 'běží $1'], [/^Error: (.*)$/, 'Chyba: $1'], [/^Switch to (.+)\?$/, 'Přepnout na $1?'],
+  [/^Delete (.+)\?$/, 'Smazat $1?'], [/^Run (.+)\?$/, 'Spustit $1?'], [/^Sent (.+)$/, 'Odesláno: $1'], [/^Joining (.+)$/, 'Připojuji do $1'],
+  [/^Uploaded(.*)$/, 'Nahráno$1'], [/^Automation: (.+)$/, 'Automatizace: $1'], [/^(\d+) reported, (\d+) ignored( \(unsaved\))?$/, (m, a, b, u) => `${a} hlášených, ${b} ignorovaných${u ? ' (neuloženo)' : ''}`],
+  [/^(\d+) Mb\/s$/, '$1 Mb/s'], [/^Neighbors \((\d+)\)$/, 'Sousedé ($1)'], [/^Routers \((\d+)\)$/, 'Routery ($1)'],
+  [/^level (.+) dBFS, peak (.+), noise floor (.+), (\d+) read errors$/, 'hladina $1 dBFS, špička $2, šum $3, chyb čtení $4'],
+  [/^(.+) stored,$/, '$1 uloženo,'], [/^(.+) ms avg, (.+) ms max, last (.+) ms$/, 'průměr $1 ms, max $2 ms, poslední $3 ms'],
+  [/^(.+) free, min (.+)$/, '$1 volné, min $2'], [/^Run only above (.+) dBFS$/, 'Spouštět jen nad $1 dBFS'],
+];
+let lang = (navigator.language || '').toLowerCase().startsWith('cs') ? 'cs' : 'en';
+try { lang = localStorage.getItem('lang') || lang; } catch (e) { /* storage blocked */ }
+const original = new WeakMap();
+
+function translateText(text) {
+  const key = text.trim().replace(/\s+/g, ' ');
+  if (!key) return null;
+  let out = CS[key];
+  if (out === undefined) {
+    for (const [rx, rep] of CS_RX) {
+      if (rx.test(key)) { out = key.replace(rx, rep); break; }
+    }
+  }
+  if (out === undefined) return null;
+  return text.replace(text.trim(), out);
+}
+
+function skip(el) {
+  return !el || el.closest('script,style,textarea,pre,code,[data-notr]');
+}
+
+function translateTree(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    if (skip(node.parentElement)) continue;
+    const base = original.has(node) && original.get(node).cs === node.nodeValue ? original.get(node).en : node.nodeValue;
+    const out = lang === 'cs' ? translateText(base) : null;
+    const want = out ?? base;
+    if (out !== null) original.set(node, { en: base, cs: out });
+    if (node.nodeValue !== want) node.nodeValue = want;
+  }
+  const els = root.querySelectorAll ? root.querySelectorAll('[placeholder],[title]') : [];
+  for (const el of els) {
+    if (skip(el)) continue;
+    for (const attr of ['placeholder', 'title']) {
+      if (!el.hasAttribute(attr)) continue;
+      const en = el.dataset['en' + attr] ?? el.getAttribute(attr);
+      el.dataset['en' + attr] = en;
+      const out = lang === 'cs' ? translateText(en) : null;
+      const want = out ?? en;
+      if (el.getAttribute(attr) !== want) el.setAttribute(attr, want);
+    }
+  }
+}
+
+const i18nObserver = new MutationObserver(records => {
+  for (const r of records) {
+    if (r.type === 'characterData') translateTree(r.target.parentElement);
+    else r.addedNodes.forEach(n => translateTree(n.nodeType === 3 ? n.parentElement : n));
+  }
+});
+
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem('lang', l); } catch (e) { /* storage blocked */ }
+  document.documentElement.lang = l;
+  $('#pref-lang').value = l;
+  translateTree(document.body);
+}
+
+function setTheme(t) {
+  if (t === 'system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('theme', t); } catch (e) { /* storage blocked */ }
+  $('#pref-theme').value = t;
+}
+
+let savedTheme = 'system';
+try { savedTheme = localStorage.getItem('theme') || 'system'; } catch (e) { /* storage blocked */ }
+setTheme(savedTheme);
+setLang(lang);
+i18nObserver.observe(document.body, { subtree: true, childList: true, characterData: true });
+$('#pref-lang').addEventListener('change', e => { setLang(e.target.value); render(true); });
+$('#pref-theme').addEventListener('change', e => setTheme(e.target.value));
 
 const ROLES = {
   thread_br: { name: 'Thread border router', group: 'Thread', desc: 'OpenThread border router on Ethernet for Matter-over-Thread. Home Assistant OTBR integration via REST.' },
@@ -313,7 +544,7 @@ views.overview = () => {
       ['PSRAM free', fmtBytes(h.psram_free)]])}</div>
     <div class="card"><h3>C6 co-processor</h3>${dl([
       ['Running', esc(s.c6.bundle || 'unknown')],
-      ['Images', (s.c6.images || []).map(i => `${esc(i.name)} <span class="muted">${esc(i.version)}</span>`).join('<br>') || '<span class="bad-text">none, upload c6fw.bin</span>'],
+      ['Images', (s.c6.images || []).map(i => `<span data-notr>${esc(i.name)}</span> <span class="muted">${esc(i.version)}</span>`).join('<br>') || '<span class="bad-text">none, upload c6fw.bin</span>'],
       ['Last flash error', esc(s.c6.flash.last_error)]])}</div>
   </div>`;
 };
@@ -463,9 +694,45 @@ function snapshotCard() {
       : '<p class="muted">No snapshot yet.</p>'}</div>`;
 }
 
+/* Czech version of the Home Assistant guide (views.ha), same structure. */
+const haStepsCs = (host, rs) => ({
+  thread_br: `<h3>Thread border router → Home Assistant</h3><ol class="steps">
+    <li><b>Nastavení → Zařízení a služby → Přidat integraci → OpenThread Border Router</b>, URL:<pre>http://${esc(host)}:${rs.rest_port || 8081}</pre>(bez lomítka na konci).</li>
+    <li><b>Nastavení → Zařízení a služby → Thread → Konfigurovat</b>: objeví se síť <code>${esc(rs.network_name || '…')}</code>; nastavte ji jako <b>preferovanou</b> (menu ⋮ → <i>Použít jako preferovanou síť</i>).</li>
+    <li>Máte už v HA Thread síť (jiný border router)? Místo dvou sítí se připojte do ní: v HA otevřete informace (ⓘ) preferované sítě, zkopírujte <b>TLV aktivního datasetu</b> a vložte je na této stránce do <b>Thread → Použít dataset</b>.</li>
+    <li>Telefon: pošlete přístupové údaje do telefonu aplikací Companion (Android: <i>Nastavení → Companion app → Troubleshooting → Sync Thread credentials</i>; iOS: <i>Nastavení → Companion App → Debugging → Sync Thread credentials</i>).</li>
+    <li>Matter: nainstalujte doplněk / integraci <b>Matter Server</b>, pak <i>Nastavení → Zařízení → Přidat zařízení → Matter</i> a naskenujte kód zařízení.</li>
+    <li>Požadavky na síť: IPv6 zapnuté na hostiteli HA i v LAN, přijímání router advertisements (HA OS to dělá sám; u Dockeru nebo VM nastavte <code>net.ipv6.conf.&lt;if&gt;.accept_ra=2</code> a <code>accept_ra_rt_info_max_plen=64</code>), žádné filtrování multicastu mezi HA a bránou (zkontrolujte IGMP/MLD snooping na řízených switchích).</li></ol>`,
+  thread_router: `<h3>Thread router → existující síť</h3><ol class="steps">
+    <li>V HA: <b>Nastavení → Zařízení a služby → Thread → Konfigurovat</b>, otevřete informace (ⓘ) preferované sítě a zkopírujte <b>TLV aktivního datasetu</b> (hex). Z shellu OTBR: <code>ot-ctl dataset active -x</code>.</li>
+    <li>Vložte je na této stránce do <b>Thread → Použít dataset</b>. Router se připojí do minuty; stav přejde na <i>child</i> a pak <i>router</i>.</li>
+    <li>V HA není potřeba nic přidávat: router rozšiřuje mesh. Objeví se v topologii sítě vašeho border routeru.</li></ol>`,
+  zigbee_coordinator: `<h3>Zigbee koordinátor → Zigbee2MQTT (doporučeno)</h3><ol class="steps">
+    <li>Zigbee2MQTT <code>configuration.yaml</code> (nebo v doplňku <i>Konfigurace → serial</i>):<pre>serial:
+  port: tcp://${esc(host)}:${rs.tcp_port || 6638}
+  adapter: zboss
+advanced:
+  transmit_power: 20</pre></li>
+    <li>Restartujte Zigbee2MQTT. Na této stránce most ukáže připojeného hostitele a čítače rámců porostou.</li>
+    <li>Nechte zapnutou vlastní zálohu koordinátoru v Zigbee2MQTT; brána navíc drží kopii NVRAM koordinátoru (záložka Zigbee).</li></ol>
+    <h3>ZHA (experimentální)</h3><ol class="steps">
+    <li>ZHA nemá vestavěný typ rádia pro tento ZBOSS firmware. Nainstalujte custom component <code>zha-zboss-esp</code> (HACS), pak <b>Přidat integraci → Zigbee Home Automation</b>, typ rádia <b>ZBOSS</b>, cesta <code>socket://${esc(host)}:${rs.tcp_port || 6638}</code>.</li>
+    <li>Koordinátor může používat jen jeden hostitel. Nové TCP spojení nahradí staré.</li></ol>`,
+  zigbee_router: `<h3>Zigbee router → existující síť</h3><ol class="steps">
+    <li>Povolte připojování ve vašem Zigbee hostiteli: Zigbee2MQTT <i>Permit join (All)</i>, nebo ZHA <i>Přidat zařízení</i>.</li>
+    <li>Tady: <b>Zigbee → Připojit do sítě (steer)</b>. Router zkouší steering každých 30 s, dokud se nepřipojí.</li>
+    <li>Objeví se jako router / zesilovač dosahu. Přesun do jiné sítě: <b>Opustit síť</b> a znovu steer.</li></ol>`,
+  esphome: `<h3>ESPHome BLE proxy</h3><p>Tato stránka není dostupná, když běží ESPHome.</p>`,
+  none: `<h3>Údržba</h3><p>Neběží žádná role. Vyberte ji v záložce <b>Role</b>.</p>`,
+  ble: `<h3>Role ESPHome BLE proxy</h3><ol class="steps">
+    <li>Nahrajte ESPHome image (<code>dist/esphome.bin</code>) v <b>Systém → Firmware</b> a přepněte roli.</li>
+    <li>HA najde uzel přes mDNS (integrace <i>ESPHome</i>). Zadejte šifrovací klíč API ze secrets ESPHome.</li>
+    <li>Návrat: zařízení ESPHome v HA nabízí <b>Gateway role</b> a <b>Return to gateway</b>.</li></ol>`,
+});
+
 views.ha = () => {
   const r = activeRole(), host = ip(), rs = status.role_status || {};
-  const steps = {
+  const steps = lang === 'cs' ? haStepsCs(host, rs) : {
     thread_br: `<h3>Thread border router → Home Assistant</h3><ol class="steps">
       <li><b>Settings → Devices &amp; services → Add integration → OpenThread Border Router</b>, URL:<pre>http://${esc(host)}:${rs.rest_port || 8081}</pre>(no trailing slash).</li>
       <li><b>Settings → Devices &amp; services → Thread → Configure</b>: the network <code>${esc(rs.network_name || '…')}</code> appears; mark it <b>preferred</b> (menu ⋮ → <i>Use as preferred network</i>).</li>
@@ -494,12 +761,13 @@ advanced:
       <li>It appears as a router / range extender. To move it to another network: <b>Leave network</b>, then steer again.</li></ol>`,
     esphome: `<h3>ESPHome BLE proxy</h3><p>This page is not available while ESPHome runs.</p>`,
     none: `<h3>Maintenance</h3><p>No role is running. Pick one under <b>Role</b>.</p>`,
-  };
-  return `<div class="card">${steps[r] || steps.none}</div>
-  <div class="card"><h3>ESPHome BLE proxy role</h3><ol class="steps">
+    ble: `<h3>ESPHome BLE proxy role</h3><ol class="steps">
     <li>Upload the ESPHome image (<code>dist/esphome.bin</code>) under <b>System → Firmware</b>, then switch the role.</li>
     <li>HA discovers the node via mDNS (<i>ESPHome</i> integration). Enter the API encryption key from the ESPHome secrets.</li>
-    <li>To return: the ESPHome device exposes <b>Gateway role</b> and <b>Return to gateway</b> in HA.</li></ol></div>
+    <li>To return: the ESPHome device exposes <b>Gateway role</b> and <b>Return to gateway</b> in HA.</li></ol>`,
+  };
+  return `<div class="card" data-notr>${steps[r] || steps.none}</div>
+  <div class="card" data-notr>${steps.ble}</div>
   <div class="card"><h3>MQTT (optional)</h3>
     <p class="muted">Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).</p>
     <div id="mqtt-box" class="muted">Loading…</div></div>`;
@@ -573,9 +841,9 @@ async function loadSoundConfig() {
 function renderEvents() {
   const rows = sndCfg.events.map((e, i) => `<tr>
     <td><input type="checkbox" data-ev-toggle="${i}" ${e.enabled ? 'checked' : ''}></td>
-    <td><b>${esc(e.name)}</b><br><span class="muted">${esc(e.id)}</span></td>
+    <td data-notr><b>${esc(e.name)}</b><br><span class="muted">${esc(e.id)}</span></td>
     <td>${e.kind}</td><td>${e.threshold}</td>
-    <td title="${esc(e.classes.map(clsName).join(', '))}">${e.classes.length}</td>
+    <td data-notr title="${esc(e.classes.map(clsName).join(', '))}">${e.classes.length}</td>
     <td>${e.active ? pill('ok', 'now') : ''}</td><td>${e.count || 0}</td>
     <td>${e.last_ago_s !== undefined ? fmtUptime(e.last_ago_s) + ' ago' : ''}</td>
     <td><button class="btn" data-ev-edit="${i}">Edit</button> <button class="btn" data-ev-yaml="${i}">HA automation</button> <button class="btn danger" data-ev-del="${i}">Delete</button></td></tr>`).join('');
@@ -591,14 +859,14 @@ function renderTree() {
     g.get(group).push([i, name]);
   });
   const row = ([i, name]) => `<label class="cls-row" data-name="${esc(name.toLowerCase())}" style="display:flex;gap:8px;align-items:center;padding:2px 0">
-    <input type="checkbox" data-cls="${i}" ${sndExclude.has(i) ? '' : 'checked'}><span style="flex:1">${esc(name)}</span>
+    <input type="checkbox" data-cls="${i}" ${sndExclude.has(i) ? '' : 'checked'}><span style="flex:1" data-notr>${esc(name)}</span>
     <span class="progress" style="width:80px;height:6px"><div id="cs-${i}"></div></span></label>`;
   let html = '';
   for (const [top, groups] of tops) {
     const n = [...groups.values()].reduce((a, v) => a + v.length, 0);
     html += `<details class="cls-top"><summary><b>${esc(top)}</b> <span class="muted">${n}</span> <button class="btn" data-cls-all="${esc(top)}">all</button> <button class="btn" data-cls-none="${esc(top)}">none</button></summary><div style="padding-left:16px">`;
     for (const [group, items] of groups) {
-      html += group === '-' ? items.map(row).join('') : `<details><summary>${esc(group)} <span class="muted">${items.length}</span></summary><div style="padding-left:16px">${items.map(row).join('')}</div></details>`;
+      html += group === '-' ? items.map(row).join('') : `<details><summary><span data-notr>${esc(group)}</span> <span class="muted">${items.length}</span></summary><div style="padding-left:16px">${items.map(row).join('')}</div></details>`;
     }
     html += '</div></details>';
   }
@@ -620,7 +888,7 @@ async function loadScoresAndLog() {
   try {
     const log = await api('/api/sound/log');
     $('#snd-log').innerHTML = log.length ? `<table><tr><th>When</th><th>Event</th><th>Sound</th><th>Score</th><th>Level</th><th>Duration</th><th></th></tr>${log.map(l => `<tr>
-      <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? esc(l.event) : '<span class="muted">no event</span>'}</td><td>${esc(l.class_name)}</td>
+      <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? `<span data-notr>${esc(l.event)}</span>` : '<span class="muted">no event</span>'}</td><td data-notr>${esc(l.class_name)}</td>
       <td>${(l.score * 100).toFixed(0)} %</td><td>${l.level_db} dB</td><td>${l.ongoing ? pill('ok', 'ongoing') : l.duration_s ? l.duration_s + ' s' : ''}</td>
       <td><button class="btn" data-log-ignore="${l.class}">Ignore sound</button>
       ${l.event ? `<button class="btn" data-log-raise="${esc(l.event)}">Raise threshold</button>` : `<button class="btn" data-log-new="${l.class}">Create event</button>`}</td></tr>`).join('')}</table>` : '<p class="muted">Nothing yet.</p>';
@@ -637,7 +905,7 @@ async function putEvents(cfg) {
 }
 
 function chips(id, list) {
-  $('#' + id).innerHTML = list.map(i => `<span class="pill">${esc(clsName(i))} <a href="#" data-chip-del="${id}:${i}">×</a></span>`).join('') || '<span class="muted">none</span>';
+  $('#' + id).innerHTML = list.map(i => `<span class="pill" data-notr>${esc(clsName(i))} <a href="#" data-chip-del="${id}:${i}">×</a></span>`).join('') || '<span class="muted">none</span>';
 }
 
 function openEditor(idx, template) {
@@ -703,7 +971,7 @@ async function loadSound() {
     ['Inference', inf.runs ? `${inf.avg_ms} ms avg, ${inf.max_ms} ms max, last ${inf.last_ms} ms` : ''],
     ['CPU (core 1)', inf.runs ? inf.cpu_pct + ' %' : ''],
     ['Runs / skipped quiet', `${inf.runs} / ${inf.skipped_quiet}`]]);
-  $('#snd-top').innerHTML = inf.top ? `<table>${inf.top.map(t => `<tr><td>${esc(t.name)}</td><td style="width:50%"><div class="progress"><div style="width:${t.score * 100}%"></div></div></td><td>${(t.score * 100).toFixed(0)} %</td></tr>`).join('')}</table>
+  $('#snd-top').innerHTML = inf.top ? `<table>${inf.top.map(t => `<tr><td data-notr>${esc(t.name)}</td><td style="width:50%"><div class="progress"><div style="width:${t.score * 100}%"></div></div></td><td>${(t.score * 100).toFixed(0)} %</td></tr>`).join('')}</table>
     <p class="muted">${inf.top_age_s.toFixed(0)} s ago</p>` : 'Recognition is off or nothing above the gate yet.';
 }
 

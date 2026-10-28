@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI05).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI07).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -39,7 +39,8 @@ async function test(id, title, fn) {
 // checks would then block its API calls to the board.
 const pnaOff = ['--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,LocalNetworkAccessChecks'];
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: args.html ? pnaOff : [] });
-const context = await browser.newContext(args.password ? { httpCredentials: { username: 'admin', password: args.password } } : {});
+// English locale: the UI picks Czech for a Czech browser and the error checks match English text.
+const context = await browser.newContext({ locale: 'en-US', ...(args.password ? { httpCredentials: { username: 'admin', password: args.password } } : {}) });
 const page = await context.newPage();
 page.on('pageerror', e => pageErrors.push(e.message));
 if (args.html && args.html !== true) {
@@ -126,6 +127,51 @@ await test('UI05', 'Thread: "Copy TLVs" shows the dataset (border router or rout
   const tlvs = await page.inputValue('#copy-text');
   check(/^[0-9a-f]{40,}$/.test(tlvs), `dataset TLVs shown (${tlvs.length} hex chars)`);
   await page.click('#copy-dlg button[value=close]');
+});
+
+await test('UI06', 'Language: Czech translates every tab, keeps sound names, English restores the original', async () => {
+  await page.selectOption('#pref-lang', 'cs');
+  await page.waitForTimeout(800);
+  check(await page.getAttribute('html', 'lang') === 'cs', 'html lang = cs');
+  check((await page.textContent('nav button[data-tab=overview]')).trim() === 'Přehled', 'Overview tab reads "Přehled"');
+  for (const id of ['overview', 'role', 'thread', 'zigbee', 'sound', 'ha', 'tools', 'system']) {
+    await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+    await tab(id);
+    await page.waitForTimeout(1200);
+    const t = await toastText();
+    check(!t.startsWith('Error') && !t.startsWith('Chyba'), `${id}: no error toast${t ? ` (${t})` : ''}`);
+    if (id === 'sound') {
+      check((await page.textContent('#main')).includes('Události posílané do Home Assistant'), 'sound tab content translated');
+      check(await page.$$eval('.cls-row span[data-notr]', s => s.some(e => e.textContent === 'Speech')), 'sound class names stay untranslated');
+    }
+  }
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 20000 });
+  check(await page.inputValue('#pref-lang') === 'cs', 'language kept after reload');
+  await page.selectOption('#pref-lang', 'en');
+  await page.waitForTimeout(800);
+  check((await page.textContent('nav button[data-tab=overview]')).trim() === 'Overview', 'English restores "Overview"');
+  check(!/[ěščřžůť]/.test(await page.innerText('body')), 'no Czech text left on the page');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI07', 'Theme: light, dark and system switch the page colours and persist', async () => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.selectOption('#pref-theme', 'light');
+  const light = await bg();
+  check(await page.getAttribute('html', 'data-theme') === 'light', `light: data-theme=light (${light})`);
+  await page.selectOption('#pref-theme', 'dark');
+  const dark = await bg();
+  check(await page.getAttribute('html', 'data-theme') === 'dark' && dark !== light, `dark: different background (${dark})`);
+  await page.reload();
+  await page.waitForSelector('.card', { timeout: 20000 });
+  check(await bg() === dark && await page.inputValue('#pref-theme') === 'dark', 'dark kept after reload');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.selectOption('#pref-theme', 'system');
+  check(await page.getAttribute('html', 'data-theme') === null && await bg() === light, 'system + light OS: no attribute, light background');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  check(await bg() === dark, 'system + dark OS: dark background');
+  await page.emulateMedia({ colorScheme: null });
 });
 
 await browser.close();
