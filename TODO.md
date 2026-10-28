@@ -12,7 +12,14 @@
 - [x] Kompletní `dist/` (všechny 4 C6 balíky), záloha P4, první flash
 - [x] Automatické HW testy TC01–TC13 (tests/results/2026-10-28/report.md), 10/10 v regresi
 
+- [x] Zvuk fáze 1–2: mikrofon ES8311, YAMNet int8 na P4 (60 ms/inferenci), záložka Sound, layout flash v2
+- [x] Oddělené datasety Thread rolí (TC16), komprimované C6 balíky, potvrzení obrazu při restartu z UI
+
 ## Čeká
+- [ ] **Vrátit bránu do Thread sítě `MyHome284238473`** (dataset z HA → UI Thread → Apply dataset); testy ji přesunuly do testovací sítě
+- [ ] Zvuk fáze 3: MQTT `event` entity (řeč, pes, zvonek, alarmy, ...), výběr detekcí a prahy v UI
+- [ ] Zvuk fáze 4: učicí režim (vzorky v oddílu `sounds`, profily embedding + tónové)
+- [ ] Zvuk fáze 5: ladění falešných poplachů, 24h test se zapnutou detekcí
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
 - [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin

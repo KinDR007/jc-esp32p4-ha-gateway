@@ -1,0 +1,32 @@
+[
+  {
+    "id": "TC04",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 32
+  },
+  {
+    "id": "TC08",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 25
+  },
+  {
+    "id": "TC10",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 98
+  },
+  {
+    "id": "TC14",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 35
+  },
+  {
+    "id": "TC15",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 30
+  }
+]

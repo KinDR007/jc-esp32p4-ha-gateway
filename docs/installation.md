@@ -27,11 +27,24 @@ cp firmware/esphome/secrets.yaml.example firmware/esphome/secrets.yaml   # opens
 Single parts: `scripts/build_c6.sh <name>`, `scripts/build_gateway.sh`, `scripts/build_esphome.sh`,
 `scripts/pack_c6fw.py`.
 
-## Flash layout
+## Flash layout (v2)
 
 [firmware/partitions.csv](../firmware/partitions.csv): `nvs` (settings, Thread network), `gw_a`/`gw_b`
-(gateway A/B with rollback), `esphome`, `c6fw` (C6 bundles), `c6data` (Zigbee network snapshots,
-one slot per Zigbee firmware), `coredump`. Offsets must not change on deployed boards.
+(3 MB each, gateway A/B with rollback), `esphome` (2 MB), `c6fw` (2 MB, deflate-compressed C6
+bundles), `c6data` (Zigbee network snapshots, one slot per Zigbee firmware), `model` (4 MB, YAMNet),
+`sounds` (1.56 MB, learning mode recordings), `coredump`.
+
+Migration from v1 (first install on 2026-10-28): `scripts/flash_p4.sh <port>` writes every image but
+keeps NVS, so the role, Thread network, password and MQTT survive. The C6 is reflashed on the next
+start (new bundle format). Zigbee snapshots of v1 are not carried over.
+
+## Sound recognition model
+
+`scripts/build_model.sh` creates the pinned Python 3.11 toolchain (`tools/yamnet/requirements.lock`),
+fetches the official YAMNet weights (checksum checked), checks the device log-mel code against the
+reference and exports `tools/yamnet/out/yamnet_p4.espdl`. `build_all.sh` adds it to `dist/` and the
+factory image. To replace the model on a running board: turn sound off, restart, upload
+`yamnet_p4.espdl` in the Sound tab, turn sound on.
 
 ## First installation
 
@@ -50,7 +63,8 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 
 | What | How | Safety |
 |---|---|---|
-| Gateway | UI System → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s, else rollback |
+| Gateway | UI System → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
+| Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
 | ESPHome image | UI System → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
 | C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`) | header checked before erase, sha256 per bundle; C6 reflashed on next start if its bundle changed |
 

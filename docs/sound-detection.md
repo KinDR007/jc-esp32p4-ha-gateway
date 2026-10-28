@@ -1,6 +1,7 @@
 # Detekce zvukových událostí mikrofonem desky (analýza, 2026-10-28)
 
-Stav: rešerše a návrh, čeká na potvrzení. Nic z toho zatím není implementované.
+Stav: fáze 1 (audio základ) a 2 (YAMNet na zařízení) hotové a ověřené na desce, viz
+[Výsledky fáze 1–2](#výsledky-fáze-12-2026-10-28). Fáze 3–5 čekají na potvrzení.
 
 ## Cíl
 
@@ -128,6 +129,58 @@ role (Thread, Zigbee, ESPHome) musí fungovat beze změny.
 3. **Detekce tříd:** inference, mapování tříd podle Frigate, MQTT event entity, výběr detekcí v UI, nové testovací případy.
 4. **Učicí režim:** profily embedding a centroid, profily typu tónový signál (Goertzel), nahrávka pozadí, kalibrace prahu.
 5. **Ladění a stabilita:** falešné poplachy, 24h test se zapnutou detekcí v roli Thread BR i Zigbee.
+
+## Výsledky fáze 1–2 (2026-10-28)
+
+Rozhodnutí uživatele: model YAMNet, detekovat vše co model umí, učicí režim bude uchovávat vzorky.
+
+### Implementace
+
+- Komponenta `firmware/gateway/components/sound`:
+  - ES8311 přes `esp_codec_dev`, I2S 16 kHz, mikrofon na levém slotu
+  - kruhový buffer 10 s v PSRAM, hladina zvuku a šumové pozadí
+  - log-mel v C (`sound_mel.c`), ověřený proti Python referenci s odchylkou max 5e-5 (`tools/yamnet/test_mel.py`)
+  - inference přes ESP-DL 3.3, parametry modelu se kopírují do PSRAM
+  - ve výchozím stavu vypnuto
+  - zachytávání a inference běží na jádře 1 s nízkou prioritou; inference se spouští jen nad prahem hlasitosti
+  - pojistka CPU vypne inferenci nad 60 % jádra
+  - zastaralý zvuk se zahazuje, nedohání se
+- Model `tools/yamnet`:
+  - YAMNet přepsaný do PyTorch s oficiálními váhami (3,74 M vah, 69,2 M MAC na patch)
+  - kvantizace ESP-PPQ int8 pro P4, kalibrace na ESC-50
+  - logity oříznuté na ±16, jinak by měly kvantizační krok 4
+  - shoda s float modelem: top-1 79 %, top-1 v top-5 97 %
+  - build: `scripts/build_model.sh`
+- ESP-DL se kompiluje jen s operátory a int8 jádry, která model používá (`yamnet.compile_req.yml`).
+  Bez toho by měla binárka 3,46 MB a do 3MB slotu by se nevešla; takhle má 2,35 MB.
+- Rozdělení flash v2:
+  - oddíly `model` (4 MB) a `sounds` (1,56 MB), slot ESPHome 2 MB
+  - balíky C6 komprimované (2,77 → 1,65 MB); P4 je při flashování rozbalí
+  - NVS se nemění: role, Thread síť i nastavení migraci přežijí
+- Web UI, záložka Sound: zapnutí, zesílení, práh, živá hladina, nahrávka 5 s, upload modelu,
+  statistiky inference, top 5 tříd.
+- MQTT: senzor `Sound level` (dBFS), když je mikrofon zapnutý.
+
+### Měření na desce (P4 v1.3, 360 MHz)
+
+| Veličina | Hodnota |
+|---|---|
+| Načtení modelu (4 MB do PSRAM) | 407–481 ms |
+| Inference na patch (0,96 s zvuku, každých 0,48 s) | 59–62 ms průměr, max 109 ms |
+| Zátěž jádra 1 | 5–16 % (inference běží jen nad prahem hlasitosti) |
+| Řeč (syntéza `say` z reproduktoru Macu) | Speech 1,00 |
+| Štěkot (ESC-50) | Dog 0,71–0,82, Bark 0,56–0,68 |
+| Regrese rolí se zapnutým zvukem | TC04–TC13 PASS (po úpravě testů), OTA upload při běžící inferenci bez resetu |
+
+### Problémy nalezené na desce a opravy
+
+| Problém | Oprava |
+|---|---|
+| Watchdog při dlouhém OTA uploadu se zapnutým zvukem (IDLE1 nedostal čas) | upload i výpočet mel pravidelně uvolní jádro, zpožděný zvuk se zahazuje |
+| Skóre jen 0,02 nebo 0,50 | logity oříznuté na ±16 před kvantizací |
+| Komprimovaný zápis do C6 přes jeho ROM loader dával špatná data | rozbalení na P4 (tinfl na haldě, kontrola MD5), zápis nekomprimovaně |
+| Restart z UI v první minutě po aktualizaci vrátil starou verzi | restart vyžádaný přes API nejdřív potvrdí běžící verzi |
+| Role Thread router přepsala síť border routeru | border router si ukládá vlastní dataset (`br_dataset`), test TC16 |
 
 ## Zdroje
 

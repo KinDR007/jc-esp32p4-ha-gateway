@@ -3,6 +3,7 @@
 | Date | Firmware | Result | Report |
 |---|---|---|---|
 | 2026-10-28 | gateway `c712ab9` | TC01–TC13 automated: 10/10 in the final regression; M01 partly (OTBR in HA) | [2026-10-28/report.md](2026-10-28/report.md) |
+| 2026-10-28 | gateway with sound, layout v2 | TC04–TC16 with sound on: all PASS after test fixes | [2026-10-28-sound/report.md](2026-10-28-sound/report.md) |
 
 Runs of 2026-10-28, in order:
 

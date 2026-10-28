@@ -1,0 +1,101 @@
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+  11:13:26 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  11:13:26 ok: thread_br started without maintenance ('')
+  11:13:26 ok: active role is thread_br
+  11:13:26 switch took 13 s
+  11:13:26 ok: C6 runs ot_rcp
+  11:13:28 ok: Thread role router, network MyHome284238473, channel 25, RCP openthread-esp32/b774170ff46-b678a4f63; esp32c6;  2026-10-28 08:45:35 UTC
+  11:13:28 ok: border routing running
+TC04 FAIL (75 s) timeout waiting for SRP server, NAT64 and border agent (last: None)
+
+TC05 Zigbee coordinator: C6 gets zigbee_ncp, TCP bridge accepts a client, NCP answers after reset.
+  11:14:56 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=25s
+  11:14:56 ok: zigbee_coordinator started without maintenance ('')
+  11:14:56 ok: active role is zigbee_coordinator
+  11:14:56 switch took 27 s
+  11:14:56 ok: C6 runs zigbee_ncp
+  11:14:59 ok: NCP sent 530 B after reset (UART link alive)
+  11:14:59 ok: no UART errors
+  11:15:00 ok: TCP client registered (192.168.88.189)
+  11:15:01 ok: client disconnect detected
+TC05 PASS (33 s) 
+
+TC06 Leaving and re-entering the coordinator saves and restores its network data.
+  11:15:16 back after restart: active=thread_br c6=ot_rcp uptime=12s
+  11:15:16 ok: thread_br started without maintenance ('')
+  11:15:16 ok: active role is thread_br
+  11:15:16 switch took 15 s
+  11:15:16 ok: snapshot of zigbee_ncp saved ({'bundle': 'zigbee_ncp', 'size': 17408, 'generation': 1})
+  11:15:16 ok: Thread network unchanged after a Zigbee detour
+  11:15:44 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=25s
+  11:15:44 ok: zigbee_coordinator started without maintenance ('')
+  11:15:44 ok: active role is zigbee_coordinator
+  11:15:44 switch took 27 s
+  11:15:44 ok: zb_storage restored on return to the coordinator
+  11:15:44 ok: snapshot generation unchanged (no extra save)
+TC06 PASS (42 s) 
+
+TC07 Zigbee router: C6 gets the router firmware and reports status over the line protocol.
+  11:16:12 back after restart: active=zigbee_router c6=zigbee_router uptime=26s
+  11:16:12 ok: zigbee_router started without maintenance ('')
+  11:16:12 ok: active role is zigbee_router
+  11:16:12 switch took 28 s
+  11:16:12 ok: C6 runs zigbee_router
+  11:16:14 ok: router state idle, channel 255, ieee 9c139efffec404d0
+  11:16:14 ok: command accepted
+  11:16:14 ok: coordinator snapshot still kept while the router runs
+TC07 PASS (30 s) 
+
+TC08 Thread router: idle without dataset, joins after the dataset is applied.
+  11:16:29 back after restart: active=thread_router c6=ot_rcp uptime=12s
+  11:16:29 ok: thread_router started without maintenance ('')
+  11:16:29 ok: active role is thread_router
+  11:16:29 switch took 15 s
+  11:16:29 ok: C6 runs ot_rcp
+  11:16:29 ok: router mode
+TC08 FAIL (15 s) no dataset from TC04 to apply
+
+TC09 ESPHome: gateway hands over, BLE proxy scans, Return to gateway brings back thread_br.
+  11:16:29 ok: switch to esphome accepted
+  11:17:28 ok: gateway web UI is gone (ESPHome runs)
+  11:17:40 ok: ESPHome ble-proxy-p4gw-e30a08 2026.10.1
+  11:17:40 ok: BLE advertisements from 31 devices in 10 s
+  11:17:54 back after restart: active=thread_br c6=ot_rcp uptime=13s
+  11:17:54 ok: returned to thread_br
+  11:17:54 ok: C6 reflashed back to ot_rcp
+TC09 PASS (85 s) 
+
+TC10 Gateway OTA: new image goes to the other slot and confirms itself after 60 s.
+  11:18:11 ok: upload accepted into gw_a
+  11:18:11 ok: written to the inactive slot
+  11:18:25 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  11:18:25 ok: boots the new slot, pending verify
+  11:19:35 ok: confirmed valid after 60 s
+TC10 FAIL (103 s) gateway image refused for the ESPHome slot
+
+TC11 Password protects the API; it can be removed again.
+  11:19:37 ok: password set
+  11:19:37 ok: 401 without credentials
+  11:19:37 ok: 200 with credentials
+  11:19:37 ok: 401 with a wrong password
+  11:19:37 ok: password removed
+  11:19:37 ok: open again
+TC11 PASS (0 s) 
+
+TC12 Broken uploads are rejected and do not damage the stored images.
+  11:19:37 ok: garbage c6fw rejected ({'error': 'ESP_ERR_INVALID_VERSION'})
+  11:19:37 ok: stored bundles intact after the rejected upload
+  11:19:37 ok: garbage gateway image rejected ({'error': 'image has no application description'})
+  11:19:49 ok: valid c6fw re-uploaded
+  11:19:49 ok: four bundles listed again
+TC12 PASS (12 s) 
+
+TC13 Forced C6 reflash from the UI restores the current role's firmware.
+  11:19:49 ok: reflash requested
+  11:20:04 back after restart: active=thread_br c6=ot_rcp uptime=12s
+  11:20:04 ok: thread_br running again after reflash
+  11:20:04 ok: flash log present
+TC13 PASS (15 s) 
+
+Summary: TC04 FAIL, TC05 PASS, TC06 PASS, TC07 PASS, TC08 FAIL, TC09 PASS, TC10 FAIL, TC11 PASS, TC12 PASS, TC13 PASS
+exit 1

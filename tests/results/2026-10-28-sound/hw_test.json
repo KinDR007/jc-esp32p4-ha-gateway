@@ -1,0 +1,62 @@
+[
+  {
+    "id": "TC04",
+    "result": "FAIL",
+    "detail": "timeout waiting for SRP server, NAT64 and border agent (last: None)",
+    "seconds": 75
+  },
+  {
+    "id": "TC05",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC06",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 42
+  },
+  {
+    "id": "TC07",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 30
+  },
+  {
+    "id": "TC08",
+    "result": "FAIL",
+    "detail": "no dataset from TC04 to apply",
+    "seconds": 15
+  },
+  {
+    "id": "TC09",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 85
+  },
+  {
+    "id": "TC10",
+    "result": "FAIL",
+    "detail": "gateway image refused for the ESPHome slot",
+    "seconds": 103
+  },
+  {
+    "id": "TC11",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC12",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 12
+  },
+  {
+    "id": "TC13",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 15
+  }
+]

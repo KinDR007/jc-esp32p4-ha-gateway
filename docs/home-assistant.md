@@ -54,4 +54,6 @@ HA discovers the node (ESPHome integration); enter the API key from
 
 Broker in the gateway UI (Home Assistant tab). Entities via MQTT discovery: active role, role
 select, maintenance reason, uptime, chip temperature, heap, Ethernet, IP, C6 firmware, Thread state,
-Zigbee host connection, restart button. Base topic `p4gw/<hostname>/`.
+Zigbee host connection, restart button, sound level (dBFS, when the microphone is on).
+Base topic `p4gw/<hostname>/`. Sound events (speech, dog, doorbell, ...) as MQTT `event` entities
+are planned (phase 3 in [sound-detection.md](sound-detection.md)).

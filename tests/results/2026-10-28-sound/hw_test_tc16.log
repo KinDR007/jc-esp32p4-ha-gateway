@@ -1,0 +1,18 @@
+TC16 Border router keeps its own network after the router role joined another one.
+  11:29:42 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  11:29:42 ok: thread_br started without maintenance ('')
+  11:29:42 ok: active role is thread_br
+  11:29:42 switch took 13 s
+  11:29:53 back after restart: active=thread_router c6=ot_rcp uptime=6s
+  11:29:53 ok: thread_router started without maintenance ('')
+  11:29:53 ok: active role is thread_router
+  11:29:53 switch took 9 s
+  11:29:53 ok: router joined the test network
+  11:30:02 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  11:30:02 ok: thread_br started without maintenance ('')
+  11:30:02 ok: active role is thread_br
+  11:30:02 switch took 9 s
+  11:30:02 ok: border router back on P4GW-0A08
+TC16 PASS (32 s) 
+
+Summary: TC16 PASS

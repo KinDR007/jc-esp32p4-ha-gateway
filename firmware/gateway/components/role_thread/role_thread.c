@@ -167,13 +167,34 @@ static otError apply_dataset(otInstance *instance, const otOperationalDatasetTlv
     return error;
 }
 
+/*
+ * The router role and the border router role share one OpenThread active dataset in NVS.
+ * The border router keeps its own copy so that a detour through the router role (which joins
+ * whatever network it was given) never moves the border router to another network.
+ */
+static void save_br_dataset(otInstance *instance)
+{
+    otOperationalDatasetTlvs active, saved;
+    if (otDatasetGetActiveTlvs(instance, &active) != OT_ERROR_NONE) {
+        return;
+    }
+    if (gw_config_get_blob(GW_KEY_BR_DATASET, &saved, sizeof(saved)) && saved.mLength == active.mLength &&
+        memcmp(saved.mTlvs, active.mTlvs, active.mLength) == 0) {
+        return;
+    }
+    gw_config_set_blob(GW_KEY_BR_DATASET, &active, sizeof(active));
+    ESP_LOGI(TAG, "border router dataset saved (%s)", otThreadGetNetworkName(instance));
+}
+
 static void start_border_router(otInstance *instance)
 {
     otOperationalDatasetTlvs dataset;
     esp_openthread_set_backbone_netif(gw_eth_netif());
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
 
-    if (otDatasetGetActiveTlvs(instance, &dataset) != OT_ERROR_NONE) {
+    if (gw_config_get_blob(GW_KEY_BR_DATASET, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
+        ESP_LOGI(TAG, "using the saved border router dataset");
+    } else if (otDatasetGetActiveTlvs(instance, &dataset) != OT_ERROR_NONE) {
         otOperationalDataset fresh;
         uint8_t mac[6];
         ESP_ERROR_CHECK(otDatasetCreateNewNetwork(instance, &fresh) == OT_ERROR_NONE ? ESP_OK : ESP_FAIL);
@@ -223,6 +244,14 @@ static void thread_task(void *arg)
         esp_openthread_lock_release();
         esp_br_web_start_server("/spiffs");
         snprintf(s_phase, sizeof(s_phase), "running");
+        s_started = true;
+        /* Follow dataset changes made by Home Assistant (REST) or the web UI. */
+        while (true) {
+            esp_openthread_lock_acquire(portMAX_DELAY);
+            save_br_dataset(instance);
+            esp_openthread_lock_release();
+            vTaskDelay(pdMS_TO_TICKS(30000));
+        }
     } else {
         esp_openthread_lock_acquire(portMAX_DELAY);
         start_router(instance);

@@ -13,6 +13,7 @@ TC09 (ESPHome) needs aioesphomeapi and the API key; run it with the ESPHome venv
 Destructive: switches roles, reflashes the C6 and writes the gateway slot.
 """
 import argparse
+import glob
 import json
 import os
 import socket
@@ -178,25 +179,32 @@ def tc04_thread_br():
     t = wait_until('Thread leader', leader, 90)
     check(True, f'Thread role {t["role"]}, network {t["network_name"]}, channel {t["channel"]}, RCP {t["rcp_version"]}')
     check(t['border_router']['routing'] == 'running', 'border routing running')
+    code, d = http('GET', '/api/thread/dataset?reveal=1')
+    check(code == 200 and len(d.get('tlvs', '')) > 40, 'dataset TLVs readable')
+    CTX['dataset'] = d['tlvs']
+    CTX['network_name'] = d['network_name']
 
     def br_services():
         code, t = http('GET', '/api/thread/status')
         br = t.get('border_router', {})
-        return br if br.get('srp_server') == 'running' and br.get('nat64') == 'active' and br.get('border_agent') else None
+        if not br.get('border_agent'):
+            return None
+        # Only one border router per network runs SRP/NAT64; as a router next to another
+        # primary border router they stay stopped/idle.
+        if t.get('role') == 'leader' and (br.get('srp_server') != 'running' or br.get('nat64') != 'active'):
+            return None
+        return t
 
     # SRP, NAT64 and the border agent come up some 20 s after the node becomes leader.
-    wait_until('SRP server, NAT64 and border agent', br_services, 60)
-    check(True, 'SRP server running, NAT64 active, border agent active')
+    t = wait_until('border agent (and SRP/NAT64 when leader)', br_services, 60)
+    br = t['border_router']
+    check(True, f'border agent active, SRP {br["srp_server"]}, NAT64 {br["nat64"]} (role {t["role"]})')
     code, node = http('GET', '/node', port=8081)
     check(code == 200 and isinstance(node, dict), f'OTBR REST /node on port 8081 ({code})')
     code, ds = http('GET', '/node/dataset/active', port=8081)
     check(code == 200, f'OTBR REST active dataset ({code})')
     code, cli = http('POST', '/api/thread/cli', {'cmd': 'state', 'wait_ms': 300})
     check(code == 200 and ('leader' in cli['output'] or 'router' in cli['output']), f'web CLI state: {cli.get("output", "").split()[:1]}')
-    code, d = http('GET', '/api/thread/dataset?reveal=1')
-    check(code == 200 and len(d.get('tlvs', '')) > 40, 'dataset TLVs readable')
-    CTX['dataset'] = d['tlvs']
-    CTX['network_name'] = d['network_name']
 
 
 def tc05_zigbee_coordinator():
@@ -327,7 +335,9 @@ def tc10_ota_rollback_slots():
     slot = next(x for x in status()['slots'] if x['running'])
     check(slot['state'] == 'valid', 'confirmed valid after 60 s')
     code, r = http('POST', '/api/ota/esphome', raw=image, timeout=120)
-    check(code == 400, 'gateway image refused for the ESPHome slot')
+    check(code in (400, 413), f'gateway image refused for the ESPHome slot ({code})')
+    esphome = next(x for x in status()['slots'] if x['label'] == 'esphome')
+    check(esphome.get('project') == 'ble-proxy-p4gw', 'ESPHome slot left intact')
 
 
 def tc11_auth():
@@ -364,12 +374,79 @@ def tc13_rcp_reflash():
     check('C6 now runs' in logs_since(0), 'flash log present')
 
 
+def tc14_sound_service():
+    """Sound service: microphone captures, YAMNet loads and runs within the CPU budget."""
+    code, st = http('GET', '/api/sound/status')
+    if not st.get('running'):
+        http('POST', '/api/sound/config', {'enabled': True, 'inference': True})
+        http('POST', '/api/reboot', {})
+        wait_restart(status()['role']['desired'])
+    st = wait_until('inference runs', lambda: (lambda s: s if s['inference']['runs'] >= 10 else None)(
+        http('GET', '/api/sound/status')[1]), 120, 3)
+    check(st['running'] and st['read_errors'] == 0, f'capturing, level {st["level_db"]} dBFS, floor {st["floor_db"]}')
+    check(st['model']['loaded'], f'model loaded in {st["model"]["load_ms"]} ms')
+    inf = st['inference']
+    check(inf['avg_ms'] < 150, f'inference {inf["avg_ms"]} ms avg, {inf["max_ms"]} ms max')
+    time.sleep(35)
+    inf = http('GET', '/api/sound/status')[1]['inference']
+    check(inf['enabled'] and inf['cpu_pct'] < 40, f'CPU {inf["cpu_pct"]} % of core 1, still enabled')
+    code, wav = http('GET', '/api/sound/clip?seconds=2', timeout=30)
+    check(code == 200 and isinstance(wav, bytes) and wav[:4] == b'RIFF' and len(wav) == 44 + 2 * 16000 * 2,
+          '2 s WAV clip')
+
+
+def tc15_sound_recognition():
+    """Recognition of sounds played by this computer's speaker (needs --play, board within earshot)."""
+    if not ARGS.play:
+        raise Fail('skipped: run with --play next to the board')
+    import subprocess
+
+    def heard(names, seconds=15):
+        end = time.time() + seconds
+        best = {}
+        while time.time() < end:
+            for t in http('GET', '/api/sound/status')[1]['inference'].get('top', []):
+                best[t['name']] = max(best.get(t['name'], 0), t['score'])
+            time.sleep(1)
+        return {n: best.get(n, 0) for n in names}
+
+    subprocess.Popen(['say', 'Hello, this is a recognition test. One, two, three, four, five, six, seven.'])
+    sc = heard(['Speech'])
+    check(sc['Speech'] >= 0.6, f'speech {sc["Speech"]:.2f}')
+    clips = sorted(glob.glob(os.path.join(ROOT, 'tools/yamnet/data/esc50/*-A-0.wav')))
+    subprocess.Popen(['sh', '-c', ' ; '.join(f'afplay "{c}"' for c in clips)])
+    sc = heard(['Dog', 'Bark'])
+    check(max(sc.values()) >= 0.5, f'dog {sc["Dog"]:.2f}, bark {sc["Bark"]:.2f}')
+
+
+def tc16_thread_dataset_isolation():
+    """Border router keeps its own network after the router role joined another one."""
+    switch('thread_br')
+    br_net = http('GET', '/api/thread/status')[1]['network_name']
+
+    def cli(cmd):
+        return http('POST', '/api/thread/cli', {'cmd': cmd, 'wait_ms': 300})[1]['output']
+
+    cli('dataset init new')
+    cli('dataset networkname P4TEST')
+    tlvs = cli('dataset tlvs').split()[0]
+    cli('dataset clear')
+    switch('thread_router')
+    code, r = http('POST', '/api/thread/dataset', {'tlvs': tlvs})
+    check(code == 200 and r.get('network_name') == 'P4TEST', 'router joined the test network')
+    switch('thread_br')
+    t = wait_until('border router network', lambda: (lambda t: t if t.get('network_name') else None)(
+        http('GET', '/api/thread/status')[1]), 60)
+    check(t['network_name'] == br_net, f'border router back on {br_net}')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
     ('TC07', tc07_zigbee_router), ('TC08', tc08_thread_router), ('TC09', tc09_esphome_roundtrip),
     ('TC10', tc10_ota_rollback_slots), ('TC11', tc11_auth), ('TC12', tc12_invalid_uploads),
-    ('TC13', tc13_rcp_reflash),
+    ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
+    ('TC16', tc16_thread_dataset_isolation),
 ]
 
 
@@ -381,6 +458,7 @@ def main():
     p.add_argument('--esphome-key')
     p.add_argument('--list', action='store_true')
     p.add_argument('--report', help='write results as JSON')
+    p.add_argument('--play', action='store_true', help='TC15: play test sounds on this computer')
     ARGS = p.parse_args()
     if ARGS.list:
         for tid, fn in TESTS:

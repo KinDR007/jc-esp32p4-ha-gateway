@@ -1,0 +1,50 @@
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+  11:20:50 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  11:20:50 ok: thread_br started without maintenance ('')
+  11:20:50 ok: active role is thread_br
+  11:20:50 switch took 13 s
+  11:20:50 ok: C6 runs ot_rcp
+  11:21:06 ok: Thread role leader, network P4GW-0A08, channel 24, RCP openthread-esp32/b774170ff46-b678a4f63; esp32c6;  2026-10-28 08:45:35 UTC
+  11:21:06 ok: border routing running
+  11:21:06 ok: dataset TLVs readable
+  11:21:08 ok: border agent active, SRP running, NAT64 active (role leader)
+  11:21:08 ok: OTBR REST /node on port 8081 (200)
+  11:21:08 ok: OTBR REST active dataset (200)
+  11:21:09 ok: web CLI state: ['leader']
+TC04 PASS (32 s) 
+
+TC08 Thread router: idle without dataset, joins after the dataset is applied.
+  11:21:18 back after restart: active=thread_router c6=ot_rcp uptime=7s
+  11:21:18 ok: thread_router started without maintenance ('')
+  11:21:18 ok: active role is thread_router
+  11:21:18 switch took 10 s
+  11:21:18 ok: C6 runs ot_rcp
+  11:21:18 ok: router mode
+  11:21:19 ok: dataset applied ({'network_name': 'P4GW-0A08'})
+  11:21:34 ok: Thread router role leader on P4GW-0A08
+TC08 PASS (25 s) 
+
+TC10 Gateway OTA: new image goes to the other slot and confirms itself after 60 s.
+  11:21:51 ok: upload accepted into gw_b
+  11:21:51 ok: written to the inactive slot
+  11:22:00 back after restart: active=thread_router c6=ot_rcp uptime=7s
+  11:22:00 ok: boots the new slot, pending verify
+  11:23:10 ok: confirmed valid after 60 s
+  11:23:12 ok: gateway image refused for the ESPHome slot (413)
+  11:23:12 ok: ESPHome slot left intact
+TC10 PASS (98 s) 
+
+TC14 Sound service: microphone captures, YAMNet loads and runs within the CPU budget.
+  11:23:12 ok: capturing, level -64.8000030517578 dBFS, floor -65.5
+  11:23:12 ok: model loaded in 481 ms
+  11:23:12 ok: inference 61.5999984741211 ms avg, 109.0999984741211 ms max
+  11:23:47 ok: CPU 5.5 % of core 1, still enabled
+  11:23:47 ok: 2 s WAV clip
+TC14 PASS (35 s) 
+
+TC15 Recognition of sounds played by this computer's speaker (needs --play, board within earshot).
+  11:24:02 ok: speech 1.00
+  11:24:17 ok: dog 0.71, bark 0.56
+TC15 PASS (30 s) 
+
+Summary: TC04 PASS, TC08 PASS, TC10 PASS, TC14 PASS, TC15 PASS

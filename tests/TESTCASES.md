@@ -19,6 +19,9 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 - `dist/` z `scripts/build_all.sh` (TC10, TC12 nahrávají `dist/p4gw.bin` a `dist/c6fw.bin`).
 - Bez hesla v UI (TC11 si heslo nastaví a zase odebere).
 - TC01–TC03 předpokládají první start; další testy navazují v pořadí (TC06 a TC08 používají stav z TC04/TC05).
+- TC04 v síti s jiným primárním border routerem: SRP a NAT64 této brány jsou neaktivní, test to toleruje.
+- **Pozor:** testy přepínají role. Border router se díky uloženému datasetu vrací do své sítě, ale během
+  testu není dostupný; neběžte je na bráně, na které právě závisí provoz domácnosti.
 
 ## Testovací případy
 
@@ -37,6 +40,9 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC11 | Heslo | nastavení, přístup bez/se/se špatným heslem, odebrání | 401 / 200 / 401, po odebrání opět 200 |
 | TC12 | Neplatné uploady | nesmysl do c6fw a gateway, pak platný c6fw | 400, uložené image nepoškozené, 4 balíky zpět |
 | TC13 | Vynucený reflash C6 | `POST /api/c6/reflash` | po restartu běží stejná role, v logu `C6 now runs` |
+| TC14 | Zvuková služba | zapnout mikrofon a rozpoznávání | zachytávání bez chyb, model načten, inference pod 150 ms, CPU jádra 1 pod 40 %, klip WAV 2 s |
+| TC15 | Rozpoznávání zvuků (`--play`) | `say` a ESC-50 štěkot z reproduktoru počítače u desky | Speech ≥ 0,6, Dog nebo Bark ≥ 0,5 |
+| TC16 | Oddělené Thread sítě rolí | router se připojí do testovací sítě, pak zpět na BR | border router zůstane ve své síti |
 
 ## Ruční testy (mimo automat)
 
