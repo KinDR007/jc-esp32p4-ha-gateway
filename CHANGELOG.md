@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.3 (2026-10-28)
 
 - Thread network map (Thread › Topology): routers with link quality between them, end devices,
   leader and border routers, vendor/model where devices report it (OpenThread mesh diagnostics,
@@ -28,8 +28,8 @@
   (`/api/identify`), the Identify button of any device in Zigbee › Network and devices, or the
   Zigbee Identify cluster of the router (Zigbee2MQTT, Home Assistant). The board has no controllable
   LED.
-- Map details box no longer covers the map: it takes the free place beside the drawing or the
-  corner hiding the fewest devices and highlighted links (Thread and Zigbee map).
+- Map details box in the top left corner of the map for every device (Thread and Zigbee map),
+  no longer next to the pointer over the links.
 - Thread map: hovering a device highlights its links, as in the Zigbee map. The device lists under
   the maps no longer open the details box (map only). Test UI14.
 - Fix: the Zigbee2MQTT device list sometimes did not arrive after a restart (retained message
