@@ -113,11 +113,19 @@ UI09 Network surroundings: the last scan shows channels, spectrum and a recommen
 UI09 PASS
 
 UI10 Home Assistant: header shows who uses the gateway, settings find HA and test the Matter Server
-  ok: header user pill shown for thread_br (OTBR REST: OTBR REST: 192.168.88.189 · last contact 4m ago)
+  ok: header user pill shown for thread_br (OTBR REST: OTBR REST: 192.168.88.189 · last contact 15m ago)
   1 Home Assistant instance(s) found over mDNS
   ok: "Use" fills ws://192.168.88.201:5580/ws
   Matter Server test: OK: 11 Matter nodes ws://192.168.88.201:5580/ws
   ok: no uncaught script errors 
 UI10 PASS
 
-Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS, UI09 PASS, UI10 PASS
+UI11 C6 flashing: progress in the header on every page, gone when it ends
+  ok: header pill: Flashing C6 · 46 %
+  ok: stage in the tooltip
+  ok: strip under the header at 46%
+  ok: no banner on the page
+  ok: pill and strip gone after flashing
+UI11 PASS
+
+Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS, UI09 PASS, UI10 PASS, UI11 PASS

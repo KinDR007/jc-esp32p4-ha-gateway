@@ -29,6 +29,12 @@ html, body { margin: 0; background: var(--bg); color: var(--text);
   font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 /* Layout: header on top, section menu on the left (a drawer below 900 px), content on the right. */
 header { position: sticky; top: 0; z-index: 20; height: 52px; background: var(--panel); border-bottom: 1px solid var(--border); }
+/* C6 flashing: a pill with the percentage and a strip along the bottom edge of the header */
+#hdr-flash .progress { width: 70px; height: 6px; }
+#hdr-flash .progress > div { background: var(--warn); }
+#hdr-flash { border-color: var(--warn); }
+#flash-strip { position: absolute; left: 0; bottom: -1px; height: 3px; width: 0; background: var(--warn); transition: width .4s; display: none; }
+header.flashing #flash-strip { display: block; }
 .bar { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 12px; }
 .brand { font-weight: 650; font-size: 16px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .brand small { color: var(--muted); font-weight: 400; }
@@ -60,7 +66,7 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
   main { padding: 14px; }
   .brand small, #hdr-uptime { display: none; }
 }
-@media (max-width: 560px) { #hdr-eth, #hdr-role, #hdr-peer { display: none; } }
+@media (max-width: 560px) { #hdr-eth, #hdr-role, #hdr-peer, #hdr-flash { display: none; } }
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .grid > .wide { grid-column: 1 / -1; }
@@ -177,6 +183,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <span class="pill" id="hdr-role"><span class="dot"></span><span>…</span></span>
     <span class="pill" id="hdr-eth"><span class="dot"></span><span>Ethernet</span></span>
     <span class="pill hidden" id="hdr-peer"><span class="dot"></span><span></span></span>
+    <span class="pill hidden" id="hdr-flash"><span class="dot warn"></span><span id="hdr-flash-text"></span><span class="progress"><div></div></span></span>
     <div class="spacer"></div>
     <span class="muted" id="hdr-uptime"></span>
     <span class="prefs row">
@@ -184,6 +191,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <select id="pref-theme" title="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
     </span>
   </div>
+  <div id="flash-strip"></div>
 </header>
 <div class="layout">
   <nav id="side"></nav>
@@ -933,6 +941,16 @@ function renderHeader() {
   const e = status.eth;
   $('#hdr-eth').innerHTML = `<span class="dot ${e.link ? 'ok' : 'bad'}"></span><span>${e.link ? (e.speed || '') + ' Mb/s' : 'link down'}</span>`;
   $('#hdr-uptime').textContent = 'up ' + fmtUptime(status.uptime_s);
+  /* C6 flashing, visible on every page */
+  const fl = status.c6.flash;
+  $('header').classList.toggle('flashing', !!fl.busy);
+  $('#hdr-flash').classList.toggle('hidden', !fl.busy);
+  if (fl.busy) {
+    $('#hdr-flash-text').textContent = `${L('Flashing C6', 'Flashování C6')} · ${fl.percent} %`;
+    $('#hdr-flash .progress > div').style.width = fl.percent + '%';
+    $('#hdr-flash').title = fl.stage;
+    $('#flash-strip').style.width = fl.percent + '%';
+  }
   /* who uses the gateway: Zigbee2MQTT keeps a TCP session; Home Assistant calls the OTBR REST API
    * only now and then (start, Thread settings, dataset changes), so for Thread the last contact */
   const rs = status.role_status || {}, peer = $('#hdr-peer');
@@ -964,11 +982,8 @@ function haAge(rs) {
 
 function maintenanceBanner() {
   const r = status.role;
-  const flash = status.c6.flash;
   let html = '';
-  if (flash.busy) {
-    html += `<div class="alert"><b>Flashing the C6:</b> ${esc(flash.stage)}<div class="progress" style="margin-top:8px"><div style="width:${flash.percent}%"></div></div></div>`;
-  }
+
   if (r.maintenance) html += `<div class="alert bad"><b>Maintenance mode:</b> ${esc(r.maintenance)}</div>`;
   if (!status.auth) html += `<div class="alert">No password set. Anyone on the LAN can switch roles and read the Thread network key. Set one under <b>System</b>.</div>`;
   return html;

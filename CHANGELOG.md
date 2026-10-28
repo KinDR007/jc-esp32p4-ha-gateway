@@ -12,6 +12,8 @@
   System › Settings and defaults to the add-on on that host. The header shows who uses the
   gateway: Zigbee2MQTT connected or not, for Thread the last OTBR REST contact (kept across
   restarts). Test UI10.
+- C6 flashing progress in the header on every page (pill with percentage, strip along the
+  header) instead of a banner on some pages. Test UI11.
 - Fix: Czech labels of the Topology, Live and Events menu items and of the C6 tile were lost in
   v1.2; UI06 now checks that every menu item is translated.
 

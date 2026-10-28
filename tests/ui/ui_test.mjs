@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI10).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI11).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -286,6 +286,27 @@ await test('UI10', 'Home Assistant: header shows who uses the gateway, settings 
     await page.fill('#matter-url', before); // not saved: leave the setting as it was
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI11', 'C6 flashing: progress in the header on every page, gone when it ends', async () => {
+  let busy = true;
+  await page.route(`${base}api/status`, async route => {
+    const res = await route.fetch();
+    const j = await res.json();
+    if (busy) j.c6.flash = { busy: true, percent: 46, stage: 'writing 0x10000 (232 kB)', last_error: '' };
+    await route.fulfill({ response: res, json: j });
+  });
+  await tab('sound/events');
+  await page.waitForFunction(() => !document.querySelector('#hdr-flash').classList.contains('hidden'), null, { timeout: 15000 });
+  check((await page.textContent('#hdr-flash')).includes('46 %'), `header pill: ${(await page.textContent('#hdr-flash')).trim()}`);
+  check(await page.getAttribute('#hdr-flash', 'title') === 'writing 0x10000 (232 kB)', 'stage in the tooltip');
+  const strip = await page.$eval('#flash-strip', e => [getComputedStyle(e).display, e.style.width]);
+  check(strip[0] === 'block' && strip[1] === '46%', `strip under the header at ${strip[1]}`);
+  check(!(await page.textContent('#main')).includes('Flash'), 'no banner on the page');
+  busy = false;
+  await page.waitForFunction(() => document.querySelector('#hdr-flash').classList.contains('hidden'), null, { timeout: 15000 });
+  check(await page.$eval('#flash-strip', e => getComputedStyle(e).display) === 'none', 'pill and strip gone after flashing');
+  await page.unroute(`${base}api/status`);
 });
 
 await browser.close();
