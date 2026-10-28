@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "freertos/event_groups.h"
+#include "lwip/ip6_addr.h"
 #include "gw.h"
 #include "sdkconfig.h"
 
@@ -51,7 +52,9 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
         if (event->esp_netif != s_netif) {
             return;
         }
-        ESP_LOGI(TAG, "IPv6 " IPV6STR, IPV62STR(event->ip6_info.ip));
+        char addr[48];
+        ip6addr_ntoa_r((const ip6_addr_t *)&event->ip6_info.ip, addr, sizeof(addr));
+        ESP_LOGI(TAG, "IPv6 %s", addr);
         if (esp_netif_ip6_get_addr_type(&event->ip6_info.ip) == ESP_IP6_ADDR_IS_GLOBAL ||
             esp_netif_ip6_get_addr_type(&event->ip6_info.ip) == ESP_IP6_ADDR_IS_UNIQUE_LOCAL) {
             xEventGroupSetBits(s_events, BIT_IP6);
@@ -143,7 +146,7 @@ cJSON *gw_eth_status(void)
     esp_ip6_addr_t addrs[CONFIG_LWIP_IPV6_NUM_ADDRESSES];
     int count = s_netif ? esp_netif_get_all_ip6(s_netif, addrs) : 0;
     for (int i = 0; i < count; i++) {
-        snprintf(buf, sizeof(buf), IPV6STR, IPV62STR(addrs[i]));
+        ip6addr_ntoa_r((const ip6_addr_t *)&addrs[i], buf, sizeof(buf));
         cJSON_AddItemToArray(ip6, cJSON_CreateString(buf));
     }
     return json;

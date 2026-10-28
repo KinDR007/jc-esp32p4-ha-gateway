@@ -255,7 +255,7 @@ views.overview = () => {
       ['IPv4', esc(e.ipv4)], ['Gateway', esc(e.gateway)], ['IPv6', (e.ipv6 || []).map(esc).join('<br>')],
       ['MAC', esc(e.mac)], ['Hostname', esc(s.hostname) + '.local'], ['Link changes', e.link_changes]])}</div>
     <div class="card"><h3>System</h3>${dl([
-      ['Firmware', esc(s.version)], ['ESP-IDF', esc(s.idf)], ['Chip revision', 'v' + (s.chip_revision / 100).toFixed(2)],
+      ['Firmware', esc(s.version)], ['ESP-IDF', esc(s.idf)], ['Chip revision', `v${Math.floor(s.chip_revision / 100)}.${s.chip_revision % 100}`],
       ['Uptime', fmtUptime(s.uptime_s)], ['Last reset', esc(s.reset_reason)],
       ['Temperature', s.temperature_c !== undefined ? s.temperature_c + ' °C' : ''],
       ['Heap (internal)', `${fmtBytes(h.internal_free)} free, min ${fmtBytes(h.internal_min)}`],
