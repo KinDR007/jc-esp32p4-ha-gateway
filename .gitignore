@@ -17,3 +17,4 @@ tools/yamnet/out/
 __pycache__/
 tools/yamnet/out_*.log
 tests/ui/node_modules/
+tools/web/node_modules/

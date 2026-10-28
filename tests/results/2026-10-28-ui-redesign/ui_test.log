@@ -1,0 +1,103 @@
+UI01 every tab renders without script errors or error toasts
+  ok: overview: opened, no error toast
+  ok: role: opened, no error toast
+  ok: thread/info: opened, no error toast
+  ok: thread/topology: opened, no error toast
+  ok: thread/diag: opened, no error toast
+  ok: thread/settings: opened, no error toast
+  ok: zigbee/info: opened, no error toast
+  ok: zigbee/diag: opened, no error toast
+  ok: zigbee/backups: opened, no error toast
+  ok: sound/live: opened, no error toast
+  ok: sound/events: opened, no error toast
+  ok: sound/log: opened, no error toast
+  ok: sound/classes: opened, no error toast
+  ok: ha/guide: opened, no error toast
+  ok: ha/mqtt: opened, no error toast
+  ok: ha/esphome: opened, no error toast
+  ok: system/info: opened, no error toast
+  ok: system/firmware: opened, no error toast
+  ok: system/diag: opened, no error toast
+  ok: system/settings: opened, no error toast
+  ok: system/maint: opened, no error toast
+  ok: no uncaught script errors 
+UI01 PASS
+
+UI02 Sound: every "HA automation" button shows the automation for its entity
+  ok: 22 events listed
+  ok: all 22 automation dialogs open with a valid entity id and no error
+UI02 PASS
+
+UI03 Sound: event editor opens with the event and cancels without changes
+  ok: editor open
+  ok: event id filled
+  ok: configuration unchanged after cancel
+UI03 PASS
+
+UI04 Sound: search filters the tree of all sounds
+  ok: 3 matching sounds shown
+UI04 PASS
+
+UI05 Thread: "Copy TLVs" shows the dataset (border router or router role only)
+  ok: no error toast (Copied to the clipboard)
+  ok: dataset TLVs shown (222 hex chars)
+UI05 PASS
+
+UI06 Language: Czech translates every tab, keeps sound names, English restores the original
+  ok: html lang = cs
+  ok: Overview menu item reads "Přehled"
+  ok: overview: no error toast
+  ok: role: no error toast
+  ok: thread/info: no error toast
+  ok: thread/topology: no error toast
+  ok: thread/diag: no error toast
+  ok: thread/settings: no error toast
+  ok: zigbee/info: no error toast
+  ok: zigbee/diag: no error toast
+  ok: zigbee/backups: no error toast
+  ok: sound/live: no error toast
+  ok: sound/events: no error toast
+  ok: sound events page translated
+  ok: event shown by its Czech name (Řeč)
+  ok: "Heard now" labels a class of that event in Czech (Řeč  class )
+  ok: sound/log: no error toast
+  ok: sound/classes: no error toast
+  ok: sound class names stay untranslated
+  ok: ha/guide: no error toast
+  ok: ha/mqtt: no error toast
+  ok: ha/esphome: no error toast
+  ok: system/info: no error toast
+  ok: system/firmware: no error toast
+  ok: system/diag: no error toast
+  ok: system/settings: no error toast
+  ok: system/maint: no error toast
+  ok: language kept after reload
+  ok: English restores "Overview"
+  ok: no Czech text left on the page
+  ok: no uncaught script errors 
+UI06 PASS
+
+UI07 Theme: light, dark and system switch the page colours and persist
+  ok: light: data-theme=light (rgb(244, 246, 249))
+  ok: dark: different background (rgb(15, 19, 24))
+  ok: dark kept after reload
+  ok: system + light OS: no attribute, light background
+  ok: system + dark OS: dark background
+UI07 PASS
+
+UI08 Navigation: left menu with sub pages, deep links, mobile drawer, explanation tooltips
+  ok: Thread sub pages listed (thread/info, thread/topology, thread/diag, thread/settings)
+  ok: desktop: menu on the left, no menu button
+  ok: every menu icon has an SVG path
+  ok: deep link #system/diag opens that page after a reload
+  ok: old #tools link lands on System → Diagnostics
+  ok: Temperature has an explanation icon
+  ok: hover shows the explanation (Internal temperature sensor of the P4 di…)
+  ok: phone: menu button shown
+  ok: phone: menu hidden
+  ok: menu button opens the drawer
+  ok: choosing a page closes the drawer
+  ok: no uncaught script errors 
+UI08 PASS
+
+Summary: UI01 PASS, UI02 PASS, UI03 PASS, UI04 PASS, UI05 PASS, UI06 PASS, UI07 PASS, UI08 PASS

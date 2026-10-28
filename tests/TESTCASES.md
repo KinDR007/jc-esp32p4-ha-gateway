@@ -61,12 +61,13 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 
 | ID | Co ověřuje | Očekávaný výsledek |
 |---|---|---|
-| UI01 | všechny záložky | žádná chybová hláška ani nezachycená výjimka JS |
+| UI01 | všechny stránky levého menu (sekce i podsekce) | stránka se otevře (adresa `#sekce/podsekce`), žádná chybová hláška ani nezachycená výjimka JS |
 | UI02 | Sound → „HA automation“ u každé události | otevře se dialog se šablonou, entity `event.`/`binary_sensor.<host>_snd_<id>`, žádná chyba |
 | UI03 | editor události | otevře se s daty, „Cancel“ nic nezmění |
 | UI04 | hledání ve stromu zvuků | „aircraft“ zobrazí jen odpovídající zvuky |
 | UI05 | Thread → „Copy TLVs“ (role Thread) | dialog s hex datasetem, žádná chyba |
 | UI06 | jazyk CZ, všechny záložky, pak EN | záložky a texty česky (`Přehled`), jména zvuků zůstanou anglicky, události mají český název (i v „Právě slyším“), volba přežije reload, EN vrátí původní texty |
+| UI08 | navigace a vysvětlivky | podsekce Thread v menu, ikony mají SVG, odkaz `#system/diag` po reloadu, starý `#tools` vede na Systém › Diagnostika, ⓘ u Teploty ukáže vysvětlení, na mobilu výsuvné menu (otevře se ☰, zavře výběrem) |
 | UI07 | vzhled světlý / tmavý / systém | `data-theme` a barva pozadí se mění, volba přežije reload, „systém“ sleduje nastavení OS |
 
 ## Ruční testy (mimo automat)

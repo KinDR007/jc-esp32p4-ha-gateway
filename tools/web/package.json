@@ -1,0 +1,9 @@
+{
+  "name": "p4gw-web-tools",
+  "private": true,
+  "description": "Generates the icon block of the gateway web UI",
+  "type": "module",
+  "dependencies": {
+    "@mdi/js": "7.4.47"
+  }
+}

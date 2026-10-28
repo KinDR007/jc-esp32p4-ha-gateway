@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Web UI redesign: left menu with sub pages (Information / Diagnostics / Settings pattern, Tools
+  merged into System), deep links `#section/page`, drawer menu on phones, wider tiles, Material
+  Design Icons embedded as SVG (`tools/web/gen_icons.mjs`), explanation tooltips (ⓘ) for values,
+  network devices, roles and actions in Czech and English. Browser test UI08.
+- Detailed hardware info: P4 CPU load per core, temperature min/max, flash/PSRAM/NVS usage, MAC,
+  build fingerprint; C6 MAC, chip revision, flash size and flash count (read from its bootloader
+  at the next flashing). The C6 radio firmwares do not report the C6 temperature.
+
 - Web UI in Czech and English (picked from the browser language, switch in the header) and a
   light / dark / system theme switch. Browser tests UI06–UI07.
 - Household preset: clap, repeated clapping and finger snap events.

@@ -79,7 +79,8 @@ docs/                  hardware, installation, Home Assistant, assignment, schem
 
 ## Web UI and API
 
-Port 80, single page embedded in the firmware, in Czech or English with a light, dark or system
+Port 80, single page embedded in the firmware with a left menu (sections and sub pages, deep links
+`#section/page`), in Czech or English with a light, dark or system
 theme (switches in the header, remembered by the browser). HTTP Basic auth (user `admin`) once a password is
 set. Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/ota/{gateway,esphome,c6fw}`,
 `/api/c6/{backup,reflash,zigbee-snapshot}`, `/api/thread/{status,dataset,cli}`,

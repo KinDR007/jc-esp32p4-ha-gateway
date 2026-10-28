@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI07).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI08).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -52,7 +52,17 @@ if (args.password) {
 }
 
 const toastText = () => page.textContent('#toast');
-const tab = async id => { await page.click(`nav button[data-tab=${id}]`); await page.waitForTimeout(600); };
+// every page of the left menu (section/sub page)
+const ROUTES = ['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/info', 'zigbee/diag',
+  'zigbee/backups', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
+  'system/info', 'system/firmware', 'system/diag', 'system/settings', 'system/maint'];
+const tab = async route => {
+  const [sec] = route.split('/');
+  // the section link opens its first sub page and lists the others
+  await page.click(`#side a[data-route="${sec}"]`);
+  if (route.includes('/')) await page.click(`#side a[data-route="${route}"]`);
+  await page.waitForTimeout(600);
+};
 
 await page.goto(base);
 await page.waitForSelector('.card', { timeout: 20000 });
@@ -60,18 +70,18 @@ const status = await page.evaluate(() => fetch('/api/status', { headers: session
 const hostId = status.hostname.replace(/-/g, '_');
 
 await test('UI01', 'every tab renders without script errors or error toasts', async () => {
-  for (const id of ['overview', 'role', 'thread', 'zigbee', 'sound', 'ha', 'tools', 'system']) {
+  for (const id of ROUTES) {
     await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
     await tab(id);
     await page.waitForTimeout(1200);
     const t = await toastText();
-    check(!t.startsWith('Error'), `${id}: no error toast${t ? ` (${t})` : ''}`);
+    check(!t.startsWith('Error') && await page.evaluate(r => location.hash === '#' + r, id), `${id}: opened, no error toast${t ? ` (${t})` : ''}`);
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
 await test('UI02', 'Sound: every "HA automation" button shows the automation for its entity', async () => {
-  await tab('sound');
+  await tab('sound/events');
   await page.waitForSelector('button[data-ev-yaml]', { timeout: 20000 });
   const n = await page.$$eval('button[data-ev-yaml]', b => b.length);
   check(n > 0, `${n} events listed`);
@@ -105,6 +115,8 @@ await test('UI03', 'Sound: event editor opens with the event and cancels without
 });
 
 await test('UI04', 'Sound: search filters the tree of all sounds', async () => {
+  await tab('sound/classes');
+  await page.waitForSelector('.cls-row', { state: 'attached', timeout: 20000 });
   await page.fill('#cls-search', 'aircraft');
   await page.waitForTimeout(400);
   const visible = await page.$$eval('.cls-row', rs => rs.filter(r => r.style.display !== 'none').length);
@@ -117,7 +129,7 @@ await test('UI05', 'Thread: "Copy TLVs" shows the dataset (border router or rout
     console.log('  skipped: no Thread role active');
     return;
   }
-  await tab('thread');
+  await tab('thread/settings');
   await page.waitForSelector('#ds-copy', { timeout: 10000 });
   await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
   await page.click('#ds-copy');
@@ -133,20 +145,23 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
   await page.selectOption('#pref-lang', 'cs');
   await page.waitForTimeout(800);
   check(await page.getAttribute('html', 'lang') === 'cs', 'html lang = cs');
-  check((await page.textContent('nav button[data-tab=overview]')).trim() === 'Přehled', 'Overview tab reads "Přehled"');
-  for (const id of ['overview', 'role', 'thread', 'zigbee', 'sound', 'ha', 'tools', 'system']) {
+  check((await page.textContent('#side a[data-route=overview]')).trim() === 'Přehled', 'Overview menu item reads "Přehled"');
+  for (const id of ROUTES) {
     await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
     await tab(id);
     await page.waitForTimeout(1200);
     const t = await toastText();
     check(!t.startsWith('Error') && !t.startsWith('Chyba'), `${id}: no error toast${t ? ` (${t})` : ''}`);
-    if (id === 'sound') {
-      check((await page.textContent('#main')).includes('Události posílané do Home Assistant'), 'sound tab content translated');
+    if (id === 'sound/classes') {
+      await page.waitForSelector('.cls-row', { state: 'attached', timeout: 20000 });
       check(await page.$$eval('.cls-row span[data-notr]', s => s.some(e => e.textContent === 'Speech')), 'sound class names stay untranslated');
+    }
+    if (id === 'sound/events') {
+      await page.waitForSelector('#ev-table b', { timeout: 20000 });
+      check((await page.textContent('#main')).includes('Události posílané do Home Assistant'), 'sound events page translated');
       const ev = (await page.evaluate(() => fetch('/api/sound/events').then(r => r.json()))).events.find(e => e.name_cs);
       if (ev) check(await page.$$eval('#ev-table b', (b, n) => b.some(x => x.textContent === n), ev.name_cs), `event shown by its Czech name (${ev.name_cs})`);
       if (ev) {
-        await page.waitForSelector('#snd-top table', { timeout: 10000 });
         const label = await page.evaluate(([i, n]) => typeof heardName === 'function' ? heardName({ index: i, name: n }) : '', [ev.classes[0], 'class']);
         check(label.includes(ev.name_cs), `"Heard now" labels a class of that event in Czech (${label.replace(/<[^>]+>/g, ' ')})`);
       }
@@ -157,7 +172,7 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
   check(await page.inputValue('#pref-lang') === 'cs', 'language kept after reload');
   await page.selectOption('#pref-lang', 'en');
   await page.waitForTimeout(800);
-  check((await page.textContent('nav button[data-tab=overview]')).trim() === 'Overview', 'English restores "Overview"');
+  check((await page.textContent('#side a[data-route=overview]')).trim() === 'Overview', 'English restores "Overview"');
   check(!/[ěščřžůť]/.test(await page.innerText('body')), 'no Czech text left on the page');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
@@ -179,6 +194,42 @@ await test('UI07', 'Theme: light, dark and system switch the page colours and pe
   await page.emulateMedia({ colorScheme: 'dark' });
   check(await bg() === dark, 'system + dark OS: dark background');
   await page.emulateMedia({ colorScheme: null });
+});
+
+await test('UI08', 'Navigation: left menu with sub pages, deep links, mobile drawer, explanation tooltips', async () => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await tab('thread/info');
+  const subs = await page.$$eval('#side .subs a', a => a.map(x => x.dataset.route));
+  check(subs.join() === 'thread/info,thread/topology,thread/diag,thread/settings', `Thread sub pages listed (${subs.join(', ')})`);
+  check(await page.isVisible('#side') && !(await page.isVisible('#menu-btn')), 'desktop: menu on the left, no menu button');
+  check(await page.$$eval('#side svg.mdi path', p => p.every(x => (x.getAttribute('d') || '').length > 10)), 'every menu icon has an SVG path');
+  await page.goto(base + '#system/diag');
+  await page.waitForSelector('#log', { timeout: 20000 });
+  check(await page.$eval('#side a.cur', a => a.dataset.route) === 'system/diag', 'deep link #system/diag opens that page after a reload');
+  await page.goto(base + '#tools');
+  await page.waitForSelector('#log', { timeout: 20000 });
+  check(await page.evaluate(() => location.hash) === '#system/diag', 'old #tools link lands on System → Diagnostics');
+  await page.goBack();
+  await page.waitForTimeout(800);
+  await tab('overview');
+  const t = await page.$('#main .tip[data-tip="Temperature"]');
+  check(!!t, 'Temperature has an explanation icon');
+  await t.hover();
+  await page.waitForTimeout(200);
+  check(await page.isVisible('#tipbox') && (await page.textContent('#tipbox')).includes('P4'), `hover shows the explanation (${(await page.textContent('#tipbox')).slice(0, 40)}…)`);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.waitForTimeout(400);
+  check(await page.isVisible('#menu-btn'), 'phone: menu button shown');
+  const x = () => page.$eval('#side', el => el.getBoundingClientRect().right);
+  check(await x() <= 0, 'phone: menu hidden');
+  await page.click('#menu-btn');
+  await page.waitForTimeout(400);
+  check(await x() > 100, 'menu button opens the drawer');
+  await page.click('#side a[data-route="role"]');
+  await page.waitForTimeout(600);
+  check(await x() <= 0 && await page.evaluate(() => location.hash) === '#role', 'choosing a page closes the drawer');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
 await browser.close();
