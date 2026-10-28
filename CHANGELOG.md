@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Web UI redesign: left menu with sub pages (Information / Diagnostics / Settings pattern, Tools
-  merged into System), deep links `#section/page`, drawer menu on phones, wider tiles, Material
+  merged into System), two tiles per row with one label column width, roles grouped per function
+  (Thread, Zigbee, ESPHome), deep links `#section/page`, drawer menu on phones, wider tiles, Material
   Design Icons embedded as SVG (`tools/web/gen_icons.mjs`), explanation tooltips (ⓘ) for values,
   network devices, roles and actions in Czech and English. Browser test UI08.
 - C6 telemetry (temperature, free RAM, uptime, reset reason) from the Thread RCP, the Zigbee

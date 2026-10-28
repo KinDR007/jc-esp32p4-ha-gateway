@@ -61,7 +61,8 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
   .brand small, #hdr-uptime { display: none; }
 }
 @media (max-width: 560px) { #hdr-eth, #hdr-role { display: none; } }
-.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .grid > .wide { grid-column: 1 / -1; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
 .card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; text-transform: uppercase;
@@ -75,8 +76,11 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
   background: var(--text); color: var(--bg); box-shadow: 0 4px 16px rgba(0,0,0,.25); pointer-events: none; display: none; }
 .card + .card, .grid + .card, .card + .grid, main > * + *, #thread-status > * + * { margin-top: 14px; }
 .grid > .card { margin-top: 0; }
-dl { display: grid; grid-template-columns: max-content 1fr; gap: 5px 16px; margin: 0; }
-dt { color: var(--muted); white-space: nowrap; }
+/* one label column width on every tile, so values line up across the whole UI */
+:root { --label-w: 210px; }
+@media (max-width: 560px) { :root { --label-w: 150px; } }
+dl { display: grid; grid-template-columns: var(--label-w) minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+dt { color: var(--muted); }
 dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 99px;
   background: var(--panel-2); border: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
@@ -111,10 +115,15 @@ pre { background: var(--code); border: 1px solid var(--border); border-radius: 8
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .log { height: 420px; white-space: pre; overflow: auto; }
-.roles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.role-group + .role-group { margin-top: 18px; }
+.role-group h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+.role-group h4 .mdi { color: var(--accent); }
+.roles { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .roles { grid-template-columns: minmax(0, 1fr); } }
 .role { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--panel); display: flex; flex-direction: column; gap: 8px; }
 .role.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.role h4 { margin: 0; font-size: 15px; }
+.role h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; }
+.role h4 .mdi { color: var(--accent); }
 .role p { margin: 0; color: var(--muted); flex: 1; }
 .progress { height: 8px; border-radius: 99px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--border); }
 .meter { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
@@ -437,7 +446,7 @@ const ROLES = {
   thread_router: { icon: 'router-wireless', name: 'Thread router', group: 'Thread', desc: 'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.' },
   zigbee_coordinator: { icon: 'zigbee', name: 'Zigbee coordinator', group: 'Zigbee', desc: 'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.' },
   zigbee_router: { icon: 'zigbee', name: 'Zigbee router', group: 'Zigbee', desc: 'Standalone Zigbee router (range extender) that joins your existing Zigbee network.' },
-  esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'Bluetooth', desc: 'Reboots into the ESPHome Bluetooth proxy image; the C6 runs esp-hosted. Return via the ESPHome device in HA.' },
+  esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'ESPHome', desc: 'Reboots into the ESPHome Bluetooth proxy image; the C6 runs esp-hosted. Return via the ESPHome device in HA.' },
 };
 
 async function api(path, opts = {}) {
@@ -915,18 +924,21 @@ views.overview = () => {
 views.role = () => {
   const active = activeRole(), desired = status.role.desired;
   const esphome = status.slots.find(x => x.label === 'esphome');
-  const cards = Object.entries(ROLES).map(([id, r]) => {
+  const card = ([id, r]) => {
     const disabled = id === 'esphome' && !esphome?.version;
+    const state = id === active ? pill('ok', 'active') : id === desired ? pill('warn', 'selected') : '';
     return `<div class="role ${id === active ? 'active' : ''}">
-      <div class="row"><span class="pill">${ic(r.icon)}${r.group}</span>${id === active ? pill('ok', 'active') : id === desired ? pill('warn', 'selected') : ''}</div>
-      <h4>${r.name}${tip('role:' + id)}</h4><p>${r.desc}${disabled ? '<br><span class="warn-text">Upload an ESPHome image under System first.</span>' : ''}</p>
+      <div class="row"><h4>${ic(r.icon)}<span>${r.name}</span>${tip('role:' + id)}</h4><span class="spacer"></span>${state}</div><p>${r.desc}${disabled ? '<br><span class="warn-text">Upload an ESPHome image under System first.</span>' : ''}</p>
       <div><button class="btn ${id === active ? '' : 'primary'}" data-role="${id}" ${id === active || disabled ? 'disabled' : ''}>${ic(id === active ? 'check' : 'swap-horizontal')}${id === active ? 'Running' : 'Switch'}</button></div>
     </div>`;
-  }).join('');
+  };
+  /* one row per function: Thread, Zigbee, ESPHome */
+  const groups = [['Thread', 'access-point-network'], ['Zigbee', 'zigbee'], ['ESPHome', 'bluetooth']].map(([g, icon]) =>
+    `<div class="role-group"><h4>${ic(icon)}<span>${g}</span></h4><div class="roles">${Object.entries(ROLES).filter(([, r]) => r.group === g).map(card).join('')}</div></div>`).join('');
   return maintenanceBanner() + `<div class="card">${h3('swap-horizontal', 'Select role')}
     <p class="muted">Switching restarts the gateway and reflashes the C6 when the role needs different radio firmware (about 30 s).
     Zigbee network data is saved before leaving a Zigbee role and restored when you come back. The Thread network is stored on the P4 and survives switching.</p>
-    <div class="roles">${cards}</div></div>`;
+    ${groups}</div>`;
 };
 
 const notThread = () => `<div class="card"><p class="muted">Thread is not the active role.</p></div>`;
@@ -1344,6 +1356,7 @@ async function loadSound() {
   if (!$('#snd-en')) return;
   let st;
   try { st = await api('/api/sound/status'); } catch (e) { return; }
+  if (!$('#snd-en')) return; /* the page changed while the request ran */
   const set = (id, fn) => { const el = $('#' + id); if (el && document.activeElement !== el) fn(el); };
   set('snd-en', el => { el.checked = st.enabled; });
   set('snd-ai', el => { el.checked = st.inference.enabled; });
