@@ -24,6 +24,7 @@ runs in Home Assistant. Open manual tests are listed in [TODO.md](TODO.md).
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, MQTT |
 | [docs/zadani.md](docs/zadani.md) | original assignment and feasibility analysis (Czech) |
+| [docs/sound-detection.md](docs/sound-detection.md) | sound event detection: research and proposal (Czech, pending) |
 | [tests/TESTCASES.md](tests/TESTCASES.md) | test cases (automated and manual) |
 | [tests/results/](tests/results/) | test runs, logs and reports |
 
