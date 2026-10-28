@@ -503,8 +503,9 @@ views.system = () => {
   <div class="grid">
     <div class="card"><h3>Settings</h3>
       <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
-      <label class="field"><span>Web UI password (user admin, empty disables)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
-      <div class="row"><button class="btn primary" id="set-save">Save</button></div></div>
+      <label class="field"><span>New web UI password (user admin)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
+      <div class="row"><button class="btn primary" id="set-save">Save</button>
+        <button class="btn danger" id="set-nopass" ${status.auth ? '' : 'disabled'}>Remove password</button></div></div>
     <div class="card"><h3>Maintenance</h3><div class="row">
       <button class="btn" id="sys-reboot">Restart</button>
       <button class="btn danger" id="sys-reflash">Reflash C6 now</button>
@@ -606,6 +607,12 @@ document.addEventListener('click', async e => {
         try { sessionStorage.setItem('auth', auth); } catch (err) { /* storage blocked */ }
       }
       toast(body.hostname ? 'Saved, restart to apply the hostname' : 'Saved');
+    } else if (t.id === 'set-nopass') {
+      if (!await confirmDialog('Remove the password?', 'Anyone on the LAN can then switch roles and read the Thread network key.')) return;
+      await api('/api/settings', { json: { password: '' } });
+      auth = null;
+      try { sessionStorage.removeItem('auth'); } catch (err) { /* storage blocked */ }
+      toast('Password removed');
     } else if (t.id === 'sys-reboot') {
       if (!await confirmDialog('Restart?', 'The active role stops for about 10 s.')) return;
       await api('/api/reboot', { method: 'POST' });
