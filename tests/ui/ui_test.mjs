@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI19).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI20).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -524,6 +524,22 @@ await test('UI19', 'Diagnostics: the log before the last restart downloads', asy
   const text = readFileSync(await dl.path(), 'utf8');
   check(dl.suggestedFilename().endsWith('-previous.log'), `file ${dl.suggestedFilename()}`);
   check(/^[IWE] \(/m.test(text), `log lines (${text.length} B)`);
+});
+
+await test('UI20', 'Settings backup: export downloads the settings, a foreign file and a cancelled import change nothing', async () => {
+  await tab('system/settings');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#set-export')]);
+  const file = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+  check(file.format === 'p4gw-settings' && !file.secrets && file.keys.role && !file.keys.password, `export without passwords, ${Object.keys(file.keys).length} keys`);
+  await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+  await page.setInputFiles('#set-import', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"format":"other"}') });
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.startsWith('Error'), null, { timeout: 3000 });
+  check(true, `foreign file refused: ${await toastText()}`);
+  await page.setInputFiles('#set-import', { name: 'ok.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(file)) });
+  await page.waitForSelector('#confirm[open]');
+  const text = await page.textContent('#confirm-text');
+  await page.keyboard.press('Escape');
+  check(text.includes(file.hostname) && !(await page.$('#busy-dlg[open]')), `confirmation names the source, cancel keeps the gateway running`);
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

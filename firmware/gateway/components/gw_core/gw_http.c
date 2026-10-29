@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "esp_check.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "gw.h"
 #include "mbedtls/base64.h"
@@ -120,11 +121,16 @@ esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message)
 
 cJSON *gw_http_read_json(httpd_req_t *req)
 {
-    if (req->content_len == 0 || req->content_len > MAX_JSON_BODY) {
+    return gw_http_read_json_max(req, MAX_JSON_BODY);
+}
+
+cJSON *gw_http_read_json_max(httpd_req_t *req, size_t max)
+{
+    if (req->content_len == 0 || req->content_len > max) {
         gw_http_send_error(req, req->content_len ? 413 : 400, "expected a JSON body");
         return NULL;
     }
-    char *body = malloc(req->content_len + 1);
+    char *body = heap_caps_malloc(req->content_len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!body) {
         gw_http_send_error(req, 500, "out of memory");
         return NULL;

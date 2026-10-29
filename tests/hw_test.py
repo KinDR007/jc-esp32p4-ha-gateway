@@ -404,6 +404,42 @@ def tc24_previous_log():
     check('restart in' not in logs_since(), 'the current log starts fresh')
 
 
+def tc25_settings_backup():
+    """Settings backup: export without board state, refused imports change nothing, import restores."""
+    code, full = http('GET', '/api/settings/export?secrets=1')
+    check(code == 200 and full.get('format') == 'p4gw-settings' and full['secrets'], f'export with secrets, {len(full["keys"])} keys')
+    board = {'bootcnt', 'gw_slot', 'c6_name', 'c6_sha', 'c6_force', 'c6_tries', 'c6_ok', 'ha_seen', 'fail_rst', 'netscan'}
+    check(not board & set(full['keys']), 'no per-board state keys')
+    check('role' in full['keys'] and 'br_dataset' in full['keys'], 'role and Thread dataset included')
+    code, plain = http('GET', '/api/settings/export')
+    check(not {'password', 'mqtt_pass'} & set(plain['keys']) and not plain['secrets'], 'passwords only with secrets=1')
+
+    def keys_now():
+        return http('GET', '/api/settings/export?secrets=1')[1]['keys']
+
+    test_url = 'ws://192.0.2.1:5580/ws'
+    bad = dict(full, keys=dict(full['keys'], matter_url={'str': test_url}, zz_bad={'blob': '***'}))
+    code, r = http('POST', '/api/settings/import', bad)
+    check(code == 400 and 'zz_bad' in r.get('error', ''), f'invalid base64 refused: {r.get("error")}')
+    code, r = http('POST', '/api/settings/import', dict(full, keys={'role': {'u8': 99}}))
+    check(code == 400, f'unknown role refused: {r.get("error")}')
+    code, r = http('POST', '/api/settings/import', {'format': 'other', 'keys': {}})
+    check(code == 400, 'other format refused')
+    check(keys_now() == full['keys'], 'refused imports changed nothing')
+
+    flashes = status()['c6']['chip']['flashes']
+    changed = dict(full, keys=dict(full['keys'], matter_url={'str': test_url}, c6_force={'u8': 1}))
+    code, r = http('POST', '/api/settings/import', changed)
+    check(code == 200 and r.get('restarting'), f'import accepted ({r})')
+    wait_restart(status()['role']['desired'])
+    now = keys_now()
+    check(now['matter_url']['str'] == test_url, 'imported value active after the restart')
+    check(status()['c6']['chip']['flashes'] == flashes, 'board key in the file ignored (no C6 reflash)')
+    code, r = http('POST', '/api/settings/import', full)
+    wait_restart(status()['role']['desired'])
+    check(keys_now() == full['keys'], 'original settings restored')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -723,7 +759,7 @@ TESTS = [
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
-    ('TC24', tc24_previous_log),
+    ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
 ]
 
 

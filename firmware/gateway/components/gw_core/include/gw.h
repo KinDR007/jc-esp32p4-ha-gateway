@@ -62,6 +62,12 @@ bool gw_config_get_blob(const char *key, void *out, size_t len);
 esp_err_t gw_config_set_blob(const char *key, const void *value, size_t len);
 esp_err_t gw_config_blob_size(const char *key, size_t *len);
 esp_err_t gw_config_erase(const char *key);
+/* Settings backup: the "p4gw" namespace without per-board state (boot counters, C6 state, last
+ * scan), passwords only with secrets. {"<key>": {"u8": n} | {"str": "..."} | {"blob": "<base64>"}} */
+cJSON *gw_config_export(bool secrets);
+/* Writes the keys of an export over the current ones (keys missing in it stay); per-board state
+ * keys are ignored. err names the first bad entry. */
+esp_err_t gw_config_import(const cJSON *keys, char *err, size_t err_len);
 
 /* ---- runtime state ---- */
 typedef struct {
@@ -111,6 +117,7 @@ esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
 esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message);
 /* Reads a JSON body (max 4 KiB). NULL after an error response was sent. */
 cJSON *gw_http_read_json(httpd_req_t *req);
+cJSON *gw_http_read_json_max(httpd_req_t *req, size_t max);
 /* Streams the request body to sink in full 4 KiB blocks (the last one may be shorter). */
 typedef esp_err_t (*gw_sink_fn)(void *ctx, uint32_t offset, const void *data, size_t len);
 esp_err_t gw_http_receive(httpd_req_t *req, gw_sink_fn sink, void *ctx);

@@ -84,6 +84,8 @@ board: Thread roles 13–15 s, Zigbee roles 25–27 s (C6 flash), ESPHome hand-o
 | C6 not responding | check jumpers, **System → Reflash C6 now** |
 | Bad gateway image | automatic rollback; otherwise `scripts/flash_p4.sh` |
 | Repeated crashes | after several crashes in a row the role is not started, UI stays reachable; download the core dump |
+| Repeated crashes, cause unknown | **System → Diagnostics → Log before the last restart** (last 16 KiB of the previous run, gone after a power cut) |
+| New board, erased NVS | **System → Settings → Settings backup**: export (with passwords if wanted) beforehand, import on the new board; the Zigbee network comes back from the C6 snapshots |
 | Restore factory C6 | write the full C6 backup with esptool over a USB-UART on JP1 20/22, IO9 (pin 24) to GND; the factory app can also be extracted from the P4 factory backup (embedded `network_adapter` image at 0x5f0000 of the tested board) |
 | Restore factory P4 | `esptool --chip esp32p4 write-flash 0 backups/p4_backup.bin` |
 

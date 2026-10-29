@@ -19,6 +19,10 @@
 - Log before the last restart: the last 16 KiB of log are also kept in internal RAM that startup
   does not clear, so after a requested, watchdog or panic restart the log of the previous run is
   available (`/api/logs/previous`, System › Diagnostics). Not kept over a power cut. Tests TC24, UI19.
+- Settings backup (System › Settings): export of the role, Thread datasets, MQTT, Home Assistant,
+  transmit power and sound settings as JSON, passwords only on request; import checks every entry
+  before writing, ignores per-board state (C6 firmware, counters) and restarts the gateway
+  (`/api/settings/export[?secrets=1]`, `/api/settings/import`). Tests TC25, UI20.
 
 ## v1.4 (2026-10-29)
 

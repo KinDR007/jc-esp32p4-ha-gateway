@@ -451,7 +451,7 @@ const CS = {
     'Publikuje bránu do Home Assistant přes MQTT discovery: roli, stav a diagnostiku jako entity, výběr role a tlačítko restartu. Potřebuje integraci MQTT a broker (např. doplněk Mosquitto).',
   // tools
   'Diagnostics': 'Diagnostika', 'Status JSON': 'Stav JSON', 'Thread JSON': 'Thread JSON', 'Zigbee JSON': 'Zigbee JSON',
-  'Download core dump': 'Stáhnout core dump', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
+  'Download core dump': 'Stáhnout core dump', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
   'next boot': 'příští start', 'Gateway firmware': 'Firmware brány', 'ESPHome image': 'ESPHome image', 'C6 firmware bundle': 'Balík firmwaru C6',
@@ -800,6 +800,7 @@ const TIPS = {
   'slot:gw_b': ['Gateway firmware slot B. Updates go to the slot that is not running.', 'Slot B firmwaru brány. Aktualizace jde vždy do slotu, který neběží.'],
   'slot:esphome': ['ESPHome BLE proxy image, started by the ESPHome role.', 'Image ESPHome BLE proxy, spouští ho role ESPHome.'],
   'State': ['valid: confirmed image; new: not started yet; pending: on trial until it runs stable.', 'valid: potvrzený image; new: ještě nespuštěný; pending: na zkoušku, dokud neběží stabilně.'],
+  'Settings backup': ['Role, Thread networks, MQTT, Home Assistant, transmit power and sound settings as one file, for a new board or after an NVS erase. Board state (C6 firmware, counters) is not part of it. Zigbee network data is backed up separately (C6 snapshots).', 'Role, sítě Thread, MQTT, Home Assistant, vysílací výkon a nastavení zvuku v jednom souboru, pro novou desku nebo po smazání NVS. Stav desky (firmware C6, čítače) v něm není. Data sítě Zigbee se zálohují zvlášť (snapshoty C6).'],
   'Previous log': ['The last 16 KiB of log before the last restart (requested, watchdog or crash). Not kept over a power cut.', 'Posledních 16 KiB logu před posledním restartem (vyžádaným, watchdogem i pádem). Výpadek napájení ho nepřežije.'],
   'Core dump': ['Crash record of the last panic, for debugging. Empty when the gateway never crashed.', 'Záznam posledního pádu pro ladění. Prázdný, když brána nespadla.'],
   'Restart': ['Restarts the P4; the active role is back after about 10 s.', 'Restartuje P4; aktivní role naběhne asi za 10 s.'],
@@ -1644,6 +1645,12 @@ document.addEventListener('change', e => {
   if (id === 'ev-add') { addChip('ev-add', 'classes', 'ev-classes'); return; }
   if (id === 'ev-add-sup') { addChip('ev-add-sup', 'suppress', 'ev-suppress'); return; }
   if (id === 'ev-thr') { $('#ev-thr-v').textContent = e.target.value; return; }
+  if (id === 'set-import') {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (f) importSettings(f).catch(err => toast('Error: ' + err.message));
+    return;
+  }
   if (id === 'ev-import') {
     const f = e.target.files[0];
     if (f) f.text().then(t => { const c = JSON.parse(t); sndExclude = new Set(c.exclude || []); sndDirty = false; return putEvents(c); }).then(() => renderTree()).catch(err => toast('Error: ' + err.message));
@@ -2531,7 +2538,12 @@ views['system/settings'] = () => `<div class="grid"><div class="card">${h3('home
     <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
     <label class="field"><span>New web UI password (user admin)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
     <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button>
-      <button class="btn danger" id="set-nopass" ${status.auth ? '' : 'disabled'}>${ic('lock-outline')}Remove password</button></div></div></div>`;
+      <button class="btn danger" id="set-nopass" ${status.auth ? '' : 'disabled'}>${ic('lock-outline')}Remove password</button></div></div>
+  <div class="card">${h3('backup-restore', 'Settings backup')}
+    <div class="row"><button class="btn" id="set-export">${ic('download')}Export</button>
+      <label><input type="checkbox" id="set-secrets"> Include passwords</label></div>
+    <div class="row"><label class="btn">${ic('upload')}Import<input type="file" id="set-import" accept=".json" hidden></label>${tip('Settings backup')}</div>
+    <p class="muted">${L('The file holds the Thread network keys: keep it private. Import restarts the gateway.', 'Soubor obsahuje klíče sítě Thread: uchovejte ho v soukromí. Import bránu restartuje.')}</p></div></div>`;
 
 views['system/maint'] = () => maintenanceBanner() + `<div class="grid"><div class="card">${h3('wrench-outline', 'Maintenance')}
     <div class="row"><button class="btn" id="sys-reboot">${ic('restart')}Restart</button>${tip('Restart')}</div>
@@ -2740,6 +2752,8 @@ document.addEventListener('click', async e => {
       waitForRestart();
     } else if (t.id === 'cd-get') {
       download('/api/coredump', 'coredump.elf');
+    } else if (t.id === 'set-export') {
+      await download('/api/settings/export' + ($('#set-secrets').checked ? '?secrets=1' : ''), status.hostname + '-settings.json');
     } else if (t.id === 'log-prev') {
       await download('/api/logs/previous', status.hostname + '-previous.log');
     } else if (t.id === 'cd-del') {
@@ -2840,6 +2854,16 @@ function upload(kind) {
 
 let restarting = false;
 /* modal: the restart and what follows it (C6 flashing, role start) blocks the UI until done */
+async function importSettings(file) {
+  const c = JSON.parse(await file.text());
+  if (c.format !== 'p4gw-settings') throw new Error(L('not a settings file of this gateway', 'není to soubor nastavení této brány'));
+  const when = c.exported ? new Date(c.exported * 1000).toLocaleString() : '?';
+  if (!await confirmDialog('Import settings?', L(`Settings of ${c.hostname} from ${when} (${Object.keys(c.keys || {}).length} items${c.secrets ? ', with passwords' : ''}) overwrite the current ones and the gateway restarts.`,
+    `Nastavení ${c.hostname} z ${when} (${Object.keys(c.keys || {}).length} položek${c.secrets ? ', s hesly' : ''}) přepíše současné a brána se restartuje.`))) return;
+  await api('/api/settings/import', { json: c });
+  toast('Settings imported: the gateway restarts');
+  waitForRestart();
+}
 async function waitForRestart(modal = true) {
   restarting = true;
   Object.assign(busy, { expect: modal, since: Date.now(), eta: null });

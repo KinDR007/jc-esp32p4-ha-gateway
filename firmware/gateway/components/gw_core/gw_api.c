@@ -786,6 +786,59 @@ static esp_err_t settings_post(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
+/* ---- settings backup ---- */
+
+#define SETTINGS_FORMAT "p4gw-settings"
+#define SETTINGS_MAX_BODY (64 * 1024)
+
+static esp_err_t settings_export_get(httpd_req_t *req)
+{
+    char query[32], value[8];
+    bool secrets = httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK &&
+                   httpd_query_key_value(query, "secrets", value, sizeof(value)) == ESP_OK && strcmp(value, "1") == 0;
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "format", SETTINGS_FORMAT);
+    cJSON_AddNumberToObject(json, "version", 1);
+    cJSON_AddStringToObject(json, "hostname", gw_state()->hostname);
+    cJSON_AddStringToObject(json, "firmware", esp_app_get_description()->version);
+    cJSON_AddNumberToObject(json, "exported", (double)time(NULL));
+    cJSON_AddBoolToObject(json, "secrets", secrets);
+    cJSON_AddItemToObject(json, "keys", gw_config_export(secrets));
+    char disposition[80];
+    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s-settings.json\"", gw_state()->hostname);
+    httpd_resp_set_hdr(req, "Content-Disposition", disposition);
+    return gw_http_send_json(req, json);
+}
+
+static esp_err_t settings_import_post(httpd_req_t *req)
+{
+    if (c6_progress()->busy) {
+        return gw_http_send_error(req, 409, "C6 flashing in progress");
+    }
+    cJSON *body = gw_http_read_json_max(req, SETTINGS_MAX_BODY);
+    if (!body) {
+        return ESP_OK;
+    }
+    const char *format = GW_JSON_STR(body, "format");
+    if (!format || strcmp(format, SETTINGS_FORMAT) != 0) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 400, "not a settings file of this gateway (format " SETTINGS_FORMAT ")");
+    }
+    char err[96] = "";
+    const cJSON *keys = cJSON_GetObjectItem(body, "keys");
+    esp_err_t ret = gw_config_import(keys, err, sizeof(err));
+    int count = cJSON_GetArraySize(keys);
+    cJSON_Delete(body);
+    if (ret != ESP_OK) {
+        return gw_http_send_error(req, ret == ESP_ERR_INVALID_ARG ? 400 : 500, err[0] ? err : esp_err_to_name(ret));
+    }
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "keys", count);
+    cJSON_AddBoolToObject(json, "restarting", true);
+    gw_restart_later(1000);
+    return gw_http_send_json(req, json);
+}
+
 /* ---- ping ---- */
 
 typedef struct {
@@ -933,6 +986,8 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/role", HTTP_POST, role_post);
     gw_http_register("/api/reboot", HTTP_POST, reboot_post);
     gw_http_register("/api/settings", HTTP_POST, settings_post);
+    gw_http_register("/api/settings/export", HTTP_GET, settings_export_get);
+    gw_http_register("/api/settings/import", HTTP_POST, settings_import_post);
     gw_http_register("/api/ota/gateway", HTTP_POST, gateway_upload);
     gw_http_register("/api/ota/esphome", HTTP_POST, esphome_upload);
     gw_http_register("/api/ota/c6fw", HTTP_POST, c6fw_upload);
