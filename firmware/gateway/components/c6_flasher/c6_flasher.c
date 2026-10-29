@@ -10,6 +10,7 @@
 #include "esp_heap_caps.h"
 #include "esp_loader.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "nvs.h"
 #include "esp_partition.h"
 #include "esp_rom_crc.h"
@@ -595,6 +596,7 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
 
     ESP_RETURN_ON_FALSE(s, ESP_ERR_NO_MEM, TAG, "no mem");
     s_progress.busy = true;
+    s_progress.started_us = esp_timer_get_time();
     s_progress.last_error[0] = '\0';
     progress(0, "verifying image");
 
@@ -715,6 +717,7 @@ esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
         return ESP_ERR_NO_MEM;
     }
     s_progress.busy = true;
+    s_progress.started_us = esp_timer_get_time();
     s_progress.last_error[0] = '\0';
     progress(0, "reading C6 flash");
     err = session_open(s);

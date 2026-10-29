@@ -312,6 +312,9 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddBoolToObject(prog, "busy", p->busy);
     cJSON_AddNumberToObject(prog, "percent", p->percent);
     cJSON_AddStringToObject(prog, "stage", p->stage);
+    if (p->busy) {
+        cJSON_AddNumberToObject(prog, "elapsed_s", (double)((esp_timer_get_time() - p->started_us) / 100000) / 10);
+    }
     cJSON_AddStringToObject(prog, "last_error", p->last_error);
     cJSON *snaps = cJSON_AddArrayToObject(c6, "snapshots");
     static const char *const snap_bundles[] = {"zigbee_ncp", "zigbee_router"};

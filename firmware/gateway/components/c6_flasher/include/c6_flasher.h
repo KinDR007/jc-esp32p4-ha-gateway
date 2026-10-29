@@ -48,6 +48,7 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     bool busy;
     int percent;
+    int64_t started_us; /* esp_timer time when the current operation started */
     char stage[48];
     char last_error[96];
 } c6_progress_t;

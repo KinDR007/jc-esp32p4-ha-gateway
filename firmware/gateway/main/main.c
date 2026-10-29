@@ -55,6 +55,10 @@ static bool ensure_c6(const char *bundle)
     ESP_LOGW(TAG, "C6: %s -> %s %s%s", current[0] ? current : "unknown", entry.name, entry.version,
              force ? " (forced)" : "");
 
+    /* Flash only once the web UI is reachable (it polls once a second), so it shows the whole progress. */
+    if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
     err = c6_flash_bundle(&entry, current);
     if (err != ESP_OK) {
         gw_set_maintenance("%s", c6_progress()->last_error);
@@ -215,6 +219,9 @@ void app_main(void)
     } else {
         if (netscan_full_pending()) {
             /* the scanner image runs on the C6 first; apply_role flashes the role image back */
+            if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
+                vTaskDelay(pdMS_TO_TICKS(2000));
+            }
             netscan_run_full();
         }
         apply_role(st->desired);
