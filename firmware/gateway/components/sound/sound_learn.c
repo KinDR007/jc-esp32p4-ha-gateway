@@ -492,8 +492,8 @@ static float suggested(const profile_t *p, bool *separable)
     } else {
         t = p->self_min;
     }
-    /* YAMNet embeddings are not negative: unrelated sounds still reach a cosine of about 0.4-0.5 */
-    float floor = p->type == TYPE_TONE ? 0.3f : 0.5f;
+    /* YAMNet embeddings are not negative: unrelated sounds still reach a cosine of 0.45-0.53 (TC28) */
+    float floor = p->type == TYPE_TONE ? 0.3f : 0.55f;
     t = t < floor ? floor : t > 0.98f ? 0.98f : t;
     return t;
 }

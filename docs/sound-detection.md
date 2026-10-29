@@ -379,8 +379,8 @@ Implementace (`firmware/gateway/components/sound/sound_learn.c`, UI Zvuk › Nau
 - **Pozadí:** 5 nahrávek místnosti (mikrofon 5 s nebo WAV). Kalibrace:
   - shoda vzorků = nejnižší skóre vzorku proti ostatním (leave-one-out)
   - pozadí = nejvyšší skóre nahrávek pozadí
-  - navržený práh = pozadí + 70 % rozdílu ke shodě vzorků, s minimem 0,5 pro embedding
-    (embeddingy jsou nezáporné, nesouvisející zvuky dávají podobnost 0,4–0,5) a 0,3 pro tón;
+  - navržený práh = pozadí + 70 % rozdílu ke shodě vzorků, s minimem 0,55 pro embedding
+    (embeddingy jsou nezáporné, nesouvisející zvuky dávají podobnost 0,45–0,53) a 0,3 pro tón;
     když se pozadí a vzorky překrývají, UI to označí
 - **Událost** s polem `profile` místo `classes`: stejná detekční logika, MQTT entity a log (třída
   „learned sound“). Tlačítko Vytvořit událost ji založí s navrženým prahem.
@@ -398,7 +398,9 @@ Ověření (TC28, nahrávání WAV):
 | tón 2000 Hz (3 vzorky) | 0,85 | 0 | 0,60 | pípnutí 2010 Hz: 0,85 | tón 900 Hz: 0 |
 | pes (2 klipy ESC-50) | 0,64 | 0,19 | 0,51 | jiný pes: 0,77 | déšť, tleskání, ohňostroj: max 0,46 |
 
-S prostředním prahem (0,43) by ohňostroj (0,49) falešně spustil událost „pes“; proto 70 % a minimum.
+S prostředním prahem (0,43) by ohňostroj (0,49) falešně spustil událost „pes“; proto 70 % a minimum 0,55.
+Skóre téhož souboru se mezi běhy liší o 0,01–0,07 (cizí zvuky 0,45–0,53 ve třech bězích, shoda vzorků 0,61–0,64);
+příčina zatím není známá (esp-dl běží na jednom jádře, výpočet melů je deterministický), viz TODO.
 S 5–10 vzorky stejného zdroje bude shoda vzorků i rezerva vyšší. Živé nahrávání z mikrofonu a spuštění
 události přehraným zvukem čeká na test s reproduktorem u desky (výstup Macu byl ztlumený).
 

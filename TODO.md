@@ -27,6 +27,7 @@
 - [ ] Ověřit pojistku startů a 3s pojistku telemetrie na skutečném selhání
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
+- [ ] Zjistit, proč embedding YAMNet téhož zvuku kolísá mezi běhy o 0,01–0,07 (TC28; esp-dl jedno jádro, mel deterministický)
 - [ ] M10: naučený zvuk z mikrofonu a spuštění události přehráním (reproduktor Macu byl ztlumený)
 - [ ] Zvuk fáze 5: 24h test se zapnutou detekcí v roli Thread BR běží od 2026-10-29 11:24 (`tests/soak.py`, výsledky `tests/results/2026-10-29/soak_thread_br/`); pak ladění falešných poplachů podle `detections.jsonl` a stejný běh v roli Zigbee
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
