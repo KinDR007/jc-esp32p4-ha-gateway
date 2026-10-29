@@ -5,6 +5,7 @@
 
 #include "c6_flasher.h"
 #include "cJSON.h"
+#include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -237,6 +238,15 @@ static void init_mdns(const char *hostname)
     mdns_hostname_set(hostname);
     mdns_instance_name_set("P4 gateway");
     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+
+    /* Home Assistant finds the gateway by this service (zeroconf in the p4gw integration). */
+    uint8_t mac[6];
+    char mac_text[18];
+    esp_read_mac(mac, ESP_MAC_BASE);
+    snprintf(mac_text, sizeof(mac_text), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4],
+             mac[5]);
+    mdns_txt_item_t txt[] = {{"mac", mac_text}, {"version", esp_app_get_description()->version}};
+    mdns_service_add(NULL, "_p4gw", "_tcp", 80, txt, sizeof(txt) / sizeof(txt[0]));
 }
 
 /* JSON trees in PSRAM: Zigbee2MQTT device lists and Thread maps are far bigger than internal RAM allows. */

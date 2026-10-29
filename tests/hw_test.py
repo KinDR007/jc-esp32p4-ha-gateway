@@ -984,6 +984,117 @@ def tc22_zigbee_net():
     check(code == 400, 'unknown action refused')
 
 
+def mdns_query(service, timeout=3):
+    """Answers to a one-shot mDNS PTR query for service (e.g. _p4gw._tcp.local), raw packets."""
+    q = b'\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00'
+    q += b''.join(bytes([len(p)]) + p.encode() for p in service.split('.')) + b'\x00\x00\x0c\x00\x01'
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(0.5)
+    sock.sendto(q, ('224.0.0.251', 5353))
+    answers, end = [], time.time() + timeout
+    while time.time() < end:
+        try:
+            answers.append(sock.recvfrom(4096))
+        except socket.timeout:
+            pass
+    sock.close()
+    return answers
+
+
+class WsClient:
+    """Minimal WebSocket client (text frames from the server, no masking needed on receive)."""
+
+    def __init__(self, path, auth=None):
+        import base64
+        self.sock = socket.create_connection((ARGS.host, 80), timeout=10)
+        key = base64.b64encode(os.urandom(16)).decode()
+        hdr = f'GET {path} HTTP/1.1\r\nHost: {ARGS.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' \
+              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n'
+        if auth:
+            hdr += 'Authorization: Basic ' + base64.b64encode(f'admin:{auth}'.encode()).decode() + '\r\n'
+        self.sock.sendall((hdr + '\r\n').encode())
+        resp = b''
+        while b'\r\n\r\n' not in resp:
+            chunk = self.sock.recv(1024)
+            if not chunk:
+                break
+            resp += chunk
+        self.status = int(resp.split(b' ')[1]) if resp.startswith(b'HTTP/1.1') else 0
+        self.buf = resp.split(b'\r\n\r\n', 1)[1] if b'\r\n\r\n' in resp else b''
+
+    def _read(self, n):
+        while len(self.buf) < n:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise Fail('WebSocket closed')
+            self.buf += chunk
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    def messages(self, seconds):
+        """Text messages (parsed JSON) received within seconds."""
+        out, end = [], time.time() + seconds
+        while time.time() < end:
+            self.sock.settimeout(max(0.1, end - time.time()))
+            try:
+                b0, b1 = self._read(2)
+            except socket.timeout:
+                break
+            n = b1 & 0x7f
+            if n == 126:
+                n = int.from_bytes(self._read(2), 'big')
+            elif n == 127:
+                n = int.from_bytes(self._read(8), 'big')
+            data = self._read(n)
+            if b0 & 0x0f == 1:
+                out.append(json.loads(data))
+        return out
+
+    def close(self):
+        self.sock.close()
+
+
+def tc30_ha_integration_interface():
+    """Home Assistant integration: mDNS _p4gw._tcp with the MAC, WebSocket push of every sound message, password."""
+    st = status()
+    mac = st['eth']['mac'].encode()
+    answers = mdns_query('_p4gw._tcp.local')
+    check(any(b'mac=' + mac in a for a, _ in answers), f'mDNS _p4gw._tcp answers with mac={mac.decode()} ({len(answers)} packets)')
+
+    original = _events_config()
+    ws = WsClient('/api/ws')
+    check(ws.status == 101, 'WebSocket handshake without a password')
+    try:
+        # "Silence" (class 494) tops every quiet window: the event fires at once
+        cfg = json.loads(json.dumps(original))
+        cfg['events'].append({'id': 'tc30_test', 'name': 'TC30 test', 'kind': 'impulse', 'threshold': 0.2, 'windows': 1,
+                              'hold_s': 2, 'cooldown_s': 0, 'classes': [494], 'suppress': [], 'enabled': True})
+        check(http('PUT', '/api/sound/events', cfg)[0] == 200, 'test event added')
+        msgs = ws.messages(8)
+        states = {m['topic'] for m in msgs if m['topic'].endswith('/state')}
+        enabled = [e['id'] for e in cfg['events'] if e.get('enabled', True)]
+        check(states >= {f'sound/{i}/state' for i in enabled},
+              f'state of all {len(enabled)} enabled events pushed in one burst ({len(states)} received)')
+        detected = [json.loads(m['payload']) for m in msgs if m['topic'] == 'sound/tc30_test']
+        check(detected and detected[0]['event_type'] == 'detected', f'detection pushed: {detected[:1]}')
+    finally:
+        ws.close()
+        http('PUT', '/api/sound/events', original)
+    check('tc30_test' not in {e['id'] for e in http('GET', '/api/sound/events')[1]['events']}, 'events restored')
+
+    pw = 'hwtest-' + str(int(time.time()))
+    check(http('POST', '/api/settings', {'password': pw})[0] == 200, 'password set')
+    try:
+        ws = WsClient('/api/ws')
+        check(ws.status != 101, f'handshake without credentials refused ({ws.status})')
+        ws.close()
+        ws = WsClient('/api/ws', auth=pw)
+        check(ws.status == 101, 'handshake with credentials')
+        ws.close()
+    finally:
+        check(http('POST', '/api/settings', {'password': ''}, auth=pw)[0] == 200, 'password removed')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -995,7 +1106,7 @@ TESTS = [
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
-    ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options),
+    ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
 ]
 
 

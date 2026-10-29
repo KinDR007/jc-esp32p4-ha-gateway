@@ -119,6 +119,8 @@ httpd_handle_t gw_http_server(void);
 /* Registers an API handler behind the auth check. */
 esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *));
 esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
+/* Sends {"topic","payload"} to the clients of /api/ws (what goes to MQTT, without a broker). */
+void gw_http_push(const char *topic, const char *payload);
 esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message);
 /* Reads a JSON body (max 4 KiB). NULL after an error response was sent. */
 cJSON *gw_http_read_json(httpd_req_t *req);

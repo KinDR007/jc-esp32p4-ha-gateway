@@ -319,7 +319,7 @@ void gw_update_mqtt_discovery(void)
 
 void gw_update_mqtt_state(void)
 {
-    if (!s_up.lock || !gw_mqtt_connected()) {
+    if (!s_up.lock) {
         return;
     }
     cJSON *j = state_json();

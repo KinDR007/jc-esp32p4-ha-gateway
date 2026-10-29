@@ -163,6 +163,7 @@ bool gw_mqtt_connected(void)
 void gw_mqtt_publish(const char *suffix, const char *payload, bool retain)
 {
     char buf[128];
+    gw_http_push(suffix, payload);
     if (!gw_mqtt_connected()) {
         return;
     }
