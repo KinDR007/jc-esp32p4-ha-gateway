@@ -75,7 +75,7 @@ static struct {
     /* inference */
     char model_error[96];
     uint32_t model_load_ms;
-    uint32_t runs, skipped, late;
+    uint32_t runs, skipped, late, flash_skips;
     float last_ms, avg_ms, max_ms;
     float cpu_pct;
     top_t top[TOP_N];
@@ -308,9 +308,16 @@ static void infer_task(void *arg)
             sound_events_update(NULL, s.level_db, esp_timer_get_time());
             continue;
         }
+        if (!gw_flash_try_lock()) {
+            /* an upload or C6 flashing is writing the P4 flash, see gw_flash_lock() */
+            s.flash_skips++;
+            sound_events_update(NULL, s.level_db, esp_timer_get_time());
+            continue;
+        }
         memcpy(patch, history, MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float));
         start = esp_timer_get_time();
         sound_model_run(patch, scores, NULL);
+        gw_flash_unlock();
         int64_t took = esp_timer_get_time() - start;
         busy_us += took;
 
@@ -395,6 +402,7 @@ static cJSON *status_json(void)
     cJSON_AddNumberToObject(inf, "runs", s.runs);
     cJSON_AddNumberToObject(inf, "skipped_quiet", s.skipped);
     cJSON_AddNumberToObject(inf, "late_resyncs", s.late);
+    cJSON_AddNumberToObject(inf, "flash_skips", s.flash_skips);
     cJSON_AddNumberToObject(inf, "last_ms", round((double)(s.last_ms) * 10) / 10.0);
     cJSON_AddNumberToObject(inf, "avg_ms", round((double)(s.avg_ms) * 10) / 10.0);
     cJSON_AddNumberToObject(inf, "max_ms", round((double)(s.max_ms) * 10) / 10.0);

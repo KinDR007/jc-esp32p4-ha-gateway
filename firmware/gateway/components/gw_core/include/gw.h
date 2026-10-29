@@ -127,6 +127,14 @@ bool gw_api_temperature(float *celsius);
 #define GW_C6_TELEMETRY_SPINEL_PROP 0x3cf0 /* P4GW_SPINEL_PROP_TELEMETRY of the C6 side */
 void gw_c6_telemetry_set(const char *json);
 
+/* Long P4 flash writes and the sound model exclude each other: every flash write stalls both
+ * cores, and a model run slowed down that way keeps CPU 1 busy until the task watchdog fires.
+ * Uploads and C6 flashing hold the lock for the whole operation (after a model run in progress
+ * ends); recognition runs the model only when it gets the lock at once. */
+void gw_flash_lock(void);
+void gw_flash_unlock(void);
+bool gw_flash_try_lock(void);
+
 /* Identify: the web UI blinks an icon while it runs (the board has no LED it could drive). */
 void gw_identify(int seconds);
 int gw_identify_left(void);

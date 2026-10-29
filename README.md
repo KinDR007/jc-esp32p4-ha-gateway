@@ -64,7 +64,8 @@ P4 flash (16 MB, firmware/partitions.csv)
   network lives in P4 NVS and is not touched by C6 flashing.
 - Stability: gateway images confirm themselves after 60 s (else rollback), repeated crashes stop
   role start but keep the UI, RCP failures trigger a limited number of C6 reflashes (a recovery
-  restart counts as an unstable boot), core dumps are kept in flash.
+  restart counts as an unstable boot), core dumps are kept in flash. Sound recognition pauses while
+  an upload or C6 flashing writes the P4 flash (both cores stall on every flash write).
 - C6 telemetry (temperature, memory, uptime) reaches the web UI over each role's own link, see
   [docs/hardware.md](docs/hardware.md#c6-telemetry). The ESP-IDF openthread component is built from
   a patched copy (`firmware/patches/`, applied by `firmware/cmake/patched_openthread.cmake`).

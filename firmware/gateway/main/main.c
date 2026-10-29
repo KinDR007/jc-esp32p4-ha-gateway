@@ -62,7 +62,9 @@ static bool ensure_c6(const char *bundle)
     if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
+    gw_flash_lock();
     err = c6_flash_bundle(&entry, current);
+    gw_flash_unlock();
     if (err != ESP_OK) {
         gw_set_maintenance("%s", c6_progress()->last_error);
         return false;

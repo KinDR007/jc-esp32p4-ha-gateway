@@ -1,0 +1,126 @@
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+  08:23:49 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  08:23:49 ok: thread_br started without maintenance ('')
+  08:23:49 ok: active role is thread_br
+  08:23:49 switch took 13 s
+  08:23:49 ok: C6 runs ot_rcp
+  08:23:51 ok: Thread role router, network MyHome284238473, channel 25, RCP openthread-esp32/daba4c2-; esp32c6;  2026-10-29 05:38:15 UTC
+  08:23:51 ok: border routing running
+  08:23:51 ok: dataset TLVs readable
+  08:23:51 ok: border agent active, SRP stopped, NAT64 idle (role router)
+  08:23:51 ok: OTBR REST /node on port 8081 (200)
+  08:23:51 ok: OTBR REST active dataset (200)
+  08:23:52 ok: web CLI state: ['router']
+TC04 PASS (15 s) 
+
+TC05 Zigbee coordinator: C6 gets zigbee_ncp, TCP bridge accepts a client, NCP answers after reset.
+  08:24:06 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=11s
+  08:24:06 ok: zigbee_coordinator started without maintenance ('')
+  08:24:06 ok: active role is zigbee_coordinator
+  08:24:06 switch took 14 s
+  08:24:06 ok: C6 runs zigbee_ncp
+  08:24:09 ok: NCP sent 533 B after reset (UART link alive)
+  08:24:09 ok: no UART errors
+  08:24:10 ok: TCP client registered (192.168.88.189)
+  08:24:11 ok: client disconnect detected
+TC05 PASS (19 s) 
+
+TC07 Zigbee router: C6 gets the router firmware and reports status over the line protocol.
+  08:24:30 back after restart: active=zigbee_router c6=zigbee_router uptime=16s
+  08:24:30 ok: zigbee_router started without maintenance ('')
+  08:24:30 ok: active role is zigbee_router
+  08:24:30 switch took 19 s
+  08:24:30 ok: C6 runs zigbee_router
+  08:24:40 ok: router state joined, channel 11, ieee 9c139efffec404d0
+  08:24:40 ok: command accepted
+  08:24:40 ok: coordinator snapshot still kept while the router runs
+TC07 PASS (29 s) 
+
+TC12 Broken uploads are rejected and do not damage the stored images.
+  08:24:40 ok: garbage c6fw rejected ({'error': 'ESP_ERR_INVALID_VERSION'})
+  08:24:40 ok: stored bundles intact after the rejected upload (6)
+  08:24:40 ok: garbage gateway image rejected ({'error': 'image has no application description'})
+  08:24:55 ok: valid c6fw re-uploaded
+  08:24:55 ok: 6 bundles listed again
+TC12 PASS (15 s) 
+
+TC13 Forced C6 reflash from the UI restores the current role's firmware.
+  08:24:55 ok: reflash requested
+  08:26:21 back after restart: active=zigbee_router c6=zigbee_router uptime=83s
+  08:26:21 ok: zigbee_router running again after reflash
+  08:26:21 ok: flash log present
+  08:26:21 ok: forced reflash writes the whole slots layout again
+TC13 PASS (86 s) 
+
+TC14 Sound service: microphone captures, YAMNet loads and runs within the CPU budget.
+  08:26:21 ok: capturing, level -64.7 dBFS, floor -65.6
+  08:26:21 ok: model loaded in 389 ms
+  08:26:21 ok: inference 61.6 ms avg, 82.8 ms max
+  08:26:56 ok: CPU 16.7 % of core 1, still enabled
+  08:26:57 ok: 2 s WAV clip
+TC14 PASS (35 s) 
+
+TC19 C6 telemetry in every gateway role; the Zigbee host stream stays clean and answers requests.
+  08:27:16 back after restart: active=thread_br c6=ot_rcp uptime=17s
+  08:27:16 ok: thread_br started without maintenance ('')
+  08:27:16 ok: active role is thread_br
+  08:27:16 switch took 19 s
+  08:27:16 ok: Thread RCP: 36.5 °C, 426052 B free, up 0 s
+  08:27:51 ok: no RCP failure while it is polled
+  08:28:08 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=14s
+  08:28:08 ok: zigbee_coordinator started without maintenance ('')
+  08:28:08 ok: active role is zigbee_coordinator
+  08:28:08 switch took 17 s
+  08:28:18 ok: Zigbee NCP: 38.5 °C, 295492 B free
+  08:28:53 ok: no telemetry frame reached the host (2 frames)
+  08:28:53 ok: NCP answered GET_MODULE_VERSION (000101003700004f00050100000f0302000000)
+  08:28:53 ok: telemetry keeps coming while a host is connected
+  08:29:08 back after restart: active=zigbee_router c6=zigbee_router uptime=12s
+  08:29:08 ok: zigbee_router started without maintenance ('')
+  08:29:08 ok: active role is zigbee_router
+  08:29:08 switch took 15 s
+  08:29:08 ok: Zigbee router: 34.5 °C, 374924 B free
+  08:29:23 back after restart: active=thread_br c6=ot_rcp uptime=12s
+  08:29:23 ok: thread_br started without maintenance ('')
+  08:29:23 ok: active role is thread_br
+  08:29:23 switch took 15 s
+TC19 PASS (147 s) 
+
+TC20 Network surroundings: quick scan in the Thread role, full scan with Wi-Fi, role restored afterwards.
+  08:29:32 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  08:29:32 ok: thread_br started without maintenance ('')
+  08:29:32 ok: active role is thread_br
+  08:29:32 switch took 9 s
+  08:29:33 ok: quick scan started ({'started': True})
+  08:29:48 ok: quick: 16 channels in 13225 ms
+  08:29:48 ok: quick: own network MyHome284238473 found on channel 25
+  08:29:48 ok: no RCP failure caused by the scan
+  08:29:48 ok: full scan requested, gateway restarts
+  08:30:22 ok: full: scanner 1.0.0, 16 channels, 14285 ms
+  08:30:22 ok: full: 19 Wi-Fi access points, one entry each
+  08:30:22 ok: full: own Thread PAN seen in traffic
+  08:30:27 back after restart: active=thread_br c6=ot_rcp uptime=36s
+  08:30:27 ok: role firmware back on the C6
+  08:30:27 ok: Thread network unchanged after the scan
+TC20 PASS (63 s) 
+
+TC23 C6 slots layout: a role switch only selects the slot, the Zigbee router keeps its network.
+  08:30:27 ok: c6fw carries the slots layout
+  08:30:44 back after restart: active=zigbee_router c6=zigbee_router uptime=14s
+  08:30:44 ok: zigbee_router started without maintenance ('')
+  08:30:44 ok: active role is zigbee_router
+  08:30:44 switch took 17 s
+  08:30:44 ok: zigbee_router: layout already on the C6, not written again
+  08:30:44 ok: zigbee_router: slot selected
+  08:30:54 ok: router back in its network: pan 0x1a62, channel 11
+  08:31:13 back after restart: active=thread_br c6=ot_rcp uptime=16s
+  08:31:13 ok: thread_br started without maintenance ('')
+  08:31:13 ok: active role is thread_br
+  08:31:13 switch took 19 s
+  08:31:13 ok: thread_br: layout already on the C6, not written again
+  08:31:13 ok: thread_br: slot selected
+  08:31:13 ok: Thread attached as child
+  08:31:13 ok: switches done in under a minute: zigbee_router 17 s, thread_br 19 s
+TC23 PASS (46 s) 
+
+Summary: TC04 PASS, TC05 PASS, TC07 PASS, TC12 PASS, TC13 PASS, TC14 PASS, TC19 PASS, TC20 PASS, TC23 PASS

@@ -11,6 +11,11 @@
   layouts erased the C6 NVS on each switch). Research and measurements: docs/c6-slots.md.
   Tests TC13, TC23.
 - C6 temperature shows its min and max since the gateway start, like the P4. Test UI18.
+- Fix: a gateway, ESPHome or c6fw upload sometimes ended in a task watchdog restart (2 of 5
+  uploads with sound recognition on, 0 of 5 with it off). Every flash write stalls both cores and
+  a model run slowed down that way kept CPU 1 from its idle task for 10 s. Uploads and C6 flashing
+  now hold a lock (`gw_flash_lock`) and recognition skips the model meanwhile
+  (`flash_skips` in `/api/sound/status`).
 
 ## v1.4 (2026-10-29)
 

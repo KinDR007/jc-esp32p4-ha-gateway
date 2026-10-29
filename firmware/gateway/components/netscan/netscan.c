@@ -115,7 +115,9 @@ static esp_err_t flash_scanner(cJSON *res)
         return ESP_ERR_INVALID_STATE;
     }
     /* Zigbee network data of the current bundle is saved by the flasher and restored with the role. */
+    gw_flash_lock();
     esp_err_t err = c6_flash_bundle(&entry, current);
+    gw_flash_unlock();
     if (err != ESP_OK) {
         /* unknown C6 content: make the role flash its image again */
         gw_config_set_str(GW_KEY_C6_BUNDLE, "");

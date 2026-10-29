@@ -30,6 +30,7 @@ static const char *TAG = "gw_api";
 static cJSON *(*s_role_status)(void);
 static temperature_sensor_handle_t s_temp;
 static SemaphoreHandle_t s_upload_lock;
+static SemaphoreHandle_t s_flash_lock;
 
 void gw_api_set_role_status(cJSON *(*provider)(void))
 {
@@ -551,6 +552,21 @@ static esp_err_t app_upload(httpd_req_t *req, const esp_partition_t *target, boo
     return gw_http_send_json(req, json);
 }
 
+void gw_flash_lock(void)
+{
+    xSemaphoreTake(s_flash_lock, portMAX_DELAY);
+}
+
+void gw_flash_unlock(void)
+{
+    xSemaphoreGive(s_flash_lock);
+}
+
+bool gw_flash_try_lock(void)
+{
+    return xSemaphoreTake(s_flash_lock, 0) == pdTRUE;
+}
+
 static esp_err_t locked_upload(httpd_req_t *req, esp_err_t (*fn)(httpd_req_t *))
 {
     if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress()->busy) {
@@ -559,7 +575,9 @@ static esp_err_t locked_upload(httpd_req_t *req, esp_err_t (*fn)(httpd_req_t *))
         }
         return gw_http_send_error(req, 409, "another upload or C6 flash is running");
     }
+    gw_flash_lock();
     esp_err_t err = fn(req);
+    gw_flash_unlock();
     xSemaphoreGive(s_upload_lock);
     return err;
 }
@@ -885,6 +903,7 @@ static esp_err_t coredump_delete(httpd_req_t *req)
 esp_err_t gw_api_register(void)
 {
     s_upload_lock = xSemaphoreCreateMutex();
+    s_flash_lock = xSemaphoreCreateMutex();
     temperature_sensor_config_t temp_cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
     if (temperature_sensor_install(&temp_cfg, &s_temp) == ESP_OK) {
         temperature_sensor_enable(s_temp);
