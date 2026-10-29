@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4 (2026-10-29)
 
 - C6 flashing: a dialog locks the web UI from the restart until the role runs, with the stage,
   a smooth progress bar and the remaining time (`elapsed_s` in `/api/status` c6.flash). The
