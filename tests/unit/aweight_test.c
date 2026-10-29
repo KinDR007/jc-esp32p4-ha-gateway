@@ -8,6 +8,7 @@
 #include "sound_aweight.h"
 
 #define RATE 16000
+#define PI 3.14159265358979323846 /* M_PI is not in strict C11 (glibc) */
 
 static double gain_db(double hz)
 {
@@ -16,7 +17,7 @@ static double gain_db(double hz)
     double in = 0, out = 0;
     /* 20 s: the 20.6 Hz poles settle (float32 state, as on the gateway) */
     for (long n = 0; n < 20L * RATE; n++) {
-        float x = (float)sin(2 * M_PI * hz * n / RATE);
+        float x = (float)sin(2 * PI * hz * n / RATE);
         float y = aweight_step(&f, x);
         if (n >= 10L * RATE) {
             in += (double)x * x;
