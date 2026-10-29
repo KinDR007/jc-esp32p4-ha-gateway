@@ -27,7 +27,7 @@ runs in Home Assistant. Open manual tests are listed in [TODO.md](TODO.md).
 |---|---|
 | [docs/hardware.md](docs/hardware.md) | board, chip revision, **JP1 jumpers**, pinout, USB notes |
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
-| [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, MQTT |
+| [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
 | [docs/zadani.md](docs/zadani.md) | original assignment and feasibility analysis (Czech) |
 | [docs/sound-detection.md](docs/sound-detection.md) | sound event detection: research and proposal (Czech, pending) |
 | [tests/TESTCASES.md](tests/TESTCASES.md) | test cases (automated and manual) |
@@ -83,6 +83,7 @@ firmware/partitions.csv
 scripts/               env, fetch, build, pack, flash, backup
 tests/                 hardware test automation, test cases, results
 docs/                  hardware, installation, Home Assistant, assignment, schematics
+custom_components/p4gw Home Assistant integration (HACS), tests in tests/ha_integration
 ```
 
 ## Web UI and API
@@ -92,7 +93,7 @@ Port 80, single page embedded in the firmware with a left menu (sections and sub
 theme (switches in the header, remembered by the browser). HTTP Basic auth (user `admin`) once a password is
 set. Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/logs/previous` (each line starts with unix ms or `+<ms since boot>`), `/api/ota/{gateway,esphome,c6fw}`,
 `/api/c6/{backup,reflash,zigbee-snapshot}` (GET download, POST back up now), `/api/thread/{status,dataset,cli}`,
-`/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/update/{check,install}`, `/api/tools/ping`, `/api/coredump`.
+`/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/update/{check,install}`, `/api/tools/ping`, `/api/coredump`, `/api/ws` (WebSocket push for the Home Assistant integration).
 The OTBR REST API for Home Assistant is on port 8081 (Thread border router role).
 
 ## Licenses

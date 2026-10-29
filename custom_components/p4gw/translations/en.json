@@ -1,0 +1,132 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "description": "Address of the P4 gateway (IP or hostname).",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "For example 192.168.1.50 or p4gw-e30a08.local"
+        }
+      },
+      "confirm": {
+        "description": "Add the P4 gateway {name} ({host})?"
+      },
+      "auth": {
+        "description": "The gateway at {host} has a web UI password (user admin).",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Wrong password"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "cannot_connect": "Failed to connect",
+      "not_p4gw": "Not a P4 gateway",
+      "reauth_successful": "Re-authentication was successful",
+      "wrong_device": "This address belongs to another gateway"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "role": {
+        "name": "Active role",
+        "state": {
+          "none": "Maintenance",
+          "thread_br": "Thread border router",
+          "thread_router": "Thread router",
+          "zigbee_coordinator": "Zigbee coordinator",
+          "zigbee_router": "Zigbee router",
+          "esphome": "ESPHome BLE proxy"
+        }
+      },
+      "maintenance": {
+        "name": "Maintenance reason"
+      },
+      "thread_state": {
+        "name": "Thread state"
+      },
+      "sound_level": {
+        "name": "Sound level"
+      },
+      "temperature": {
+        "name": "Chip temperature"
+      },
+      "c6_temperature": {
+        "name": "C6 temperature"
+      },
+      "boot_time": {
+        "name": "Started"
+      },
+      "heap_free": {
+        "name": "Free internal heap"
+      },
+      "cpu_load": {
+        "name": "CPU load"
+      },
+      "ip": {
+        "name": "IP address"
+      },
+      "c6_firmware": {
+        "name": "C6 firmware"
+      }
+    },
+    "binary_sensor": {
+      "ethernet": {
+        "name": "Ethernet"
+      },
+      "zigbee_host": {
+        "name": "Zigbee host connected"
+      },
+      "push": {
+        "name": "Push connection"
+      },
+      "sound_active": {
+        "name": "{name} active"
+      }
+    },
+    "event": {
+      "sound": {
+        "name": "{name}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "detected": "Detected"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "desired_role": {
+        "name": "Role",
+        "state": {
+          "thread_br": "Thread border router",
+          "thread_router": "Thread router",
+          "zigbee_coordinator": "Zigbee coordinator",
+          "zigbee_router": "Zigbee router",
+          "esphome": "ESPHome BLE proxy"
+        }
+      }
+    },
+    "button": {
+      "zigbee_backup": {
+        "name": "Back up Zigbee network"
+      },
+      "update_check": {
+        "name": "Check for update"
+      }
+    },
+    "switch": {
+      "sound": {
+        "name": "Sound recognition"
+      }
+    }
+  }
+}

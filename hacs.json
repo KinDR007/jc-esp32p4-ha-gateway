@@ -1,0 +1,5 @@
+{
+  "name": "P4 Gateway",
+  "render_readme": true,
+  "homeassistant": "2025.2.0"
+}

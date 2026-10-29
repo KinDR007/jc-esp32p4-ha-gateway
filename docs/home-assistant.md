@@ -64,6 +64,46 @@ LED the firmware can drive).
 HA discovers the node (ESPHome integration); enter the API key from
 `firmware/esphome/secrets.yaml`. Return to a gateway role with *Gateway role* + *Return to gateway*.
 
+## P4 Gateway integration (native, without MQTT)
+
+Like SMLIGHT SLZB devices, the gateway has its own Home Assistant integration
+([custom_components/p4gw](../custom_components/p4gw)). It talks to the gateway directly: no broker,
+no add-on.
+
+Install (once):
+
+- HACS › Integrations › ⋮ › Custom repositories: this repository, category *Integration*, then
+  install **P4 Gateway**; or
+- copy `custom_components/p4gw` into `/config/custom_components/` (e.g. over the SSH add-on).
+
+Restart Home Assistant. The gateway announces itself over mDNS (`_p4gw._tcp`, TXT `mac`, `version`),
+so it appears under Settings › Devices › **Discovered**; or add it by hand (Add integration ›
+P4 Gateway, address). With a web UI password set, the flow asks for it (user `admin`); a password
+changed later starts re-authentication.
+
+How it works: state is read from the REST API every 30 s (`/api/status`, `/api/sound/status`,
+`/api/sound/events`); sound detections, sound event states and update progress are pushed at once
+over a WebSocket (`/api/ws`, same password; the gateway sends there everything it publishes to
+MQTT, with or without a broker). The push connection reconnects by itself after 10 s.
+
+| Entity | Notes |
+|---|---|
+| Active role, Thread state, Sound level | sensors |
+| Role (select) | switching restarts the gateway; the ESPHome role replaces the gateway firmware, so the entities stay unavailable until the gateway is back |
+| Sound recognition (switch) | microphone and model on/off |
+| `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
+| Firmware (update) | install with progress, from the online update manifest |
+| Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
+| Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |
+| Chip and C6 temperature, Started, IP, C6 firmware, Maintenance reason, heap, CPU load | diagnostic (heap and CPU disabled by default) |
+
+The integration and MQTT discovery can run side by side, but every entity would then exist twice.
+With the integration in use, switch off **Home Assistant discovery** in the gateway MQTT settings
+(MQTT then keeps only the plain topics, e.g. for Zigbee2MQTT network view).
+
+Tests: `tests/ha_integration` (pytest-homeassistant-custom-component against a fake gateway,
+also in CI), hardware test TC30 (mDNS, WebSocket push, password on the handshake).
+
 ## MQTT (optional)
 
 Broker in the gateway UI (Home Assistant tab). Entities via MQTT discovery: active role, role

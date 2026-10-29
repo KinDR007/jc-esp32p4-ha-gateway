@@ -1,0 +1,193 @@
+{
+  "hostname": "p4gw-e30a08",
+  "version": "v1.4-18-g59e0ef5",
+  "idf": "v5.5.5",
+  "built": "Oct 29 2026",
+  "built_time": "13:16:29",
+  "time": 1793281381,
+  "matter_url": "ws://192.168.88.201:5580/ws",
+  "chip_revision": 103,
+  "uptime_s": 5135,
+  "reset_reason": "software",
+  "auth": true,
+  "heap": {
+    "internal_free": 220167,
+    "internal_min": 174100,
+    "internal_largest": 69632,
+    "psram_free": 28599132
+  },
+  "temperature_c": 33.2,
+  "role": {
+    "active": "thread_br",
+    "desired": "thread_br",
+    "maintenance": "",
+    "stable": true
+  },
+  "eth": {
+    "link": true,
+    "link_changes": 1,
+    "speed": 100,
+    "full_duplex": true,
+    "mac": "30:ed:a0:e3:0a:08",
+    "ipv4": "192.168.88.243",
+    "gateway": "192.168.88.1",
+    "ipv6": [
+      "FE80::32ED:A0FF:FEE3:A08",
+      "FDB7:6A25:8FD1:48C2:32ED:A0FF:FEE3:A08"
+    ]
+  },
+  "slots": [
+    {
+      "label": "gw_a",
+      "size": 3145728,
+      "project": "p4gw",
+      "version": "v1.4-17-g37ab2f9-dirty",
+      "built": "Oct 29 2026",
+      "state": "valid",
+      "running": false,
+      "boot": false
+    },
+    {
+      "label": "gw_b",
+      "size": 3145728,
+      "project": "p4gw",
+      "version": "v1.4-18-g59e0ef5",
+      "built": "Oct 29 2026",
+      "state": "valid",
+      "running": true,
+      "boot": true
+    },
+    {
+      "label": "esphome",
+      "size": 2097152,
+      "project": "ble-proxy-p4gw",
+      "version": "2026.10.1",
+      "built": "",
+      "running": false,
+      "boot": false
+    }
+  ],
+  "c6": {
+    "bundle": "ot_rcp",
+    "adopted": true,
+    "images": [
+      {
+        "name": "slots",
+        "version": "4 firmware slots",
+        "size": 1260892
+      },
+      {
+        "name": "ot_rcp",
+        "version": "esp_ot_rcp v5.5.5-p4gw.3",
+        "size": 124
+      },
+      {
+        "name": "zigbee_ncp",
+        "version": "esp-coordinator 1.5.79",
+        "size": 200
+      },
+      {
+        "name": "zigbee_router",
+        "version": "p4gw_zigbee_router 1.2.0",
+        "size": 196
+      },
+      {
+        "name": "esp_hosted",
+        "version": "network_adapter 2.12.13",
+        "size": 729348
+      },
+      {
+        "name": "scanner",
+        "version": "p4gw_scanner 1.0.0",
+        "size": 124
+      }
+    ],
+    "chip": {
+      "mac": "9c:13:9e:c4:04:d0",
+      "revision": 2,
+      "flash_size": 4194304,
+      "flashes": 136
+    },
+    "telemetry": {
+      "fw": "ot_rcp",
+      "ver": "v5.5.5-p4gw.3",
+      "temp_c": 41.5,
+      "heap_free": 421288,
+      "heap_min": 415988,
+      "uptime_s": 14440,
+      "reset": "poweron",
+      "rev": 2,
+      "age_s": 23,
+      "temp_min_c": 41.5,
+      "temp_max_c": 42.5
+    },
+    "flash": {
+      "busy": false,
+      "percent": 0,
+      "stage": "",
+      "last_error": ""
+    },
+    "snapshot_days": 7,
+    "snapshots": [
+      {
+        "bundle": "zigbee_ncp",
+        "size": 17408,
+        "generation": 45,
+        "saved": 1793266901
+      },
+      {
+        "bundle": "zigbee_router",
+        "size": 17408,
+        "generation": 46,
+        "saved": 1793266916
+      }
+    ]
+  },
+  "hw": {
+    "cpu_mhz": 360,
+    "cores": 2,
+    "cpu_load": [
+      0.9,
+      21.1
+    ],
+    "tasks": 21,
+    "temp_min_c": 33.2,
+    "temp_max_c": 34.2,
+    "flash_size": 16777216,
+    "psram_size": 33554432,
+    "psram_min": 27009168,
+    "psram_largest": 26738688,
+    "internal_total": 471631,
+    "mac_base": "30:ed:a0:e3:0a:08",
+    "elf_sha256": "580bd26f6",
+    "app_slot": "gw_b",
+    "nvs": {
+      "used": 501,
+      "total": 2520,
+      "namespaces": 6
+    }
+  },
+  "update": {
+    "installed_version": "v1.4-18-g59e0ef5",
+    "latest_version": "v1.4-18-g59e0ef5",
+    "title": "P4 gateway firmware",
+    "release_summary": "",
+    "in_progress": false,
+    "url": "",
+    "percent": 0,
+    "checked": 0,
+    "checking": false,
+    "error": "",
+    "available": false
+  },
+  "identify_s": 0,
+  "role_status": {
+    "mode": "border_router",
+    "rest_client": "192.168.88.201",
+    "rest_client_age_s": 821,
+    "phase": "running",
+    "role": "router",
+    "network_name": "MyHome284238473",
+    "channel": 25
+  }
+}

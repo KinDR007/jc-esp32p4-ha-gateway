@@ -1,0 +1,132 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "description": "Adresa P4 brány (IP nebo hostname).",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "Například 192.168.1.50 nebo p4gw-e30a08.local"
+        }
+      },
+      "confirm": {
+        "description": "Přidat P4 bránu {name} ({host})?"
+      },
+      "auth": {
+        "description": "Brána {host} má heslo webového rozhraní (uživatel admin).",
+        "data": {
+          "password": "Heslo"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nepodařilo se připojit",
+      "invalid_auth": "Špatné heslo"
+    },
+    "abort": {
+      "already_configured": "Zařízení už je nastavené",
+      "cannot_connect": "Nepodařilo se připojit",
+      "not_p4gw": "Nejde o P4 bránu",
+      "reauth_successful": "Přihlášení obnoveno",
+      "wrong_device": "Na této adrese je jiná brána"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "role": {
+        "name": "Aktivní role",
+        "state": {
+          "none": "Údržba",
+          "thread_br": "Thread border router",
+          "thread_router": "Thread router",
+          "zigbee_coordinator": "Zigbee koordinátor",
+          "zigbee_router": "Zigbee router",
+          "esphome": "ESPHome BLE proxy"
+        }
+      },
+      "maintenance": {
+        "name": "Důvod údržby"
+      },
+      "thread_state": {
+        "name": "Stav Threadu"
+      },
+      "sound_level": {
+        "name": "Hladina zvuku"
+      },
+      "temperature": {
+        "name": "Teplota čipu"
+      },
+      "c6_temperature": {
+        "name": "Teplota C6"
+      },
+      "boot_time": {
+        "name": "Spuštěno"
+      },
+      "heap_free": {
+        "name": "Volná interní paměť"
+      },
+      "cpu_load": {
+        "name": "Vytížení CPU"
+      },
+      "ip": {
+        "name": "IP adresa"
+      },
+      "c6_firmware": {
+        "name": "Firmware C6"
+      }
+    },
+    "binary_sensor": {
+      "ethernet": {
+        "name": "Ethernet"
+      },
+      "zigbee_host": {
+        "name": "Zigbee host připojen"
+      },
+      "push": {
+        "name": "Push spojení"
+      },
+      "sound_active": {
+        "name": "{name} aktivní"
+      }
+    },
+    "event": {
+      "sound": {
+        "name": "{name}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "detected": "Detekováno"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "desired_role": {
+        "name": "Role",
+        "state": {
+          "thread_br": "Thread border router",
+          "thread_router": "Thread router",
+          "zigbee_coordinator": "Zigbee koordinátor",
+          "zigbee_router": "Zigbee router",
+          "esphome": "ESPHome BLE proxy"
+        }
+      }
+    },
+    "button": {
+      "zigbee_backup": {
+        "name": "Zálohovat Zigbee síť"
+      },
+      "update_check": {
+        "name": "Zkontrolovat aktualizaci"
+      }
+    },
+    "switch": {
+      "sound": {
+        "name": "Rozpoznávání zvuku"
+      }
+    }
+  }
+}

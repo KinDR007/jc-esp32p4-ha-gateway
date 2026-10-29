@@ -26,6 +26,7 @@
 - [x] Síťové okolí: rychlý a úplný sken, doporučení kanálů (TC20, UI09)
 - [ ] Ověřit pojistku startů a 3s pojistku telemetrie na skutečném selhání
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
+- [ ] Integrace P4 Gateway: nasadit do HA (192.168.88.201), přidat bránu ze zeroconf a ověřit entity, push zvukové události a update; pak vypnout MQTT discovery
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
 - [ ] Zjistit, proč embedding YAMNet téhož zvuku kolísá mezi běhy o 0,01–0,07 (TC28; esp-dl jedno jádro, mel deterministický)
 - [ ] M10: naučený zvuk z mikrofonu a spuštění události přehráním (reproduktor Macu byl ztlumený)

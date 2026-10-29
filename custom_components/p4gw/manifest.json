@@ -1,0 +1,19 @@
+{
+  "domain": "p4gw",
+  "name": "P4 Gateway",
+  "codeowners": [
+    "@KinDR007"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/home-assistant.md",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/KinDR007/jc-esp32p4-ha-gateway/issues",
+  "requirements": [],
+  "version": "1.0.0",
+  "zeroconf": [
+    {
+      "type": "_p4gw._tcp.local."
+    }
+  ]
+}

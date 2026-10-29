@@ -52,12 +52,25 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC27 | Online aktualizace: kontroly | neplatná URL, kontrola a instalace bez nabídky, chybějící manifest, ne-manifest, HTTPS | odmítnutí 400/409, čitelné chyby, HTTPS projde TLS (404 ze serveru), instalace bez nabídky odmítnuta |
 | TC28 | Naučené zvuky | WAV: 3× pípnutí 2 kHz (tón), 2 psí klipy ESC-50 (embedding), pozadí 6 s z mikrofonu, test nahrávek, událost s profilem | tón 2003 Hz; cizí WAV, špatný název a jiný typ odmítnuty; pozadí pod prahem a prah pod shodou vzorků; pípnutí a jiný pes nad prahem, 900 Hz a déšť/tleskání/ohňostroj pod ním; událost s profilem uložena, neplatný profil odmítnut; po testu nic nezůstane |
 | TC29 | Volby MQTT | testovací mosquitto (`--mqtt-test host:dir`: 18883, TLS 8883, ws 1884, wss 8884, vlastní CA) | neplatné hodnoty 400; ws připojí; TLS s veřejnou CA, cizí CA a jménem ≠ IP odmítnuto s popisem; vlastní CA bez kontroly jména a wss připojí; client ID, keepalive 20 s, základní topic, stav po 10 s; discovery vypnuto odebere entity, `homeassistant/status online` je pošle znovu; původní nastavení obnoveno |
+| TC30 | Rozhraní integrace Home Assistant | mDNS dotaz `_p4gw._tcp`, WebSocket `/api/ws`, dočasná událost na třídu Silence, heslo | mDNS odpoví s MAC brány; stav všech povolených událostí dorazí v jedné dávce celý a detekce ihned; bez hesla handshake 401, s heslem 101; události i heslo obnoveny |
 | TC22 | Zigbee síť přes Zigbee2MQTT | `GET /api/zigbee/net`, zavření připojování | instance nalezena na brokeru, seznam zařízení s koordinátorem, Zigbee2MQTT odpoví na operaci, neznámá operace 400 |
 | TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |
 | TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
 
 Jednotkový test filtru rámců (bez desky): `cc -std=c11 -Wall -Wextra -Werror -o /tmp/zb_filter_test tests/unit/zb_filter_test.c && /tmp/zb_filter_test`
 | TC16 | Oddělené Thread sítě rolí | router se připojí do testovací sítě, pak zpět na BR | border router zůstane ve své síti |
+
+## Integrace Home Assistant (bez desky)
+
+[ha_integration/test_p4gw.py](ha_integration/test_p4gw.py): pytest-homeassistant-custom-component proti
+falešné bráně (REST a WebSocket na 127.0.0.1), běží i v CI.
+`pip install -r tests/ha_integration/requirements.txt && python -m pytest tests/ha_integration`
+
+Ověřuje: config flow ručně, s heslem (špatné heslo), nedostupná brána, zeroconf (potvrzení, změna
+adresy u známé brány, záznam bez MAC odmítnut); entity a jejich stavy, entity jen pro povolené
+události; push detekce a stavu události, push průběhu aktualizace; nová událost přidá entity bez
+reloadu, vypnutá je nedostupná; příkazy (přepínač zvuku, role, restart, instalace); obnovení push
+spojení; heslo nastavené později spustí reauth.
 
 ## UI testy (prohlížeč)
 

@@ -10,7 +10,9 @@ cc -std=c11 -Wall -Wextra -Werror -o "$tmp/zb_filter_test" tests/unit/zb_filter_
 "$tmp/zb_filter_test"
 
 echo "== python syntax"
-python3 -m py_compile scripts/*.py tests/*.py tests/zha/*.py
+python3 -m py_compile scripts/*.py tests/*.py tests/zha/*.py tests/ha_integration/*.py custom_components/p4gw/*.py
+python3 -m json.tool custom_components/p4gw/manifest.json >/dev/null
+for f in custom_components/p4gw/strings.json custom_components/p4gw/translations/*.json hacs.json; do python3 -m json.tool "$f" >/dev/null; done
 
 echo "== web UI script"
 python3 - firmware/gateway/web/index.html "$tmp/ui.js" <<'PY'

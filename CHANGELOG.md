@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Home Assistant integration **P4 Gateway** (`custom_components/p4gw`, HACS), modelled on the
+  SMLIGHT integration: found by zeroconf, password in the config flow and re-authentication, REST
+  polling plus push over a WebSocket, so it needs no MQTT broker. Sensors, role select, sound
+  recognition switch, event and binary sensor per sound event, firmware update with progress,
+  restart/identify/Zigbee backup buttons, diagnostics. Firmware: mDNS service `_p4gw._tcp` (TXT `mac`,
+  `version`) and `/api/ws`, which forwards everything the gateway publishes to MQTT, broker or not,
+  through its own queue (a burst of 23 messages arrived whole, one server job per message lost all
+  but 6). Tests: `tests/ha_integration` (13, CI with hassfest), TC30.
+- Fix: `auth` in `/api/status` read the password into a 2-byte buffer, so a set password showed as
+  none (the UI warned about a missing password) and a removed one as set. TC11 checks it.
 - C6 slots layout: the Thread RCP, Zigbee router, Zigbee coordinator and scanner firmwares sit in
   their own slots of one C6 layout (`firmware/c6/slots.csv`, installed once, ~70 s). A role switch
   writes only otadata (8 kB) and the Zigbee network data instead of a whole firmware: the C6 write
