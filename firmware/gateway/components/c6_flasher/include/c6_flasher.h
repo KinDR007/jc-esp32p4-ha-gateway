@@ -85,7 +85,10 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name);
 void c6_slots_invalidate(void);
 
 /* Snapshot of a bundle's preserved C6 regions (Zigbee network data), one slot per bundle. */
-esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation);
+/* saved_unix (may be NULL): when it was taken, 0 when unknown. */
+esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix);
+/* Saves the preserved regions of the running bundle without flashing (the C6 restarts). */
+esp_err_t c6_snapshot_take(const char *bundle);
 esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_t len);
 
 /* Streams the whole C6 flash (backup of the factory firmware). The C6 restarts afterwards. */

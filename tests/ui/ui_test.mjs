@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI20).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI21).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -540,6 +540,22 @@ await test('UI20', 'Settings backup: export downloads the settings, a foreign fi
   const text = await page.textContent('#confirm-text');
   await page.keyboard.press('Escape');
   check(text.includes(file.hostname) && !(await page.$('#busy-dlg[open]')), `confirmation names the source, cancel keeps the gateway running`);
+});
+
+await test('UI21', 'Zigbee backups: the automatic interval is stored, Back up now only in a Zigbee role', async () => {
+  await page.goto(base + '#zigbee/backups');
+  await page.waitForSelector('#zb-snap-days');
+  const days = () => page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.c6.snapshot_days));
+  const was = await days();
+  await page.selectOption('#zb-snap-days', '1');
+  await page.waitForTimeout(800);
+  check(await days() === 1, 'daily stored');
+  await page.selectOption('#zb-snap-days', String(was));
+  await page.waitForTimeout(800);
+  check(await days() === was, `restored to ${was}`);
+  const role = await page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.role.active));
+  check(await page.isDisabled('#zb-snap-now') === !role.startsWith('zigbee'), `Back up now ${role.startsWith('zigbee') ? 'enabled' : 'disabled'} in ${role}`);
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

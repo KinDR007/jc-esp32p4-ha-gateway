@@ -257,6 +257,11 @@ static void server_task(void *arg)
     }
 }
 
+bool role_zigbee_host_connected(void)
+{
+    return s_client >= 0;
+}
+
 /* ---- router: line protocol with the C6 router firmware ---- */
 
 static SemaphoreHandle_t s_router_lock;

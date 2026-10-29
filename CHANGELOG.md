@@ -23,6 +23,12 @@
   transmit power and sound settings as JSON, passwords only on request; import checks every entry
   before writing, ignores per-board state (C6 firmware, counters) and restarts the gateway
   (`/api/settings/export[?secrets=1]`, `/api/settings/import`). Tests TC25, UI20.
+- Zigbee network backup on request and automatically (Zigbee › Network backups): the gateway
+  restarts and saves the C6 network data before the role starts again (~25 s until the router is
+  back in its network). Automatic daily or weekly (default) between 02:00 and 03:00 UTC; as
+  coordinator only while no host is connected, so Zigbee2MQTT never loses its adapter unasked.
+  Backups show when they were taken (`saved` in `/api/status` c6.snapshots; `POST
+  /api/c6/zigbee-snapshot`, `zigbee_backup_days` in `/api/settings`). Tests TC26, UI21.
 
 ## v1.4 (2026-10-29)
 

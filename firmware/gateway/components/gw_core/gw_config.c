@@ -134,7 +134,7 @@ esp_err_t gw_config_erase(const char *key)
 static const char *const s_board_keys[] = {
     GW_KEY_BOOT_COUNT, GW_KEY_GW_SLOT, GW_KEY_C6_BUNDLE, GW_KEY_C6_SHA, GW_KEY_C6_FORCE, GW_KEY_C6_TRIES,
     GW_KEY_C6_ADOPTED, GW_KEY_RCP_TEL_OFF, GW_KEY_HA_SEEN, GW_KEY_FAIL_RST, GW_KEY_ESPHOME_TRY,
-    "netscan", "netscan_req",
+    GW_KEY_ZB_SNAP_REQ, "netscan", "netscan_req",
 };
 static const char *const s_secret_keys[] = {GW_KEY_PASSWORD, "mqtt_pass"};
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "driver/gpio.h"
 #include "esp32_port.h"
@@ -51,6 +52,7 @@ typedef struct __attribute__((packed)) {
     uint32_t generation;
     snap_entry_t entries[SNAP_MAX];
     uint32_t crc32;
+    uint32_t saved_unix; /* not in the crc: headers written before it have 0xffffffff, 0 = clock unset */
 } snap_header_t;
 
 static c6_progress_t s_progress;
@@ -530,6 +532,8 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
             p += hdr.entries[i].size;
         }
         hdr.crc32 = esp_rom_crc32_le(0, (const uint8_t *)&hdr, offsetof(snap_header_t, crc32));
+        time_t now = time(NULL);
+        hdr.saved_unix = now > 1700000000 ? (uint32_t)now : 0;
         if (err == ESP_OK) {
             err = esp_partition_write(part, base, &hdr, sizeof(hdr));
         }
@@ -576,7 +580,41 @@ static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
     return ESP_OK;
 }
 
-esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation)
+esp_err_t c6_snapshot_take(const char *bundle)
+{
+    c6fw_entry_t entry;
+    bundle_t b = {0};
+    session_t *s = calloc(1, sizeof(session_t));
+    ESP_RETURN_ON_FALSE(s, ESP_ERR_NO_MEM, TAG, "no mem");
+    esp_err_t err = c6fw_find(bundle, &entry);
+    if (err == ESP_OK) {
+        err = bundle_load(&entry, &b);
+    }
+    if (err == ESP_OK && !bundle_has_preserve(&b)) {
+        err = ESP_ERR_NOT_SUPPORTED;
+    }
+    if (err == ESP_OK) {
+        s_progress.busy = true;
+        s_progress.started_us = esp_timer_get_time();
+        s_progress.last_error[0] = '\0';
+        progress(2, "connecting to C6 bootloader");
+        err = session_open(s);
+        if (err == ESP_OK) {
+            err = snapshot_save(s, &b);
+            session_close(s);
+        }
+        if (err != ESP_OK) {
+            snprintf(s_progress.last_error, sizeof(s_progress.last_error), "Zigbee backup failed: %s", esp_err_to_name(err));
+        }
+        progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
+        s_progress.busy = false;
+    }
+    bundle_free(&b);
+    free(s);
+    return err;
+}
+
+esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix)
 {
     snap_header_t hdr;
     if (snapshot_find(bundle, &hdr) < 0) {
@@ -587,6 +625,9 @@ esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *g
         *total_size += hdr.entries[i].size;
     }
     *generation = hdr.generation;
+    if (saved_unix) {
+        *saved_unix = hdr.saved_unix == UINT32_MAX ? 0 : hdr.saved_unix;
+    }
     return ESP_OK;
 }
 

@@ -16,6 +16,7 @@
 - [x] Oddělené datasety Thread rolí (TC16), komprimované C6 balíky, potvrzení obrazu při restartu z UI
 
 ## Čeká
+- [ ] Ověřit automatickou noční zálohu Zigbee (02:00–03:00 UTC) v roli router; v testu TC26 ověřena jen záloha na požádání
 - [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)
 - [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18
 - [x] Web UI v češtině a angličtině, přepínač vzhledu světlý / tmavý / systém (UI06–UI07)

@@ -48,6 +48,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC23 | Sloty C6 | přepnutí thread_br → zigbee_router → thread_br | c6fw obsahuje balíček `slots`, rozložení se znovu nezapisuje, vybere se jen slot (otadata), router se vrátí do své sítě, Thread se připojí, každé přepnutí do minuty |
 | TC24 | Log před restartem | restart přes API | `/api/logs/previous` vrátí log předchozího běhu končící požadavkem na restart, aktuální log ho neobsahuje |
 | TC25 | Záloha nastavení | export, chybné importy, import se změnou a obnova | export bez stavu desky a hesla jen se `secrets=1`; neplatný base64, neznámá role a cizí formát odmítnuty bez změny; import platí po restartu, klíč stavu desky v souboru ignorován (C6 se nepřeflashuje); původní nastavení obnoveno |
+| TC26 | Záloha Zigbee | thread_br → zigbee_router, záloha na požádání, zpět | v roli Thread odmítnuto (409), interval jen 0/1/7; záloha zvýší generaci a uloží čas, nic se neflashuje, router se vrátí do sítě; odchod z role dál ukládá snapshot |
 | TC22 | Zigbee síť přes Zigbee2MQTT | `GET /api/zigbee/net`, zavření připojování | instance nalezena na brokeru, seznam zařízení s koordinátorem, Zigbee2MQTT odpoví na operaci, neznámá operace 400 |
 | TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |
 | TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
@@ -84,6 +85,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI18 | teplota C6 | na Přehledu má teplota C6 stejně jako P4 rozsah (min, max), pokud ji firmware C6 hlásí |
 | UI19 | log před restartem | Systém › Diagnostika: tlačítko stáhne log předchozího běhu (`*-previous.log`) |
 | UI20 | záloha nastavení | export stáhne JSON bez hesel, cizí soubor skončí chybou, potvrzení importu uvádí původ a zrušení nic nemění |
+| UI21 | zálohy Zigbee | výběr automatické zálohy se uloží; Zálohovat teď jen v roli Zigbee |
 | UI15 | nápovědy (i) | žádný klíč nápovědy není v TIPS dvakrát; tabulky zařízení Thread a Zigbee a údaje instance Zigbee2MQTT mají vlastní nápovědy, ne texty jiných tabulek se stejným názvem sloupce |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; modální okno zamkne stránku, ukáže fázi, procenta a odhad zbývajícího času, Escape ho nezavře; po skončení vše zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |

@@ -15,6 +15,8 @@ extern "C" {
  * ("@ZR {json}" status lines, plain text commands).
  */
 esp_err_t role_zigbee_start(bool coordinator);
+/* Coordinator: a host (Zigbee2MQTT, ZHA) is connected to the TCP bridge. */
+bool role_zigbee_host_connected(void);
 
 #ifdef __cplusplus
 }

@@ -329,15 +329,17 @@ static esp_err_t status_get(httpd_req_t *req)
         cJSON_AddNumberToObject(prog, "elapsed_s", (double)((esp_timer_get_time() - p->started_us) / 100000) / 10);
     }
     cJSON_AddStringToObject(prog, "last_error", p->last_error);
+    cJSON_AddNumberToObject(c6, "snapshot_days", gw_config_get_u8(GW_KEY_ZB_SNAP_DAYS, GW_ZB_SNAP_DAYS_DEFAULT));
     cJSON *snaps = cJSON_AddArrayToObject(c6, "snapshots");
     static const char *const snap_bundles[] = {"zigbee_ncp", "zigbee_router"};
     for (size_t i = 0; i < sizeof(snap_bundles) / sizeof(snap_bundles[0]); i++) {
-        uint32_t snap_size, snap_gen;
-        if (c6_snapshot_info(snap_bundles[i], &snap_size, &snap_gen) == ESP_OK) {
+        uint32_t snap_size, snap_gen, snap_time;
+        if (c6_snapshot_info(snap_bundles[i], &snap_size, &snap_gen, &snap_time) == ESP_OK) {
             cJSON *snap = cJSON_CreateObject();
             cJSON_AddStringToObject(snap, "bundle", snap_bundles[i]);
             cJSON_AddNumberToObject(snap, "size", snap_size);
             cJSON_AddNumberToObject(snap, "generation", snap_gen);
+            cJSON_AddNumberToObject(snap, "saved", snap_time);
             cJSON_AddItemToArray(snaps, snap);
         }
     }
@@ -675,7 +677,7 @@ static esp_err_t snapshot_get(httpd_req_t *req)
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         httpd_query_key_value(query, "bundle", bundle, sizeof(bundle));
     }
-    if (c6_snapshot_info(bundle, &size, &gen) != ESP_OK) {
+    if (c6_snapshot_info(bundle, &size, &gen, NULL) != ESP_OK) {
         return gw_http_send_error(req, 404, "no Zigbee snapshot");
     }
     char *buf = malloc(UPLOAD_CHUNK);
@@ -749,7 +751,15 @@ static esp_err_t settings_post(httpd_req_t *req)
     const char *hostname = GW_JSON_STR(body, "hostname");
     const char *password = GW_JSON_STR(body, "password");
     const char *matter_url = GW_JSON_STR(body, "matter_url");
+    const cJSON *snap_days = cJSON_GetObjectItem(body, "zigbee_backup_days");
     esp_err_t err = ESP_OK;
+    if (snap_days) {
+        if (!cJSON_IsNumber(snap_days) || (snap_days->valueint != 0 && snap_days->valueint != 1 && snap_days->valueint != 7)) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 400, "zigbee_backup_days: 0 (off), 1 or 7");
+        }
+        err = gw_config_set_u8(GW_KEY_ZB_SNAP_DAYS, (uint8_t)snap_days->valueint);
+    }
     if (matter_url) {
         if (strlen(matter_url) > 120 || (matter_url[0] && strncmp(matter_url, "ws://", 5) != 0)) {
             cJSON_Delete(body);

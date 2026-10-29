@@ -408,7 +408,8 @@ const CS = {
   'Permit join 180 s': 'Povolit připojení 180 s', 'Leave network': 'Opustit síť', 'Factory reset': 'Tovární reset', 'Identify': 'Identifikovat',
   'The router leaves its Zigbee network.': 'Router opustí svou Zigbee síť.', 'Zigbee network backups': 'Zálohy Zigbee sítí',
   'Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.': 'Ukládají se z C6 při každém odchodu ze Zigbee role a obnoví se po návratu.',
-  'Size': 'Velikost', 'Generation': 'Generace', 'No snapshot yet.': 'Zatím žádná záloha.',
+  'Size': 'Velikost', 'Generation': 'Generace', 'Saved': 'Uloženo', 'Automatic backup': 'Automatická záloha', 'off': 'vypnuto', 'daily': 'denně', 'weekly': 'týdně', 'Back up now': 'Zálohovat teď',
+  'Back up the Zigbee network now?': 'Zálohovat Zigbee síť teď?', 'Zigbee backup: the gateway restarts': 'Záloha Zigbee: brána se restartuje', 'No snapshot yet.': 'Zatím žádná záloha.',
   // sound
   'Microphone': 'Mikrofon', 'capturing': 'nahrává', 'restart to start': 'spustí se po restartu', 'off': 'vypnuto',
   'Gain': 'Zesílení', 'Record last 5 s': 'Nahrát posledních 5 s', 'Audio stays on the device. Only the clip you request here leaves it.': 'Zvuk zůstává v zařízení. Ven jde jen klip, který si tady vyžádáte.',
@@ -800,6 +801,11 @@ const TIPS = {
   'slot:gw_b': ['Gateway firmware slot B. Updates go to the slot that is not running.', 'Slot B firmwaru brány. Aktualizace jde vždy do slotu, který neběží.'],
   'slot:esphome': ['ESPHome BLE proxy image, started by the ESPHome role.', 'Image ESPHome BLE proxy, spouští ho role ESPHome.'],
   'State': ['valid: confirmed image; new: not started yet; pending: on trial until it runs stable.', 'valid: potvrzený image; new: ještě nespuštěný; pending: na zkoušku, dokud neběží stabilně.'],
+  'Automatic Zigbee backup': ['Saves the network data of the running Zigbee role between 02:00 and 03:00 UTC. The gateway restarts for it (about 20 s). As coordinator only while no Zigbee2MQTT or ZHA is connected, because the host would lose its adapter; use Back up now then.', 'Uloží data sítě běžící Zigbee role mezi 02:00 a 03:00 UTC. Brána se kvůli tomu restartuje (asi 20 s). Jako koordinátor jen tehdy, když není připojen Zigbee2MQTT ani ZHA, protože by ztratil adaptér; pak použijte Zálohovat teď.'],
+  'Snapshot firmware': ['C6 firmware whose network data the backup holds: zigbee_ncp is the coordinator, zigbee_router the router.', 'Firmware C6, jehož data sítě záloha obsahuje: zigbee_ncp je koordinátor, zigbee_router router.'],
+  'Snapshot generation': ['Counter over all backups; the higher one is newer.', 'Počítadlo přes všechny zálohy; vyšší je novější.'],
+  'Back up now': ['Restarts the gateway and saves the network data of the running Zigbee role from the C6 (it can be read only while the C6 is stopped).', 'Restartuje bránu a uloží data sítě běžící Zigbee role z C6 (dají se číst jen při zastaveném C6).'],
+  'Saved': ['When the backup was taken; — for backups from before this column existed.', 'Kdy byla záloha pořízena; — u záloh z doby před tímto sloupcem.'],
   'Settings backup': ['Role, Thread networks, MQTT, Home Assistant, transmit power and sound settings as one file, for a new board or after an NVS erase. Board state (C6 firmware, counters) is not part of it. Zigbee network data is backed up separately (C6 snapshots).', 'Role, sítě Thread, MQTT, Home Assistant, vysílací výkon a nastavení zvuku v jednom souboru, pro novou desku nebo po smazání NVS. Stav desky (firmware C6, čítače) v něm není. Data sítě Zigbee se zálohují zvlášť (snapshoty C6).'],
   'Previous log': ['The last 16 KiB of log before the last restart (requested, watchdog or crash). Not kept over a power cut.', 'Posledních 16 KiB logu před posledním restartem (vyžádaným, watchdogem i pádem). Výpadek napájení ho nepřežije.'],
   'Core dump': ['Crash record of the last panic, for debugging. Empty when the gateway never crashed.', 'Záznam posledního pádu pro ladění. Prázdný, když brána nespadla.'],
@@ -856,6 +862,7 @@ const ICONS = {
   'cog-outline': 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10M10,22C9.75,22 9.54,21.82 9.5,21.58L9.13,18.93C8.5,18.68 7.96,18.34 7.44,17.94L4.95,18.95C4.73,19.03 4.46,18.95 4.34,18.73L2.34,15.27C2.21,15.05 2.27,14.78 2.46,14.63L4.57,12.97L4.5,12L4.57,11L2.46,9.37C2.27,9.22 2.21,8.95 2.34,8.73L4.34,5.27C4.46,5.05 4.73,4.96 4.95,5.05L7.44,6.05C7.96,5.66 8.5,5.32 9.13,5.07L9.5,2.42C9.54,2.18 9.75,2 10,2H14C14.25,2 14.46,2.18 14.5,2.42L14.87,5.07C15.5,5.32 16.04,5.66 16.56,6.05L19.05,5.05C19.27,4.96 19.54,5.05 19.66,5.27L21.66,8.73C21.79,8.95 21.73,9.22 21.54,9.37L19.43,11L19.5,12L19.43,13L21.54,14.63C21.73,14.78 21.79,15.05 21.66,15.27L19.66,18.73C19.54,18.95 19.27,19.04 19.05,18.95L16.56,17.95C16.04,18.34 15.5,18.68 14.87,18.93L14.5,21.58C14.46,21.82 14.25,22 14,22H10M11.25,4L10.88,6.61C9.68,6.86 8.62,7.5 7.85,8.39L5.44,7.35L4.69,8.65L6.8,10.2C6.4,11.37 6.4,12.64 6.8,13.8L4.68,15.36L5.43,16.66L7.86,15.62C8.63,16.5 9.68,17.14 10.87,17.38L11.24,20H12.76L13.13,17.39C14.32,17.14 15.37,16.5 16.14,15.62L18.57,16.66L19.32,15.36L17.2,13.81C17.6,12.64 17.6,11.37 17.2,10.2L19.31,8.65L18.56,7.35L16.15,8.39C15.38,7.5 14.32,6.86 13.12,6.62L12.75,4H11.25Z',
   'console': 'M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L11.7,12.3C12.09,12.69 12.09,13.33 11.7,13.72L8.42,17H5.59L9.58,13Z',
   'content-copy': 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
+  'content-save-outline': 'M17 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3M19 19H5V5H16.17L19 7.83V19M12 12C10.34 12 9 13.34 9 15S10.34 18 12 18 15 16.66 15 15 13.66 12 12 12M6 6H15V10H6V6Z',
   'counter': 'M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H11V6H4M20,18V6H18.76C19,6.54 18.95,7.07 18.95,7.13C18.88,7.8 18.41,8.5 18.24,8.75L15.91,11.3L19.23,11.28L19.24,12.5L14.04,12.47L14,11.47C14,11.47 17.05,8.24 17.2,7.95C17.34,7.67 17.91,6 16.5,6C15.27,6.05 15.41,7.3 15.41,7.3L13.87,7.31C13.87,7.31 13.88,6.65 14.25,6H13V18H15.58L15.57,17.14L16.54,17.13C16.54,17.13 17.45,16.97 17.46,16.08C17.5,15.08 16.65,15.08 16.5,15.08C16.37,15.08 15.43,15.13 15.43,15.95H13.91C13.91,15.95 13.95,13.89 16.5,13.89C19.1,13.89 18.96,15.91 18.96,15.91C18.96,15.91 19,17.16 17.85,17.63L18.37,18H20M8.92,16H7.42V10.2L5.62,10.76V9.53L8.76,8.41H8.92V16Z',
   'delete-outline': 'M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z',
   'developer-board': 'M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z',
@@ -1316,12 +1323,16 @@ views['zigbee/diag'] = () => {
 views['zigbee/backups'] = () => snapshotCard();
 
 function snapshotCard() {
-  const snaps = status.c6.snapshots || [];
+  const snaps = status.c6.snapshots || [], days = status.c6.snapshot_days ?? 7, zb = isZigbee();
   return `<div class="card">${h3('backup-restore', 'Zigbee network backups')}
     <p class="muted">Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.</p>
-    ${snaps.length ? `<table><tr><th>Firmware</th><th>Size</th><th>Generation</th><th></th></tr>${snaps.map(s =>
-      `<tr><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td><button class="btn" data-snap="${esc(s.bundle)}">${ic('download')}Download</button></td></tr>`).join('')}</table>`
-      : '<p class="muted">No snapshot yet.</p>'}</div>`;
+    ${snaps.length ? `<table><tr>${[['Firmware', 'Snapshot firmware'], 'Size', ['Generation', 'Snapshot generation'], 'Saved'].map(th).join('')}<th></th></tr>${snaps.map(s =>
+      `<tr><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td>${s.saved ? new Date(s.saved * 1000).toLocaleString() : '—'}</td>
+      <td><button class="btn" data-snap="${esc(s.bundle)}">${ic('download')}Download</button></td></tr>`).join('')}</table>`
+      : '<p class="muted">No snapshot yet.</p>'}
+    <div class="row" style="margin-top:12px"><label class="field" style="margin:0"><span>Automatic backup${tip('Automatic Zigbee backup')}</span>
+      <select id="zb-snap-days">${[[0, 'off'], [1, 'daily'], [7, 'weekly']].map(([v, l]) => `<option value="${v}" ${v === days ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    <div class="row"><button class="btn" id="zb-snap-now" ${zb ? '' : 'disabled'}>${ic('content-save-outline')}Back up now</button>${tip('Back up now')}</div></div>`;
 }
 
 /* Czech version of the Home Assistant guide (views.ha), same structure. */
@@ -1641,6 +1652,7 @@ document.addEventListener('change', e => {
     putEvents({ events }).catch(err => toast('Error: ' + err.message));
     return;
   }
+  if (id === 'zb-snap-days') { api('/api/settings', { json: { zigbee_backup_days: +e.target.value } }).then(() => { status.c6.snapshot_days = +e.target.value; toast('Saved'); }).catch(err => toast('Error: ' + err.message)); return; }
   if (id === 'z2m-base') { api('/api/zigbee/net/base', { json: { base: e.target.value } }).then(() => loadZigbeeNet(true)).catch(err => toast('Error: ' + err.message)); return; }
   if (id === 'ev-add') { addChip('ev-add', 'classes', 'ev-classes'); return; }
   if (id === 'ev-add-sup') { addChip('ev-add-sup', 'suppress', 'ev-suppress'); return; }
@@ -2754,6 +2766,13 @@ document.addEventListener('click', async e => {
       download('/api/coredump', 'coredump.elf');
     } else if (t.id === 'set-export') {
       await download('/api/settings/export' + ($('#set-secrets').checked ? '?secrets=1' : ''), status.hostname + '-settings.json');
+    } else if (t.id === 'zb-snap-now') {
+      if (!await confirmDialog('Back up the Zigbee network now?', activeRole() === 'zigbee_coordinator'
+        ? L('The gateway restarts and reads the network data from the C6 (about 20 s). Zigbee2MQTT loses the adapter meanwhile and may have to be restarted.', 'Brána se restartuje a přečte data sítě z C6 (asi 20 s). Zigbee2MQTT mezitím ztratí adaptér a může být nutné ho restartovat.')
+        : L('The gateway restarts and reads the network data from the C6 (about 20 s); the router rejoins its network afterwards.', 'Brána se restartuje a přečte data sítě z C6 (asi 20 s); router se pak vrátí do své sítě.'))) return;
+      await api('/api/c6/zigbee-snapshot', { method: 'POST' });
+      toast('Zigbee backup: the gateway restarts');
+      waitForRestart();
     } else if (t.id === 'log-prev') {
       await download('/api/logs/previous', status.hostname + '-previous.log');
     } else if (t.id === 'cd-del') {

@@ -60,7 +60,8 @@ P4 flash (16 MB, firmware/partitions.csv)
   one the role needs and updates the C6 through its ROM bootloader over JP1. The Thread and Zigbee
   firmwares share one C6 layout with a slot each, so a switch only selects the slot (8 kB,
   [docs/c6-slots.md](docs/c6-slots.md)). For ESPHome it selects the ESPHome slot and restarts into it.
-- Zigbee network data survives switching (snapshot to `c6data`, restored on return). The Thread
+- Zigbee network data survives switching (snapshot to `c6data`, restored on return) and is also
+  backed up weekly at night or on request (the gateway restarts for it, see CHANGELOG). The Thread
   network lives in P4 NVS and is not touched by C6 flashing.
 - Stability: gateway images confirm themselves after 60 s (else rollback), repeated crashes stop
   role start but keep the UI, RCP failures trigger a limited number of C6 reflashes (a recovery
@@ -89,7 +90,7 @@ Port 80, single page embedded in the firmware with a left menu (sections and sub
 `#section/page`), in Czech or English with a light, dark or system
 theme (switches in the header, remembered by the browser). HTTP Basic auth (user `admin`) once a password is
 set. Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/logs/previous`, `/api/ota/{gateway,esphome,c6fw}`,
-`/api/c6/{backup,reflash,zigbee-snapshot}`, `/api/thread/{status,dataset,cli}`,
+`/api/c6/{backup,reflash,zigbee-snapshot}` (GET download, POST back up now), `/api/thread/{status,dataset,cli}`,
 `/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/tools/ping`, `/api/coredump`.
 The OTBR REST API for Home Assistant is on port 8081 (Thread border router role).
 

@@ -440,6 +440,35 @@ def tc25_settings_backup():
     check(keys_now() == full['keys'], 'original settings restored')
 
 
+def tc26_zigbee_backup():
+    """Zigbee backup on request: refused outside Zigbee, router data saved with its time, router rejoins."""
+    if status()['role']['active'] != 'thread_br':
+        switch('thread_br')
+    code, r = http('POST', '/api/c6/zigbee-snapshot')
+    check(code == 409, f'refused in the Thread role ({r.get("error")})')
+    check(http('POST', '/api/settings', {'zigbee_backup_days': 3})[0] == 400, 'interval other than 0, 1, 7 refused')
+    check(http('POST', '/api/settings', {'zigbee_backup_days': 7})[0] == 200 and status()['c6']['snapshot_days'] == 7, 'weekly set')
+    switch('zigbee_router')
+    wait_until('router joined', lambda: (lambda rs: rs if (rs.get('router') or {}).get('joined') else None)(status()['role_status'] or {}), 60)
+    snap = lambda: next((x for x in status()['c6']['snapshots'] if x['bundle'] == 'zigbee_router'), {})
+    before = snap()
+    flashes = status()['c6']['chip']['flashes']
+    t0 = time.time()
+    code, r = http('POST', '/api/c6/zigbee-snapshot')
+    check(code == 200 and r.get('restarting'), 'backup requested')
+    wait_restart('zigbee_router')
+    after = snap()
+    check(after.get('generation', 0) == before.get('generation', 0) + 1, f'new generation {after.get("generation")}')
+    check(abs(after.get('saved', 0) - time.time()) < 120, 'saved time is now')
+    check(status()['c6']['chip']['flashes'] == flashes, 'nothing flashed')
+    check('Zigbee network backup: ESP_OK' in logs_since(0), 'backup logged')
+    r = wait_until('router joined', lambda: (lambda rs: rs if (rs.get('router') or {}).get('joined') else None)(status()['role_status'] or {}), 60)['router']
+    check(True, f'router back in its network after {time.time() - t0:.0f} s: pan {r["pan_id"]}')
+    switch('thread_br')
+    wait_until('Thread attached', lambda: (lambda rs: rs if rs.get('role') in ('router', 'leader', 'child') else None)(status()['role_status'] or {}), 60)
+    check(snap().get('generation') == after.get('generation') + 1, 'leaving the role still saves a snapshot')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -760,6 +789,7 @@ TESTS = [
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
+    ('TC26', tc26_zigbee_backup),
 ]
 
 

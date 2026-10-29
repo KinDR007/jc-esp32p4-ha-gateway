@@ -51,6 +51,9 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
+#define GW_KEY_ZB_SNAP_DAYS "zb_snap_days" /* u8, automatic Zigbee network backup every n days, 0 = off */
+#define GW_ZB_SNAP_DAYS_DEFAULT 7
+#define GW_KEY_ZB_SNAP_REQ "zb_snap_req" /* u8, back up the Zigbee network data on the next start */
 
 esp_err_t gw_config_init(void);
 uint8_t gw_config_get_u8(const char *key, uint8_t def);

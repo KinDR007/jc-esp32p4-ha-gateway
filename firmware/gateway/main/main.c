@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "c6_flasher.h"
 #include "cJSON.h"
@@ -9,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "gw.h"
@@ -103,6 +105,16 @@ static void apply_role(gw_role_t role)
     } else if (!ensure_c6(gw_role_c6_bundle(role))) {
         return;
     }
+    if ((role == GW_ROLE_ZIGBEE_COORD || role == GW_ROLE_ZIGBEE_ROUTER) && gw_config_get_u8(GW_KEY_ZB_SNAP_REQ, 0)) {
+        gw_config_erase(GW_KEY_ZB_SNAP_REQ);
+        if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+        gw_flash_lock();
+        esp_err_t err = c6_snapshot_take(gw_role_c6_bundle(role));
+        gw_flash_unlock();
+        ESP_LOGI(TAG, "Zigbee network backup: %s", esp_err_to_name(err));
+    }
 
     esp_err_t err = ESP_OK;
     switch (role) {
@@ -133,6 +145,58 @@ static void apply_role(gw_role_t role)
         return;
     }
     st->active = role;
+}
+
+/* ---- Zigbee network backup ----
+ * The C6 data can only be read through its ROM bootloader, so a backup restarts the gateway and
+ * saves the data before the role starts again (the C6 restarts anyway). The automatic one runs
+ * between 02:00 and 03:00 UTC; as coordinator only while no host is connected, because the host
+ * loses its adapter for the restart.
+ */
+#define SNAP_HOUR_UTC 2
+#define SNAP_CHECK_MS (10 * 60 * 1000)
+
+static void request_zigbee_backup(void)
+{
+    gw_config_set_u8(GW_KEY_ZB_SNAP_REQ, 1);
+    gw_restart_later(1000);
+}
+
+static esp_err_t zigbee_snapshot_post(httpd_req_t *req)
+{
+    gw_role_t role = gw_state()->active;
+    if (role != GW_ROLE_ZIGBEE_COORD && role != GW_ROLE_ZIGBEE_ROUTER) {
+        return gw_http_send_error(req, 409, "only in a Zigbee role");
+    }
+    if (c6_progress()->busy) {
+        return gw_http_send_error(req, 409, "C6 flashing in progress");
+    }
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddBoolToObject(json, "restarting", true);
+    request_zigbee_backup();
+    return gw_http_send_json(req, json);
+}
+
+static bool zigbee_backup_due(void)
+{
+    gw_role_t role = gw_state()->active;
+    uint8_t days = gw_config_get_u8(GW_KEY_ZB_SNAP_DAYS, GW_ZB_SNAP_DAYS_DEFAULT);
+    time_t now = time(NULL);
+    struct tm utc;
+    uint32_t size, gen, saved = 0;
+
+    /* up for an hour at least: a failed attempt (it restarts) is not repeated in the same night */
+    if ((role != GW_ROLE_ZIGBEE_COORD && role != GW_ROLE_ZIGBEE_ROUTER) || !days || now < 1700000000 ||
+        esp_timer_get_time() < 3600LL * 1000000) {
+        return false;
+    }
+    gmtime_r(&now, &utc);
+    if (utc.tm_hour != SNAP_HOUR_UTC || (role == GW_ROLE_ZIGBEE_COORD && role_zigbee_host_connected())) {
+        return false;
+    }
+    c6_snapshot_info(gw_role_c6_bundle(role), &size, &gen, &saved);
+    /* an hour of slack: the check runs every 10 minutes, so yesterday's backup may be 23.9 h old */
+    return !saved || now - (time_t)saved >= (time_t)days * 86400 - 3600;
 }
 
 /* Home Assistant instances in the LAN (mDNS _home-assistant._tcp): the web UI suggests the
@@ -214,6 +278,7 @@ void app_main(void)
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
+    gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
     netscan_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
@@ -236,5 +301,12 @@ void app_main(void)
     if (!st->stable) {
         gw_boot_mark_stable();
         ESP_LOGI(TAG, "stable, role %s", gw_role_name(st->active));
+    }
+    while (true) {
+        if (zigbee_backup_due()) {
+            ESP_LOGW(TAG, "automatic Zigbee network backup");
+            request_zigbee_backup();
+        }
+        vTaskDelay(pdMS_TO_TICKS(SNAP_CHECK_MS));
     }
 }
