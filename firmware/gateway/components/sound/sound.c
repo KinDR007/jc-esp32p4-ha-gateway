@@ -23,6 +23,7 @@
 #include "freertos/task.h"
 #include "gw.h"
 #include "sound_events.h"
+#include "sound_learn.h"
 #include "sound_mel.h"
 #include "sound_model.h"
 
@@ -249,6 +250,8 @@ static void infer_task(void *arg)
     float *history = heap_caps_malloc(MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float), MALLOC_CAP_SPIRAM);
     float *patch = heap_caps_malloc(MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float), MALLOC_CAP_SPIRAM);
     float *scores = heap_caps_malloc(SOUND_CLASSES * sizeof(float), MALLOC_CAP_SPIRAM);
+    float *embedding = heap_caps_malloc(SOUND_EMBEDDING * sizeof(float), MALLOC_CAP_SPIRAM);
+    int16_t *audio = heap_caps_malloc(LEARN_AUDIO * sizeof(int16_t), MALLOC_CAP_SPIRAM);
     float frame[MEL_WINDOW];
     uint64_t next_frame = 0;
     uint32_t frames = 0, since_patch = 0;
@@ -267,6 +270,7 @@ static void infer_task(void *arg)
     next_frame = samples_total() / MEL_HOP;
 
     while (true) {
+        sound_learn_poll();
         uint64_t total = samples_total();
         if (total - next_frame * MEL_HOP > MAX_LAG_SAMPLES + MEL_PATCH_FRAMES * MEL_HOP) {
             /* Behind real time (flash writes stall both cores): rebuild the history from the
@@ -301,7 +305,7 @@ static void infer_task(void *arg)
         /* Let the idle task (task watchdog) run between patches whatever the backlog. */
         vTaskDelay(1);
         since_patch = 0;
-        bool loud = window_peak_db >= s.gate_db;
+        bool loud = window_peak_db >= s.gate_db || sound_learn_wants_all();
         window_peak_db = -120.0f;
         if (!s.infer_enabled || !sound_model_ready() || !loud) {
             s.skipped++;
@@ -316,10 +320,19 @@ static void infer_task(void *arg)
         }
         memcpy(patch, history, MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float));
         start = esp_timer_get_time();
-        sound_model_run(patch, scores, NULL);
+        sound_model_run(patch, scores, embedding);
         gw_flash_unlock();
         int64_t took = esp_timer_get_time() - start;
         busy_us += took;
+
+        /* the audio the patch was computed from, for learned sounds */
+        uint64_t first = (next_frame - MEL_PATCH_FRAMES) * MEL_HOP;
+        double energy = 0;
+        for (int i = 0; i < LEARN_AUDIO; i++) {
+            audio[i] = s.ring[(first + i) % RING];
+            energy += (double)audio[i] * audio[i];
+        }
+        sound_learn_window(embedding, audio, to_db(sqrt(energy / LEARN_AUDIO) / 32768.0), esp_timer_get_time());
 
         top_t top[TOP_N] = {0};
         for (int c = 0; c < SOUND_CLASSES; c++) {
@@ -575,6 +588,43 @@ static void mqtt_state(cJSON *state)
     }
 }
 
+static bool learn_ready(void)
+{
+    return s.running && s.infer_enabled && sound_model_ready();
+}
+
+static float learn_gate_db(void)
+{
+    return s.gate_db;
+}
+
+/* The model on audio that is not in the ring (an uploaded recording). Inference task only. */
+static esp_err_t learn_embed(const int16_t *audio, float *embedding)
+{
+    static float *patch, *scores;
+    float frame[MEL_WINDOW];
+    if (!patch) {
+        patch = heap_caps_malloc(MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float), MALLOC_CAP_SPIRAM);
+        scores = heap_caps_malloc(SOUND_CLASSES * sizeof(float), MALLOC_CAP_SPIRAM);
+    }
+    if (!patch || !scores) {
+        return ESP_ERR_NO_MEM;
+    }
+    for (int f = 0; f < MEL_PATCH_FRAMES; f++) {
+        for (int i = 0; i < MEL_WINDOW; i++) {
+            frame[i] = audio[f * MEL_HOP + i] / 32768.0f;
+        }
+        mel_frame(frame, patch + f * MEL_BANDS);
+    }
+    if (!gw_flash_try_lock()) {
+        return ESP_ERR_INVALID_STATE; /* an upload or C6 flashing is writing the flash */
+    }
+    esp_err_t err = sound_model_run(patch, scores, embedding);
+    gw_flash_unlock();
+    vTaskDelay(1); /* several windows in a row: let the idle task run */
+    return err;
+}
+
 esp_err_t sound_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
@@ -588,6 +638,8 @@ esp_err_t sound_init(void)
     gw_mqtt_set_extension(mqtt_discovery, mqtt_state);
     load_class_names();
     sound_events_init(class_name);
+    static const sound_learn_hooks_t hooks = {.ready = learn_ready, .gate_db = learn_gate_db, .embed = learn_embed};
+    sound_learn_init(&hooks);
     if (!gw_config_get_u8(KEY_ENABLED, 0)) {
         return ESP_OK;
     }

@@ -490,6 +490,112 @@ def tc27_online_update_checks():
     check(status()['update']['url'] == '', 'URL cleared')
 
 
+def _tone_wav(path, hz, seconds=1.5, lead=0.4):
+    import math, random, struct, wave
+    rate = 16000
+    rnd = random.Random(hz)
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        frames = [int(rnd.gauss(0, 60)) for _ in range(int(lead * rate))] + \
+                 [int(8000 * math.sin(2 * math.pi * hz * i / rate) + rnd.gauss(0, 60)) for i in range(int(seconds * rate))]
+        w.writeframes(struct.pack(f'<{len(frames)}h', *frames))
+
+
+def tc28_learned_sounds():
+    """Learned sounds from WAV uploads: tone and embedding profiles, background from the room, calibration, scoring."""
+    import shutil, subprocess, tempfile
+    tmp = tempfile.mkdtemp()
+    wav = lambda name: os.path.join(tmp, name)
+    _tone_wav(wav('beep.wav'), 2000)
+    _tone_wav(wav('beep2.wav'), 2010, seconds=1.0)
+    _tone_wav(wav('other.wav'), 900)
+    clips = {os.path.basename(c): c for c in glob.glob(os.path.join(ROOT, 'tools/yamnet/data/esc50/*.wav'))}
+    dogs = sorted(c for n, c in clips.items() if n.endswith('-0.wav'))
+    others = sorted(c for n, c in clips.items() if n.split('-')[-1] in ('10.wav', '22.wav', '48.wav'))
+    if len(dogs) < 3 or not others or not shutil.which('afconvert'):
+        raise Fail('skipped: needs tools/yamnet/data/esc50 (scripts/build_model.sh) and afconvert (macOS)')
+    conv = []
+    for k, c in enumerate(dogs + others):
+        out = wav(f'clip{k}.wav')
+        subprocess.run(['afconvert', '-f', 'WAVE', '-d', 'LEI16@16000', '-c', '1', c, out], check=True)
+        conv.append(out)
+    dog_samples, dog_test, other_tests = conv[:2], conv[2], conv[3:]
+    code, room = http('GET', '/api/sound/clip?seconds=6', timeout=30)
+    check(code == 200 and room[:4] == b'RIFF', 'background: 6 s of this room from the microphone')
+    with open(wav('room.wav'), 'wb') as f:
+        f.write(room)
+
+    learn = lambda: http('GET', '/api/sound/learn')[1]
+    check(learn()['ready'], 'recognition runs')
+    for pid in ('tc_beep', 'tc_dog'):
+        http('DELETE', f'/api/sound/learn?profile={pid}')
+    bg_before = {x['slot'] for x in learn()['background']}
+    free_before = learn()['slots_free']
+
+    def upload(path, query):
+        with open(path, 'rb') as f:
+            code, r = http('POST', '/api/sound/learn/upload?' + query, raw=f.read(), timeout=60)
+        if code != 200:
+            raise Fail(f'upload {os.path.basename(path)} ({query}): {code} {r}')
+        return r
+
+    code, r = http('POST', '/api/sound/learn/upload?kind=sample&profile=tc_x', raw=b'RIFF' + b'\0' * 100)
+    check(code == 400, f'not a WAV refused ({r.get("error")})')
+    code, r = http('POST', '/api/sound/learn/upload?kind=sample&profile=Bad-Id', raw=open(wav('beep.wav'), 'rb').read())
+    check(code == 409, f'invalid name refused ({r.get("error")})')
+    bg_new = []
+    try:
+        for f in (wav('beep.wav'), wav('beep2.wav'), wav('beep.wav')):
+            upload(f, 'kind=sample&profile=tc_beep&type=tone')
+        p = next(x for x in learn()['profiles'] if x['id'] == 'tc_beep')
+        check(abs(p['tone_hz'] - 2003) <= 30 and p['samples'] == 3, f'tone profile: {p["tone_hz"]} Hz from {p["samples"]} samples')
+        code, r = http('POST', '/api/sound/learn/upload?kind=sample&profile=tc_beep&type=embedding', raw=open(wav('beep.wav'), 'rb').read())
+        check(code == 409, 'a sample of the other type refused')
+        for f in dog_samples:
+            upload(f, 'kind=sample&profile=tc_dog&type=embedding')
+        r = upload(wav('room.wav'), 'kind=background')
+        l = learn()
+        bg_new = [x['slot'] for x in l['background'] if x['slot'] not in bg_before]
+        check(len(bg_new) == 5 and l['slots_free'] == free_before - 3 - 2 - 5, f'{r["result"]}, {l["slots_free"]} slots free')
+        prof = {p['id']: p for p in l['profiles'] if p['id'].startswith('tc_')}
+        for p in prof.values():
+            check(p['separable'] and p['background_max'] < p['threshold'] <= p['self_min'],
+                  f'{p["id"]}: samples alike {p["self_min"]}, background {p["background_max"]}, threshold {p["threshold"]}')
+        code, w = http('GET', f'/api/sound/learn/sample?slot={prof["tc_beep"]["slots"][0]["slot"]}')
+        check(code == 200 and w[:4] == b'RIFF' and len(w) == 44 + 2 * 15600, 'a sample plays back as WAV')
+
+        score = lambda f: upload(f, 'test=1')['scores']
+        sc = score(wav('beep2.wav'))
+        check(sc['tc_beep'] >= prof['tc_beep']['threshold'], f'the beep scores {sc["tc_beep"]} for tc_beep')
+        sc = score(wav('other.wav'))
+        check(sc['tc_beep'] < prof['tc_beep']['threshold'], f'a 900 Hz tone scores {sc["tc_beep"]} for tc_beep')
+        sc = score(dog_test)
+        check(sc['tc_dog'] >= prof['tc_dog']['threshold'], f'another dog recording scores {sc["tc_dog"]} for tc_dog')
+        worst = max(score(f)['tc_dog'] for f in other_tests)
+        check(worst < prof['tc_dog']['threshold'], f'rain, clapping, fireworks score at most {worst} for tc_dog')
+
+        events = http('GET', '/api/sound/events')[1]
+        saved = {k: events[k] for k in ('preset', 'exclude', 'events')}
+        ev = {'id': 'tc_beep', 'name': 'tc beep', 'kind': 'impulse', 'threshold': prof['tc_beep']['threshold'], 'windows': 1,
+              'hold_s': 2, 'cooldown_s': 0, 'classes': [], 'suppress': [], 'profile': 'tc_beep'}
+        try:
+            code, r = http('PUT', '/api/sound/events', dict(saved, events=saved['events'] + [ev]))
+            got = next((e for e in r.get('events', []) if e['id'] == 'tc_beep'), {})
+            check(code == 200 and got.get('profile') == 'tc_beep', 'event on the learned tone saved with its profile')
+            code, r = http('PUT', '/api/sound/events', dict(saved, events=saved['events'] + [dict(ev, profile='Bad-Id')]))
+            check(code == 400, f'invalid profile in an event refused ({r.get("error")})')
+        finally:
+            http('PUT', '/api/sound/events', saved)
+    finally:
+        for pid in ('tc_beep', 'tc_dog'):
+            http('DELETE', f'/api/sound/learn?profile={pid}')
+        for slot in bg_new:
+            http('DELETE', f'/api/sound/learn?slot={slot}')
+    check(learn()['slots_free'] == free_before, 'test samples removed')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -811,6 +917,7 @@ TESTS = [
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
+    ('TC28', tc28_learned_sounds),
 ]
 
 

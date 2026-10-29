@@ -40,6 +40,12 @@
 - CI: GitHub Actions run `scripts/ci_checks.sh` (unit test, Python and web UI syntax, icon block) and
   `scripts/ci_build.sh` (C6 firmwares, gateway, c6fw.bin in `espressif/idf:v5.5.5`). The gateway
   build regenerates its sdkconfig when `sdkconfig.defaults` changed.
+- Learned sounds (sound phase 4, Sound › Learned sounds): samples recorded with the microphone or
+  uploaded as WAV are kept in the `sounds` partition (0.96 s audio and the YAMNet embedding each,
+  44 slots). Profiles of type "any sound" (cosine similarity to the mean embedding) or "beep or
+  tone" (energy at the dominant frequency), background recordings calibrate a suggested threshold,
+  a test recording shows the scores. Sound events take a `profile` instead of classes and reach
+  Home Assistant like the others (`/api/sound/learn*`). Tests TC28, UI23.
 
 ## v1.4 (2026-10-29)
 

@@ -363,6 +363,45 @@ v HA) je potřeba ověřit v HA, protože broker 192.168.88.27 vyžaduje přihl�
   - TC19: přehraný zvuk vyvolá událost v HA
 - Odhad: 1 den práce a test na desce s brokerem 192.168.88.27.
 
+## Fáze 4: naučené zvuky (2026-10-29)
+
+Implementace (`firmware/gateway/components/sound/sound_learn.c`, UI Zvuk › Naučené zvuky):
+- **Vzorek:** 0,96 s zvuku (jedno okno modelu, 15 600 vzorků) a jeho embedding YAMNet (1024 hodnot).
+  Ukládá se do oddílu `sounds` po slotech 36 kB, celkem 44 slotů. Zvuk zůstává uložený, takže jde
+  přehrát a profil se dá kdykoli přepočítat.
+- **Zdroje vzorků:**
+  - z mikrofonu: tlačítko Nahrát, uloží se nejhlasitější okno do 4 s; ticho pod prahem spouštění se odmítne
+  - ze souboru WAV (16 kHz mono, 1–10 s), např. nahrávka telefonem přímo u spotřebiče
+- **Profily** (vzorky se stejným názvem):
+  - *jakýkoli zvuk:* kosinová podobnost embeddingu s průměrem vzorků (centroid)
+  - *pípnutí nebo tón:* dominantní frekvence vzorků (Goertzel, hrubé hledání 40 Hz v nejhlasitějších
+    4096 vzorcích, pak jemné po 5 Hz) a podíl energie na ní, poměřený se vzorky
+- **Pozadí:** 5 nahrávek místnosti (mikrofon 5 s nebo WAV). Kalibrace:
+  - shoda vzorků = nejnižší skóre vzorku proti ostatním (leave-one-out)
+  - pozadí = nejvyšší skóre nahrávek pozadí
+  - navržený práh = pozadí + 70 % rozdílu ke shodě vzorků, s minimem 0,5 pro embedding
+    (embeddingy jsou nezáporné, nesouvisející zvuky dávají podobnost 0,4–0,5) a 0,3 pro tón;
+    když se pozadí a vzorky překrývají, UI to označí
+- **Událost** s polem `profile` místo `classes`: stejná detekční logika, MQTT entity a log (třída
+  „learned sound“). Tlačítko Vytvořit událost ji založí s navrženým prahem.
+- **Test nahrávky:** WAV se vyhodnotí proti všem profilům a nic se neuloží.
+- **API:**
+  - `GET/DELETE /api/sound/learn`
+  - `POST /api/sound/learn/record` (`kind` sample/background, `profile`, `type` embedding/tone)
+  - `POST /api/sound/learn/upload?kind=…&profile=…&type=…` nebo `?test=1` (tělo WAV)
+  - `GET /api/sound/learn/sample?slot=n`
+
+Ověření (TC28, nahrávání WAV):
+
+| Profil | Shoda vzorků | Pozadí (místnost) | Práh | Pozitivní test | Negativní test |
+|---|---|---|---|---|---|
+| tón 2000 Hz (3 vzorky) | 0,85 | 0 | 0,60 | pípnutí 2010 Hz: 0,85 | tón 900 Hz: 0 |
+| pes (2 klipy ESC-50) | 0,64 | 0,19 | 0,51 | jiný pes: 0,77 | déšť, tleskání, ohňostroj: max 0,46 |
+
+S prostředním prahem (0,43) by ohňostroj (0,49) falešně spustil událost „pes“; proto 70 % a minimum.
+S 5–10 vzorky stejného zdroje bude shoda vzorků i rezerva vyšší. Živé nahrávání z mikrofonu a spuštění
+události přehraným zvukem čeká na test s reproduktorem u desky (výstup Macu byl ztlumený).
+
 ## Zdroje
 
 1. YAMNet: https://github.com/tensorflow/models/tree/master/research/audioset/yamnet, třídy: yamnet_class_map.csv

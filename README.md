@@ -13,7 +13,8 @@ MQTT, the REST API or the ESPHome device in Home Assistant.
 | ESPHome BLE proxy | ESPHome image (own slot) | `esp_hosted` (SDIO) | ESPHome integration |
 
 Independent of the role (except ESPHome): **sound recognition** with the onboard microphone,
-YAMNet on the P4 (521 AudioSet classes, about 60 ms per 0.96 s of audio, off by default), see
+YAMNet on the P4 (521 AudioSet classes, about 60 ms per 0.96 s of audio, off by default) and
+sounds learned on the board (samples, tone or embedding profiles), see
 [docs/sound-detection.md](docs/sound-detection.md).
 
 Status: all roles and transitions pass the automated hardware tests (10/10 regression, see

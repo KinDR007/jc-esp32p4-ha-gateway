@@ -272,10 +272,11 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <label class="field"><span>Hold after last hit (s)</span><input type="number" id="ev-hold" min="1" max="600"></label>
       <label class="field"><span>Cooldown between events (s)</span><input type="number" id="ev-cool" min="0" max="3600"></label>
     </div>
-    <label class="field"><span>Sounds that trigger it</span><div id="ev-classes" class="row"></div>
+    <p id="ev-profile" data-notr></p>
+    <div id="ev-sounds"><label class="field"><span>Sounds that trigger it</span><div id="ev-classes" class="row"></div>
       <input type="text" id="ev-add" list="class-names" placeholder="add a sound (type to search)"></label>
     <label class="field"><span>Ignore while any of these is heard (e.g. Television for speech)</span><div id="ev-suppress" class="row"></div>
-      <input type="text" id="ev-add-sup" list="class-names" placeholder="add a sound"></label>
+      <input type="text" id="ev-add-sup" list="class-names" placeholder="add a sound"></label></div>
     <datalist id="class-names"></datalist>
     <div class="row"><button class="btn primary" value="save">Save</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
   </form>
@@ -452,7 +453,11 @@ const CS = {
     'Publikuje bránu do Home Assistant přes MQTT discovery: roli, stav a diagnostiku jako entity, výběr role a tlačítko restartu. Potřebuje integraci MQTT a broker (např. doplněk Mosquitto).',
   // tools
   'Diagnostics': 'Diagnostika', 'Status JSON': 'Stav JSON', 'Thread JSON': 'Thread JSON', 'Zigbee JSON': 'Zigbee JSON',
-  'Download core dump': 'Stáhnout core dump', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
+  'Download core dump': 'Stáhnout core dump', 'Learned sounds': 'Naučené zvuky', 'Record': 'Nahrávání', 'Sound name (ID)': 'Název zvuku (ID)', 'Type': 'Typ',
+  'any sound (YAMNet embedding)': 'jakýkoli zvuk (embedding YAMNet)', 'beep or tone (frequency)': 'pípnutí nebo tón (frekvence)', 'Record sample (4 s)': 'Nahrát vzorek (4 s)',
+  'Record background (5 s)': 'Nahrát pozadí (5 s)', 'Play the sound near the board right after pressing Record. 5 to 10 samples per sound, then the background of the room.': 'Pusťte zvuk u desky hned po stisku Nahrát. 5 až 10 vzorků na zvuk, potom pozadí místnosti.',
+  'Background': 'Pozadí', 'Sound': 'Zvuk', 'Samples': 'Vzorky', 'Samples alike': 'Shoda vzorků', 'Threshold': 'Práh', 'Now': 'Teď', 'No learned sound yet.': 'Zatím žádný naučený zvuk.',
+  'Delete background': 'Smazat pozadí', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
@@ -807,6 +812,14 @@ const TIPS = {
   'Snapshot generation': ['Counter over all backups; the higher one is newer.', 'Počítadlo přes všechny zálohy; vyšší je novější.'],
   'Back up now': ['Restarts the gateway and saves the network data of the running Zigbee role from the C6 (it can be read only while the C6 is stopped).', 'Restartuje bránu a uloží data sítě běžící Zigbee role z C6 (dají se číst jen při zastaveném C6).'],
   'Saved': ['When the backup was taken; — for backups from before this column existed.', 'Kdy byla záloha pořízena; — u záloh z doby před tímto sloupcem.'],
+  'Learn from a file': ['A WAV recording, 16 kHz mono 16-bit, 1 to 10 s, e.g. the washing machine beep recorded with a phone next to it (convert with: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). As a sample its loudest 0.96 s are used; Test recording shows how the learned sounds score it, nothing is saved.', 'Nahrávka WAV, 16 kHz mono 16 bit, 1 až 10 s, např. pípnutí pračky nahrané telefonem u ní (převod: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). Jako vzorek se použije nejhlasitějších 0,96 s; Test nahrávky ukáže, jaké skóre jí dají naučené zvuky, nic se neukládá.'],
+  'Learned sound ID': ['Name of the learned sound, also the ID of the event created from it (a-z, 0-9, _). More samples under the same name improve it.', 'Název naučeného zvuku a zároveň ID události z něj vytvořené (a-z, 0-9, _). Další vzorky pod stejným názvem ho zpřesní.'],
+  'Learned sound type': ['Any sound: compared with what YAMNet hears (cosine similarity of embeddings), for barking of your dog, a door, a voice. Beep or tone: share of energy at the dominant frequency of the samples, for appliance beeps and piezo alarms.', 'Jakýkoli zvuk: porovnává se s tím, co slyší YAMNet (kosinová podobnost embeddingů), pro štěkot vašeho psa, dveře, hlas. Pípnutí nebo tón: podíl energie na dominantní frekvenci vzorků, pro pípání spotřebičů a piezo alarmy.'],
+  'Record background': ['Five recordings of the room as it usually sounds (TV, fridge, talking). They set the threshold: above anything the background reaches, below the samples.', 'Pět nahrávek místnosti, jak obvykle zní (TV, lednice, hovor). Určují práh: nad vším, čeho dosáhne pozadí, pod vzorky.'],
+  'Samples alike': ['Lowest score of a sample against the other samples of the sound; low means the samples differ (record more, or closer).', 'Nejnižší skóre vzorku proti ostatním vzorkům zvuku; nízké znamená, že se vzorky liší (nahrajte další nebo blíž).'],
+  'Background score': ['Highest score the background recordings reach for this sound. It has to stay below the samples.', 'Nejvyšší skóre, kterého pro tento zvuk dosáhnou nahrávky pozadí. Musí zůstat pod vzorky.'],
+  'Suggested threshold': ['Halfway between the background and the samples; used by Create event and editable there.', 'Uprostřed mezi pozadím a vzorky; použije ho Vytvořit událost a dá se tam upravit.'],
+  'Learned score now': ['Score of the last recognition window, to test: play the sound and watch it rise above the threshold.', 'Skóre posledního okna rozpoznávání, pro test: pusťte zvuk a sledujte, jestli přesáhne práh.'],
   'Update URL': ['Manifest of the online update, e.g. dist/manifest.json from scripts/make_update_manifest.sh copied with p4gw.bin to /config/www/p4gw/ of Home Assistant. Checked every 6 hours; Home Assistant shows the update entity over MQTT and can install it. Empty: off.', 'Manifest online aktualizace, např. dist/manifest.json ze scripts/make_update_manifest.sh zkopírovaný s p4gw.bin do /config/www/p4gw/ v Home Assistant. Kontroluje se každých 6 hodin; Home Assistant ukazuje entitu aktualizace přes MQTT a umí ji nainstalovat. Prázdné: vypnuto.'],
   'Settings backup': ['Role, Thread networks, MQTT, Home Assistant, transmit power and sound settings as one file, for a new board or after an NVS erase. Board state (C6 firmware, counters) is not part of it. Zigbee network data is backed up separately (C6 snapshots).', 'Role, sítě Thread, MQTT, Home Assistant, vysílací výkon a nastavení zvuku v jednom souboru, pro novou desku nebo po smazání NVS. Stav desky (firmware C6, čítače) v něm není. Data sítě Zigbee se zálohují zvlášť (snapshoty C6).'],
   'Previous log': ['The last 16 KiB of log before the last restart (requested, watchdog or crash). Not kept over a power cut.', 'Posledních 16 KiB logu před posledním restartem (vyžádaným, watchdogem i pádem). Výpadek napájení ho nepřežije.'],
@@ -877,6 +890,7 @@ const ICONS = {
   'history': 'M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3',
   'home-assistant': 'M21.8,13H20V21H13V17.67L15.79,14.88L16.5,15C17.66,15 18.6,14.06 18.6,12.9C18.6,11.74 17.66,10.8 16.5,10.8A2.1,2.1 0 0,0 14.4,12.9L14.5,13.61L13,15.13V9.65C13.66,9.29 14.1,8.6 14.1,7.8A2.1,2.1 0 0,0 12,5.7A2.1,2.1 0 0,0 9.9,7.8C9.9,8.6 10.34,9.29 11,9.65V15.13L9.5,13.61L9.6,12.9A2.1,2.1 0 0,0 7.5,10.8A2.1,2.1 0 0,0 5.4,12.9A2.1,2.1 0 0,0 7.5,15L8.21,14.88L11,17.67V21H4V13H2.25C1.83,13 1.42,13 1.42,12.79C1.43,12.57 1.85,12.15 2.28,11.72L11,3C11.33,2.67 11.67,2.33 12,2.33C12.33,2.33 12.67,2.67 13,3L17,7V6H19V9L21.78,11.78C22.18,12.18 22.59,12.59 22.6,12.8C22.6,13 22.2,13 21.8,13M7.5,12A0.9,0.9 0 0,1 8.4,12.9A0.9,0.9 0 0,1 7.5,13.8A0.9,0.9 0 0,1 6.6,12.9A0.9,0.9 0 0,1 7.5,12M16.5,12C17,12 17.4,12.4 17.4,12.9C17.4,13.4 17,13.8 16.5,13.8A0.9,0.9 0 0,1 15.6,12.9A0.9,0.9 0 0,1 16.5,12M12,6.9C12.5,6.9 12.9,7.3 12.9,7.8C12.9,8.3 12.5,8.7 12,8.7C11.5,8.7 11.1,8.3 11.1,7.8C11.1,7.3 11.5,6.9 12,6.9Z',
   'home-outline': 'M12 5.69L17 10.19V18H15V12H9V18H7V10.19L12 5.69M12 3L2 12H5V20H11V14H13V20H19V12H22',
+  'home-sound-out-outline': 'M2.4038 7.01172C2.47451 4.39542 4.45441 2.41552 7 2.41552V1.00131C3.53517 0.9306 0.848167 3.61761 0.989589 7.01172L2.4038 7.01172Z M7 5.38537V3.97116C5.23223 4.04187 3.95944 5.31466 3.95944 7.01172H5.37365C5.51507 6.16319 6.15147 5.52679 7 5.38537Z M17 2.41552C19.5456 2.41552 21.5255 4.39542 21.5962 7.01172L23.0104 7.01172C23.1518 3.61761 20.4648 0.9306 17 1.00131V2.41552Z M17 3.97116V5.38537C17.8485 5.52679 18.4849 6.16319 18.6263 7.01172H20.0406C20.0406 5.31466 18.7678 4.04187 17 3.97116Z M19 20V12H22L12 3L2 12H5V20H19ZM12 5.7L17 10.2V18H7V10.2L12 5.7Z',
   'information-outline': 'M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z',
   'key-outline': 'M21 18H15V15H13.3C12.2 17.4 9.7 19 7 19C3.1 19 0 15.9 0 12S3.1 5 7 5C9.7 5 12.2 6.6 13.3 9H24V15H21V18M17 16H19V13H22V11H11.9L11.7 10.3C11 8.3 9.1 7 7 7C4.2 7 2 9.2 2 12S4.2 17 7 17C9.1 17 11 15.7 11.7 13.7L11.9 13H17V16M7 15C5.3 15 4 13.7 4 12S5.3 9 7 9 10 10.3 10 12 8.7 15 7 15M7 11C6.4 11 6 11.4 6 12S6.4 13 7 13 8 12.6 8 12 7.6 11 7 11Z',
   'lan-connect': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,13V18L3,20H10V18H5V13H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M14,15H20V19H14V15Z',
@@ -894,10 +908,12 @@ const ICONS = {
   'playlist-check': 'M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z',
   'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
   'radar': 'M19.07,4.93L17.66,6.34C19.1,7.79 20,9.79 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12C4,7.92 7.05,4.56 11,4.07V6.09C8.16,6.57 6,9.03 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12C18,10.34 17.33,8.84 16.24,7.76L14.83,9.17C15.55,9.9 16,10.9 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12C8,10.14 9.28,8.59 11,8.14V10.28C10.4,10.63 10,11.26 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.26 13.6,10.62 13,10.28V2H12A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,9.24 20.88,6.74 19.07,4.93Z',
+  'record-circle-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z',
   'refresh': 'M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z',
   'restart': 'M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z',
   'router-network': 'M5 9C3.9 9 3 9.9 3 11V15C3 16.11 3.9 17 5 17H11V19H10C9.45 19 9 19.45 9 20H2V22H9C9 22.55 9.45 23 10 23H14C14.55 23 15 22.55 15 22H22V20H15C15 19.45 14.55 19 14 19H13V17H19C20.11 17 21 16.11 21 15V11C21 9.9 20.11 9 19 9H5M6 12H8V14H6V12M9.5 12H11.5V14H9.5V12M13 12H15V14H13V12Z',
   'router-wireless': 'M20.2,5.9L21,5.1C19.6,3.7 17.8,3 16,3C14.2,3 12.4,3.7 11,5.1L11.8,5.9C13,4.8 14.5,4.2 16,4.2C17.5,4.2 19,4.8 20.2,5.9M19.3,6.7C18.4,5.8 17.2,5.3 16,5.3C14.8,5.3 13.6,5.8 12.7,6.7L13.5,7.5C14.2,6.8 15.1,6.5 16,6.5C16.9,6.5 17.8,6.8 18.5,7.5L19.3,6.7M19,13H17V9H15V13H5A2,2 0 0,0 3,15V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V15A2,2 0 0,0 19,13M8,18H6V16H8V18M11.5,18H9.5V16H11.5V18M15,18H13V16H15V18Z',
+  'school-outline': 'M12 3L1 9L5 11.18V17.18L12 21L19 17.18V11.18L21 10.09V17H23V9L12 3M18.82 9L12 12.72L5.18 9L12 5.28L18.82 9M17 16L12 18.72L7 16V12.27L12 15L17 12.27V16Z',
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
@@ -965,7 +981,8 @@ const NAV = [
     { id: 'backups', label: 'Network backups', icon: 'backup-restore' }, { id: 'network', label: 'Network and devices', icon: 'graph-outline' }] },
   { id: 'sound', label: 'Sound', icon: 'waveform', subs: [
     { id: 'live', label: 'Live', icon: 'ear-hearing' }, { id: 'events', label: 'Events', icon: 'bell-ring-outline' },
-    { id: 'log', label: 'Detection log', icon: 'history' }, { id: 'classes', label: 'Sound selection', icon: 'playlist-check' }] },
+    { id: 'log', label: 'Detection log', icon: 'history' }, { id: 'classes', label: 'Sound selection', icon: 'playlist-check' },
+    { id: 'learn', label: 'Learned sounds', icon: 'school-outline' }] },
   { id: 'ha', label: 'Home Assistant', icon: 'home-assistant', subs: [
     { id: 'guide', label: 'Guide', icon: 'book-open-variant' }, { id: 'mqtt', label: 'MQTT', icon: 'transit-connection-variant' },
     { id: 'esphome', label: 'ESPHome', icon: 'bluetooth' }] },
@@ -1467,6 +1484,80 @@ views['sound/classes'] = () => `<div class="card">${h3('playlist-check', 'All so
   <p class="muted">Unticked sounds are never reported, whatever the events say. The bar shows the live score.</p>
   <div id="cls-tree"></div></div>`;
 
+views['sound/learn'] = () => `<div class="grid">
+  <div class="card">${h3('record-circle-outline', 'Record')}
+    <label class="field"><span>Sound name (ID)${tip('Learned sound ID')}</span><input type="text" id="ln-id" pattern="[a-z0-9_]{1,23}" placeholder="washer_done"></label>
+    <label class="field"><span>Type${tip('Learned sound type')}</span><select id="ln-type"><option value="embedding">any sound (YAMNet embedding)</option><option value="tone">beep or tone (frequency)</option></select></label>
+    <div class="row"><button class="btn primary" id="ln-sample">${ic('record-circle-outline')}Record sample (4 s)</button>
+      <button class="btn" id="ln-bg">${ic('home-sound-out-outline')}Record background (5 s)</button>${tip('Record background')}</div>
+    <div id="ln-state" class="muted">Play the sound near the board right after pressing Record. 5 to 10 samples per sound, then the background of the room.</div>
+    <div class="row" style="margin-top:12px"><input type="file" id="ln-file" accept=".wav,audio/wav">${tip('Learn from a file')}</div>
+    <div class="row"><button class="btn" id="ln-up-sample">${ic('upload')}Upload as sample</button><button class="btn" id="ln-up-bg">${ic('upload')}Upload as background</button>
+      <button class="btn" id="ln-up-test">${ic('play')}Test recording</button></div></div>
+  <div class="card">${h3('home-sound-out-outline', 'Background')}<div id="ln-bgs" class="muted">Loading…</div></div>
+  <div class="card wide">${h3('school-outline', 'Learned sounds')}<div class="table-wrap" id="ln-table"><p class="muted">Loading…</p></div></div>
+</div>`;
+
+let learn = null;
+async function loadLearn() {
+  if (route() !== 'sound/learn' || !$('#ln-table')) return;
+  try { learn = await api('/api/sound/learn'); } catch (e) { return; }
+  if (!$('#ln-table')) return;
+  const r = learn.recording;
+  $('#ln-state').innerHTML = r.active ? `${pill('warn', 'recording')} ${esc(r.kind)} ${esc(r.kind === 'sample' ? r.profile : '')}`
+    : r.result ? `${pill(r.ok ? 'ok' : 'err', r.ok ? 'done' : 'error')} ${esc(r.result)} · ${learn.slots_free} / ${learn.slots_total} ${L('free slots', 'volných slotů')}`
+    : `${learn.ready ? '' : pill('err', L('recognition off', 'rozpoznávání vypnuto')) + ' '}${learn.slots_free} / ${learn.slots_total} ${L('free slots', 'volných slotů')}`;
+  $('#ln-sample').disabled = $('#ln-bg').disabled = r.active || !learn.ready;
+  const when = t => t ? new Date(t * 1000).toLocaleString() : '';
+  const slotRow = x => `<span class="pill" data-notr>#${x.slot} ${x.level_db} dB${x.tone_hz ? ' · ' + x.tone_hz + ' Hz' : ''}
+    <a href="#" data-ln-play="${x.slot}" title="${esc(when(x.saved))}">${ic('play')}</a><a href="#" data-ln-del="${x.slot}">×</a></span>`;
+  $('#ln-bgs').innerHTML = learn.background.length ? `<div class="row">${learn.background.map(slotRow).join('')}</div>
+    <div class="row"><button class="btn danger" data-ln-delprof="_background">${ic('delete-outline')}Delete background</button></div>` : L('None yet: record it once the sounds are learned, while the room sounds as usual.', 'Zatím žádné: nahrajte ho, až budou zvuky naučené, když místnost zní jako obvykle.');
+  const events = sndCfg?.events || [];
+  $('#ln-table').innerHTML = learn.profiles.length ? `<table><tr>${[['Sound', 'Learned sound ID'], ['Type', 'Learned sound type'], 'Samples', ['Samples alike', 'Samples alike'], ['Background', 'Background score'], ['Threshold', 'Suggested threshold'], ['Now', 'Learned score now']].map(th).join('')}<th></th></tr>${learn.profiles.map(p => {
+    const ev = events.find(e => e.profile === p.id);
+    return `<tr><td data-notr><b>${esc(p.id)}</b><div class="row" style="margin-top:4px">${p.slots.map(slotRow).join('')}</div></td>
+      <td>${p.type === 'tone' ? `tone ${p.tone_hz} Hz` : 'sound'}</td><td>${p.samples}</td><td>${p.self_min}</td><td>${learn.background.length ? p.background_max : '—'}</td>
+      <td>${p.threshold} ${p.separable ? '' : pill('warn', L('overlaps background', 'překrývá pozadí'))}</td>
+      <td><span class="progress" style="width:80px;height:6px;display:inline-block"><div style="width:${Math.round((p.score ?? 0) * 100)}%"></div></span> ${p.score ?? ''}</td>
+      <td>${ev ? `<span class="muted">${L('event', 'událost')} ${esc(ev.id)}</span>` : `<button class="btn primary" data-ln-event="${esc(p.id)}">${ic('bell-ring-outline')}Create event</button>`}
+        <button class="btn danger" data-ln-delprof="${esc(p.id)}">${ic('delete-outline')}Delete</button></td></tr>`;
+  }).join('')}</table>` : '<p class="muted">No learned sound yet.</p>';
+}
+
+async function learnRecord(kind) {
+  const profile = $('#ln-id').value.trim();
+  if (kind === 'sample' && !/^[a-z0-9_]{1,23}$/.test(profile)) { toast(L('Name: a-z, 0-9, _ (max 23)', 'Název: a-z, 0-9, _ (max 23)')); return; }
+  await api('/api/sound/learn/record', { json: { kind, profile, type: $('#ln-type').value } });
+  loadLearn();
+}
+
+async function learnUpload(mode) {
+  const file = $('#ln-file').files[0];
+  if (!file) { toast('Choose a file'); return; }
+  const profile = $('#ln-id').value.trim();
+  if (mode === 'sample' && !/^[a-z0-9_]{1,23}$/.test(profile)) { toast(L('Name: a-z, 0-9, _ (max 23)', 'Název: a-z, 0-9, _ (max 23)')); return; }
+  const q = mode === 'test' ? 'test=1' : `kind=${mode}&profile=${encodeURIComponent(profile)}&type=${$('#ln-type').value}`;
+  const r = await api('/api/sound/learn/upload?' + q, { method: 'POST', body: file, headers: { 'Content-Type': 'audio/wav' } });
+  if (mode === 'test') {
+    const list = Object.entries(r.scores).map(([id, v]) => `${id} ${v}`).join(', ');
+    $('#ln-state').innerHTML = `${pill('ok', 'test')} ${r.windows} ${L('windows', 'oken')}: ${esc(list || L('no learned sound', 'žádný naučený zvuk'))}`;
+  } else {
+    toast(r.result);
+    loadLearn();
+  }
+}
+
+async function learnEvent(id) {
+  const p = learn.profiles.find(x => x.id === id);
+  await loadSoundConfig();
+  if (sndCfg.events.some(e => e.id === id)) { toast(L('An event with this ID exists', 'Událost s tímto ID už existuje')); return; }
+  const events = sndCfg.events.slice();
+  events.push({ id, name: id.replace(/_/g, ' '), kind: 'impulse', enabled: true, threshold: p.threshold, windows: 1, hold_s: 3, cooldown_s: 10, classes: [], suppress: [], profile: id });
+  await putEvents({ events });
+  loadLearn();
+}
+
 let soundTimer = null;
 let sndClasses = null, sndCfg = null, sndExclude = new Set(), sndDirty = false, sndTick = 0, editIdx = -1, editEv = null;
 
@@ -1499,7 +1590,7 @@ function renderEvents() {
     <td><input type="checkbox" data-ev-toggle="${i}" ${e.enabled ? 'checked' : ''}></td>
     <td data-notr><b>${esc(evName(e))}</b><br><span class="muted">${evName(e) !== e.name ? esc(e.name) + ' · ' : ''}${esc(e.id)}</span></td>
     <td>${e.kind}</td><td>${e.threshold}</td>
-    <td data-notr title="${esc(e.classes.map(clsName).join(', '))}">${e.classes.length}</td>
+    <td data-notr title="${esc(e.classes.map(clsName).join(', '))}">${e.profile ? `${L('learned', 'naučený')}: ${esc(e.profile)}` : e.classes.length}</td>
     <td>${e.active ? pill('ok', 'now') : ''}</td><td>${e.count || 0}</td>
     <td>${e.last_ago_s !== undefined ? fmtUptime(e.last_ago_s) + ' ago' : ''}</td>
     <td><button class="btn" data-ev-edit="${i}">${ic('pencil-outline')}Edit</button> <button class="btn" data-ev-yaml="${i}">${ic('home-assistant')}HA automation</button> <button class="btn danger" data-ev-del="${i}">${ic('delete-outline')}Delete</button></td></tr>`).join('');
@@ -1547,7 +1638,7 @@ async function loadScoresAndLog() {
     $('#snd-log').innerHTML = log.length ? `<table><tr>${['When', 'Event', 'Sound', ['Score', 'Detection score'], 'Level', 'Duration'].map(th).join('')}<th></th></tr>${log.map(l => `<tr>
       <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? `<span data-notr>${esc(evName(sndCfg?.events.find(e => e.id === l.event) || { name: l.event }))}</span>` : '<span class="muted">no event</span>'}</td><td data-notr>${esc(l.class_name)}</td>
       <td>${(l.score * 100).toFixed(0)} %</td><td>${l.level_db} dB</td><td>${l.ongoing ? pill('ok', 'ongoing') : l.duration_s ? l.duration_s + ' s' : ''}</td>
-      <td><button class="btn" data-log-ignore="${l.class}">${ic('close')}Ignore sound</button>
+      <td>${l.class < 0 ? '' : `<button class="btn" data-log-ignore="${l.class}">${ic('close')}Ignore sound</button>`}
       ${l.event ? `<button class="btn" data-log-raise="${esc(l.event)}">${ic('playlist-check')}Raise threshold</button>` : `<button class="btn" data-log-new="${l.class}">${ic('bell-ring-outline')}Create event</button>`}</td></tr>`).join('')}</table>` : '<p class="muted">Nothing yet.</p>';
   } catch (e) { /* ignore */ }
 }
@@ -1574,6 +1665,8 @@ function openEditor(idx, template) {
   $('#ev-thr').value = editEv.threshold; $('#ev-thr-v').textContent = editEv.threshold;
   $('#ev-win').value = editEv.windows; $('#ev-hold').value = editEv.hold_s; $('#ev-cool').value = editEv.cooldown_s;
   chips('ev-classes', editEv.classes); chips('ev-suppress', editEv.suppress);
+  $('#ev-profile').textContent = editEv.profile ? `${L('Learned sound', 'Naučený zvuk')}: ${editEv.profile}` : '';
+  $('#ev-sounds').classList.toggle('hidden', !!editEv.profile);
   $('#ev-dlg').returnValue = '';
   $('#ev-dlg').showModal();
 }
@@ -2820,6 +2913,16 @@ document.addEventListener('click', async e => {
       render(true);
     } else if (t.id === 'upd-install') {
       await installUpdate();
+    } else if (t.id === 'ln-sample' || t.id === 'ln-bg') {
+      await learnRecord(t.id === 'ln-sample' ? 'sample' : 'background');
+    } else if (t.id === 'ln-up-sample' || t.id === 'ln-up-bg' || t.id === 'ln-up-test') {
+      await learnUpload({ 'ln-up-sample': 'sample', 'ln-up-bg': 'background', 'ln-up-test': 'test' }[t.id]);
+    } else if (t.dataset.lnEvent) {
+      await learnEvent(t.dataset.lnEvent);
+    } else if (t.dataset.lnDelprof) {
+      if (!await confirmDialog('Delete the samples?', t.dataset.lnDelprof === '_background' ? L('All background recordings are deleted.', 'Smažou se všechny nahrávky pozadí.') : L(`All samples of ${t.dataset.lnDelprof} are deleted. An event using it stops detecting.`, `Smažou se všechny vzorky ${t.dataset.lnDelprof}. Událost, která ho používá, přestane detekovat.`))) return;
+      await api('/api/sound/learn?profile=' + encodeURIComponent(t.dataset.lnDelprof), { method: 'DELETE' });
+      loadLearn();
     } else if (t.id === 'log-prev') {
       await download('/api/logs/previous', status.hostname + '-previous.log');
     } else if (t.id === 'cd-del') {
@@ -2869,6 +2972,18 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('click', e => {
+  const ln = e.target.closest('a[data-ln-play], a[data-ln-del]');
+  if (ln) {
+    e.preventDefault();
+    if (ln.dataset.lnPlay) {
+      fetch('/api/sound/learn/sample?slot=' + ln.dataset.lnPlay, { headers: auth ? { Authorization: 'Basic ' + auth } : {} })
+        .then(r => r.ok ? r.blob() : Promise.reject(new Error(r.statusText))).then(b => new Audio(URL.createObjectURL(b)).play())
+        .catch(err => toast('Error: ' + err.message));
+    } else {
+      api('/api/sound/learn?slot=' + ln.dataset.lnDel, { method: 'DELETE' }).then(loadLearn).catch(err => toast('Error: ' + err.message));
+    }
+    return;
+  }
   const a = e.target.closest('a[data-chip-del]');
   if (!a) return;
   e.preventDefault();
@@ -3055,7 +3170,8 @@ function render(full) {
     if (route() === 'zigbee/network') loadZigbeeNet(true);
     if (tab === 'sound') {
       loadSound(); loadSoundConfig().catch(err => toast('Error: ' + err.message));
-      if (!soundTimer) soundTimer = setInterval(() => { loadSound(); loadScoresAndLog(); if (sndTick % 10 === 0 && sndCfg && !$('#ev-dlg').open) api('/api/sound/events').then(c => { sndCfg = c; renderEvents(); }).catch(() => {}); }, 1000);
+      if (route() === 'sound/learn') loadLearn();
+      if (!soundTimer) soundTimer = setInterval(() => { loadSound(); loadScoresAndLog(); loadLearn(); if (sndTick % 10 === 0 && sndCfg && !$('#ev-dlg').open) api('/api/sound/events').then(c => { sndCfg = c; renderEvents(); }).catch(() => {}); }, 1000);
     }
   } else if (tab === 'thread') {
     loadThread();

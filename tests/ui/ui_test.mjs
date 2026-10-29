@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI22).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI23).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -569,6 +569,26 @@ await test('UI22', 'Online update: the card saves the URL and shows why a check 
   await page.click('#upd-save');
   await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('Off'), null, { timeout: 10000 });
   check(await page.isDisabled('#upd-check'), 'cleared: off, Check disabled');
+});
+
+await test('UI23', 'Learned sounds: the page loads, a foreign file is refused, a test recording shows its scores', async () => {
+  await page.goto(base + '#sound/learn');
+  await page.waitForFunction(() => document.querySelector('#ln-table') && !document.querySelector('#ln-table').textContent.includes('Loading'), null, { timeout: 10000 });
+  check(/free slots|recognition off/.test(await page.textContent('#ln-state')), `state: ${(await page.textContent('#ln-state')).trim()}`);
+  await page.setInputFiles('#ln-file', { name: 'x.wav', mimeType: 'audio/wav', buffer: Buffer.from('RIFF' + '\0'.repeat(100)) });
+  await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
+  await page.click('#ln-up-test');
+  await page.waitForFunction(() => document.querySelector('#toast').textContent.startsWith('Error'), null, { timeout: 5000 });
+  check(true, `foreign file refused: ${await toastText()}`);
+  const rate = 16000, n = rate * 2, buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVEfmt ', 8); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round(8000 * Math.sin(2 * Math.PI * 1500 * i / rate)), 44 + 2 * i);
+  await page.setInputFiles('#ln-file', { name: 'tone.wav', mimeType: 'audio/wav', buffer: buf });
+  await page.click('#ln-up-test');
+  await page.waitForFunction(() => /windows|oken/.test(document.querySelector('#ln-state').textContent), null, { timeout: 20000 });
+  check(true, `test result: ${(await page.textContent('#ln-state')).trim()}`);
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "gw.h"
+#include "sound_learn.h"
 #include "sound_model.h"
 
 static const char *TAG = "sound_events";
@@ -24,6 +25,8 @@ static const char *TAG = "sound_events";
 #define UNASSIGNED_SCORE 0.6f
 #define UNASSIGNED_REPEAT_US (60 * 1000000LL)
 #define MAX_BODY (32 * 1024)
+#define LEARNED_CLASS (-1) /* peak_class of an event on a learned sound */
+#define NO_CLASS (-2)
 
 extern const char presets_start[] asm("_binary_sound_presets_json_start");
 extern const char presets_end[] asm("_binary_sound_presets_json_end");
@@ -35,6 +38,7 @@ typedef struct {
     char name[48];
     char name_cs[96]; /* optional Czech name: web UI and an HA attribute only */
     char device_class[16];
+    char profile[24]; /* learned sound (sound_learn) instead of classes */
     bool enabled;
     bool continuous;
     float threshold;
@@ -73,6 +77,11 @@ static int s_log_next;
 static float *s_scores;
 static int64_t s_scores_us;
 static int64_t *s_unassigned_us;
+
+static const char *cls_name(int c)
+{
+    return c == LEARNED_CLASS ? "learned sound" : s_class_name(c);
+}
 
 static bool bit(const uint32_t *set, int i)
 {
@@ -206,6 +215,13 @@ static esp_err_t parse_config(cJSON *root, sevent_t *ev, int *count, uint32_t *e
         }
         const char *dc = GW_JSON_STR(e, "device_class");
         strlcpy(x->device_class, dc ? dc : "", sizeof(x->device_class));
+        const char *profile = GW_JSON_STR(e, "profile");
+        if (profile && profile[0] && !valid_id(profile)) {
+            snprintf(err, err_len, "event %s: profile must be a-z, 0-9, _ (max 23)", id);
+            ret = ESP_ERR_INVALID_ARG;
+            break;
+        }
+        strlcpy(x->profile, profile ? profile : "", sizeof(x->profile));
         cJSON *en = cJSON_GetObjectItem(e, "enabled");
         x->enabled = !en || cJSON_IsTrue(en);
         x->continuous = kind && strcmp(kind, "continuous") == 0;
@@ -245,6 +261,9 @@ static cJSON *config_json(bool runtime)
         cJSON_AddStringToObject(e, "kind", x->continuous ? "continuous" : "impulse");
         if (x->device_class[0]) {
             cJSON_AddStringToObject(e, "device_class", x->device_class);
+        }
+        if (x->profile[0]) {
+            cJSON_AddStringToObject(e, "profile", x->profile);
         }
         cJSON_AddBoolToObject(e, "enabled", x->enabled);
         cJSON_AddNumberToObject(e, "threshold", round((double)(x->threshold) * 100) / 100.0);
@@ -349,7 +368,7 @@ static void publish_event(const sevent_t *x, float level_db)
     char t[64];
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "event_type", "detected");
-    cJSON_AddStringToObject(json, "class", s_class_name(x->peak_class));
+    cJSON_AddStringToObject(json, "class", cls_name(x->peak_class));
     cJSON_AddNumberToObject(json, "score", round((double)(x->peak) * 100) / 100.0);
     cJSON_AddNumberToObject(json, "level_db", round((double)(level_db) * 10) / 10.0);
     if (x->name_cs[0]) {
@@ -390,9 +409,16 @@ void sound_events_update(const float *scores, float level_db, int64_t now)
             continue;
         }
         float best = 0;
-        int best_class = -1;
+        int best_class = NO_CLASS;
         bool suppressed = false;
-        for (int c = 0; scores && c < SOUND_CLASSES; c++) {
+        if (x->profile[0] && scores) {
+            float score = sound_learn_score(x->profile);
+            if (score >= 0) {
+                best = score;
+                best_class = LEARNED_CLASS;
+            }
+        }
+        for (int c = 0; scores && !x->profile[0] && c < SOUND_CLASSES; c++) {
             if (bit(x->suppress, c) && scores[c] >= SUPPRESS_SCORE) {
                 suppressed = true;
             }
@@ -402,7 +428,7 @@ void sound_events_update(const float *scores, float level_db, int64_t now)
             }
         }
         float threshold = x->active ? x->threshold - HYSTERESIS : x->threshold;
-        bool hit = !suppressed && best_class >= 0 && best >= threshold;
+        bool hit = !suppressed && best_class != NO_CLASS && best >= threshold;
         if (hit) {
             x->hits = x->hits < 255 ? x->hits + 1 : 255;
             x->last_hit_us = now;
@@ -420,7 +446,7 @@ void sound_events_update(const float *scores, float level_db, int64_t now)
                     x->count++;
                     publish_event(x, level_db);
                     x->log_slot = log_add(x->id, x->peak_class, x->peak, level_db, x->continuous ? -1 : 0);
-                    ESP_LOGI(TAG, "%s (%s %.2f)", x->id, s_class_name(x->peak_class), x->peak);
+                    ESP_LOGI(TAG, "%s (%s %.2f)", x->id, cls_name(x->peak_class), x->peak);
                 } else {
                     x->log_slot = -1;
                 }
@@ -633,7 +659,7 @@ static esp_err_t log_get(httpd_req_t *req)
         cJSON_AddNumberToObject(e, "ago_s", (now - l->at_us) / 1000000);
         cJSON_AddStringToObject(e, "event", l->id);
         cJSON_AddNumberToObject(e, "class", l->cls);
-        cJSON_AddStringToObject(e, "class_name", s_class_name(l->cls));
+        cJSON_AddStringToObject(e, "class_name", cls_name(l->cls));
         cJSON_AddNumberToObject(e, "score", round((double)(l->score) * 100) / 100.0);
         cJSON_AddNumberToObject(e, "level_db", round((double)(l->level_db) * 10) / 10.0);
         if (l->duration_s >= 0) {
