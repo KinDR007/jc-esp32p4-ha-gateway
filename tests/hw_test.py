@@ -400,7 +400,7 @@ def tc24_previous_log():
     code, text = http('GET', '/api/logs/previous')
     text = text.decode(errors='replace') if isinstance(text, bytes) else str(text)
     check(code == 200 and len(text) > 1000, f'previous log {len(text)} B')
-    check('restart in' in text[-400:], 'ends with the restart request of the previous run')
+    check('restart in' in text[-3000:], 'ends with the restart request of the previous run (other tasks may log in its last 500 ms)')
     check('restart in' not in logs_since(), 'the current log starts fresh')
 
 
@@ -467,6 +467,27 @@ def tc26_zigbee_backup():
     switch('thread_br')
     wait_until('Thread attached', lambda: (lambda rs: rs if rs.get('role') in ('router', 'leader', 'child') else None)(status()['role_status'] or {}), 60)
     check(snap().get('generation') == after.get('generation') + 1, 'leaving the role still saves a snapshot')
+
+
+def tc27_online_update_checks():
+    """Online update: URL validation, no install without an offer, readable errors of a failed check."""
+    def checked(url):
+        http('POST', '/api/settings', {'update_url': url})
+        return wait_until('check done', lambda: (lambda u: u if not u['checking'] else None)(status()['update']), 40, 0.5)
+
+    check(http('POST', '/api/settings', {'update_url': 'ftp://x/m.json'})[0] == 400, 'non-HTTP URL refused')
+    http('POST', '/api/settings', {'update_url': ''})
+    check(http('POST', '/api/update/check')[0] == 409, 'check without a URL refused')
+    check(http('POST', '/api/update/install')[0] == 409, 'install without an offer refused')
+    u = checked(f'http://{ARGS.host}/nope.json')
+    check(u['error'] == 'manifest: HTTP 404' and not u['available'], f'missing manifest: {u["error"]}')
+    u = checked(f'http://{ARGS.host}/api/mqtt')
+    check('expected' in u['error'] and not u['available'], f'not a manifest: {u["error"]}')
+    u = checked('https://example.com/p4gw/manifest.json')
+    check(u['error'] == 'manifest: HTTP 404', f'HTTPS reaches the server (certificate bundle): {u["error"]}')
+    check(http('POST', '/api/update/install')[0] == 409, 'still nothing to install')
+    http('POST', '/api/settings', {'update_url': ''})
+    check(status()['update']['url'] == '', 'URL cleared')
 
 
 def tc13_rcp_reflash():
@@ -789,7 +810,7 @@ TESTS = [
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
-    ('TC26', tc26_zigbee_backup),
+    ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
 ]
 
 

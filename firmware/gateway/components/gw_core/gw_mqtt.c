@@ -288,6 +288,7 @@ static void publish_discovery(void)
     gw_mqtt_entity("binary_sensor", "zigbee_client", "Zigbee host connected", "{{ value_json.zigbee_client }}",
                    connectivity_extra);
     gw_mqtt_entity("button", "restart", "Restart", NULL, restart_extra);
+    gw_update_mqtt_discovery();
     if (s_ext_discovery) {
         s_ext_discovery();
     }
@@ -368,6 +369,11 @@ static void handle_command(const char *t, int tlen, const char *data, int dlen)
     if (strcmp(name, expect) == 0) {
         gw_restart_later(1000);
     }
+    topic(expect, sizeof(expect), "update/install");
+    if (strcmp(name, expect) == 0) {
+        esp_err_t err = gw_update_install();
+        ESP_LOGW(TAG, "update via MQTT: %s", esp_err_to_name(err));
+    }
 }
 
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -386,8 +392,11 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         esp_mqtt_client_subscribe(s_client, buf, 1);
         topic(buf, sizeof(buf), "restart/set");
         esp_mqtt_client_subscribe(s_client, buf, 1);
+        topic(buf, sizeof(buf), "update/install");
+        esp_mqtt_client_subscribe(s_client, buf, 1);
         publish_discovery();
         publish_state();
+        gw_update_mqtt_state();
         if (s_listener.on_connect) {
             s_listener.on_connect();
         }

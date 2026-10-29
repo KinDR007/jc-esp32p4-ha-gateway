@@ -1,0 +1,10 @@
+# M09 online update install, 4 runs, sound recognition on, manifest on a LAN HTTP server (2026-10-29)
+run 1: 40 s, gw_a -> gw_b (valid), reset software, esphome ble-proxy-p4gw 2026.10.1, error ''
+run 2: 41 s, gw_b -> gw_a (valid), reset software, esphome ble-proxy-p4gw 2026.10.1, error ''
+run 3: 40 s, gw_a -> gw_b (valid), reset software, esphome ble-proxy-p4gw 2026.10.1, error ''
+run 4: 41 s, gw_b -> gw_a (valid), reset software, esphome ble-proxy-p4gw 2026.10.1, error ''
+coredump 404
+sound running True flash_skips 0
+
+# refused before any write: missing image (HTTP 404), c6fw.bin (not an app image), p4gw_scanner.bin (other project)
+# found and fixed during this test: task watchdog in the download loop (no yield), and esp_https_ota writing to the esphome slot when running from gw_b

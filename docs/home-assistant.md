@@ -71,6 +71,11 @@ select, maintenance reason, uptime, chip temperature, heap, Ethernet, IP, C6 fir
 Zigbee host connection, restart button, sound level (dBFS, when the microphone is on).
 Base topic `p4gw/<hostname>/`.
 
+
+Firmware update entity (`update.<host>_firmware`): installed and offered gateway version from the
+online update manifest (System › Firmware › Online update), *Install* downloads it into the other
+gateway slot and restarts. Without a manifest URL it always shows the installed version.
+
 ## Sound events (MQTT)
 
 Configured in the gateway UI, Sound tab (presets, per-event classes and timing, ignored sounds).

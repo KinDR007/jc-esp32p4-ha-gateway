@@ -97,3 +97,6 @@ CONFIG_SERIAL_FLASHER_LOG_LEVEL_WARN=y
 # CPU load per core in the web UI (idle task run time)
 CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
 CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64=y
+
+# Online update: the manifest and image may come from a plain HTTP server in the LAN (e.g. Home Assistant /local)
+CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP=y

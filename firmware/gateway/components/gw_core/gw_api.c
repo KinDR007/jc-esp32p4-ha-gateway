@@ -345,6 +345,7 @@ static esp_err_t status_get(httpd_req_t *req)
     }
 
     cJSON_AddItemToObject(json, "hw", hw_json());
+    cJSON_AddItemToObject(json, "update", gw_update_status());
     cJSON_AddNumberToObject(json, "identify_s", gw_identify_left());
     if (s_role_status) {
         cJSON_AddItemToObject(json, "role_status", s_role_status());
@@ -516,7 +517,7 @@ static esp_err_t ota_sink(void *arg, uint32_t offset, const void *data, size_t l
     return esp_ota_write(ctx->handle, data, len);
 }
 
-static const esp_partition_t *other_gateway_slot(void)
+const esp_partition_t *gw_other_gateway_slot(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_partition_subtype_t subtype = running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0
@@ -580,24 +581,38 @@ bool gw_flash_try_lock(void)
     return xSemaphoreTake(s_flash_lock, 0) == pdTRUE;
 }
 
-static esp_err_t locked_upload(httpd_req_t *req, esp_err_t (*fn)(httpd_req_t *))
+bool gw_upload_begin(void)
 {
-    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress()->busy) {
-        if (xSemaphoreGetMutexHolder(s_upload_lock) == xTaskGetCurrentTaskHandle()) {
-            xSemaphoreGive(s_upload_lock);
-        }
-        return gw_http_send_error(req, 409, "another upload or C6 flash is running");
+    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE) {
+        return false;
+    }
+    if (c6_progress()->busy) {
+        xSemaphoreGive(s_upload_lock);
+        return false;
     }
     gw_flash_lock();
-    esp_err_t err = fn(req);
+    return true;
+}
+
+void gw_upload_end(void)
+{
     gw_flash_unlock();
     xSemaphoreGive(s_upload_lock);
+}
+
+static esp_err_t locked_upload(httpd_req_t *req, esp_err_t (*fn)(httpd_req_t *))
+{
+    if (!gw_upload_begin()) {
+        return gw_http_send_error(req, 409, "another upload or C6 flash is running");
+    }
+    esp_err_t err = fn(req);
+    gw_upload_end();
     return err;
 }
 
 static esp_err_t gateway_upload_inner(httpd_req_t *req)
 {
-    return app_upload(req, other_gateway_slot(), true);
+    return app_upload(req, gw_other_gateway_slot(), true);
 }
 
 static esp_err_t esphome_upload_inner(httpd_req_t *req)
@@ -752,7 +767,17 @@ static esp_err_t settings_post(httpd_req_t *req)
     const char *password = GW_JSON_STR(body, "password");
     const char *matter_url = GW_JSON_STR(body, "matter_url");
     const cJSON *snap_days = cJSON_GetObjectItem(body, "zigbee_backup_days");
+    const char *update_url = GW_JSON_STR(body, "update_url");
     esp_err_t err = ESP_OK;
+    if (update_url) {
+        if (strlen(update_url) > 200 ||
+            (update_url[0] && strncmp(update_url, "http://", 7) != 0 && strncmp(update_url, "https://", 8) != 0)) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 400, "update_url: http(s)://host/path/manifest.json, max 200 characters, empty to clear");
+        }
+        err = gw_config_set_str(GW_KEY_UPDATE_URL, update_url);
+        gw_update_check_soon();
+    }
     if (snap_days) {
         if (!cJSON_IsNumber(snap_days) || (snap_days->valueint != 0 && snap_days->valueint != 1 && snap_days->valueint != 7)) {
             cJSON_Delete(body);

@@ -8,6 +8,7 @@
 #include "esp_err.h"
 #include "esp_http_server.h"
 #include "esp_netif.h"
+#include "esp_partition.h"
 #include "freertos/FreeRTOS.h"
 
 #ifdef __cplusplus
@@ -51,6 +52,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
+#define GW_KEY_UPDATE_URL "upd_url" /* str, manifest of the online update, empty = off */
 #define GW_KEY_ZB_SNAP_DAYS "zb_snap_days" /* u8, automatic Zigbee network backup every n days, 0 = off */
 #define GW_ZB_SNAP_DAYS_DEFAULT 7
 #define GW_KEY_ZB_SNAP_REQ "zb_snap_req" /* u8, back up the Zigbee network data on the next start */
@@ -146,6 +148,25 @@ void gw_c6_telemetry_set(const char *json);
 void gw_flash_lock(void);
 void gw_flash_unlock(void);
 bool gw_flash_try_lock(void);
+/* Right to write a gateway image (uploads, online update), with the flash lock: false while another
+ * upload or C6 flashing runs. */
+bool gw_upload_begin(void);
+void gw_upload_end(void);
+/* The gateway slot (gw_a/gw_b) not running now: target of gateway updates. Never the esphome slot. */
+const esp_partition_t *gw_other_gateway_slot(void);
+
+/* Online update from a manifest URL (GW_KEY_UPDATE_URL):
+ *   {"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "..."}
+ * "p4gw" may be relative to the manifest. Checked every 6 h; offered to Home Assistant as an MQTT
+ * update entity. */
+void gw_update_start(void);
+void gw_update_check_soon(void);
+/* Starts the download and installation of the offered version; restarts when done. */
+esp_err_t gw_update_install(void);
+cJSON *gw_update_status(void);
+/* MQTT: discovery of the update entity and its state (called by gw_mqtt on connect and on change). */
+void gw_update_mqtt_discovery(void);
+void gw_update_mqtt_state(void);
 
 /* Identify: the web UI blinks an icon while it runs (the board has no LED it could drive). */
 void gw_identify(int seconds);

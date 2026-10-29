@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI21).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI22).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -556,6 +556,19 @@ await test('UI21', 'Zigbee backups: the automatic interval is stored, Back up no
   const role = await page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.role.active));
   check(await page.isDisabled('#zb-snap-now') === !role.startsWith('zigbee'), `Back up now ${role.startsWith('zigbee') ? 'enabled' : 'disabled'} in ${role}`);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI22', 'Online update: the card saves the URL and shows why a check failed', async () => {
+  await tab('system/firmware');
+  await page.fill('#upd-url', `http://${host}/nope.json`);
+  await page.click('#upd-save');
+  await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('HTTP 404'), null, { timeout: 25000 });
+  check(true, `error shown: ${(await page.textContent('#upd-state')).trim()}`);
+  check(await page.isDisabled('#upd-install'), 'Install disabled without an offer');
+  await page.fill('#upd-url', '');
+  await page.click('#upd-save');
+  await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('Off'), null, { timeout: 10000 });
+  check(await page.isDisabled('#upd-check'), 'cleared: off, Check disabled');
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

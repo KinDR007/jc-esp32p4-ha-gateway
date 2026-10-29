@@ -32,6 +32,14 @@
 - ZHA checked: zigpy-zboss 2.0.5 forms a network on the coordinator role, restarts on it and opens
   permit join, but ZHA does not include zigpy-zboss and it needs zigpy < 2 (Home Assistant runs 2.x),
   so Zigbee2MQTT stays the only host (docs/home-assistant.md, `tests/zha/zigpy_zboss_check.py`).
+- Online update of the gateway image from a manifest URL (System › Firmware, HTTP or HTTPS),
+  checked every 6 hours and offered to Home Assistant as an MQTT update entity that can install it.
+  The image goes to the other gateway slot (never the ESPHome slot) and is checked for the p4gw
+  project before that slot is erased. `scripts/make_update_manifest.sh` writes the manifest
+  (`/api/update/{check,install}`, `update_url` in `/api/settings`). Tests TC27, UI22.
+- CI: GitHub Actions run `scripts/ci_checks.sh` (unit test, Python and web UI syntax, icon block) and
+  `scripts/ci_build.sh` (C6 firmwares, gateway, c6fw.bin in `espressif/idf:v5.5.5`). The gateway
+  build regenerates its sdkconfig when `sdkconfig.defaults` changed.
 
 ## v1.4 (2026-10-29)
 

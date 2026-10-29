@@ -66,9 +66,23 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 | Gateway | UI System → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
 | Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
 | ESPHome image | UI System → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
+| Gateway, online | UI System → Firmware → Online update, or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
 | C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
 
 Uploads are refused for the first 60 s after a gateway update, until the new image is confirmed.
+
+Online update: `scripts/make_update_manifest.sh ["notes"] [release_url]` writes `dist/manifest.json`
+next to `dist/p4gw.bin`; copy both to a web server the gateway reaches, e.g. `/config/www/p4gw/` of
+Home Assistant, and set `http://<ha>:8123/local/p4gw/manifest.json` as the manifest URL.
+`{"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "..."}`; `p4gw` may be an
+absolute URL. HTTPS works with the ESP-IDF certificate bundle. Only the gateway image is updated
+this way; c6fw.bin and the ESPHome image are uploaded in the UI.
+
+CI (GitHub Actions, `.github/workflows/ci.yml`): `scripts/ci_checks.sh` (unit test, Python and web
+UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 firmwares,
+gateway, `c6fw.bin`; artifacts `p4gw.bin` and `c6fw.bin`). The ESPHome image is not built there, it
+needs the API key. Run the build locally the same way:
+`docker run --rm -v "$PWD":/src espressif/idf:v5.5.5 bash -c 'cp -a /src /w && /w/scripts/ci_build.sh'`.
 
 ## Role switching
 
@@ -85,7 +99,7 @@ board: Thread roles 13–15 s, Zigbee roles 25–27 s (C6 flash), ESPHome hand-o
 | Bad gateway image | automatic rollback; otherwise `scripts/flash_p4.sh` |
 | Repeated crashes | after several crashes in a row the role is not started, UI stays reachable; download the core dump |
 | Repeated crashes, cause unknown | **System → Diagnostics → Log before the last restart** (last 16 KiB of the previous run, gone after a power cut) |
-| New board, erased NVS | **System → Settings → Settings backup**: export (with passwords if wanted) beforehand, import on the new board; the Zigbee network comes back from the C6 snapshots |
+| New board, erased NVS | **System → Settings → Settings backup**: export (with passwords if wanted) beforehand, import on the new board. Zigbee network data is not part of it: it lives on the C6 and in the old board's `c6data` (downloadable under Zigbee › Network backups, not restorable on another board yet) |
 | Restore factory C6 | write the full C6 backup with esptool over a USB-UART on JP1 20/22, IO9 (pin 24) to GND; the factory app can also be extracted from the P4 factory backup (embedded `network_adapter` image at 0x5f0000 of the tested board) |
 | Restore factory P4 | `esptool --chip esp32p4 write-flash 0 backups/p4_backup.bin` |
 
