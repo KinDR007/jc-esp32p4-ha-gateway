@@ -30,7 +30,7 @@
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
 - [x] OTA brány: občas reset spojení a restart do starého slotu. Příčina (core dump 2026-10-29): task watchdog, IDLE1 hladověl, na CPU 1 běžel model zvuku zpomalený zápisy do flash (cache vypnutá pro obě jádra). Oprava: zámek `gw_flash_lock`, model během nahrávání a flashování C6 neběží
-- [ ] Sloty C6: dvakrát po sobě výpadek RCP po startu Thread při rychlém sledu přepnutí (TC23 hned po přerušeném běhu, 2026-10-29 07:14); obnova sama (vynucený reflash). V 16 dalších přepnutích nereprodukováno; pro diagnózu uchovat log před restartem po RCP failure
+- [ ] Sloty C6: dvakrát po sobě výpadek RCP po startu Thread při rychlém sledu přepnutí (TC23 hned po přerušeném běhu, 2026-10-29 07:14); obnova sama (vynucený reflash). V 16 dalších přepnutích nereprodukováno; log před restartem po RCP failure je teď v `/api/logs/previous` (TC24)
 - [ ] Ověřit modální okno flashování i při úplném skenu okolí a přepnutí role (ověřeno jen Přeflashovat C6)
 - [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin
 - [x] Vysílací výkon C6 (Thread, Zigbee router, Zigbee2MQTT) a Identify s ikonou v hlavičce (UI13)

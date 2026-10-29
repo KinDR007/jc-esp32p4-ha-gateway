@@ -16,6 +16,9 @@
   a model run slowed down that way kept CPU 1 from its idle task for 10 s. Uploads and C6 flashing
   now hold a lock (`gw_flash_lock`) and recognition skips the model meanwhile
   (`flash_skips` in `/api/sound/status`).
+- Log before the last restart: the last 16 KiB of log are also kept in internal RAM that startup
+  does not clear, so after a requested, watchdog or panic restart the log of the previous run is
+  available (`/api/logs/previous`, System › Diagnostics). Not kept over a power cut. Tests TC24, UI19.
 
 ## v1.4 (2026-10-29)
 

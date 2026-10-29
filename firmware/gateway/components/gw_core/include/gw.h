@@ -99,6 +99,8 @@ cJSON *gw_eth_status(void);
 esp_err_t gw_log_init(size_t size);
 /* Copies log text starting at *seq, advances *seq. Returns bytes copied. */
 size_t gw_log_read(uint32_t *seq, char *out, size_t len);
+/* Last 16 KiB of log of the run before the last restart (not after a power-on); 0 when none. */
+size_t gw_log_previous(const char **text);
 
 /* ---- HTTP ---- */
 esp_err_t gw_http_start(void);

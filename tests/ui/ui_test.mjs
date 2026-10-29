@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI18).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI19).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -516,6 +516,14 @@ await test('UI18', 'C6 temperature with its min and max like the P4', async () =
   const text = await page.$$eval('#main dt', dts => dts.filter(d => /C6 temperature|Temperature/.test(d.querySelector('.tip')?.dataset.tip || ''))
     .map(d => d.nextElementSibling.textContent));
   check(text.length === 2 && /min [\d.]+, max [\d.]+/.test(text[0]) && /min [\d.]+, max [\d.]+/.test(text[1]), `P4 and C6 with min/max: ${text.join(' | ')}`);
+});
+
+await test('UI19', 'Diagnostics: the log before the last restart downloads', async () => {
+  await tab('system/diag');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#log-prev')]);
+  const text = readFileSync(await dl.path(), 'utf8');
+  check(dl.suggestedFilename().endsWith('-previous.log'), `file ${dl.suggestedFilename()}`);
+  check(/^[IWE] \(/m.test(text), `log lines (${text.length} B)`);
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

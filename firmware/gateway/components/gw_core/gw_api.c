@@ -373,6 +373,17 @@ static esp_err_t logs_get(httpd_req_t *req)
     return err;
 }
 
+static esp_err_t logs_previous_get(httpd_req_t *req)
+{
+    const char *text;
+    size_t n = gw_log_previous(&text);
+    if (!n) {
+        return gw_http_send_error(req, 404, "no log from before the last restart");
+    }
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, text, n);
+}
+
 static esp_err_t role_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -918,6 +929,7 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/status", HTTP_GET, status_get);
     gw_http_register("/api/identify", HTTP_POST, identify_post);
     gw_http_register("/api/logs", HTTP_GET, logs_get);
+    gw_http_register("/api/logs/previous", HTTP_GET, logs_previous_get);
     gw_http_register("/api/role", HTTP_POST, role_post);
     gw_http_register("/api/reboot", HTTP_POST, reboot_post);
     gw_http_register("/api/settings", HTTP_POST, settings_post);

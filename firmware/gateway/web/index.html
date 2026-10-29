@@ -451,7 +451,7 @@ const CS = {
     'Publikuje bránu do Home Assistant přes MQTT discovery: roli, stav a diagnostiku jako entity, výběr role a tlačítko restartu. Potřebuje integraci MQTT a broker (např. doplněk Mosquitto).',
   // tools
   'Diagnostics': 'Diagnostika', 'Status JSON': 'Stav JSON', 'Thread JSON': 'Thread JSON', 'Zigbee JSON': 'Zigbee JSON',
-  'Download core dump': 'Stáhnout core dump', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
+  'Download core dump': 'Stáhnout core dump', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
   'next boot': 'příští start', 'Gateway firmware': 'Firmware brány', 'ESPHome image': 'ESPHome image', 'C6 firmware bundle': 'Balík firmwaru C6',
@@ -800,6 +800,7 @@ const TIPS = {
   'slot:gw_b': ['Gateway firmware slot B. Updates go to the slot that is not running.', 'Slot B firmwaru brány. Aktualizace jde vždy do slotu, který neběží.'],
   'slot:esphome': ['ESPHome BLE proxy image, started by the ESPHome role.', 'Image ESPHome BLE proxy, spouští ho role ESPHome.'],
   'State': ['valid: confirmed image; new: not started yet; pending: on trial until it runs stable.', 'valid: potvrzený image; new: ještě nespuštěný; pending: na zkoušku, dokud neběží stabilně.'],
+  'Previous log': ['The last 16 KiB of log before the last restart (requested, watchdog or crash). Not kept over a power cut.', 'Posledních 16 KiB logu před posledním restartem (vyžádaným, watchdogem i pádem). Výpadek napájení ho nepřežije.'],
   'Core dump': ['Crash record of the last panic, for debugging. Empty when the gateway never crashed.', 'Záznam posledního pádu pro ladění. Prázdný, když brána nespadla.'],
   'Restart': ['Restarts the P4; the active role is back after about 10 s.', 'Restartuje P4; aktivní role naběhne asi za 10 s.'],
   'Reflash C6 now': ['Rewrites the C6 with the firmware of the current role. Use after repeated radio failures.', 'Přepíše C6 firmwarem aktuální role. Použijte po opakovaných výpadcích rádia.'],
@@ -1663,7 +1664,8 @@ views['system/diag'] = () => `<div class="grid">
     <a class="btn" href="/api/status" target="_blank">${ic('download')}Status JSON</a>
     ${isThread() ? `<a class="btn" href="/api/thread/status" target="_blank">${ic('download')}Thread JSON</a>` : ''}
     ${isZigbee() ? `<a class="btn" href="/api/zigbee/status" target="_blank">${ic('download')}Zigbee JSON</a>` : ''}</div>
-    <div class="row"><button class="btn" id="cd-get">${ic('download')}Download core dump</button><button class="btn danger" id="cd-del">${ic('delete-outline')}Erase core dump</button>${tip('Core dump')}</div></div>
+    <div class="row"><button class="btn" id="cd-get">${ic('download')}Download core dump</button><button class="btn danger" id="cd-del">${ic('delete-outline')}Erase core dump</button>${tip('Core dump')}</div>
+    <div class="row"><button class="btn" id="log-prev">${ic('download')}Log before the last restart</button>${tip('Previous log')}</div></div>
   <div class="card wide">${h3('text-box-outline', 'Log')}<div class="row"><button class="btn" id="log-pause">Pause</button><button class="btn" id="log-clear">Clear</button>
     <button class="btn" id="log-save">${ic('download')}Download</button><input type="text" id="log-filter" placeholder="filter" style="flex:1"></div>
     <pre class="log" id="log"></pre></div>
@@ -2738,6 +2740,8 @@ document.addEventListener('click', async e => {
       waitForRestart();
     } else if (t.id === 'cd-get') {
       download('/api/coredump', 'coredump.elf');
+    } else if (t.id === 'log-prev') {
+      await download('/api/logs/previous', status.hostname + '-previous.log');
     } else if (t.id === 'cd-del') {
       await api('/api/coredump', { method: 'DELETE' });
       toast('Core dump erased');

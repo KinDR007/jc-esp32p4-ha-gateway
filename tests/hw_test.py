@@ -393,6 +393,17 @@ def tc23_slot_switch():
     check(all(t < 60 for t in times.values()), 'switches done in under a minute: ' + ', '.join(f'{k} {v:.0f} s' for k, v in times.items()))
 
 
+def tc24_previous_log():
+    """Log before the last restart: kept in RAM over a requested restart, ends with the restart."""
+    http('POST', '/api/reboot', {})
+    wait_restart(status()['role']['desired'])
+    code, text = http('GET', '/api/logs/previous')
+    text = text.decode(errors='replace') if isinstance(text, bytes) else str(text)
+    check(code == 200 and len(text) > 1000, f'previous log {len(text)} B')
+    check('restart in' in text[-400:], 'ends with the restart request of the previous run')
+    check('restart in' not in logs_since(), 'the current log starts fresh')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -712,6 +723,7 @@ TESTS = [
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
+    ('TC24', tc24_previous_log),
 ]
 
 

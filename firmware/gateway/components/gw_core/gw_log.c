@@ -1,13 +1,30 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "esp_attr.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "gw.h"
 
 /* Log lines are teed into a ring buffer in PSRAM so the web UI can show them. */
+
+/* A second, smaller copy lives in internal RAM that startup leaves alone, so the log before a
+ * software, watchdog or panic restart can be read after it (internal RAM, unlike PSRAM, has no
+ * write-back cache that a panic could lose). */
+#define KEPT_SIZE (16 * 1024)
+#define KEPT_MAGIC 0x50344C47u
+typedef struct {
+    uint32_t magic;
+    uint32_t head; /* total bytes ever written */
+    uint32_t check;
+    char data[KEPT_SIZE];
+} kept_log_t;
+static __NOINIT_ATTR kept_log_t s_kept;
+static char *s_prev;
+static size_t s_prev_len;
 
 static char *s_ring;
 static size_t s_size;
@@ -29,6 +46,41 @@ static void ring_write(const char *data, size_t len)
     s_head += len;
 }
 
+static void kept_write(const char *data, size_t len)
+{
+    if (len > KEPT_SIZE) {
+        data += len - KEPT_SIZE;
+        len = KEPT_SIZE;
+    }
+    size_t pos = s_kept.head % KEPT_SIZE;
+    size_t first = len < KEPT_SIZE - pos ? len : KEPT_SIZE - pos;
+    memcpy(s_kept.data + pos, data, first);
+    memcpy(s_kept.data, data + first, len - first);
+    s_kept.head += len;
+    s_kept.check = s_kept.head ^ KEPT_MAGIC;
+}
+
+/* Takes over what the previous run left in s_kept, then starts it over for this run. */
+static void kept_init(void)
+{
+    esp_reset_reason_t reason = esp_reset_reason();
+    if (reason != ESP_RST_POWERON && reason != ESP_RST_BROWNOUT && s_kept.magic == KEPT_MAGIC &&
+        s_kept.check == (s_kept.head ^ KEPT_MAGIC) && s_kept.head > 0) {
+        size_t len = s_kept.head < KEPT_SIZE ? s_kept.head : KEPT_SIZE;
+        s_prev = heap_caps_malloc(len, MALLOC_CAP_SPIRAM);
+        if (s_prev) {
+            size_t start = s_kept.head - len;
+            for (size_t i = 0; i < len; i++) {
+                s_prev[i] = s_kept.data[(start + i) % KEPT_SIZE];
+            }
+            s_prev_len = len;
+        }
+    }
+    s_kept.head = 0;
+    s_kept.check = KEPT_MAGIC;
+    s_kept.magic = KEPT_MAGIC;
+}
+
 static int log_vprintf(const char *fmt, va_list args)
 {
     if (xPortInIsrContext() || xTaskGetSchedulerState() != taskSCHEDULER_RUNNING ||
@@ -40,7 +92,9 @@ static int log_vprintf(const char *fmt, va_list args)
     int len = vsnprintf(s_line, sizeof(s_line), fmt, copy);
     va_end(copy);
     if (len > 0) {
-        ring_write(s_line, (size_t)len < sizeof(s_line) ? (size_t)len : sizeof(s_line) - 1);
+        size_t n = (size_t)len < sizeof(s_line) ? (size_t)len : sizeof(s_line) - 1;
+        ring_write(s_line, n);
+        kept_write(s_line, n);
     }
     xSemaphoreGive(s_lock);
     return s_orig(fmt, args);
@@ -53,6 +107,7 @@ esp_err_t gw_log_init(size_t size)
         return ESP_ERR_NO_MEM;
     }
     s_size = size;
+    kept_init();
     s_lock = xSemaphoreCreateMutex();
     s_orig = esp_log_set_vprintf(log_vprintf);
     return ESP_OK;
@@ -79,4 +134,10 @@ size_t gw_log_read(uint32_t *seq, char *out, size_t len)
     xSemaphoreGive(s_lock);
     *seq = from + count;
     return count;
+}
+
+size_t gw_log_previous(const char **text)
+{
+    *text = s_prev;
+    return s_prev_len;
 }
