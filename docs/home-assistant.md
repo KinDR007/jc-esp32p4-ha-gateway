@@ -37,8 +37,14 @@ advanced:
   transmit_power: 20
 ```
 
-ZHA: only with the experimental `zha-zboss-esp` custom component (HACS), radio type ZBOSS,
-path `socket://<ip>:6638`. One TCP client at a time; a new connection replaces the old one.
+One TCP client at a time; a new connection replaces the old one.
+
+ZHA (built into Home Assistant) cannot use this coordinator today (2026-10-29). The protocol fits:
+zigpy-zboss 2.0.5 (the zigpy library for ZBOSS NCPs) formed a network on the gateway, started again
+from the stored network in 0.9 s and opened permit join (`tests/zha/zigpy_zboss_check.py`; pairing a
+device was not tried). But ZHA does not ship zigpy-zboss (not among the radio libraries of the `zha`
+package) and zigpy-zboss requires `zigpy<2`, while Home Assistant runs zigpy 2.x, so not even a
+copied ZHA custom component can load it without porting zigpy-zboss first. Use Zigbee2MQTT.
 The gateway keeps a copy of the coordinator NVRAM whenever it leaves the role (Zigbee tab).
 
 ## Zigbee router

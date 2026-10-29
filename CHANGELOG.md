@@ -29,6 +29,9 @@
   coordinator only while no host is connected, so Zigbee2MQTT never loses its adapter unasked.
   Backups show when they were taken (`saved` in `/api/status` c6.snapshots; `POST
   /api/c6/zigbee-snapshot`, `zigbee_backup_days` in `/api/settings`). Tests TC26, UI21.
+- ZHA checked: zigpy-zboss 2.0.5 forms a network on the coordinator role, restarts on it and opens
+  permit join, but ZHA does not include zigpy-zboss and it needs zigpy < 2 (Home Assistant runs 2.x),
+  so Zigbee2MQTT stays the only host (docs/home-assistant.md, `tests/zha/zigpy_zboss_check.py`).
 
 ## v1.4 (2026-10-29)
 
