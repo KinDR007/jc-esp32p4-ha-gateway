@@ -72,7 +72,7 @@ const tab = async route => {
 };
 // pages that open only in their role
 const needsRole = route => /^thread\//.test(route) ? !status.role.active.startsWith('thread')
-  : /^zigbee\/(info|diag)$/.test(route) ? !status.role.active.startsWith('zigbee') : false;
+  : /^zigbee\/(info|diag|backups)$/.test(route) ? !status.role.active.startsWith('zigbee') : false;
 
 await page.goto(base);
 await page.waitForSelector('.card', { timeout: 20000 });
@@ -544,6 +544,12 @@ await test('UI20', 'Settings backup: export downloads the settings, a foreign fi
 });
 
 await test('UI21', 'Zigbee backups: the automatic interval is stored, Back up now only in a Zigbee role', async () => {
+  if (await needsRole('zigbee/backups')) {
+    await page.goto(base + '#zigbee/backups');
+    await page.waitForTimeout(800);
+    check(await page.evaluate(() => location.hash) !== '#zigbee/backups', 'outside a Zigbee role the page is closed and its link leads elsewhere');
+    return;
+  }
   await page.goto(base + '#zigbee/backups');
   await page.waitForSelector('#zb-snap-days');
   const days = () => page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.c6.snapshot_days));

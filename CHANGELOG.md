@@ -57,6 +57,9 @@
   (system, network/MQTT/web, Thread, Zigbee, sound, C6 flashing), level and tag (a click on a tag
   shows only that tag), search with highlighting or a `/regular expression/`. Downloads (also the log
   before the last restart) have the full local date and time. Test UI25.
+- Menu: Zigbee › Network backups is closed outside a Zigbee role like Information and Diagnostics
+  (backing up and the automatic backup work only there). Network and devices stays open: it shows
+  Zigbee2MQTT over MQTT whatever the gateway's role. Tests UI16, UI21.
 
 ## v1.4 (2026-10-29)
 

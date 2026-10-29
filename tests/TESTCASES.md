@@ -88,7 +88,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI18 | teplota C6 | na Přehledu má teplota C6 stejně jako P4 rozsah (min, max), pokud ji firmware C6 hlásí |
 | UI19 | log před restartem | Systém › Diagnostika: tlačítko stáhne log předchozího běhu (`*-previous.log`) |
 | UI20 | záloha nastavení | export stáhne JSON bez hesel, cizí soubor skončí chybou, potvrzení importu uvádí původ a zrušení nic nemění |
-| UI21 | zálohy Zigbee | výběr automatické zálohy se uloží; Zálohovat teď jen v roli Zigbee |
+| UI21 | zálohy Zigbee | mimo roli Zigbee je stránka zavřená; v roli Zigbee se výběr automatické zálohy uloží a funguje Zálohovat teď |
 | UI22 | online aktualizace | uložení URL, zobrazení chyby kontroly, Instalovat zakázáno bez nabídky, vymazání URL |
 | UI23 | naučené zvuky | stránka se načte, cizí soubor skončí chybou, test nahrávky ukáže skóre |
 | UI24 | MQTT | volby TLS jen pro mqtts:// a wss://, pole certifikátu jen pro vlastní CA, pokročilé volby |
