@@ -1,0 +1,180 @@
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+  07:02:09 back after restart: active=thread_br c6=ot_rcp uptime=9s
+  07:02:09 ok: thread_br started without maintenance ('')
+  07:02:09 ok: active role is thread_br
+  07:02:09 switch took 12 s
+  07:02:09 ok: C6 runs ot_rcp
+  07:02:09 ok: Thread role router, network MyHome284238473, channel 25, RCP openthread-esp32/daba4c2-; esp32c6;  2026-10-29 05:38:15 UTC
+  07:02:09 ok: border routing running
+  07:02:09 ok: dataset TLVs readable
+  07:02:09 ok: border agent active, SRP stopped, NAT64 idle (role router)
+  07:02:09 ok: OTBR REST /node on port 8081 (200)
+  07:02:09 ok: OTBR REST active dataset (200)
+  07:02:09 ok: web CLI state: ['router']
+TC04 PASS (12 s) 
+
+TC05 Zigbee coordinator: C6 gets zigbee_ncp, TCP bridge accepts a client, NCP answers after reset.
+  07:02:27 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=14s
+  07:02:27 ok: zigbee_coordinator started without maintenance ('')
+  07:02:27 ok: active role is zigbee_coordinator
+  07:02:27 switch took 17 s
+  07:02:27 ok: C6 runs zigbee_ncp
+  07:02:30 ok: NCP sent 582 B after reset (UART link alive)
+  07:02:30 ok: no UART errors
+  07:02:31 ok: TCP client registered (192.168.88.189)
+  07:02:32 ok: client disconnect detected
+TC05 PASS (22 s) 
+
+TC06 Leaving and re-entering the coordinator saves and restores its network data.
+  07:02:49 back after restart: active=thread_br c6=ot_rcp uptime=14s
+  07:02:49 ok: thread_br started without maintenance ('')
+  07:02:49 ok: active role is thread_br
+  07:02:49 switch took 17 s
+  07:02:49 ok: snapshot of zigbee_ncp saved ({'bundle': 'zigbee_ncp', 'size': 17408, 'generation': 20})
+  07:02:51 ok: Thread network unchanged after a Zigbee detour
+  07:03:08 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=14s
+  07:03:08 ok: zigbee_coordinator started without maintenance ('')
+  07:03:08 ok: active role is zigbee_coordinator
+  07:03:08 switch took 17 s
+  07:03:08 ok: zb_storage restored on return to the coordinator
+  07:03:08 ok: snapshot generation unchanged (no extra save)
+TC06 PASS (36 s) 
+
+TC07 Zigbee router: C6 gets the router firmware and reports status over the line protocol.
+  07:03:27 back after restart: active=zigbee_router c6=zigbee_router uptime=16s
+  07:03:27 ok: zigbee_router started without maintenance ('')
+  07:03:27 ok: active role is zigbee_router
+  07:03:27 switch took 19 s
+  07:03:27 ok: C6 runs zigbee_router
+  07:03:37 ok: router state joined, channel 11, ieee 9c139efffec404d0
+  07:03:38 ok: command accepted
+  07:03:38 ok: coordinator snapshot still kept while the router runs
+TC07 PASS (29 s) 
+
+TC08 Thread router: idle without dataset, joins after the dataset is applied.
+  07:03:53 back after restart: active=thread_router c6=ot_rcp uptime=12s
+  07:03:53 ok: thread_router started without maintenance ('')
+  07:03:53 ok: active role is thread_router
+  07:03:53 switch took 15 s
+  07:03:53 ok: C6 runs ot_rcp
+  07:03:53 ok: router mode
+  07:03:53 ok: dataset applied ({'network_name': 'MyHome284238473'})
+  07:03:58 ok: Thread router role router on MyHome284238473
+TC08 PASS (20 s) 
+
+TC09 ESPHome: gateway hands over, BLE proxy scans, Return to gateway brings back thread_br.
+  07:03:58 ok: switch to esphome accepted
+  07:05:08 ok: gateway web UI is gone (ESPHome runs)
+  07:05:20 ok: ESPHome ble-proxy-p4gw-e30a08 2026.10.1
+  07:05:20 ok: BLE advertisements from 19 devices in 10 s
+  07:06:41 back after restart: active=thread_br c6=ot_rcp uptime=80s
+  07:06:41 ok: returned to thread_br
+  07:06:41 ok: C6 reflashed back to ot_rcp
+TC09 PASS (163 s) 
+
+TC12 Broken uploads are rejected and do not damage the stored images.
+  07:06:41 ok: garbage c6fw rejected ({'error': 'ESP_ERR_INVALID_VERSION'})
+  07:06:41 ok: stored bundles intact after the rejected upload (6)
+  07:06:41 ok: garbage gateway image rejected ({'error': 'image has no application description'})
+  07:06:56 ok: valid c6fw re-uploaded
+  07:06:56 ok: 6 bundles listed again
+TC12 PASS (15 s) 
+
+TC13 Forced C6 reflash from the UI restores the current role's firmware.
+  07:06:56 ok: reflash requested
+  07:08:14 back after restart: active=thread_br c6=ot_rcp uptime=75s
+  07:08:14 ok: thread_br running again after reflash
+  07:08:14 ok: flash log present
+  07:08:14 ok: forced reflash writes the whole slots layout again
+TC13 PASS (78 s) 
+
+TC16 Border router keeps its own network after the router role joined another one.
+  07:08:23 back after restart: active=thread_br c6=ot_rcp uptime=7s
+  07:08:23 ok: thread_br started without maintenance ('')
+  07:08:23 ok: active role is thread_br
+  07:08:23 switch took 10 s
+  07:08:38 back after restart: active=thread_router c6=ot_rcp uptime=10s
+  07:08:38 ok: thread_router started without maintenance ('')
+  07:08:38 ok: active role is thread_router
+  07:08:38 switch took 13 s
+  07:08:38 ok: router joined the test network
+  07:08:47 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  07:08:47 ok: thread_br started without maintenance ('')
+  07:08:47 ok: active role is thread_br
+  07:08:47 switch took 9 s
+  07:08:47 ok: border router back on MyHome284238473
+TC16 PASS (33 s) 
+
+TC19 C6 telemetry in every gateway role; the Zigbee host stream stays clean and answers requests.
+  07:09:00 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  07:09:00 ok: thread_br started without maintenance ('')
+  07:09:00 ok: active role is thread_br
+  07:09:00 switch took 13 s
+  07:09:00 ok: Thread RCP: 37.5 °C, 421320 B free, up 40 s
+  07:09:35 ok: no RCP failure while it is polled
+  07:09:48 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=10s
+  07:09:48 ok: zigbee_coordinator started without maintenance ('')
+  07:09:48 ok: active role is zigbee_coordinator
+  07:09:48 switch took 13 s
+  07:09:58 ok: Zigbee NCP: 39.5 °C, 295492 B free
+  07:10:33 ok: no telemetry frame reached the host (2 frames)
+  07:10:33 ok: NCP answered GET_MODULE_VERSION (000101003700004f00050100000f0302000000)
+  07:10:33 ok: telemetry keeps coming while a host is connected
+  07:10:52 back after restart: active=zigbee_router c6=zigbee_router uptime=16s
+  07:10:52 ok: zigbee_router started without maintenance ('')
+  07:10:52 ok: active role is zigbee_router
+  07:10:52 switch took 19 s
+  07:10:52 ok: Zigbee router: 35.5 °C, 370352 B free
+  07:11:12 back after restart: active=thread_br c6=ot_rcp uptime=17s
+  07:11:12 ok: thread_br started without maintenance ('')
+  07:11:12 ok: active role is thread_br
+  07:11:12 switch took 19 s
+TC19 PASS (145 s) 
+
+TC20 Network surroundings: quick scan in the Thread role, full scan with Wi-Fi, role restored afterwards.
+  07:11:21 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  07:11:21 ok: thread_br started without maintenance ('')
+  07:11:21 ok: active role is thread_br
+  07:11:21 switch took 9 s
+  07:11:21 ok: quick scan started ({'started': True})
+  07:11:36 ok: quick: 16 channels in 13195 ms
+  07:11:36 ok: quick: own network MyHome284238473 found on channel 25
+  07:11:36 ok: no RCP failure caused by the scan
+  07:11:36 ok: full scan requested, gateway restarts
+  07:12:06 ok: full: scanner 1.0.0, 16 channels, 13836 ms
+  07:12:06 ok: full: 20 Wi-Fi access points, one entry each
+  07:12:06 ok: full: own Thread PAN seen in traffic
+  07:12:11 back after restart: active=thread_br c6=ot_rcp uptime=32s
+  07:12:11 ok: role firmware back on the C6
+  07:12:11 ok: Thread network unchanged after the scan
+TC20 PASS (60 s) 
+
+TC21 Thread network map: topology discovery returns this gateway and the routers it links to.
+  07:12:20 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  07:12:20 ok: thread_br started without maintenance ('')
+  07:12:20 ok: active role is thread_br
+  07:12:20 switch took 9 s
+  07:12:41 ok: 11 routers in 485 ms (all answered)
+  07:12:41 ok: this gateway is in the map as border router R10
+  07:12:41 ok: its links: [1, 7, 13, 14, 23, 28, 33, 49]
+  07:12:44 ok: a second discovery right after works too
+TC21 PASS (33 s) 
+
+TC22 Zigbee network through Zigbee2MQTT: instance found on the broker, devices, an operation answered.
+  07:12:44 ok: Zigbee2MQTT 2.14.2 at zigbee2mqtt, coordinator ZStack3x0, 77 devices
+  07:12:44 ok: device list includes the coordinator
+  07:12:45 ok: permit join closed, answered by Zigbee2MQTT (ok)
+  07:12:45 ok: unknown action refused
+TC22 PASS (1 s) 
+
+TC23 C6 slots layout: a role switch only selects the slot, the Zigbee router keeps its network.
+  07:12:45 ok: c6fw carries the slots layout
+  07:12:58 back after restart: active=zigbee_router c6=zigbee_router uptime=10s
+  07:12:58 ok: zigbee_router started without maintenance ('')
+  07:12:58 ok: active role is zigbee_router
+  07:12:58 switch took 13 s
+  07:12:58 ok: zigbee_router: layout already on the C6, not written again
+  07:12:58 ok: zigbee_router: slot selected
+TC23 ERROR (13 s) AttributeError: 'NoneType' object has no attribute 'get'
+
+Summary: TC04 PASS, TC05 PASS, TC06 PASS, TC07 PASS, TC08 PASS, TC09 PASS, TC12 PASS, TC13 PASS, TC16 PASS, TC19 PASS, TC20 PASS, TC21 PASS, TC22 PASS, TC23 ERROR

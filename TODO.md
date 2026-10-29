@@ -29,12 +29,12 @@
 - [ ] Zvuk fáze 5: ladění falešných poplachů, 24h test se zapnutou detekcí
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
-- [ ] OTA brány 2026-10-29: první upload bez odpovědi, brána se restartovala do starého slotu; druhý pokus OK (souvisí s jednorázovým resetem spojení při OTA)
+- [ ] OTA brány: občas reset spojení a restart do starého slotu (2026-10-29 dvakrát z ~9 uploadů); příčina je **task watchdog** během uploadu (reset reason), core dump nejde dekódovat (sestavení už neexistuje); při příštím výskytu stáhnout `/api/coredump` a dekódovat proti `build/gateway/p4gw.elf` téhož sestavení
+- [ ] Sloty C6: dvakrát po sobě výpadek RCP po startu Thread při rychlém sledu přepnutí (TC23 hned po přerušeném běhu, 2026-10-29 07:14); obnova sama (vynucený reflash). V 16 dalších přepnutích nereprodukováno; pro diagnózu uchovat log před restartem po RCP failure
 - [ ] Ověřit modální okno flashování i při úplném skenu okolí a přepnutí role (ověřeno jen Přeflashovat C6)
 - [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin
 - [x] Vysílací výkon C6 (Thread, Zigbee router, Zigbee2MQTT) a Identify s ikonou v hlavičce (UI13)
 - [ ] Ověřit zápis výkonu ze Zigbee2MQTT (`analog_output` / `tx_power`), MQTT broker vyžaduje přihlášení
-- [ ] Chyba: Zigbee router po návratu z jiné role (úplný sken okolí, přepnutí role) není v síti a
-      steeruje, ačkoli snapshot `zb_storage` síť obsahuje a obnoví se; žádný test to nehlídal (TC07 jen
-      snapshot koordinátora). Prověřit start ZBOSS po obnově (vymazané NVS?), doplnit test.
+- [x] Chyba: Zigbee router po návratu z jiné role nebyl v síti. Se sloty C6 (NVS se při přepnutí
+      nemaže) se vrátil do sítě ve všech ~12 přepnutích 2026-10-29; hlídá TC23.
 - [ ] Ověřit HA cestu k "active dataset TLVs" v aktuální verzi HA (text v UI)

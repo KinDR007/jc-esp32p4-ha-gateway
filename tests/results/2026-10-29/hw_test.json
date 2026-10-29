@@ -1,0 +1,86 @@
+[
+  {
+    "id": "TC04",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 12
+  },
+  {
+    "id": "TC05",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 22
+  },
+  {
+    "id": "TC06",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 36
+  },
+  {
+    "id": "TC07",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 29
+  },
+  {
+    "id": "TC08",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 20
+  },
+  {
+    "id": "TC09",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 163
+  },
+  {
+    "id": "TC12",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 15
+  },
+  {
+    "id": "TC13",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 78
+  },
+  {
+    "id": "TC16",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC19",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 145
+  },
+  {
+    "id": "TC20",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 60
+  },
+  {
+    "id": "TC21",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC22",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 1
+  },
+  {
+    "id": "TC23",
+    "result": "ERROR",
+    "detail": "AttributeError: 'NoneType' object has no attribute 'get'",
+    "seconds": 13
+  }
+]

@@ -39,12 +39,13 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC10 | OTA gateway | upload `dist/p4gw.bin` | zápis do neaktivního slotu, start v `pending_verify`, po 60 s `valid`; gateway image do slotu ESPHome odmítnut |
 | TC11 | Heslo | nastavení, přístup bez/se/se špatným heslem, odebrání | 401 / 200 / 401, po odebrání opět 200 |
 | TC12 | Neplatné uploady | nesmysl do c6fw a gateway, pak platný c6fw | 400, uložené image nepoškozené, 4 balíky zpět |
-| TC13 | Vynucený reflash C6 | `POST /api/c6/reflash` | po restartu běží stejná role, v logu `C6 now runs` |
+| TC13 | Vynucený reflash C6 | `POST /api/c6/reflash` | po restartu běží stejná role, v logu `C6 now runs`; se sloty se znovu zapíše celé rozložení |
 | TC14 | Zvuková služba | zapnout mikrofon a rozpoznávání | zachytávání bez chyb, model načten, inference pod 150 ms, CPU jádra 1 pod 40 %, klip WAV 2 s |
 | TC15 | Rozpoznávání zvuků (`--play`) | `say` a ESC-50 štěkot z reproduktoru počítače u desky | Speech ≥ 0,6, Dog nebo Bark ≥ 0,5 |
 | TC17 | Konfigurace událostí | neplatné ID / třída / duplicita, nová událost a výjimka, restart, předvolba | 400 pro chyby, vše přežije restart, předvolba použita, původní konfigurace obnovena |
 | TC18 | Událost z přehraného zvuku (`--play`) | kočka z ESC-50, pak s ignorovanými třídami kočky | událost `cat` vznikne, s ignorovanými třídami ne |
 | TC20 | Síťové okolí | rychlý sken v roli Thread BR, pak úplný sken (restart, skenovací firmware C6) | rychlý: 16 kanálů, vlastní Thread síť nalezena, bez výpadku RCP; úplný: skener odpoví, 16 kanálů, Wi-Fi bez duplicit, vlastní PAN v provozu; role a Thread síť po skenu zpět |
+| TC23 | Sloty C6 | přepnutí thread_br → zigbee_router → thread_br | c6fw obsahuje balíček `slots`, rozložení se znovu nezapisuje, vybere se jen slot (otadata), router se vrátí do své sítě, Thread se připojí, každé přepnutí do minuty |
 | TC22 | Zigbee síť přes Zigbee2MQTT | `GET /api/zigbee/net`, zavření připojování | instance nalezena na brokeru, seznam zařízení s koordinátorem, Zigbee2MQTT odpoví na operaci, neznámá operace 400 |
 | TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |
 | TC19 | Telemetrie C6 ve všech rolích brány | Thread BR, Zigbee koordinátor s TCP klientem (požadavek GET_MODULE_VERSION), Zigbee router | v každé roli `c6.telemetry` s teplotou a RAM; žádný výpadek RCP; k hostiteli Zigbee nedorazí rámec telemetrie (typ 0x7e), všechny rámce mají platné CRC a NCP odpoví na požadavek |
@@ -78,6 +79,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI14 | Thread › Topologie (je-li role Thread) | najetí na router v mapě ukáže detail v levém horním rohu mapy a zvýrazní jeho linky, po odjetí zvýraznění zmizí; legenda nezakrývá uzly ani detail; seznam zařízení bublinu nezobrazuje (UI12 totéž pro Zigbee) |
 | UI16 | menu podle role | stránky neaktivní role jsou v menu zavřené, odkaz na ně otevře stránku, která funguje; sekce je zavřená jen když nefunguje žádná její stránka |
 | UI17 | mapa sítě: zoom a rozložení | kolečko a +/− přibližují, − nejdál na celou mapu, domeček vrátí výchozí pohled, L rozmístí uzly podle signálu (pamatuje si to) a zpět na kruh, legenda nezakrývá uzly |
+| UI18 | teplota C6 | na Přehledu má teplota C6 stejně jako P4 rozsah (min, max), pokud ji firmware C6 hlásí |
 | UI15 | nápovědy (i) | žádný klíč nápovědy není v TIPS dvakrát; tabulky zařízení Thread a Zigbee a údaje instance Zigbee2MQTT mají vlastní nápovědy, ne texty jiných tabulek se stejným názvem sloupce |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; modální okno zamkne stránku, ukáže fázi, procenta a odhad zbývajícího času, Escape ho nezavře; po skončení vše zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |

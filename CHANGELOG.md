@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- C6 slots layout: the Thread RCP, Zigbee router, Zigbee coordinator and scanner firmwares sit in
+  their own slots of one C6 layout (`firmware/c6/slots.csv`, installed once, ~70 s). A role switch
+  writes only otadata (8 kB) and the Zigbee network data instead of a whole firmware: the C6 write
+  takes 1.6–2.8 s instead of 6–15 s, a Zigbee role switch 14–19 s instead of 27 s. c6fw format 3
+  (`pack_c6fw.py --slots`); update the gateway before c6fw.bin. Snapshots from the old layouts are
+  restored by size. The Zigbee router now returns to its network after every switch (the old
+  layouts erased the C6 NVS on each switch). Research and measurements: docs/c6-slots.md.
+  Tests TC13, TC23.
+- C6 temperature shows its min and max since the gateway start, like the P4. Test UI18.
+
 ## v1.4 (2026-10-29)
 
 - C6 flashing: a dialog locks the web UI from the restart until the role runs, with the stage,
