@@ -457,7 +457,9 @@ const CS = {
   'any sound (YAMNet embedding)': 'jakýkoli zvuk (embedding YAMNet)', 'beep or tone (frequency)': 'pípnutí nebo tón (frekvence)', 'Record sample (4 s)': 'Nahrát vzorek (4 s)',
   'Record background (5 s)': 'Nahrát pozadí (5 s)', 'Play the sound near the board right after pressing Record. 5 to 10 samples per sound, then the background of the room.': 'Pusťte zvuk u desky hned po stisku Nahrát. 5 až 10 vzorků na zvuk, potom pozadí místnosti.',
   'Background': 'Pozadí', 'Sound': 'Zvuk', 'Samples': 'Vzorky', 'Samples alike': 'Shoda vzorků', 'Threshold': 'Práh', 'Now': 'Teď', 'No learned sound yet.': 'Zatím žádný naučený zvuk.',
-  'Delete background': 'Smazat pozadí', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
+  'Delete background': 'Smazat pozadí', 'Server certificate': 'Certifikát serveru', "public CA (Let's Encrypt and others)": 'veřejná CA (Let\'s Encrypt a další)', 'own CA or self-signed certificate': 'vlastní CA nebo self-signed certifikát',
+  'CA certificate (PEM)': 'Certifikát CA (PEM)', 'Do not check the server name': 'Nekontrolovat jméno serveru', 'Advanced': 'Pokročilé', 'Client ID': 'Client ID', 'Keepalive (s)': 'Keepalive (s)',
+  'Base topic': 'Základní topic', 'State interval (s)': 'Interval stavu (s)', 'Home Assistant discovery': 'Discovery pro Home Assistant', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
@@ -800,7 +802,6 @@ const TIPS = {
   // home assistant, system
   'Discovery prefix': ['MQTT topic prefix Home Assistant listens on for discovery, homeassistant by default.', 'Prefix MQTT topiců, na kterém Home Assistant poslouchá discovery, výchozí homeassistant.'],
   'Connection': ['State of the connection to the MQTT broker.', 'Stav spojení s MQTT brokerem.'],
-  'Base topic': ['Topic under which the gateway publishes its state.', 'Topic, pod kterým brána publikuje svůj stav.'],
   'State publishes': ['State messages sent since the start.', 'Zprávy se stavem odeslané od startu.'],
   'Slot': ['Flash partition holding a firmware image.', 'Oddíl flash s firmwarem.'],
   'slot:gw_a': ['Gateway firmware slot A. Updates go to the slot that is not running.', 'Slot A firmwaru brány. Aktualizace jde vždy do slotu, který neběží.'],
@@ -813,6 +814,14 @@ const TIPS = {
   'Back up now': ['Restarts the gateway and saves the network data of the running Zigbee role from the C6 (it can be read only while the C6 is stopped).', 'Restartuje bránu a uloží data sítě běžící Zigbee role z C6 (dají se číst jen při zastaveném C6).'],
   'Saved': ['When the backup was taken; — for backups from before this column existed.', 'Kdy byla záloha pořízena; — u záloh z doby před tímto sloupcem.'],
   'Learn from a file': ['A WAV recording, 16 kHz mono 16-bit, 1 to 10 s, e.g. the washing machine beep recorded with a phone next to it (convert with: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). As a sample its loudest 0.96 s are used; Test recording shows how the learned sounds score it, nothing is saved.', 'Nahrávka WAV, 16 kHz mono 16 bit, 1 až 10 s, např. pípnutí pračky nahrané telefonem u ní (převod: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). Jako vzorek se použije nejhlasitějších 0,96 s; Test nahrávky ukáže, jaké skóre jí dají naučené zvuky, nic se neukládá.'],
+  'Broker URI': ['mqtt://host:1883, mqtts://host:8883 (TLS), ws://host:1884 or wss://… (MQTT over WebSocket, e.g. the Mosquitto add-on port 1884).', 'mqtt://host:1883, mqtts://host:8883 (TLS), ws://host:1884 nebo wss://… (MQTT přes WebSocket, např. port 1884 doplňku Mosquitto).'],
+  'Server certificate': ['TLS always verifies the broker. Public CA: brokers with a certificate from a public authority (cloud brokers, Let\'s Encrypt). Own CA: paste the CA that signed the broker certificate, or the self-signed broker certificate itself.', 'TLS vždy ověřuje broker. Veřejná CA: brokery s certifikátem od veřejné autority (cloudové brokery, Let\'s Encrypt). Vlastní CA: vložte CA, která podepsala certifikát brokeru, nebo přímo jeho self-signed certifikát.'],
+  'Do not check the server name': ['The certificate is still verified against the CA, only the name in it may differ from the URI host, e.g. when the broker is reached by IP address. Also turns off SNI (one broker per address).', 'Certifikát se dál ověřuje proti CA, jen jméno v něm se může lišit od hostitele v URI, např. když je broker zadaný IP adresou. Vypne také SNI (jeden broker na adrese).'],
+  'Client ID': ['MQTT client identifier, unique per broker. Empty: the hostname.', 'Identifikátor MQTT klienta, na brokeru jedinečný. Prázdné: hostname.'],
+  'Keepalive': ['How often the client shows the broker it is alive; the broker marks the gateway offline after 1.5 times this. 10-240 s.', 'Jak často klient dává brokeru vědět, že žije; broker označí bránu offline po 1,5násobku. 10-240 s.'],
+  'Base topic': ['Topics of the gateway: <base>/state, /availability, /role/set, sound and update. Empty: p4gw/<hostname>.', 'Topicy brány: <base>/state, /availability, /role/set, zvuk a aktualizace. Prázdné: p4gw/<hostname>.'],
+  'State interval': ['How often the state (uptime, temperature, role, memory) is published. 10-3600 s.', 'Jak často se publikuje stav (uptime, teplota, role, paměť). 10-3600 s.'],
+  'Home Assistant discovery': ['Entities appear in Home Assistant by themselves. Off: only the plain topics (Node-RED and others); the entities are removed from Home Assistant. Discovery is sent again whenever Home Assistant comes online.', 'Entity se v Home Assistant objeví samy. Vypnuto: jen holé topicy (Node-RED a další); entity se z Home Assistant odeberou. Discovery se pošle znovu pokaždé, když se Home Assistant připojí.'],
   'Learned sound ID': ['Name of the learned sound, also the ID of the event created from it (a-z, 0-9, _). More samples under the same name improve it.', 'Název naučeného zvuku a zároveň ID události z něj vytvořené (a-z, 0-9, _). Další vzorky pod stejným názvem ho zpřesní.'],
   'Learned sound type': ['Any sound: compared with what YAMNet hears (cosine similarity of embeddings), for barking of your dog, a door, a voice. Beep or tone: share of energy at the dominant frequency of the samples, for appliance beeps and piezo alarms.', 'Jakýkoli zvuk: porovnává se s tím, co slyší YAMNet (kosinová podobnost embeddingů), pro štěkot vašeho psa, dveře, hlas. Pípnutí nebo tón: podíl energie na dominantní frekvenci vzorků, pro pípání spotřebičů a piezo alarmy.'],
   'Record background': ['Five recordings of the room as it usually sounds (TV, fridge, talking). They set the threshold: above anything the background reaches, below the samples.', 'Pět nahrávek místnosti, jak obvykle zní (TV, lednice, hovor). Určují práh: nad vším, čeho dosáhne pozadí, pod vzorky.'],
@@ -1436,6 +1445,15 @@ views['ha/mqtt'] = () => `<div class="card">${h3('transit-connection-variant', '
     <p class="muted">Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).</p>
     <div id="mqtt-box" class="muted">Loading…</div></div>`;
 
+/* TLS options only for mqtts:// and wss://, the certificate only for an own CA. */
+function mqttTlsFields() {
+  if (!$('#mq-tls-box')) return;
+  $('#mq-tls-box').classList.toggle('hidden', !/^(mqtts|wss):\/\//.test($('#mq-uri').value.trim()));
+  $('#mq-ca-box').classList.toggle('hidden', $('#mq-tls').value !== 'ca');
+}
+document.addEventListener('input', e => { if (e.target.id === 'mq-uri') mqttTlsFields(); });
+document.addEventListener('change', e => { if (e.target.id === 'mq-tls') mqttTlsFields(); });
+
 async function loadMqtt() {
   const box = $('#mqtt-box');
   if (!box) return;
@@ -1443,13 +1461,28 @@ async function loadMqtt() {
     const m = await api('/api/mqtt');
     box.classList.remove('muted');
     box.innerHTML = `<div class="grid"><div>
-      <label class="field"><span>Broker URI</span><input type="text" id="mq-uri" value="${esc(m.uri)}" placeholder="mqtt://192.168.1.10:1883"></label>
+      <label class="field"><span>Broker URI${tip('Broker URI')}</span><input type="text" id="mq-uri" value="${esc(m.uri)}" placeholder="mqtt://192.168.1.10:1883"></label>
       <label class="field"><span>User</span><input type="text" id="mq-user" value="${esc(m.user)}" autocomplete="off"></label>
       <label class="field"><span>Password ${m.password_set ? '(set, leave empty to keep)' : ''}</span><input type="password" id="mq-pass" autocomplete="new-password"></label>
-      <label class="field"><span>Discovery prefix${tip('Discovery prefix')}</span><input type="text" id="mq-prefix" value="${esc(m.prefix)}"></label>
-      <div class="row"><label><input type="checkbox" id="mq-en" ${m.enabled ? 'checked' : ''}> Enabled</label><button class="btn primary" id="mq-save">${ic('check')}Save</button></div>
+      <div id="mq-tls-box">
+        <label class="field"><span>Server certificate${tip('Server certificate')}</span><select id="mq-tls">
+          <option value="bundle" ${m.tls === 'bundle' ? 'selected' : ''}>public CA (Let's Encrypt and others)</option>
+          <option value="ca" ${m.tls === 'ca' ? 'selected' : ''}>own CA or self-signed certificate</option></select></label>
+        <label class="field" id="mq-ca-box"><span>CA certificate (PEM)</span><textarea id="mq-ca" rows="5" placeholder="-----BEGIN CERTIFICATE-----">${esc(m.ca)}</textarea></label>
+        <label><input type="checkbox" id="mq-nocn" ${m.skip_cn_check ? 'checked' : ''}> Do not check the server name${tip('Do not check the server name')}</label>
+      </div>
+      <details style="margin-top:10px"><summary>Advanced</summary>
+        <label class="field"><span>Client ID${tip('Client ID')}</span><input type="text" id="mq-cid" value="${esc(m.client_id)}" placeholder="${esc(status.hostname)}"></label>
+        <label class="field"><span>Keepalive (s)${tip('Keepalive')}</span><input type="number" id="mq-ka" min="10" max="240" value="${m.keepalive}"></label>
+        <label class="field"><span>Base topic${tip('Base topic')}</span><input type="text" id="mq-base" value="${esc(m.base)}" placeholder="p4gw/${esc(status.hostname)}"></label>
+        <label class="field"><span>State interval (s)${tip('State interval')}</span><input type="number" id="mq-int" min="10" max="3600" value="${m.interval}"></label>
+        <label class="field"><span>Discovery prefix${tip('Discovery prefix')}</span><input type="text" id="mq-prefix" value="${esc(m.prefix)}"></label>
+        <label><input type="checkbox" id="mq-disc" ${m.discovery ? 'checked' : ''}> Home Assistant discovery${tip('Home Assistant discovery')}</label>
+      </details>
+      <div class="row" style="margin-top:10px"><label><input type="checkbox" id="mq-en" ${m.enabled ? 'checked' : ''}> Enabled</label><button class="btn primary" id="mq-save">${ic('check')}Save</button></div>
     </div><div>${dl([['Connection', m.connected ? pill('ok', 'connected') : m.enabled ? pill('bad', 'disconnected') : pill('', 'disabled')],
       ['Last error', esc(m.last_error)], ['Base topic', `<code>${esc(m.base_topic)}</code>`], ['State publishes', m.publishes]])}</div></div>`;
+    mqttTlsFields();
   } catch (e) {
     box.textContent = e.message;
   }
@@ -2755,7 +2788,9 @@ document.addEventListener('click', async e => {
     } else if (t.dataset.snap) {
       download('/api/c6/zigbee-snapshot?bundle=' + encodeURIComponent(t.dataset.snap), t.dataset.snap + '_nvram.bin');
     } else if (t.id === 'mq-save') {
-      const body = { uri: $('#mq-uri').value.trim(), user: $('#mq-user').value, prefix: $('#mq-prefix').value.trim(), enabled: $('#mq-en').checked };
+      const body = { uri: $('#mq-uri').value.trim(), user: $('#mq-user').value, prefix: $('#mq-prefix').value.trim(), enabled: $('#mq-en').checked,
+        tls: $('#mq-tls').value, ca: $('#mq-ca').value.trim(), skip_cn_check: $('#mq-nocn').checked, client_id: $('#mq-cid').value.trim(),
+        keepalive: +$('#mq-ka').value, base: $('#mq-base').value.trim(), interval: +$('#mq-int').value, discovery: $('#mq-disc').checked };
       if ($('#mq-pass').value) body.password = $('#mq-pass').value;
       await api('/api/mqtt', { json: body });
       toast('MQTT saved');

@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI23).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI24).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -588,6 +588,24 @@ await test('UI23', 'Learned sounds: the page loads, a foreign file is refused, a
   await page.click('#ln-up-test');
   await page.waitForFunction(() => /windows|oken/.test(document.querySelector('#ln-state').textContent), null, { timeout: 20000 });
   check(true, `test result: ${(await page.textContent('#ln-state')).trim()}`);
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certificate only for an own CA, advanced options shown', async () => {
+  await page.goto(base + '#ha/mqtt');
+  await page.waitForSelector('#mq-uri');
+  const shown = sel => page.evaluate(s => !document.querySelector(s).closest('.hidden'), sel);
+  const uri = await page.inputValue('#mq-uri');
+  await page.fill('#mq-uri', 'mqtt://10.0.0.1:1883');
+  check(!(await shown('#mq-tls')), 'mqtt://: no TLS options');
+  await page.fill('#mq-uri', 'mqtts://10.0.0.1:8883');
+  check(await shown('#mq-tls') && !(await shown('#mq-ca')), 'mqtts://: certificate choice, public CA without a PEM field');
+  await page.selectOption('#mq-tls', 'ca');
+  check(await shown('#mq-ca'), 'own CA: PEM field');
+  await page.fill('#mq-uri', 'wss://10.0.0.1:8884');
+  check(await shown('#mq-tls'), 'wss://: TLS options');
+  check(['#mq-cid', '#mq-ka', '#mq-base', '#mq-int', '#mq-disc'].every(async s => await page.$(s)), 'advanced options present');
+  await page.fill('#mq-uri', uri);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

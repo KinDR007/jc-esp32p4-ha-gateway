@@ -46,6 +46,11 @@
   tone" (energy at the dominant frequency), background recordings calibrate a suggested threshold,
   a test recording shows the scores. Sound events take a `profile` instead of classes and reach
   Home Assistant like the others (`/api/sound/learn*`). Tests TC28, UI23.
+- MQTT connection options (Home Assistant › MQTT): `mqtts://` now works (it had no certificate
+  verification set up): public CA bundle or an own CA / self-signed certificate, optional server name
+  check; MQTT over WebSocket (`ws://`, `wss://`); client ID, keepalive, base topic, state interval and
+  Home Assistant discovery on/off (off removes the entities). Discovery is sent again when Home
+  Assistant comes online (`<prefix>/status`). TLS errors name the cause. Tests TC29, UI24.
 
 ## v1.4 (2026-10-29)
 

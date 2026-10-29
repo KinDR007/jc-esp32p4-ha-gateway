@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "esp_app_desc.h"
+#include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -24,15 +25,34 @@ static const char *TAG = "gw_mqtt";
 #define KEY_USER "mqtt_user"
 #define KEY_PASS "mqtt_pass"
 #define KEY_PREFIX "mqtt_prefix"
-#define PUBLISH_INTERVAL_MS 30000
+#define KEY_TLS "mqtt_tls"       /* str, "ca": own CA certificate, else the public CA bundle */
+#define KEY_CA "mqtt_ca"         /* str, PEM of the own CA (or the broker's self-signed certificate) */
+#define KEY_NO_CN "mqtt_no_cn"   /* u8, do not check the server name in its certificate */
+#define KEY_CLIENT_ID "mqtt_cid" /* str, empty = hostname */
+#define KEY_KEEPALIVE "mqtt_ka"  /* u8 seconds, 0 = default */
+#define KEY_BASE "mqtt_base"     /* str, empty = p4gw/<hostname> */
+#define KEY_DISCOVERY "mqtt_disc" /* u8, 0 = no Home Assistant discovery (entities removed) */
+#define KEY_INTERVAL "mqtt_int"  /* str seconds, state publish interval, empty = default */
+#define DEFAULT_KEEPALIVE 30
+#define DEFAULT_INTERVAL_S 30
+#define CA_MAX 3999 /* NVS strings: 4000 bytes with the terminator */
 
 static esp_mqtt_client_handle_t s_client;
 static SemaphoreHandle_t s_lock;
 static bool s_connected;
 static char s_base[64];   /* p4gw/<hostname> */
 static char s_prefix[32]; /* discovery prefix */
-static char s_last_error[64];
+static char s_last_error[96];
 static uint32_t s_publishes;
+static char *s_ca;          /* esp-mqtt keeps the pointer, not a copy */
+static bool s_discovery = true;
+static uint32_t s_interval_s = DEFAULT_INTERVAL_S;
+static TaskHandle_t s_publish_task;
+
+static bool has_prefix(const char *s, const char *p)
+{
+    return strncmp(s, p, strlen(p)) == 0;
+}
 
 static void topic(char *out, size_t len, const char *suffix)
 {
@@ -165,6 +185,10 @@ void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
         return;
     }
     snprintf(buf, sizeof(buf), "%s/%s/%s/%s/config", s_prefix, component, st->hostname, object_id);
+    if (!s_discovery) {
+        cJSON_Delete(cfg);
+        cfg = NULL; /* discovery switched off: remove what an earlier run created */
+    }
     if (!cfg) {
         /* Empty retained config removes the entity from Home Assistant. */
         esp_mqtt_client_publish(s_client, buf, "", 0, 1, 1);
@@ -189,17 +213,10 @@ void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
 void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
                            void (*extra)(cJSON *))
 {
-    gw_state_t *st = gw_state();
     char buf[128];
     cJSON *cfg = cJSON_CreateObject();
 
     cJSON_AddStringToObject(cfg, "name", name);
-    snprintf(buf, sizeof(buf), "%s_%s", st->hostname, object_id);
-    cJSON_AddStringToObject(cfg, "unique_id", buf);
-    snprintf(buf, sizeof(buf), "%s_%s", st->hostname, object_id);
-    cJSON_AddStringToObject(cfg, "object_id", buf);
-    topic(buf, sizeof(buf), "availability");
-    cJSON_AddStringToObject(cfg, "availability_topic", buf);
     if (value_template) {
         topic(buf, sizeof(buf), "state");
         cJSON_AddStringToObject(cfg, "state_topic", buf);
@@ -208,13 +225,7 @@ void gw_mqtt_entity(const char *component, const char *object_id, const char *na
     if (extra) {
         extra(cfg);
     }
-    cJSON_AddItemToObject(cfg, "device", device_json());
-
-    char *payload = cJSON_PrintUnformatted(cfg);
-    cJSON_Delete(cfg);
-    snprintf(buf, sizeof(buf), "%s/%s/%s/%s/config", s_prefix, component, st->hostname, object_id);
-    esp_mqtt_client_publish(s_client, buf, payload, 0, 1, 1);
-    cJSON_free(payload);
+    gw_mqtt_discovery(component, object_id, cfg); /* adds ids, availability and device */
 }
 
 static void diag(cJSON *cfg)
@@ -344,10 +355,22 @@ static void publish_state(void)
 
 static void handle_command(const char *t, int tlen, const char *data, int dlen)
 {
-    char name[64], payload[32];
+    char name[96], payload[32];
     snprintf(name, sizeof(name), "%.*s", tlen, t);
     snprintf(payload, sizeof(payload), "%.*s", dlen, data);
     char expect[96];
+
+    /* Home Assistant came (back) online: its retained discovery may be gone (broker without persistence). */
+    snprintf(expect, sizeof(expect), "%s/status", s_prefix);
+    if (strcmp(name, expect) == 0) {
+        if (strcmp(payload, "online") == 0) {
+            ESP_LOGI(TAG, "Home Assistant online, discovery again");
+            publish_discovery();
+            publish_state();
+            gw_update_mqtt_state();
+        }
+        return;
+    }
 
     topic(expect, sizeof(expect), "role/set");
     if (strcmp(name, expect) == 0) {
@@ -394,6 +417,10 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         esp_mqtt_client_subscribe(s_client, buf, 1);
         topic(buf, sizeof(buf), "update/install");
         esp_mqtt_client_subscribe(s_client, buf, 1);
+        if (s_discovery) {
+            snprintf(buf, sizeof(buf), "%s/status", s_prefix);
+            esp_mqtt_client_subscribe(s_client, buf, 1);
+        }
         publish_discovery();
         publish_state();
         gw_update_mqtt_state();
@@ -415,6 +442,15 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
             snprintf(s_last_error, sizeof(s_last_error), "connection refused (code %d)",
                      event->error_handle->connect_return_code);
+        } else if (event->error_handle->esp_tls_last_esp_err || event->error_handle->esp_tls_stack_err) {
+            /* mbedTLS codes are negative: -0x2700 certificate verification failed (CA or name),
+             * -0x3000 not trusted by the certificate bundle */
+            int code = event->error_handle->esp_tls_stack_err;
+            code = code < 0 ? -code : code;
+            const char *why = code == 0x2700 ? "server certificate not accepted (CA or server name)"
+                              : code == 0x3000 ? "server certificate not signed by a public CA"
+                                               : esp_err_to_name(event->error_handle->esp_tls_last_esp_err);
+            snprintf(s_last_error, sizeof(s_last_error), "TLS: %s (mbedTLS -0x%04x)", why, code);
         } else {
             snprintf(s_last_error, sizeof(s_last_error), "transport error (errno %d)",
                      event->error_handle->esp_transport_sock_errno);
@@ -437,9 +473,10 @@ static void stop_client(void)
 
 static void start_client(void)
 {
-    char uri[128], user[64], pass[64], lwt[96];
+    char uri[128], user[64], pass[64], lwt[96], client_id[64], tls[8], base[64], interval[8];
     gw_state_t *st = gw_state();
 
+    s_last_error[0] = '\0';
     if (!gw_config_get_u8(KEY_ENABLED, 0) || !gw_config_get_str(KEY_URI, uri, sizeof(uri)) || !uri[0]) {
         return;
     }
@@ -448,19 +485,49 @@ static void start_client(void)
     if (!gw_config_get_str(KEY_PREFIX, s_prefix, sizeof(s_prefix)) || !s_prefix[0]) {
         strlcpy(s_prefix, "homeassistant", sizeof(s_prefix));
     }
-    snprintf(s_base, sizeof(s_base), "p4gw/%s", st->hostname);
+    if (gw_config_get_str(KEY_BASE, base, sizeof(base)) && base[0]) {
+        strlcpy(s_base, base, sizeof(s_base));
+    } else {
+        snprintf(s_base, sizeof(s_base), "p4gw/%s", st->hostname);
+    }
+    if (!gw_config_get_str(KEY_CLIENT_ID, client_id, sizeof(client_id)) || !client_id[0]) {
+        strlcpy(client_id, st->hostname, sizeof(client_id));
+    }
+    s_discovery = gw_config_get_u8(KEY_DISCOVERY, 1);
+    s_interval_s = gw_config_get_str(KEY_INTERVAL, interval, sizeof(interval)) && atoi(interval) >= 10
+                       ? atoi(interval) : DEFAULT_INTERVAL_S;
+    uint8_t keepalive = gw_config_get_u8(KEY_KEEPALIVE, 0);
     topic(lwt, sizeof(lwt), "availability");
 
     esp_mqtt_client_config_t cfg = {
         .broker.address.uri = uri,
         .credentials.username = user[0] ? user : NULL,
-        .credentials.client_id = st->hostname,
+        .credentials.client_id = client_id,
         .credentials.authentication.password = pass[0] ? pass : NULL,
         .session.last_will = {.topic = lwt, .msg = "offline", .qos = 1, .retain = 1},
-        .session.keepalive = 30,
+        .session.keepalive = keepalive ? keepalive : DEFAULT_KEEPALIVE,
         .network.reconnect_timeout_ms = 10000,
         .task.stack_size = 6144,
     };
+    /* TLS (mqtts://, wss://): the server certificate is always verified, by the public CA bundle or
+     * by an own CA; a self-signed broker certificate works as its own CA. */
+    free(s_ca);
+    s_ca = NULL;
+    /* only for a TLS scheme: esp-mqtt refuses TLS settings with mqtt:// or ws:// */
+    bool secure = has_prefix(uri, "mqtts://") || has_prefix(uri, "wss://");
+    if (secure && gw_config_get_str(KEY_TLS, tls, sizeof(tls)) && strcmp(tls, "ca") == 0) {
+        s_ca = heap_caps_malloc(CA_MAX + 1, MALLOC_CAP_SPIRAM);
+        if (s_ca && !gw_config_get_str(KEY_CA, s_ca, CA_MAX + 1)) {
+            free(s_ca);
+            s_ca = NULL;
+        }
+    }
+    if (s_ca) {
+        cfg.broker.verification.certificate = s_ca;
+    } else if (secure) {
+        cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+    }
+    cfg.broker.verification.skip_cert_common_name_check = secure && gw_config_get_u8(KEY_NO_CN, 0);
     s_client = esp_mqtt_client_init(&cfg);
     if (!s_client) {
         strlcpy(s_last_error, "invalid configuration", sizeof(s_last_error));
@@ -468,13 +535,14 @@ static void start_client(void)
     }
     esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, on_event, NULL);
     esp_mqtt_client_start(s_client);
-    ESP_LOGI(TAG, "broker %s", uri);
+    ESP_LOGI(TAG, "broker %s as %s%s", uri, client_id, s_ca ? ", own CA" : "");
 }
 
 static void publish_task(void *arg)
 {
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(PUBLISH_INTERVAL_MS));
+        /* woken by a settings change, so a new interval applies at once */
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(s_interval_s * 1000));
         xSemaphoreTake(s_lock, portMAX_DELAY);
         if (s_client && s_connected) {
             publish_state();
@@ -494,6 +562,19 @@ static esp_err_t mqtt_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "user", buf);
     cJSON_AddBoolToObject(json, "password_set", gw_config_get_str(KEY_PASS, buf, sizeof(buf)) && buf[0]);
     cJSON_AddStringToObject(json, "prefix", s_prefix[0] ? s_prefix : "homeassistant");
+    gw_config_get_str(KEY_TLS, buf, sizeof(buf));
+    cJSON_AddStringToObject(json, "tls", strcmp(buf, "ca") == 0 ? "ca" : "bundle");
+    char *ca = heap_caps_malloc(CA_MAX + 1, MALLOC_CAP_SPIRAM);
+    cJSON_AddStringToObject(json, "ca", ca && gw_config_get_str(KEY_CA, ca, CA_MAX + 1) ? ca : "");
+    free(ca);
+    cJSON_AddBoolToObject(json, "skip_cn_check", gw_config_get_u8(KEY_NO_CN, 0));
+    gw_config_get_str(KEY_CLIENT_ID, buf, sizeof(buf));
+    cJSON_AddStringToObject(json, "client_id", buf);
+    cJSON_AddNumberToObject(json, "keepalive", gw_config_get_u8(KEY_KEEPALIVE, 0) ?: DEFAULT_KEEPALIVE);
+    gw_config_get_str(KEY_BASE, buf, sizeof(buf));
+    cJSON_AddStringToObject(json, "base", buf);
+    cJSON_AddBoolToObject(json, "discovery", gw_config_get_u8(KEY_DISCOVERY, 1));
+    cJSON_AddNumberToObject(json, "interval", s_interval_s);
     cJSON_AddStringToObject(json, "base_topic", s_base);
     cJSON_AddBoolToObject(json, "connected", s_connected);
     cJSON_AddStringToObject(json, "last_error", s_last_error);
@@ -501,9 +582,24 @@ static esp_err_t mqtt_get(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
+static bool valid_topic(const char *t)
+{
+    size_t n = strlen(t);
+    return n < 64 && !strpbrk(t, "#+ ") && (n == 0 || (t[0] != '/' && t[n - 1] != '/'));
+}
+
+static bool ca_stored(void)
+{
+    char *ca = heap_caps_malloc(CA_MAX + 1, MALLOC_CAP_SPIRAM);
+    bool stored = ca && gw_config_get_str(KEY_CA, ca, CA_MAX + 1) && ca[0];
+    free(ca);
+    return stored;
+}
+
+
 static esp_err_t mqtt_post(httpd_req_t *req)
 {
-    cJSON *body = gw_http_read_json(req);
+    cJSON *body = gw_http_read_json_max(req, 8192); /* the CA certificate */
     if (!body) {
         return ESP_OK;
     }
@@ -511,12 +607,41 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     const char *user = GW_JSON_STR(body, "user");
     const char *pass = GW_JSON_STR(body, "password");
     const char *prefix = GW_JSON_STR(body, "prefix");
+    const char *tls = GW_JSON_STR(body, "tls");
+    const char *ca = GW_JSON_STR(body, "ca");
+    const char *client_id = GW_JSON_STR(body, "client_id");
+    const char *base = GW_JSON_STR(body, "base");
     cJSON *enabled = cJSON_GetObjectItem(body, "enabled");
+    cJSON *no_cn = cJSON_GetObjectItem(body, "skip_cn_check");
+    cJSON *discovery = cJSON_GetObjectItem(body, "discovery");
+    cJSON *keepalive = cJSON_GetObjectItem(body, "keepalive");
+    cJSON *interval = cJSON_GetObjectItem(body, "interval");
+    const char *error = NULL;
+    bool uses_ca = tls ? strcmp(tls, "ca") == 0 : false;
 
-    if ((uri && (strlen(uri) > 120 || (strncmp(uri, "mqtt://", 7) && strncmp(uri, "mqtts://", 8)))) ||
-        (user && strlen(user) > 63) || (pass && strlen(pass) > 63) || (prefix && strlen(prefix) > 31)) {
+    if (uri && (strlen(uri) > 120 || !(has_prefix(uri, "mqtt://") || has_prefix(uri, "mqtts://") ||
+                                       has_prefix(uri, "ws://") || has_prefix(uri, "wss://")))) {
+        error = "uri: mqtt://, mqtts://, ws:// or wss://host:port, max 120 characters";
+    } else if ((user && strlen(user) > 63) || (pass && strlen(pass) > 63) || (client_id && strlen(client_id) > 63)) {
+        error = "user, password and client ID: max 63 characters";
+    } else if (prefix && (!valid_topic(prefix) || !prefix[0] || strlen(prefix) > 31)) {
+        error = "prefix: a topic without wildcards and outer slashes, max 31 characters";
+    } else if (base && !valid_topic(base)) {
+        error = "base topic: without #, +, spaces and outer slashes, max 63 characters";
+    } else if (tls && strcmp(tls, "ca") != 0 && strcmp(tls, "bundle") != 0) {
+        error = "tls: bundle (public CA) or ca (own certificate)";
+    } else if (ca && ca[0] && (strlen(ca) > CA_MAX || !strstr(ca, "-----BEGIN CERTIFICATE-----"))) {
+        error = "ca: PEM certificate (-----BEGIN CERTIFICATE-----), max 3999 characters";
+    } else if (uses_ca && !(ca && ca[0]) && !ca_stored()) {
+        error = "own CA selected: paste its certificate";
+    } else if (keepalive && (!cJSON_IsNumber(keepalive) || keepalive->valueint < 10 || keepalive->valueint > 240)) {
+        error = "keepalive: 10-240 s";
+    } else if (interval && (!cJSON_IsNumber(interval) || interval->valueint < 10 || interval->valueint > 3600)) {
+        error = "interval: 10-3600 s";
+    }
+    if (error) {
         cJSON_Delete(body);
-        return gw_http_send_error(req, 400, "uri must start with mqtt:// or mqtts://, fields max 63 chars");
+        return gw_http_send_error(req, 400, error);
     }
     if (uri) {
         gw_config_set_str(KEY_URI, uri);
@@ -530,15 +655,50 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     if (prefix) {
         gw_config_set_str(KEY_PREFIX, prefix);
     }
+    if (tls) {
+        gw_config_set_str(KEY_TLS, tls);
+    }
+    if (ca) {
+        gw_config_set_str(KEY_CA, ca);
+    }
+    if (client_id) {
+        gw_config_set_str(KEY_CLIENT_ID, client_id);
+    }
+    if (base) {
+        gw_config_set_str(KEY_BASE, base);
+    }
+    if (keepalive) {
+        gw_config_set_u8(KEY_KEEPALIVE, keepalive->valueint);
+    }
+    if (interval) {
+        char text[8];
+        snprintf(text, sizeof(text), "%d", interval->valueint);
+        gw_config_set_str(KEY_INTERVAL, text);
+    }
+    if (cJSON_IsBool(no_cn)) {
+        gw_config_set_u8(KEY_NO_CN, cJSON_IsTrue(no_cn));
+    }
+    if (cJSON_IsBool(discovery)) {
+        gw_config_set_u8(KEY_DISCOVERY, cJSON_IsTrue(discovery));
+    }
     if (cJSON_IsBool(enabled)) {
         gw_config_set_u8(KEY_ENABLED, cJSON_IsTrue(enabled));
     }
     cJSON_Delete(body);
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
+    /* Discovery switched off: remove the entities while still connected with the old settings. */
+    if (cJSON_IsBool(discovery) && !gw_config_get_u8(KEY_DISCOVERY, 1) && s_discovery && gw_mqtt_connected()) {
+        s_discovery = false;
+        publish_discovery();
+        vTaskDelay(pdMS_TO_TICKS(500)); /* let the removals go out before the client stops */
+    }
     stop_client();
     start_client();
     xSemaphoreGive(s_lock);
+    if (s_publish_task) {
+        xTaskNotifyGive(s_publish_task);
+    }
     return mqtt_get(req);
 }
 
@@ -549,5 +709,5 @@ esp_err_t gw_mqtt_start(void)
     gw_http_register("/api/mqtt", HTTP_POST, mqtt_post);
     snprintf(s_base, sizeof(s_base), "p4gw/%s", gw_state()->hostname);
     start_client();
-    return xTaskCreate(publish_task, "mqtt_pub", 4096, NULL, 3, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreate(publish_task, "mqtt_pub", 4096, NULL, 3, &s_publish_task) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

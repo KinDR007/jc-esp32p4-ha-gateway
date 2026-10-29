@@ -596,6 +596,81 @@ def tc28_learned_sounds():
     check(learn()['slots_free'] == free_before, 'test samples removed')
 
 
+def tc29_mqtt_options():
+    """MQTT connection options against a test broker (--mqtt-test host:dir): WebSocket, TLS with own CA and
+    name check, client ID, base topic, interval, discovery off and on, Home Assistant birth; then the original settings."""
+    if not ARGS.mqtt_test:
+        raise Fail('skipped: needs --mqtt-test <host>:<dir with ca.crt, other.crt> (mosquitto on 18883, 8883, 1884, 8884)')
+    import subprocess
+    host, cert_dir = ARGS.mqtt_test.split(':', 1)
+    ca, other = (open(os.path.join(cert_dir, f)).read() for f in ('ca.crt', 'other.crt'))
+    code, backup = http('GET', '/api/settings/export?secrets=1')
+    check(code == 200, 'original settings exported (restored by import at the end)')
+    defaults = {'tls': 'bundle', 'ca': '', 'skip_cn_check': False, 'client_id': '', 'base': '', 'keepalive': 30,
+                'interval': 30, 'discovery': True}
+
+    def mqtt(ok=True, **cfg):
+        code, r = http('POST', '/api/mqtt', cfg)
+        if code != 200:
+            raise Fail(f'{cfg}: {code} {r}')
+        # a failure has to show its error; a success may follow an error of the previous client
+        done = (lambda m: m if m['connected'] else None) if ok else (lambda m: m if m['last_error'] else None)
+        return wait_until('connected' if ok else 'connection error', lambda: done(http('GET', '/api/mqtt')[1]), 25, 1)
+
+    def sub(topic, seconds, count=1):
+        out = subprocess.run(['mosquitto_sub', '-h', host, '-p', '18883', '-t', topic, '-v', '-W', str(seconds), '-C', str(count)],
+                             capture_output=True, text=True)
+        return out.stdout.strip().splitlines()
+
+    try:
+        for bad, why in ((dict(uri='http://x'), 'http URI'), (dict(prefix='home/#'), 'wildcard prefix'), (dict(base='p4gw/x/'), 'base with outer slash'),
+                         (dict(keepalive=5), 'keepalive 5 s'), (dict(interval=5), 'interval 5 s'), (dict(tls='ca', ca='x'), 'CA not PEM'),
+                         (dict(tls='insecure'), 'unknown TLS mode')):
+            check(http('POST', '/api/mqtt', bad)[0] == 400, f'refused: {why}')
+        m = mqtt(uri=f'ws://{host}:1884', user='', password='', **defaults)
+        check(m['connected'], 'MQTT over WebSocket connects')
+        m = mqtt(False, uri=f'mqtts://{host}:8883')
+        check(not m['connected'] and 'public CA' in m['last_error'], f'self-signed broker refused with the public CA bundle: {m["last_error"]}')
+        m = mqtt(False, tls='ca', ca=other)
+        check(not m['connected'] and 'not accepted' in m['last_error'], f'wrong CA refused: {m["last_error"]}')
+        m = mqtt(False, tls='ca', ca=ca)
+        check(not m['connected'] and 'not accepted' in m['last_error'], f'right CA, but the IP is not the certificate name: {m["last_error"]}')
+        check(http('POST', '/api/mqtt', {'tls': 'ca', 'ca': ''})[0] == 200 and http('GET', '/api/mqtt')[1]['ca'] == '',
+              'certificate can be cleared')
+        check(http('POST', '/api/mqtt', {'tls': 'ca'})[0] == 400, 'own CA without a certificate refused')
+        m = mqtt(tls='ca', ca=ca, skip_cn_check=True)
+        check(m['connected'], 'own CA with the name check off connects over TLS')
+        m = mqtt(uri=f'wss://{host}:8884')
+        check(m['connected'], 'MQTT over secure WebSocket connects')
+
+        m = mqtt(uri=f'mqtt://{host}:18883', client_id='tc29-client', base='p4gw/tc29', keepalive=20, interval=10)
+        check(m['connected'] and m['base_topic'] == 'p4gw/tc29', f'base topic {m["base_topic"]}')
+        t0 = time.time()
+        state = sub('p4gw/tc29/state', 30, 3)  # the retained one at once, then every 10 s
+        check(len(state) == 3 and time.time() - t0 < 26, f'state on the new base topic every ~10 s ({time.time() - t0:.0f} s for 3)')
+        log = subprocess.run(['docker', 'logs', '--since', '2m', 'p4gw-mqtt-test'], capture_output=True, text=True).stderr + \
+              subprocess.run(['docker', 'logs', '--since', '2m', 'p4gw-mqtt-test'], capture_output=True, text=True).stdout
+        check('tc29-client' in log and 'k20' in log, 'broker saw client ID tc29-client with keepalive 20 s')
+        disc = sub(f'homeassistant/sensor/{status()["hostname"]}/uptime/config', 5)
+        check(disc and 'p4gw/tc29/state' in disc[0], 'discovery points to the new base topic')
+        mqtt(discovery=False)
+        time.sleep(1)
+        disc = sub(f'homeassistant/sensor/{status()["hostname"]}/uptime/config', 3)
+        check(not disc or disc[0].endswith('config '), f'discovery off: entity removed (empty retained config)')
+        mqtt(discovery=True)
+        subprocess.run(['mosquitto_pub', '-h', host, '-p', '18883', '-t', f'homeassistant/sensor/{status()["hostname"]}/uptime/config', '-r', '-n'])
+        subprocess.run(['mosquitto_pub', '-h', host, '-p', '18883', '-t', 'homeassistant/status', '-m', 'online'])
+        disc = sub(f'homeassistant/sensor/{status()["hostname"]}/uptime/config', 10)
+        check(disc and 'p4gw/tc29/state' in disc[0], 'Home Assistant birth (online) sends the discovery again')
+    finally:
+        http('POST', '/api/mqtt', defaults)
+        code, r = http('POST', '/api/settings/import', backup)
+        check(code == 200, 'original settings imported, the gateway restarts')
+        wait_restart(status()['role']['desired'])
+    m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
+    check(m['uri'] == backup['keys']['mqtt_uri']['str'] and m['tls'] == 'bundle' and m['base'] == '', f'original broker {m["uri"]} connected')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -917,7 +992,7 @@ TESTS = [
     ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
-    ('TC28', tc28_learned_sounds),
+    ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options),
 ]
 
 
@@ -930,6 +1005,7 @@ def main():
     p.add_argument('--list', action='store_true')
     p.add_argument('--report', help='write results as JSON')
     p.add_argument('--play', action='store_true', help='TC15: play test sounds on this computer')
+    p.add_argument('--mqtt-test', metavar='HOST:DIR', help='TC29: test mosquitto (anonymous, TLS with DIR/ca.crt) on HOST')
     ARGS = p.parse_args()
     if ARGS.list:
         for tid, fn in TESTS:

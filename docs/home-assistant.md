@@ -71,6 +71,26 @@ select, maintenance reason, uptime, chip temperature, heap, Ethernet, IP, C6 fir
 Zigbee host connection, restart button, sound level (dBFS, when the microphone is on).
 Base topic `p4gw/<hostname>/`.
 
+Connection options (Home Assistant › MQTT):
+
+| Option | Values | Default |
+|---|---|---|
+| Broker URI | `mqtt://`, `mqtts://` (TLS), `ws://`, `wss://` (MQTT over WebSocket, Mosquitto add-on port 1884) | — |
+| Server certificate (TLS) | public CA bundle, or own CA / self-signed broker certificate (PEM, max 3999 characters) | public CA |
+| Do not check the server name | the certificate is still verified against the CA; for a broker reached by IP (also disables SNI) | off |
+| Client ID | unique per broker | hostname |
+| Keepalive | 10–240 s | 30 s |
+| Base topic | no `#`, `+`, spaces or outer slashes | `p4gw/<hostname>` |
+| State interval | 10–3600 s | 30 s |
+| Discovery prefix | as configured in the HA MQTT integration | `homeassistant` |
+| Home Assistant discovery | off: plain topics only, the entities are removed from HA | on |
+
+TLS always verifies the broker; there is no "insecure" mode (it would weaken the TLS of online
+updates as well). Connection errors name the cause, e.g. `TLS: server certificate not accepted (CA or
+server name)`. When Home Assistant publishes `online` on `<prefix>/status` (its start), the gateway
+sends its discovery again, so entities come back even with a broker that does not keep retained
+messages.
+
 
 Firmware update entity (`update.<host>_firmware`): installed and offered gateway version from the
 online update manifest (System › Firmware › Online update), *Install* downloads it into the other
