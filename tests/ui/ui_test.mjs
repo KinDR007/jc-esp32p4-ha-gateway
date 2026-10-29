@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI15).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI17).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -56,13 +56,23 @@ const toastText = () => page.textContent('#toast');
 const ROUTES = ['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/info', 'zigbee/diag',
   'zigbee/backups', 'zigbee/network', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
   'system/info', 'system/firmware', 'system/diag', 'system/netscan', 'system/settings', 'system/maint'];
+// false when the menu has the page closed (it needs a role that is not active)
 const tab = async route => {
   const [sec] = route.split('/');
   // the section link opens its first sub page and lists the others
+  if (await page.$(`#side a[data-route="${sec}"][aria-disabled]`)) return false;
   await page.click(`#side a[data-route="${sec}"]`);
-  if (route.includes('/')) await page.click(`#side a[data-route="${route}"]`);
+  if (route.includes('/')) {
+    await page.waitForSelector(`#side .subs a[data-route="${route}"]`);
+    if (await page.$(`#side a[data-route="${route}"][aria-disabled]`)) return false;
+    await page.click(`#side a[data-route="${route}"]`);
+  }
   await page.waitForTimeout(600);
+  return true;
 };
+// pages that open only in their role
+const needsRole = route => /^thread\//.test(route) ? !status.role.active.startsWith('thread')
+  : /^zigbee\/(info|diag)$/.test(route) ? !status.role.active.startsWith('zigbee') : false;
 
 await page.goto(base);
 await page.waitForSelector('.card', { timeout: 20000 });
@@ -72,7 +82,11 @@ const hostId = status.hostname.replace(/-/g, '_');
 await test('UI01', 'every tab renders without script errors or error toasts', async () => {
   for (const id of ROUTES) {
     await page.evaluate(() => { document.querySelector('#toast').textContent = ''; });
-    await tab(id);
+    if (!await tab(id)) {
+      check(needsRole(id), `${id}: closed in the menu, its role is not active`);
+      continue;
+    }
+    check(!needsRole(id), `${id}: open in the menu`);
     await page.waitForTimeout(1200);
     const t = await toastText();
     check(!t.startsWith('Error') && await page.evaluate(r => location.hash === '#' + r, id), `${id}: opened, no error toast${t ? ` (${t})` : ''}`);
@@ -293,7 +307,7 @@ await test('UI11', 'C6 flashing: progress in the header on every page, gone when
   await page.route(`${base}api/status`, async route => {
     const res = await route.fetch();
     const j = await res.json();
-    if (busy) j.c6.flash = { busy: true, percent: 46, stage: 'writing 0x10000 (232 kB)', last_error: '' };
+    if (busy) j.c6.flash = { busy: true, percent: 46, stage: 'writing 0x10000 (232 kB)', last_error: '', elapsed_s: 10 };
     await route.fulfill({ response: res, json: j });
   });
   await tab('sound/events');
@@ -303,9 +317,16 @@ await test('UI11', 'C6 flashing: progress in the header on every page, gone when
   const strip = await page.$eval('#flash-strip', e => [getComputedStyle(e).display, e.style.width]);
   check(strip[0] === 'block' && strip[1] === '46%', `strip under the header at ${strip[1]}`);
   check(!(await page.textContent('#main')).includes('Flash'), 'no banner on the page');
+  check(await page.$eval('#busy-dlg', d => d.open && d.matches(':modal')), 'modal dialog blocks the page');
+  check((await page.textContent('#busy-pct')) === '46 %' && /writing 232 kB at 0x10000/.test(await page.textContent('#busy-stage')), 'dialog shows the stage and 46 %');
+  check(/about 1[0-3] s left/.test(await page.textContent('#busy-eta')), `estimate from the elapsed time: ${await page.textContent('#busy-eta')}`);
+  await page.keyboard.press('Escape');
+  check(await page.$eval('#busy-dlg', d => d.open), 'Escape does not close it');
   busy = false;
   await page.waitForFunction(() => document.querySelector('#hdr-flash').classList.contains('hidden'), null, { timeout: 15000 });
   check(await page.$eval('#flash-strip', e => getComputedStyle(e).display) === 'none', 'pill and strip gone after flashing');
+  await page.waitForFunction(() => !document.querySelector('#busy-dlg').open, null, { timeout: 5000 });
+  check(true, 'dialog closed after flashing');
   await page.unroute(`${base}api/status`);
 });
 
@@ -420,6 +441,68 @@ await test('UI15', 'info tips: one text per key, tables with the same column nam
     const info = await page.$$eval('#z2m-info dt .tip', t => t.map(x => x.dataset.tip));
     check(info.includes('Z2M base topic') && info.includes('Z2M devices'), `Zigbee2MQTT instance: ${info.join(', ')}`);
   }
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI16', 'menu: pages of an inactive role are closed, a link to one opens a page that works', async () => {
+  const off = ROUTES.filter(needsRole);
+  if (!off.length) {
+    console.log('  skipped: no role page closed in this role');
+    return;
+  }
+  for (const r of off) {
+    await page.evaluate(r => { location.hash = '#' + r; }, r);
+    await page.waitForTimeout(800);
+    const now = await page.evaluate(() => location.hash.slice(1));
+    check(now !== r && !needsRole(now), `#${r} opens #${now}`);
+  }
+  for (const sec of new Set(off.map(r => r.split('/')[0]))) {
+    const closed = await page.$eval(`#side a[data-route="${sec}"]`, a => a.hasAttribute('aria-disabled'));
+    const allOff = ROUTES.filter(r => r.startsWith(sec + '/')).every(needsRole);
+    check(closed === allOff, `${sec}: section ${closed ? 'closed' : 'open'}, ${allOff ? 'none' : 'some'} of its pages work${allOff ? '' : 's'}`);
+  }
+});
+
+await test('UI17', 'network map: wheel and buttons zoom, home resets, L arranges by signal and back', async () => {
+  let sel = null;
+  if (status.role.active.startsWith('thread')) {
+    await tab('thread/topology');
+    sel = '#topo-map svg.topo';
+  } else if ((await page.evaluate(() => fetch('/api/zigbee/net').then(r => r.json()))).map) {
+    await tab('zigbee/network');
+    sel = '#zmap svg.topo';
+  }
+  if (!sel) {
+    console.log('  skipped: no map available');
+    return;
+  }
+  await page.waitForSelector(sel + ' circle', { timeout: 60000 });
+  const svg = await page.$(sel);
+  await svg.scrollIntoViewIfNeeded();
+  const vb = () => page.getAttribute(sel, 'viewBox');
+  const base = await vb(), bb = await svg.boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+  await page.mouse.wheel(0, -200);
+  await page.waitForTimeout(300);
+  const zoomed = await vb();
+  check(+zoomed.split(' ')[2] < +base.split(' ')[2], `wheel zooms in (${base} -> ${zoomed})`);
+  await page.click('.map-tools [data-mz="home"]');
+  check(await vb() === base, 'home restores the whole map');
+  await page.click('.map-tools [data-mz="in"]');
+  check(+(await vb()).split(' ')[2] < +base.split(' ')[2], '+ zooms in');
+  await page.click('.map-tools [data-mz="out"]');
+  await page.click('.map-tools [data-mz="out"]');
+  check(await vb() === base, '− zooms out no further than the whole map');
+  const where = () => page.$$eval(`${sel} [data-node] circle, ${sel} [data-znode] circle`, c => c.slice(0, 6).map(e => e.getAttribute('cx')).join());
+  const ring = await where();
+  await page.mouse.move(2, 2);
+  await page.keyboard.press('l');
+  await page.waitForTimeout(400);
+  check(await where() !== ring && await page.evaluate(() => localStorage.getItem('mapLayout')) === 'signal', 'L arranges by signal and remembers it');
+  check(await legendClear(sel.split(' ')[0]), 'legend still clear of the drawing');
+  await page.keyboard.press('l');
+  await page.waitForTimeout(400);
+  check(await where() === ring, 'L again restores the ring');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

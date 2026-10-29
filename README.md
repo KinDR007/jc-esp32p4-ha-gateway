@@ -95,4 +95,6 @@ The OTBR REST API for Home Assistant is on port 8081 (Thread border router role)
 
 Third-party sources are fetched at build time and not included: esp-thread-br and esp-hosted-mcu
 (Apache-2.0), esp-coordinator (MIT), esp-serial-flasher (Apache-2.0), esp-zigbee-lib /
-esp-zboss-lib (Espressif license, binary). Own code: no license file yet (all rights reserved).
+esp-zboss-lib (Espressif license, binary). Web UI icons: Material Design Icons (Apache-2.0), Thread
+and Matter logos from selfh.st/icons (CC BY 4.0; trademarks of Thread Group and the Connectivity
+Standards Alliance). Own code: no license file yet (all rights reserved).

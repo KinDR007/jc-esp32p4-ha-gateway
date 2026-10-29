@@ -57,6 +57,8 @@ header.flashing #flash-strip { display: block; }
 #side .subs a { padding: 6px 10px; font-size: 13px; }
 #side .subs .mdi { width: 16px; height: 16px; }
 #side .off { opacity: .55; }
+#side a[aria-disabled] { cursor: not-allowed; opacity: .4; }
+#side a[aria-disabled]:hover { background: none; color: var(--muted); }
 main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
 .page-title { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; font-size: 20px; font-weight: 650; }
 .page-title .mdi { width: 24px; height: 24px; color: var(--accent); }
@@ -148,6 +150,10 @@ td.zact .btn { padding: 4px 6px; margin: 1px 0; }
 .zmap .zn.off circle { fill: var(--panel); stroke-dasharray: 3 3; }
 [data-znode] { cursor: pointer; }
 .map-wrap { position: relative; }
+.map-wrap svg.topo { touch-action: none; cursor: grab; }
+.map-wrap svg.topo.panning { cursor: grabbing; }
+.map-tools { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.map-tools .btn { padding: 6px; }
 .map-legend { position: absolute; top: 12px; right: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; pointer-events: none;
   background: var(--panel); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); }
 .map-legend .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
@@ -202,6 +208,12 @@ td.zact .btn { padding: 4px 6px; margin: 1px 0; }
 .meter .progress > span { display: block; height: 100%; background: var(--ok); }
 .meter .progress > span.warn { background: var(--warn); } .meter .progress > span.bad { background: var(--bad); }
 .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+#busy-dlg { max-width: 460px; }
+#busy-dlg .progress { height: 12px; margin: 14px 0 8px; }
+#busy-dlg .progress > div { transition: width .5s linear; }
+#busy-dlg .progress.ind > div { width: 30%; animation: ind 1.4s ease-in-out infinite; }
+@keyframes ind { from { margin-left: -30%; } to { margin-left: 100%; } }
+#busy-pct { font-variant-numeric: tabular-nums; }
 ol.steps { padding-left: 20px; margin: 6px 0; } ol.steps li { margin: 6px 0; }
 .hidden { display: none !important; }
 #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
@@ -284,6 +296,13 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <label class="hidden" id="zb-dlg-check"><input type="checkbox" id="zb-dlg-box"> <span id="zb-dlg-boxlabel"></span></label>
     <div class="row" style="margin-top:12px"><button class="btn primary" value="ok">OK</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
   </form>
+</dialog>
+<dialog id="busy-dlg" aria-live="polite">
+  <h3 style="margin-top:0" id="busy-title" data-notr></h3>
+  <div class="muted" id="busy-stage" data-notr></div>
+  <div class="progress" id="busy-bar"><div></div></div>
+  <div class="row"><b id="busy-pct" data-notr></b><span class="spacer"></span><span class="muted" id="busy-eta" data-notr></span></div>
+  <p class="muted" id="busy-note" data-notr></p>
 </dialog>
 <dialog id="confirm">
   <form method="dialog">
@@ -541,8 +560,8 @@ $('#pref-lang').addEventListener('change', e => { setLang(e.target.value); rende
 $('#pref-theme').addEventListener('change', e => setTheme(e.target.value));
 
 const ROLES = {
-  thread_br: { icon: 'access-point-network', name: 'Thread border router', group: 'Thread', desc: 'OpenThread border router on Ethernet for Matter-over-Thread. Home Assistant OTBR integration via REST.' },
-  thread_router: { icon: 'router-wireless', name: 'Thread router', group: 'Thread', desc: 'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.' },
+  thread_br: { icon: 'thread', name: 'Thread border router', group: 'Thread', desc: 'OpenThread border router on Ethernet for Matter-over-Thread. Home Assistant OTBR integration via REST.' },
+  thread_router: { icon: 'thread', name: 'Thread router', group: 'Thread', desc: 'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.' },
   zigbee_coordinator: { icon: 'zigbee', name: 'Zigbee coordinator', group: 'Zigbee', desc: 'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.' },
   zigbee_router: { icon: 'zigbee', name: 'Zigbee router', group: 'Zigbee', desc: 'Standalone Zigbee router (range extender) that joins your existing Zigbee network.' },
   esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'ESPHome', desc: 'Reboots into the ESPHome Bluetooth proxy image; the C6 runs esp-hosted. Return via the ESPHome device in HA.' },
@@ -552,7 +571,8 @@ async function api(path, opts = {}) {
   const headers = Object.assign({}, opts.headers || {});
   if (auth) headers.Authorization = 'Basic ' + auth;
   if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
-  const res = await fetch(path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers, body: opts.body });
+  const res = await fetch(path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers, body: opts.body,
+    signal: opts.timeout ? AbortSignal.timeout(opts.timeout) : undefined });
   if (res.status === 401) { await login(); return api(path, opts); }
   const type = res.headers.get('Content-Type') || '';
   const data = type.includes('json') ? await res.json() : await res.text();
@@ -819,7 +839,7 @@ const TIPS = {
 };
 
 /* ICONS:BEGIN */
-// Generated by tools/web/gen_icons.mjs from @mdi/js 7.4.47 (Apache-2.0), do not edit.
+// Generated by tools/web/gen_icons.mjs from @mdi/js 7.4.47 (Apache-2.0) and custom_icons.mjs, do not edit.
 const ICONS = {
   'access-point-network': 'M4.93,3.93C3.12,5.74 2,8.24 2,11C2,13.76 3.12,16.26 4.93,18.07L6.34,16.66C4.89,15.22 4,13.22 4,11C4,8.79 4.89,6.78 6.34,5.34L4.93,3.93M19.07,3.93L17.66,5.34C19.11,6.78 20,8.79 20,11C20,13.22 19.11,15.22 17.66,16.66L19.07,18.07C20.88,16.26 22,13.76 22,11C22,8.24 20.88,5.74 19.07,3.93M7.76,6.76C6.67,7.85 6,9.35 6,11C6,12.65 6.67,14.15 7.76,15.24L9.17,13.83C8.45,13.11 8,12.11 8,11C8,9.89 8.45,8.89 9.17,8.17L7.76,6.76M16.24,6.76L14.83,8.17C15.55,8.89 16,9.89 16,11C16,12.11 15.55,13.11 14.83,13.83L16.24,15.24C17.33,14.15 18,12.65 18,11C18,9.35 17.33,7.85 16.24,6.76M12,9A2,2 0 0,0 10,11A2,2 0 0,0 12,13A2,2 0 0,0 14,11A2,2 0 0,0 12,9M11,15V19H10A1,1 0 0,0 9,20H2V22H9A1,1 0 0,0 10,23H14A1,1 0 0,0 15,22H22V20H15A1,1 0 0,0 14,19H13V15H11Z',
   'backup-restore': 'M12,3A9,9 0 0,0 3,12H0L4,16L8,12H5A7,7 0 0,1 12,5A7,7 0 0,1 19,12A7,7 0 0,1 12,19C10.5,19 9.09,18.5 7.94,17.7L6.5,19.14C8.04,20.3 9.94,21 12,21A9,9 0 0,0 21,12A9,9 0 0,0 12,3M14,12A2,2 0 0,0 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12Z',
@@ -844,19 +864,23 @@ const ICONS = {
   'harddisk': 'M6,2H18A2,2 0 0,1 20,4V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V4A2,2 0 0,1 6,2M12,4A6,6 0 0,0 6,10C6,13.31 8.69,16 12.1,16L11.22,13.77C10.95,13.29 11.11,12.68 11.59,12.4L12.45,11.9C12.93,11.63 13.54,11.79 13.82,12.27L15.74,14.69C17.12,13.59 18,11.9 18,10A6,6 0 0,0 12,4M12,9A1,1 0 0,1 13,10A1,1 0 0,1 12,11A1,1 0 0,1 11,10A1,1 0 0,1 12,9M7,18A1,1 0 0,0 6,19A1,1 0 0,0 7,20A1,1 0 0,0 8,19A1,1 0 0,0 7,18M12.09,13.27L14.58,19.58L17.17,18.08L12.95,12.77L12.09,13.27Z',
   'history': 'M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3',
   'home-assistant': 'M21.8,13H20V21H13V17.67L15.79,14.88L16.5,15C17.66,15 18.6,14.06 18.6,12.9C18.6,11.74 17.66,10.8 16.5,10.8A2.1,2.1 0 0,0 14.4,12.9L14.5,13.61L13,15.13V9.65C13.66,9.29 14.1,8.6 14.1,7.8A2.1,2.1 0 0,0 12,5.7A2.1,2.1 0 0,0 9.9,7.8C9.9,8.6 10.34,9.29 11,9.65V15.13L9.5,13.61L9.6,12.9A2.1,2.1 0 0,0 7.5,10.8A2.1,2.1 0 0,0 5.4,12.9A2.1,2.1 0 0,0 7.5,15L8.21,14.88L11,17.67V21H4V13H2.25C1.83,13 1.42,13 1.42,12.79C1.43,12.57 1.85,12.15 2.28,11.72L11,3C11.33,2.67 11.67,2.33 12,2.33C12.33,2.33 12.67,2.67 13,3L17,7V6H19V9L21.78,11.78C22.18,12.18 22.59,12.59 22.6,12.8C22.6,13 22.2,13 21.8,13M7.5,12A0.9,0.9 0 0,1 8.4,12.9A0.9,0.9 0 0,1 7.5,13.8A0.9,0.9 0 0,1 6.6,12.9A0.9,0.9 0 0,1 7.5,12M16.5,12C17,12 17.4,12.4 17.4,12.9C17.4,13.4 17,13.8 16.5,13.8A0.9,0.9 0 0,1 15.6,12.9A0.9,0.9 0 0,1 16.5,12M12,6.9C12.5,6.9 12.9,7.3 12.9,7.8C12.9,8.3 12.5,8.7 12,8.7C11.5,8.7 11.1,8.3 11.1,7.8C11.1,7.3 11.5,6.9 12,6.9Z',
+  'home-outline': 'M12 5.69L17 10.19V18H15V12H9V18H7V10.19L12 5.69M12 3L2 12H5V20H11V14H13V20H19V12H22',
   'information-outline': 'M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z',
   'key-outline': 'M21 18H15V15H13.3C12.2 17.4 9.7 19 7 19C3.1 19 0 15.9 0 12S3.1 5 7 5C9.7 5 12.2 6.6 13.3 9H24V15H21V18M17 16H19V13H22V11H11.9L11.7 10.3C11 8.3 9.1 7 7 7C4.2 7 2 9.2 2 12S4.2 17 7 17C9.1 17 11 15.7 11.7 13.7L11.9 13H17V16M7 15C5.3 15 4 13.7 4 12S5.3 9 7 9 10 10.3 10 12 8.7 15 7 15M7 11C6.4 11 6 11.4 6 12S6.4 13 7 13 8 12.6 8 12 7.6 11 7 11Z',
   'lan-connect': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,13V18L3,20H10V18H5V13H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M14,15H20V19H14V15Z',
   'lan-pending': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,12V14H5V12H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M3,15V17H5V15H3M14,15H20V19H14V15M3,18V20H5V18H3M6,18V20H8V18H6M9,18V20H11V18H9Z',
   'lightbulb-on-outline': 'M20,11H23V13H20V11M1,11H4V13H1V11M13,1V4H11V1H13M4.92,3.5L7.05,5.64L5.63,7.05L3.5,4.93L4.92,3.5M16.95,5.63L19.07,3.5L20.5,4.93L18.37,7.05L16.95,5.63M12,6A6,6 0 0,1 18,12C18,14.22 16.79,16.16 15,17.2V19A1,1 0 0,1 14,20H10A1,1 0 0,1 9,19V17.2C7.21,16.16 6,14.22 6,12A6,6 0 0,1 12,6M14,21V22A1,1 0 0,1 13,23H11A1,1 0 0,1 10,22V21H14M11,18H13V15.87C14.73,15.43 16,13.86 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12C8,13.86 9.27,15.43 11,15.87V18Z',
   'lock-outline': 'M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
+  'matter': 'M7.94 7.25c0.84 0.68 1.84 1.14 2.91 1.34V2.89l1.16-0.67 1.16 0.67v5.69c1.07-0.19 2.07-0.65 2.91-1.34l2.1 1.21c-3.42 3.38-8.93 3.38-12.35 0zm2.56 14.52C11.71 17.12 8.96 12.35 4.32 11.08v2.43c1.01 0.39 1.91 1.02 2.61 1.85L2 18.21v1.34l1.16 0.66 4.93-2.84c0.37 1.02 0.47 2.12 0.3 3.18zm9.19-10.69C15.05 12.35 12.3 17.12 13.52 21.77l2.11-1.22c-0.17-1.07-0.07-2.16 0.3-3.18l4.92 2.84 1.16-0.67v-1.34l-4.93-2.84c0.7-0.83 1.6-1.46 2.61-1.85z',
   'memory': 'M17,17H7V7H17M21,11V9H19V7C19,5.89 18.1,5 17,5H15V3H13V5H11V3H9V5H7C5.89,5 5,5.89 5,7V9H3V11H5V13H3V15H5V17A2,2 0 0,0 7,19H9V21H11V19H13V21H15V19H17A2,2 0 0,0 19,17V15H21V13H19V11M13,13H11V11H13M15,9H9V15H15V9Z',
   'menu': 'M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z',
   'microphone': 'M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z',
+  'minus': 'M19,13H5V11H19V13Z',
   'package-variant': 'M2,10.96C1.5,10.68 1.35,10.07 1.63,9.59L3.13,7C3.24,6.8 3.41,6.66 3.6,6.58L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.66,6.72 20.82,6.88 20.91,7.08L22.36,9.6C22.64,10.08 22.47,10.69 22,10.96L21,11.54V16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V10.96C2.7,11.13 2.32,11.14 2,10.96M12,4.15V4.15L12,10.85V10.85L17.96,7.5L12,4.15M5,15.91L11,19.29V12.58L5,9.21V15.91M19,15.91V12.69L14,15.59C13.67,15.77 13.3,15.76 13,15.6V19.29L19,15.91M13.85,13.36L20.13,9.73L19.55,8.72L13.27,12.35L13.85,13.36Z',
   'pencil-outline': 'M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z',
   'play': 'M8,5.14V19.14L19,12.14L8,5.14Z',
   'playlist-check': 'M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z',
+  'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
   'radar': 'M19.07,4.93L17.66,6.34C19.1,7.79 20,9.79 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12C4,7.92 7.05,4.56 11,4.07V6.09C8.16,6.57 6,9.03 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12C18,10.34 17.33,8.84 16.24,7.76L14.83,9.17C15.55,9.9 16,10.9 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12C8,10.14 9.28,8.59 11,8.14V10.28C10.4,10.63 10,11.26 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.26 13.6,10.62 13,10.28V2H12A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,9.24 20.88,6.74 19.07,4.93Z',
   'restart': 'M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z',
   'router-network': 'M5 9C3.9 9 3 9.9 3 11V15C3 16.11 3.9 17 5 17H11V19H10C9.45 19 9 19.45 9 20H2V22H9C9 22.55 9.45 23 10 23H14C14.55 23 15 22.55 15 22H22V20H15C15 19.45 14.55 19 14 19H13V17H19C20.11 17 21 16.11 21 15V11C21 9.9 20.11 9 19 9H5M6 12H8V14H6V12M9.5 12H11.5V14H9.5V12M13 12H15V14H13V12Z',
@@ -865,8 +889,10 @@ const ICONS = {
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
   'text-box-outline': 'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
+  'thread': 'M12 2C6.48 2 2 6.49 2 12c0 5.48 4.43 9.94 9.89 10V12.01h-3.27c-0.97 0-1.77 0.79-1.77 1.77s0.79 1.77 1.77 1.77v2.18c-2.18 0-3.95-1.77-3.95-3.94 0-2.18 1.77-3.95 3.95-3.95h3.27v-1.1c0-1.81 1.47-3.28 3.28-3.28s3.28 1.47 3.28 3.28-1.47 3.28-3.28 3.28h-1.1v9.77C18.59 20.83 22 16.8 22 12 22 6.49 17.52 2 12 2m4.27 6.73c0-0.61-0.5-1.1-1.1-1.1-0.61 0-1.1 0.5-1.1 1.1v1.1h1.1c0.61 0 1.1-0.49 1.1-1.1',
   'transit-connection-variant': 'M18,11H14.82C14.4,9.84 13.3,9 12,9C10.7,9 9.6,9.84 9.18,11H6C5.67,11 4,10.9 4,9V8C4,6.17 5.54,6 6,6H16.18C16.6,7.16 17.7,8 19,8A3,3 0 0,0 22,5A3,3 0 0,0 19,2C17.7,2 16.6,2.84 16.18,4H6C4.39,4 2,5.06 2,8V9C2,11.94 4.39,13 6,13H9.18C9.6,14.16 10.7,15 12,15C13.3,15 14.4,14.16 14.82,13H18C18.33,13 20,13.1 20,15V16C20,17.83 18.46,18 18,18H7.82C7.4,16.84 6.3,16 5,16A3,3 0 0,0 2,19A3,3 0 0,0 5,22C6.3,22 7.4,21.16 7.82,20H18C19.61,20 22,18.93 22,16V15C22,12.07 19.61,11 18,11M19,4A1,1 0 0,1 20,5A1,1 0 0,1 19,6A1,1 0 0,1 18,5A1,1 0 0,1 19,4M5,20A1,1 0 0,1 4,19A1,1 0 0,1 5,18A1,1 0 0,1 6,19A1,1 0 0,1 5,20Z',
   'upload': 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
+  'vector-polyline': 'M2 3V9H4.95L6.95 15H6V21H12V16.41L17.41 11H22V5H16V9.57L10.59 15H9.06L7.06 9H8V3M4 5H6V7H4M18 7H20V9H18M8 17H10V19H8Z',
   'view-dashboard-outline': 'M19,5V7H15V5H19M9,5V11H5V5H9M19,13V19H15V13H19M9,17V19H5V17H9M21,3H13V9H21V3M11,3H3V13H11V3M21,11H13V21H21V11M11,15H3V21H11V15Z',
   'waveform': 'M22 12L20 13L19 14L18 13L17 16L16 13L15 21L14 13L13 15L12 13L11 17L10 13L9 22L8 13L7 19L6 13L5 14L4 13L2 12L4 11L5 10L6 11L7 5L8 11L9 2L10 11L11 7L12 11L13 9L14 11L15 3L16 11L17 8L18 11L19 10L20 11L22 12Z',
   'wrench-outline': 'M22.61,19L13.53,9.91C14.46,7.57 14,4.81 12.09,2.91C9.79,0.61 6.21,0.4 3.66,2.26L7.5,6.11L6.08,7.5L2.25,3.69C0.39,6.23 0.6,9.82 2.9,12.11C4.76,13.97 7.47,14.46 9.79,13.59L18.9,22.7C19.29,23.09 19.92,23.09 20.31,22.7L22.61,20.4C23,20 23,19.39 22.61,19M19.61,20.59L10.15,11.13C9.54,11.58 8.86,11.85 8.15,11.95C6.79,12.15 5.36,11.74 4.32,10.7C3.37,9.76 2.93,8.5 3,7.26L6.09,10.35L10.33,6.11L7.24,3C8.5,2.95 9.73,3.39 10.68,4.33C11.76,5.41 12.17,6.9 11.92,8.29C11.8,9 11.5,9.66 11.04,10.25L20.5,19.7L19.61,20.59Z',
@@ -918,11 +944,11 @@ let status = null;
 const NAV = [
   { id: 'overview', label: 'Overview', icon: 'view-dashboard-outline' },
   { id: 'role', label: 'Role', icon: 'swap-horizontal' },
-  { id: 'thread', label: 'Thread', icon: 'access-point-network', subs: [
-    { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'topology', label: 'Topology', icon: 'graph-outline' },
-    { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' }, { id: 'settings', label: 'Settings', icon: 'cog-outline' }] },
+  { id: 'thread', label: 'Thread', icon: 'thread', subs: [
+    { id: 'info', label: 'Information', icon: 'information-outline', role: true }, { id: 'topology', label: 'Topology', icon: 'graph-outline', role: true },
+    { id: 'diag', label: 'Diagnostics', icon: 'stethoscope', role: true }, { id: 'settings', label: 'Settings', icon: 'cog-outline', role: true }] },
   { id: 'zigbee', label: 'Zigbee', icon: 'zigbee', subs: [
-    { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
+    { id: 'info', label: 'Information', icon: 'information-outline', role: true }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope', role: true },
     { id: 'backups', label: 'Network backups', icon: 'backup-restore' }, { id: 'network', label: 'Network and devices', icon: 'graph-outline' }] },
   { id: 'sound', label: 'Sound', icon: 'waveform', subs: [
     { id: 'live', label: 'Live', icon: 'ear-hearing' }, { id: 'events', label: 'Events', icon: 'bell-ring-outline' },
@@ -947,12 +973,25 @@ function parseRoute(route) {
 }
 function route() { return sub ? `${tab}/${sub}` : tab; }
 function sectionActive(id) { return id === 'thread' ? isThread() : id === 'zigbee' ? isZigbee() : true; }
+/* pages marked role: true open only in their role; Zigbee2MQTT over MQTT and network backups work in any role */
+function pageEnabled(sec, s) {
+  const p = NAV.find(n => n.id === sec)?.subs?.find(x => x.id === s);
+  return !status || !p?.role || sectionActive(sec);
+}
+const firstPage = n => n.subs?.find(x => pageEnabled(n.id, x.id));
+const needsRole = id => L(`Only with the ${id === 'thread' ? 'Thread' : 'Zigbee'} role active`, `Jen při aktivní roli ${id === 'thread' ? 'Thread' : 'Zigbee'}`);
 
+let navRole = null;
 function renderNav() {
+  navRole = activeRole();
   $('#side').innerHTML = NAV.map(n => {
-    const link = `<a href="#${n.subs ? n.id + '/' + n.subs[0].id : n.id}" data-route="${n.id}" class="${n.id === tab ? (n.subs ? 'on' : 'cur') : ''} ${status && !sectionActive(n.id) ? 'off' : ''}">${ic(n.icon)}<span>${n.label}</span></a>`;
-    const subs = n.subs && n.id === tab ? `<div class="subs">${n.subs.map(x =>
-      `<a href="#${n.id}/${x.id}" data-route="${n.id}/${x.id}" class="${x.id === sub ? 'cur' : ''}">${ic(x.icon)}<span>${x.label}</span></a>`).join('')}</div>` : '';
+    const first = firstPage(n), off = status && !sectionActive(n.id) ? 'off' : '';
+    const link = n.subs && !first
+      ? `<a data-route="${n.id}" class="off" aria-disabled="true" title="${needsRole(n.id)}">${ic(n.icon)}<span>${n.label}</span></a>`
+      : `<a href="#${n.subs ? n.id + '/' + first.id : n.id}" data-route="${n.id}" class="${n.id === tab ? (n.subs ? 'on' : 'cur') : ''} ${off}">${ic(n.icon)}<span>${n.label}</span></a>`;
+    const subs = n.subs && n.id === tab ? `<div class="subs">${n.subs.map(x => pageEnabled(n.id, x.id)
+      ? `<a href="#${n.id}/${x.id}" data-route="${n.id}/${x.id}" class="${x.id === sub ? 'cur' : ''}">${ic(x.icon)}<span>${x.label}</span></a>`
+      : `<a data-route="${n.id}/${x.id}" class="off" aria-disabled="true" title="${needsRole(n.id)}">${ic(x.icon)}<span>${x.label}</span></a>`).join('')}</div>` : '';
     return link + subs;
   }).join('');
 }
@@ -1020,6 +1059,7 @@ function renderHeader() {
     $('#hdr-flash').title = fl.stage;
     $('#flash-strip').style.width = fl.percent + '%';
   }
+  renderBusy();
   const idl = status.identify_s || 0;
   $('#hdr-ident').classList.toggle('hidden', !idl);
   if (idl) {
@@ -1118,7 +1158,7 @@ views['thread/info'] = () => isThread() ? `<div id="thread-status"><div class="c
 /* the map sits outside #thread-status, which the status poll redraws every few seconds */
 views['thread/topology'] = () => isThread() ? `<div class="card">${h3('graph-outline', 'Network map')}
     <div class="row"><button class="btn" id="topo-refresh">${ic('restart')}Refresh map</button><span id="topo-state" class="muted"></span></div>
-    <div class="row" style="margin-top:8px"><span class="muted">Matter Server${tip('Matter Server')}</span><span id="matter-state" class="muted"></span>
+    <div class="row" style="margin-top:8px"><span class="muted">${ic('matter')}Matter Server${tip('Matter Server')}</span><span id="matter-state" class="muted"></span>
       <a href="#system/settings" class="muted">${L('change in System › Settings', 'změnit v Systém › Nastavení')}</a></div>
     <div id="topo-map" class="muted" style="margin-top:10px">Loading…</div></div>
   <div class="card" style="margin-top:16px">${h3('lan-connect', 'Devices in the network')}<div class="table-wrap" id="topo-devices"><p class="muted">Loading…</p></div></div>
@@ -1165,7 +1205,7 @@ async function loadThread() {
     const typeTip = v => `${esc(v)}${tip('type:' + v)}`;
     if (sub === 'info') {
       box.innerHTML = `<div class="grid">
-      <div class="card">${h3('access-point-network', 'Thread')}${dl([
+      <div class="card">${h3('thread', 'Thread')}${dl([
         ['Mode', esc(t.mode === 'border_router' ? 'Border router' : 'Router'), 'Thread mode'], ['Phase', esc(t.phase)],
         ['Device role', pill(roleCls, role) + tip('type:' + role)], ['Network', esc(t.network_name)], ['Channel', t.channel],
         ['PAN ID', esc(t.pan_id)], ['Ext PAN ID', esc(t.ext_pan_id)], ['RLOC16', esc(t.rloc16)],
@@ -1770,7 +1810,7 @@ async function matterLoad() {
 }
 
 /* formatted details box of a map node (hover, focus or tap) */
-let topoInfo = new Map();
+let topoInfo = new Map(), topoLast = null;
 function nodeBox(key) {
   const d = topoInfo.get(key);
   if (!d) return '';
@@ -1816,6 +1856,116 @@ function placeNodeBox(el, x, y) {
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
   box.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
 }
+/* ---- network maps: zoom, pan and the signal layout, the same for the Thread and the Zigbee map ---- */
+let mapLayout = 'ring';
+try { mapLayout = localStorage.getItem('mapLayout') === 'signal' ? 'signal' : 'ring'; } catch (err) { /* storage blocked */ }
+const mapView = {}; /* map -> viewBox [x, y, w, h] the user zoomed to; kept across redraws */
+
+/* Signal layout: distances between nodes follow the link quality (a stronger link is a shorter
+ * edge); nodes without a direct link end up as far apart as the best path between them. Stress
+ * majorization over the weighted shortest paths, started from the ring so the result is stable. */
+function signalLayout(ids, links, ring, W, H, margin) {
+  const n = ids.length, ix = new Map(ids.map((id, i) => [id, i]));
+  if (n < 3) return ring;
+  const D = ids.map((_, i) => ids.map((__, j) => i === j ? 0 : Infinity));
+  for (const { a, b, d } of links) {
+    const i = ix.get(a), j = ix.get(b);
+    if (i !== undefined && j !== undefined && i !== j && d < D[i][j]) D[i][j] = D[j][i] = d;
+  }
+  for (let k = 0; k < n; k++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (D[i][k] + D[k][j] < D[i][j]) D[i][j] = D[i][k] + D[k][j];
+  const far = Math.max(1, ...D.flat().filter(Number.isFinite)) * 1.3;
+  D.forEach(row => row.forEach((v, j) => { if (!Number.isFinite(v)) row[j] = far; }));
+  const rx = Math.max(1, ...ids.map(id => Math.abs(ring.get(id).x - W / 2)));
+  let X = ids.map(id => [(ring.get(id).x - W / 2) / rx * far / 2, (ring.get(id).y - H / 2) / rx * far / 2]);
+  for (let it = 0; it < 300; it++) {
+    X = X.map((p, i) => {
+      let sx = 0, sy = 0, sw = 0;
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue;
+        const w = 1 / (D[i][j] * D[i][j]), dx = p[0] - X[j][0], dy = p[1] - X[j][1], dist = Math.hypot(dx, dy) || 1e-6;
+        sx += w * (X[j][0] + D[i][j] * dx / dist);
+        sy += w * (X[j][1] + D[i][j] * dy / dist);
+        sw += w;
+      }
+      return [sx / sw, sy / sw];
+    });
+  }
+  const xs = X.map(p => p[0]), ys = X.map(p => p[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), k = Math.min((W - 2 * margin) / (Math.max(...xs) - x0 || 1), (H - 2 * margin) / (Math.max(...ys) - y0 || 1));
+  const ox = (W - k * (Math.max(...xs) - x0)) / 2, oy = (H - k * (Math.max(...ys) - y0)) / 2;
+  return new Map(ids.map((id, i) => {
+    const x = ox + k * (X[i][0] - x0), y = oy + k * (X[i][1] - y0);
+    return [id, { x, y, a: Math.atan2(y - H / 2, x - W / 2) }];
+  }));
+}
+const mapTools = () => `<div class="map-tools">
+  <button class="btn" data-mz="in" title="${L('Zoom in', 'Přiblížit')}">${ic('plus')}</button>
+  <button class="btn" data-mz="out" title="${L('Zoom out', 'Oddálit')}">${ic('minus')}</button>
+  <button class="btn" data-mz="home" title="${L('Default view', 'Výchozí zobrazení')}">${ic('home-outline')}</button>
+  <button class="btn ${mapLayout === 'signal' ? 'primary' : ''}" data-mz="layout" title="${L('Layout by signal strength (L)', 'Rozložení podle síly signálu (L)')}">${ic('vector-polyline')}</button></div>`;
+const mapHelp = () => mapLayout === 'signal'
+  ? L('Layout by signal: a stronger link draws the nodes closer (L switches back to the ring). Wheel or +/− zoom, drag moves.', 'Rozložení podle signálu: silnější linka = uzly blíž u sebe (L přepne zpět na kruh). Kolečko nebo +/− přibližuje, tažení posouvá.')
+  : L('L arranges the nodes by signal strength. Wheel or +/− zoom, drag moves.', 'L rozmístí uzly podle síly signálu. Kolečko nebo +/− přibližuje, tažení posouvá.');
+function setView(svg, vb) {
+  svg.setAttribute('viewBox', vb.map(v => +v.toFixed(2)).join(' '));
+  mapView[svg.classList.contains('tmap') ? 'tmap' : 'zmap'] = vb;
+}
+/* zoom by factor f (< 1 closer) around the map point px, py */
+function zoomMap(svg, f, px, py) {
+  const [bx, by, bw] = svg.dataset.base.split(' ').map(Number), [x, y, w, h] = svg.getAttribute('viewBox').split(' ').map(Number);
+  const nf = Math.min(Math.max(f, bw / 8 / w), bw / w);
+  if (nf === 1) return;
+  if (w * nf >= bw - 0.01) return setView(svg, svg.dataset.base.split(' ').map(Number));
+  setView(svg, [px - (px - x) * nf, py - (py - y) * nf, w * nf, h * nf]);
+}
+function mapPoint(svg, cx, cy) {
+  const m = svg.getScreenCTM().inverse();
+  return [m.a * cx + m.c * cy + m.e, m.b * cx + m.d * cy + m.f];
+}
+function initMapView(svg, key) {
+  svg.dataset.base = svg.getAttribute('viewBox');
+  if (mapView[key]) svg.setAttribute('viewBox', mapView[key].join(' '));
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomMap(svg, e.deltaY < 0 ? 1 / 1.2 : 1.2, ...mapPoint(svg, e.clientX, e.clientY));
+  }, { passive: false });
+  let drag = null;
+  svg.addEventListener('pointerdown', e => { if (e.button === 0) drag = { x: e.clientX, y: e.clientY, vb: svg.getAttribute('viewBox').split(' ').map(Number), moved: false }; });
+  svg.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    if (!drag.moved) { drag.moved = true; svg.setPointerCapture(e.pointerId); svg.classList.add('panning'); }
+    const k = 1 / svg.getScreenCTM().a;
+    setView(svg, [drag.vb[0] - dx * k, drag.vb[1] - dy * k, drag.vb[2], drag.vb[3]]);
+  });
+  const end = () => { drag = null; svg.classList.remove('panning'); };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+}
+function toggleMapLayout() {
+  mapLayout = mapLayout === 'signal' ? 'ring' : 'signal';
+  try { localStorage.setItem('mapLayout', mapLayout); } catch (err) { /* storage blocked */ }
+  delete mapView.tmap;
+  delete mapView.zmap;
+  $('#nodebox').style.display = 'none';
+  if ($('#topo-map svg')) drawTopology();
+  if ($('#zmap svg') && zmapLast) renderZMap(...zmapLast);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-mz]');
+  if (!b) return;
+  const svg = b.closest('.map-wrap').querySelector('svg.topo');
+  const [x, y, w, h] = svg.getAttribute('viewBox').split(' ').map(Number);
+  if (b.dataset.mz === 'layout') toggleMapLayout();
+  else if (b.dataset.mz === 'home') setView(svg, svg.dataset.base.split(' ').map(Number));
+  else zoomMap(svg, b.dataset.mz === 'in' ? 1 / 1.4 : 1.4, x + w / 2, y + h / 2);
+});
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'l' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if ($('svg.tmap, svg.zmap')) { e.preventDefault(); toggleMapLayout(); }
+});
+
 /* static legend in the top right corner of a map, styled like the details box */
 const lgLine = (c, dash) => `<svg width="26" height="12"><line x1="1" y1="6" x2="25" y2="6" stroke="var(--${c})" stroke-width="3"${dash ? ' stroke-dasharray="5 4"' : ''}/></svg>`;
 const lgDot = (r, fill, stroke, dash) => `<svg width="26" height="22"><circle cx="13" cy="11" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2"${dash ? ' stroke-dasharray="3 3"' : ''}/></svg>`;
@@ -1879,11 +2029,29 @@ async function loadTopology() {
       (matter.error ? `<span class="warn-text">${esc(matter.error)}</span>` : `${matter.nodes.length} ${L('Matter nodes', 'uzlů Matter')}, ${matched} ${L('found in the map', 'nalezeno v mapě')}`);
   $('#topo-state').textContent = ` ${ids.length} ${L('routers', 'routerů')}, ${kids} ${L('end devices', 'koncových zařízení')} · ${d.ms} ms` +
     (d.error ? ` · ${L('some routers did not answer', 'některé routery neodpověděly')}` : '');
+  topoLast = { routers, ids };
+  drawTopology();
+}
+
+/* draws the Thread map from the last answer: ring or, toggled with L, the signal layout */
+function drawTopology() {
+  const box = $('#topo-map');
+  if (!box || !topoLast) return;
+  const { routers, ids } = topoLast;
   const W = 900, H = 640, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 110;
-  const pos = new Map(ids.map((id, i) => {
+  let pos = new Map(ids.map((id, i) => {
     const a = -Math.PI / 2 + 2 * Math.PI * i / ids.length;
     return [id, { x: ids.length > 1 ? cx + R * Math.cos(a) : cx, y: ids.length > 1 ? cy + R * Math.sin(a) : cy, a }];
   }));
+  if (mapLayout === 'signal') {
+    /* LQ 3 is the shortest edge; the weaker of both directions counts */
+    const links = [];
+    for (const r of routers.values()) for (const l of r.links) {
+      const back = routers.get(l.id)?.links.find(x => x.id === r.id);
+      links.push({ a: r.id, b: l.id, d: 1 + 0.8 * (3 - Math.min(l.lq, back ? back.lq : l.lq)) });
+    }
+    pos = signalLayout(ids, links, pos, W, H, 110);
+  }
   const lqCls = q => q >= 3 ? 'ok' : q === 2 ? 'warn' : 'bad';
   let edges = '', nodes = '', children = '';
   const seen = new Set();
@@ -1912,13 +2080,14 @@ async function loadTopology() {
       <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${esc(label)}</text></g>`;
   }
   box.classList.remove('muted');
-  box.innerHTML = `<div class="map-wrap"><svg class="topo tmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
+  box.innerHTML = `<div class="map-wrap"><svg class="topo tmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>${mapTools()}
     ${mapLegend([[lgLine('ok'), L('good link (LQ 3)', 'dobrá linka (LQ 3)')], [lgLine('warn'), L('medium link (LQ 2)', 'střední linka (LQ 2)')],
       [lgLine('bad'), L('weak link (LQ 0–1)', 'slabá linka (LQ 0–1)')], [lgLine('muted', true), L('reported by one side only', 'hlásí jen jedna strana')],
       [lgDot(8, 'var(--panel-2)', 'var(--accent)'), L('router, number = router ID', 'router, číslo = ID routeru')], [lgDot(8, 'var(--accent)', 'var(--accent)'), L('this gateway', 'tato brána')],
       ['<span class="warn-text"><b>★</b></span>', 'leader'], ['<span class="warn-text"><b>BR</b></span>', 'border router'],
       [lgDot(5, 'var(--muted)', 'var(--muted)'), L('end device', 'koncové zařízení')], [lgDot(5, 'var(--panel)', 'var(--muted)'), L('sleepy end device', 'spící koncové zařízení')]])}</div>
-    <p class="muted">${L('Hover a device for details and its links.', 'Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.')}</p>`;
+    <p class="muted">${L('Hover a device for details and its links.', 'Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.')} ${mapHelp()}</p>`;
+  initMapView(box.querySelector('svg'), 'tmap');
   const devs = [...topoInfo.entries()];
   $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', ['Thread role', 'Device Thread role'], 'RLOC16', 'Matter node', ['Firmware', 'Device firmware']].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr>
     <td data-notr><b>${esc(v.name || v.fallback)}</b></td><td data-notr>${esc(v.matter?.vendor || v.vendor || '')}</td><td data-notr>${esc(v.matter?.product || v.model || '')}</td>
@@ -1939,7 +2108,7 @@ views['zigbee/network'] = () => `<div class="grid">
     <div class="table-wrap" id="zdev"></div></div>
 </div>`;
 
-let z2m = null, zInfo = new Map();
+let z2m = null, zInfo = new Map(), zmapLast = null;
 const zLqiCls = q => q >= 120 ? 'ok' : q >= 60 ? 'warn' : 'bad';
 function zAgo(v, now) {
   if (v === undefined || v === null) return '';
@@ -2022,6 +2191,7 @@ function renderZDevices(devs, now) {
  * routers in the colour of their LQI; hovering a device highlights its own links. */
 function renderZMap(map, devs) {
   const box = $('#zmap');
+  zmapLast = [map, devs];
   box.dataset.at = String(map.at);
   const byIeee = new Map(devs.map(x => [x.ieee, x]));
   const nodes = map.nodes.map(n => ({ ...n, dev: byIeee.get(n.ieee) }));
@@ -2037,6 +2207,12 @@ function renderZMap(map, devs) {
   map.links.forEach(l => { if (l.rel === 1 && !parent.has(l.s)) parent.set(l.s, l.t); });
   const perParent = new Map();
   ends.forEach(n => { const p = parent.get(n.ieee) || coord?.ieee; perParent.set(p, (perParent.get(p) || []).concat(n)); });
+  if (mapLayout === 'signal') {
+    /* coordinator and routers by their LQI (255 is the shortest edge); end devices stay next to their parent */
+    const ids = [...pos.keys()];
+    const links = map.links.filter(l => l.s !== l.t && pos.has(l.s) && pos.has(l.t)).map(l => ({ a: l.s, b: l.t, d: 1 + 3 * (255 - (l.lqi || 0)) / 255 }));
+    for (const [id, p] of signalLayout(ids, links, pos, W, H, 90)) pos.set(id, p);
+  }
   for (const [p, list] of perParent) {
     const pp = pos.get(p) || { x: cx, y: cy, a: 0 };
     const base = p === coord?.ieee ? Math.PI / 2 : pp.a;
@@ -2076,12 +2252,13 @@ function renderZMap(map, devs) {
   }
   const failed = nodes.filter(n => n.failed).length;
   box.classList.remove('muted');
-  box.innerHTML = `<div class="map-wrap"><svg class="topo zmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zigbee network map">${edges}${dots}</svg>
+  box.innerHTML = `<div class="map-wrap"><svg class="topo zmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zigbee network map">${edges}${dots}</svg>${mapTools()}
     ${mapLegend([[lgLine('ok'), 'LQI ≥ 120'], [lgLine('warn'), 'LQI 60–119'], [lgLine('bad'), 'LQI < 60'],
-      [lgDot(10, 'var(--accent)', 'var(--accent)'), L('coordinator', 'koordinátor')], [lgDot(7, 'var(--accent)', 'var(--accent)'), L('this gateway', 'tato brána')], [lgDot(7, 'var(--panel-2)', 'var(--accent)'), L('router (on the ring)', 'router (na kruhu)')],
+      [lgDot(10, 'var(--accent)', 'var(--accent)'), L('coordinator', 'koordinátor')], [lgDot(7, 'var(--accent)', 'var(--accent)'), L('this gateway', 'tato brána')], [lgDot(7, 'var(--panel-2)', 'var(--accent)'), mapLayout === 'signal' ? 'router' : L('router (on the ring)', 'router (na kruhu)')],
       [lgDot(4, 'var(--muted)', 'var(--muted)'), L('end device, next to its parent', 'koncové zařízení, u svého rodiče')], [lgDot(7, 'var(--panel)', 'var(--accent)', true), L('offline or did not answer', 'nedostupné nebo neodpovědělo')]])}</div>
     <p class="muted">${L(`${nodes.length} devices, ${pairs.size} links${failed ? `, ${failed} routers did not answer` : ''}. Hover a device for details and its links.`,
-      `${nodes.length} zařízení, ${pairs.size} linek${failed ? `, ${failed} routerů neodpovědělo` : ''}. Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.`)}</p>`;
+      `${nodes.length} zařízení, ${pairs.size} linek${failed ? `, ${failed} routerů neodpovědělo` : ''}. Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.`)} ${mapHelp()}</p>`;
+  initMapView(box.querySelector('svg'), 'zmap');
 }
 
 /* details box of a Zigbee device (map or table) */
@@ -2343,7 +2520,7 @@ async function loadNetscan() {
 
 views['system/settings'] = () => `<div class="grid"><div class="card">${h3('home-assistant', 'Home Assistant and Matter')}
     <div id="ha-found" class="muted">${L('Looking for Home Assistant…', 'Hledám Home Assistant…')}</div>
-    <label class="field" style="margin-top:12px"><span>Matter Server (WebSocket)${tip('Matter Server')}</span>
+    <label class="field" style="margin-top:12px"><span>${ic('matter')}Matter Server (WebSocket)${tip('Matter Server')}</span>
       <input type="text" id="matter-url" value="${esc(status.matter_url || '')}" placeholder="ws://homeassistant.local:5580/ws"></label>
     <div class="row"><button class="btn primary" id="matter-save">${ic('check')}Save</button><button class="btn" id="matter-test">${ic('play')}Test</button>
       <span id="matter-test-out" class="muted"></span></div>
@@ -2382,7 +2559,8 @@ document.addEventListener('click', async e => {
         await api('/api/role', { json: { role: t.dataset.role, skip_backup: true } });
       }
       toast('Switching, the page reconnects automatically');
-      waitForRestart();
+      /* ESPHome replaces this firmware: nothing to wait for */
+      waitForRestart(t.dataset.role !== 'esphome');
     } else if (t.dataset.cli) {
       runCli(t.dataset.cli);
     } else if (t.id === 'cli-run') {
@@ -2657,15 +2835,69 @@ function upload(kind) {
 }
 
 let restarting = false;
-async function waitForRestart() {
+/* modal: the restart and what follows it (C6 flashing, role start) blocks the UI until done */
+async function waitForRestart(modal = true) {
   restarting = true;
-  await new Promise(r => setTimeout(r, 4000));
-  for (let i = 0; i < 120; i++) {
-    try { status = await api('/api/status'); restarting = false; render(true); toast('Gateway is back'); return; } catch (e) { /* still down */ }
-    await new Promise(r => setTimeout(r, 2000));
+  Object.assign(busy, { expect: modal, since: Date.now(), eta: null });
+  renderBusy();
+  await new Promise(r => setTimeout(r, 3000));
+  for (let i = 0; i < 240; i++) {
+    /* short timeout: a request sent while the board is down hangs in TCP retries and would see it back late */
+    try { status = await api('/api/status', { timeout: 1500 }); restarting = false; render(true); toast('Gateway is back'); return; } catch (e) { /* still down */ }
+    renderBusy();
+    await new Promise(r => setTimeout(r, 1000));
   }
   restarting = false;
+  busy.expect = false;
+  renderBusy();
 }
+
+/* Blocking progress dialog while the gateway restarts, the C6 is flashed (also a C6 backup) or the
+ * new role starts. The bar moves in 0.5 s steps; the estimate comes from the elapsed time. */
+const busy = { expect: false, since: 0, eta: null, at: 0 };
+function flashStage(st) {
+  const m = /^writing 0x([0-9a-f]+) \((\d+) kB\)$/.exec(st);
+  if (m) return L(`writing ${m[2]} kB at 0x${m[1]}`, `zápis ${m[2]} kB na 0x${m[1]}`);
+  return L(st, { 'verifying image': 'kontrola image', 'connecting to C6 bootloader': 'připojení k zavaděči C6',
+    'saving Zigbee network data': 'záloha dat Zigbee sítě', 'erasing settings area': 'mazání oblasti nastavení',
+    'restoring Zigbee network data': 'obnova dat Zigbee sítě', 'reading C6 flash': 'čtení flash C6', done: 'hotovo', failed: 'selhalo' }[st] || st);
+}
+function renderBusy() {
+  const dlg = $('#busy-dlg'), fl = status?.c6?.flash, r = status?.role;
+  const phase = restarting ? (busy.expect ? 'restart' : '') : fl?.busy ? 'flash'
+    : busy.expect && r && !r.maintenance && r.active !== r.desired ? 'start' : '';
+  if (!phase) {
+    busy.expect = false;
+    busy.eta = null;
+    if (dlg.open) dlg.close();
+    return;
+  }
+  const bar = $('#busy-bar'), secs = Math.round((Date.now() - busy.since) / 1000);
+  bar.classList.toggle('ind', phase !== 'flash');
+  if (phase === 'flash') {
+    $('#busy-title').textContent = fl.stage === 'reading C6 flash' ? L('Backing up the C6 flash', 'Záloha flash C6') : L('Flashing the C6', 'Flashování C6');
+    $('#busy-stage').textContent = flashStage(fl.stage);
+    bar.firstElementChild.style.width = fl.percent + '%';
+    $('#busy-pct').textContent = fl.percent + ' %';
+    /* remaining time at the average pace so far, smoothed and counted down between samples */
+    if (fl.elapsed_s && fl.percent >= 12 && fl.percent < 100) {
+      const e = fl.elapsed_s * (100 - fl.percent) / fl.percent, now = Date.now();
+      busy.eta = busy.eta === null ? e : Math.max(0, busy.eta - (now - busy.at) / 1000) * 0.6 + e * 0.4;
+      busy.at = now;
+    }
+    $('#busy-eta').textContent = busy.eta === null ? L('estimating…', 'odhaduji…') : L(`about ${Math.ceil(busy.eta)} s left`, `zbývá asi ${Math.ceil(busy.eta)} s`);
+  } else {
+    $('#busy-title').textContent = phase === 'restart' ? L('The gateway is restarting', 'Brána se restartuje') : L('Starting the role', 'Spouštím roli');
+    $('#busy-stage').textContent = phase === 'start' ? (ROLES[r.desired]?.name || r.desired) : '';
+    bar.firstElementChild.style.width = '';
+    $('#busy-pct').textContent = '';
+    $('#busy-eta').textContent = phase === 'restart' ? L(`${secs} s`, `${secs} s`) : '';
+  }
+  $('#busy-note').textContent = L('The page is locked until the gateway is done. Do not unplug the board.',
+    'Stránka je zamčená, dokud brána neskončí. Desku neodpojujte od napájení.');
+  if (!dlg.open) dlg.showModal();
+}
+$('#busy-dlg').addEventListener('cancel', e => e.preventDefault());
 
 /* ---------------- log ---------------- */
 
@@ -2711,6 +2943,9 @@ function pageTitle() {
 
 function render(full) {
   if (!status) return;
+  /* a page of a role that is not active (bookmark, role switched meanwhile): the first page that works */
+  if (!pageEnabled(tab, sub)) return go(firstPage(NAV.find(n => n.id === tab)) ? `${tab}/${firstPage(NAV.find(n => n.id === tab)).id}` : 'overview', true);
+  if (navRole !== activeRole()) renderNav();
   renderHeader();
   const main = $('#main');
   /* Forms keep their input: only redraw passive pages on every poll. */
@@ -2737,7 +2972,7 @@ async function poll() {
   if (!restarting) {
     try { status = await api('/api/status'); render(false); } catch (e) { $('#hdr-role').innerHTML = '<span class="dot bad"></span><span>offline</span>'; }
   }
-  setTimeout(poll, status?.c6?.flash?.busy || status?.identify_s ? 1000 : 5000);
+  setTimeout(poll, $('#busy-dlg').open ? 500 : status?.c6?.flash?.busy || status?.identify_s ? 1000 : 5000);
 }
 
 renderNav();
