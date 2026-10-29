@@ -128,6 +128,8 @@ pre { background: var(--code); border: 1px solid var(--border); border-radius: 8
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .log { height: 420px; white-space: pre; overflow: auto; }
+.lv-E, .lv-Em { color: var(--bad); } .lv-W, .lv-Wm { color: var(--warn); } .lv-I, .lv-D, .lv-V { color: var(--muted); }
+.log-tag { color: var(--accent); text-decoration: none; } .log mark { background: var(--warn); color: var(--bg); }
 #nodebox { position: fixed; z-index: 50; max-width: 420px; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: none;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); pointer-events: none; }
 #nodebox .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
@@ -457,7 +459,8 @@ const CS = {
   'any sound (YAMNet embedding)': 'jakýkoli zvuk (embedding YAMNet)', 'beep or tone (frequency)': 'pípnutí nebo tón (frekvence)', 'Record sample (4 s)': 'Nahrát vzorek (4 s)',
   'Record background (5 s)': 'Nahrát pozadí (5 s)', 'Play the sound near the board right after pressing Record. 5 to 10 samples per sound, then the background of the room.': 'Pusťte zvuk u desky hned po stisku Nahrát. 5 až 10 vzorků na zvuk, potom pozadí místnosti.',
   'Background': 'Pozadí', 'Sound': 'Zvuk', 'Samples': 'Vzorky', 'Samples alike': 'Shoda vzorků', 'Threshold': 'Práh', 'Now': 'Teď', 'No learned sound yet.': 'Zatím žádný naučený zvuk.',
-  'Delete background': 'Smazat pozadí', 'Server certificate': 'Certifikát serveru', "public CA (Let's Encrypt and others)": 'veřejná CA (Let\'s Encrypt a další)', 'own CA or self-signed certificate': 'vlastní CA nebo self-signed certifikát',
+  'Delete background': 'Smazat pozadí', 'all sources': 'všechny zdroje', 'system': 'systém', 'network, MQTT, web': 'síť, MQTT, web', 'sound': 'zvuk',
+  'C6 flashing': 'flashování C6', 'all levels': 'všechny úrovně', 'warnings and errors': 'varování a chyby', 'errors': 'chyby', 'search (/regex/)': 'hledat (/regex/)', 'Server certificate': 'Certifikát serveru', "public CA (Let's Encrypt and others)": 'veřejná CA (Let\'s Encrypt a další)', 'own CA or self-signed certificate': 'vlastní CA nebo self-signed certifikát',
   'CA certificate (PEM)': 'Certifikát CA (PEM)', 'Do not check the server name': 'Nekontrolovat jméno serveru', 'Advanced': 'Pokročilé', 'Client ID': 'Client ID', 'Keepalive (s)': 'Keepalive (s)',
   'Base topic': 'Základní topic', 'State interval (s)': 'Interval stavu (s)', 'Home Assistant discovery': 'Discovery pro Home Assistant', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
@@ -814,6 +817,7 @@ const TIPS = {
   'Back up now': ['Restarts the gateway and saves the network data of the running Zigbee role from the C6 (it can be read only while the C6 is stopped).', 'Restartuje bránu a uloží data sítě běžící Zigbee role z C6 (dají se číst jen při zastaveném C6).'],
   'Saved': ['When the backup was taken; — for backups from before this column existed.', 'Kdy byla záloha pořízena; — u záloh z doby před tímto sloupcem.'],
   'Learn from a file': ['A WAV recording, 16 kHz mono 16-bit, 1 to 10 s, e.g. the washing machine beep recorded with a phone next to it (convert with: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). As a sample its loudest 0.96 s are used; Test recording shows how the learned sounds score it, nothing is saved.', 'Nahrávka WAV, 16 kHz mono 16 bit, 1 až 10 s, např. pípnutí pračky nahrané telefonem u ní (převod: ffmpeg -i in.m4a -ar 16000 -ac 1 out.wav). Jako vzorek se použije nejhlasitějších 0,96 s; Test nahrávky ukáže, jaké skóre jí dají naučené zvuky, nic se neukládá.'],
+  'Log': ['Time of each line in the local time of this browser (logged by the gateway, so also for older lines). Source and tag pick what to show, level hides informational lines, search finds text (or a /regular expression/). A click on a tag shows only that tag. Download saves the lines shown, with the full date. The gateway keeps about 64 kB of log.', 'Čas každého řádku v místním čase tohoto prohlížeče (zapisuje ho brána, takže i u starších řádků). Zdroj a tag vybírají, co zobrazit, úroveň skryje informační řádky, hledání najde text (nebo /regulární výraz/). Kliknutí na tag zobrazí jen ten tag. Stáhnout uloží zobrazené řádky s celým datem. Brána drží asi 64 kB logu.'],
   'Broker URI': ['mqtt://host:1883, mqtts://host:8883 (TLS), ws://host:1884 or wss://… (MQTT over WebSocket, e.g. the Mosquitto add-on port 1884).', 'mqtt://host:1883, mqtts://host:8883 (TLS), ws://host:1884 nebo wss://… (MQTT přes WebSocket, např. port 1884 doplňku Mosquitto).'],
   'Server certificate': ['TLS always verifies the broker. Public CA: brokers with a certificate from a public authority (cloud brokers, Let\'s Encrypt). Own CA: paste the CA that signed the broker certificate, or the self-signed broker certificate itself.', 'TLS vždy ověřuje broker. Veřejná CA: brokery s certifikátem od veřejné autority (cloudové brokery, Let\'s Encrypt). Vlastní CA: vložte CA, která podepsala certifikát brokeru, nebo přímo jeho self-signed certifikát.'],
   'Do not check the server name': ['The certificate is still verified against the CA, only the name in it may differ from the URI host, e.g. when the broker is reached by IP address. Also turns off SNI (one broker per address).', 'Certifikát se dál ověřuje proti CA, jen jméno v něm se může lišit od hostitele v URI, např. když je broker zadaný IP adresou. Vypne také SNI (jeden broker na adrese).'],
@@ -1452,7 +1456,12 @@ function mqttTlsFields() {
   $('#mq-ca-box').classList.toggle('hidden', $('#mq-tls').value !== 'ca');
 }
 document.addEventListener('input', e => { if (e.target.id === 'mq-uri') mqttTlsFields(); });
-document.addEventListener('change', e => { if (e.target.id === 'mq-tls') mqttTlsFields(); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'mq-tls') mqttTlsFields();
+  if (e.target.id === 'log-src') { logView.src = e.target.value; logView.tag = ''; renderLog(); }
+  if (e.target.id === 'log-lvl') { logView.lvl = e.target.value; renderLog(); }
+  if (e.target.id === 'log-tag') { logView.tag = e.target.value; renderLog(); }
+});
 
 async function loadMqtt() {
   const box = $('#mqtt-box');
@@ -1815,8 +1824,13 @@ views['system/diag'] = () => `<div class="grid">
     ${isZigbee() ? `<a class="btn" href="/api/zigbee/status" target="_blank">${ic('download')}Zigbee JSON</a>` : ''}</div>
     <div class="row"><button class="btn" id="cd-get">${ic('download')}Download core dump</button><button class="btn danger" id="cd-del">${ic('delete-outline')}Erase core dump</button>${tip('Core dump')}</div>
     <div class="row"><button class="btn" id="log-prev">${ic('download')}Log before the last restart</button>${tip('Previous log')}</div></div>
-  <div class="card wide">${h3('text-box-outline', 'Log')}<div class="row"><button class="btn" id="log-pause">Pause</button><button class="btn" id="log-clear">Clear</button>
-    <button class="btn" id="log-save">${ic('download')}Download</button><input type="text" id="log-filter" placeholder="filter" style="flex:1"></div>
+  <div class="card wide">${h3('text-box-outline', 'Log')}<div class="row"><button class="btn" id="log-pause">${logPaused ? 'Resume' : 'Pause'}</button><button class="btn" id="log-clear">Clear</button>
+    <button class="btn" id="log-save">${ic('download')}Download</button>
+    <select id="log-src" title="Source">${Object.keys(LOG_SOURCES).map(k => `<option value="${k}" ${k === logView.src ? 'selected' : ''}>${LOG_SOURCES[k].label}</option>`).join('')}</select>
+    <select id="log-lvl" title="Level"><option value="IWED" ${logView.lvl === 'IWED' ? 'selected' : ''}>all levels</option><option value="WE" ${logView.lvl === 'WE' ? 'selected' : ''}>warnings and errors</option><option value="E" ${logView.lvl === 'E' ? 'selected' : ''}>errors</option></select>
+    <select id="log-tag" title="Tag"></select>
+    <input type="text" id="log-filter" placeholder="search (/regex/)" value="${esc(logView.q)}" style="flex:1">${tip('Log')}</div>
+    <div class="muted" id="log-count" style="margin:4px 0"></div>
     <pre class="log" id="log"></pre></div>
 </div>`;
 
@@ -2959,7 +2973,16 @@ document.addEventListener('click', async e => {
       await api('/api/sound/learn?profile=' + encodeURIComponent(t.dataset.lnDelprof), { method: 'DELETE' });
       loadLearn();
     } else if (t.id === 'log-prev') {
-      await download('/api/logs/previous', status.hostname + '-previous.log');
+      /* formatted like the live log: the same parser on a separate buffer */
+      const keep = [logLines, logTags, logRest];
+      logLines = []; logTags = new Map(); logRest = '';
+      try {
+        logParse(await api('/api/logs/previous') + '\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([logFileText(logLines)], { type: 'text/plain' }));
+        a.download = status.hostname + '-previous.log';
+        a.click();
+      } finally { [logLines, logTags, logRest] = keep; }
     } else if (t.id === 'cd-del') {
       await api('/api/coredump', { method: 'DELETE' });
       toast('Core dump erased');
@@ -2967,11 +2990,11 @@ document.addEventListener('click', async e => {
       logPaused = !logPaused;
       t.textContent = logPaused ? 'Resume' : 'Pause';
     } else if (t.id === 'log-clear') {
-      logText = '';
+      logLines = []; logTags = new Map();
       renderLog();
     } else if (t.id === 'log-save') {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([logText], { type: 'text/plain' }));
+      a.href = URL.createObjectURL(new Blob([logFileText(logFilter())], { type: 'text/plain' }));
       a.download = status.hostname + '.log';
       a.click();
     } else if (t.dataset.upload) {
@@ -3007,6 +3030,15 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('click', e => {
+  const lt = e.target.closest('a[data-log-tag]');
+  if (lt) {
+    e.preventDefault();
+    logView.tag = logView.tag === lt.dataset.logTag ? '' : lt.dataset.logTag;
+    logView.src = 'all';
+    if ($('#log-src')) $('#log-src').value = 'all';
+    renderLog();
+    return;
+  }
   const ln = e.target.closest('a[data-ln-play], a[data-ln-del]');
   if (ln) {
     e.preventDefault();
@@ -3145,28 +3177,102 @@ $('#busy-dlg').addEventListener('cancel', e => e.preventDefault());
 
 /* ---------------- log ---------------- */
 
-let logSeq = 0, logText = '', logPaused = false;
+/* Lines from the gateway start with the time they were logged ("<unix ms> " or "+<ms since boot> ");
+ * ESP-IDF's own time in the line is dropped, the local time of the browser is shown instead. */
+const LOG_SOURCES = {
+  all: { label: 'all sources' },
+  system: { label: 'system', tags: /^(main|gw_boot|gw_config|gw_api|gw_update|gw_log|cpu_start|heap_init|spi_flash|esp_image|boot|app_init|efuse|esp_psram|esp_core_dump.*|ota|esp_ota_ops|esp_https_ota|pp|phy|temperature_sensor)$/i },
+  network: { label: 'network, MQTT, web', tags: /^(gw_eth|gw_http|gw_mqtt|esp_eth.*|eth_.*|mdns.*|esp-tls.*|transport.*|mqtt_client|httpd.*|netscan|esp_netif.*|sntp|ping_sock|lwip)$/i },
+  thread: { label: 'Thread', tags: /^(OPENTHREAD|OT_.*|obtr_web|esp_ot.*|role_thread|ot_.*|esp_br.*|thread_.*)$/i },
+  zigbee: { label: 'Zigbee', tags: /^(role_zigbee|zigbee_net|zb_.*)$/i },
+  sound: { label: 'sound', tags: /^(sound.*|I2S_IF|ES8311|Adev_Codec|FbsLoader|i2s_.*|dl_.*|esp-dl)$/i },
+  c6: { label: 'C6 flashing', tags: /^(c6_flasher|esp_loader.*|serial_flasher.*)$/i },
+};
+let logSeq = 0, logPaused = false, logRest = '', logLines = [], logTags = new Map();
+const logView = { src: 'all', lvl: 'IWED', tag: '', q: '' };
+const LOG_MAX = 6000;
+
+/* Parses complete lines; a partial last line waits for its end. */
+function logParse(text) {
+  const lines = (logRest + text).split('\n');
+  logRest = lines.pop();
+  for (const raw of lines) {
+    const m = raw.match(/^(\d{13}|\+\d+) (.*)$/);
+    const at = m ? (m[1][0] === '+' ? null : +m[1]) : null, body = (m ? m[2] : raw).replace(/\r$/, '');
+    if (!body.trim()) continue;
+    /* "I (11:18:23.116) tag: msg", OpenThread "W(12831) OPENTHREAD:[W] ..." */
+    const p = body.match(/^([IWEDV]) ?\(([\d:.]+)\) ([^:\s]+): ?(.*)$/);
+    const prev = logLines[logLines.length - 1];
+    const line = p ? { at, lvl: p[1], tag: p[3], msg: p[4] } : { at, lvl: prev?.lvl || 'I', tag: prev?.tag || '', msg: body };
+    if (!p && !m) line.at = prev?.at ?? null;
+    logLines.push(line);
+    if (line.tag) logTags.set(line.tag, (logTags.get(line.tag) || 0) + 1);
+  }
+  if (logLines.length > LOG_MAX) logLines.splice(0, logLines.length - LOG_MAX);
+}
+
+const pad = (n, w = 2) => String(n).padStart(w, '0');
+function logTime(at, full) {
+  if (at == null) return full ? '????-??-?? ??:??:??.???' : '??:??:??.???';
+  const d = new Date(at);
+  const t = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+  return full ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${t}`
+    : (new Date().toDateString() === d.toDateString() ? t : `${d.getDate()}.${d.getMonth() + 1}. ${t}`);
+}
+
+function logMatcher() {
+  const q = logView.q.trim();
+  if (!q) return null;
+  const re = q.match(/^\/(.+)\/$/);
+  try { return new RegExp(re ? re[1] : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); } catch (e) { return null; }
+}
+
+function logFilter() {
+  const src = LOG_SOURCES[logView.src], m = logMatcher();
+  return logLines.filter(l => logView.lvl.includes(l.lvl) && (!src.tags || src.tags.test(l.tag)) && (!logView.tag || l.tag === logView.tag)
+    && (!m || (m.lastIndex = 0, m.test(l.tag + ': ' + l.msg))));
+}
+
 function renderLog() {
   const box = $('#log');
   if (!box) return;
-  const f = $('#log-filter')?.value.toLowerCase();
+  const sel = $('#log-tag');
+  const tags = [...logTags.keys()].filter(t => !LOG_SOURCES[logView.src].tags || LOG_SOURCES[logView.src].tags.test(t)).sort((a, b) => a.localeCompare(b));
+  const opts = `<option value="">${L('all tags', 'všechny tagy')}</option>` + tags.map(t => `<option value="${esc(t)}" ${t === logView.tag ? 'selected' : ''}>${esc(t)} (${logTags.get(t)})</option>`).join('');
+  if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }
   const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-  box.textContent = f ? logText.split('\n').filter(l => l.toLowerCase().includes(f)).join('\n') : logText;
+  const shown = logFilter(), m = logMatcher(), last = shown.slice(-2000);
+  const hl = t => {
+    if (!m) return esc(t);
+    let out = '', i = 0;
+    for (const x of t.matchAll(m)) {
+      if (!x[0]) break;
+      out += esc(t.slice(i, x.index)) + `<mark>${esc(x[0])}</mark>`;
+      i = x.index + x[0].length;
+    }
+    return out + esc(t.slice(i));
+  };
+  box.innerHTML = last.map(l => `<span class="muted">${logTime(l.at)}</span> <span class="lv-${l.lvl}">${l.lvl}</span> ${l.tag ? `<a href="#" class="log-tag" data-log-tag="${esc(l.tag)}">${hl(l.tag)}</a>: ` : ''}<span class="lv-${l.lvl}m">${hl(l.msg)}</span>`).join('\n');
+  $('#log-count').textContent = `${shown.length} / ${logLines.length} ${L('lines', 'řádků')}` + (shown.length > last.length ? ` (${L('showing the last 2000', 'zobrazeno posledních 2000')})` : '');
   if (stick) box.scrollTop = box.scrollHeight;
 }
+
+/* Text for a file: full local date and time, level, tag. */
+const logFileText = lines => lines.map(l => `${logTime(l.at, true)} ${l.lvl} ${l.tag ? l.tag + ': ' : ''}${l.msg}`).join('\n') + '\n';
+
 async function pollLog() {
   if (route() !== 'system/diag' || logPaused || restarting) return;
   try {
     const { data, res } = await api('/api/logs?since=' + logSeq, { raw: true });
     logSeq = +res.headers.get('X-Log-Seq') || logSeq;
     if (data) {
-      logText = (logText + data.replace(/\x1b\[[0-9;]*m/g, '')).slice(-200000);
+      logParse(data.replace(/\x1b\[[0-9;]*m/g, ''));
       renderLog();
     }
   } catch (e) { /* retry next tick */ }
 }
 document.addEventListener('input', e => {
-  if (e.target.id === 'log-filter') renderLog();
+  if (e.target.id === 'log-filter') { logView.q = e.target.value; renderLog(); }
   if (e.target.id === 'zdev-filter' && z2m) renderZDevices([...zInfo.values()], z2m.now);
   if (e.target.id === 'cls-search') {
     const q = e.target.value.trim().toLowerCase();

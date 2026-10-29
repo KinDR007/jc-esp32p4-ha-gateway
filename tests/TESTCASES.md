@@ -92,6 +92,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI22 | online aktualizace | uložení URL, zobrazení chyby kontroly, Instalovat zakázáno bez nabídky, vymazání URL |
 | UI23 | naučené zvuky | stránka se načte, cizí soubor skončí chybou, test nahrávky ukáže skóre |
 | UI24 | MQTT | volby TLS jen pro mqtts:// a wss://, pole certifikátu jen pro vlastní CA, pokročilé volby |
+| UI25 | log | každý řádek začíná místním časem prohlížeče; úroveň, zdroj, tag (i kliknutím) a hledání (text se zvýrazněním, /regex/) filtrují |
 | UI15 | nápovědy (i) | žádný klíč nápovědy není v TIPS dvakrát; tabulky zařízení Thread a Zigbee a údaje instance Zigbee2MQTT mají vlastní nápovědy, ne texty jiných tabulek se stejným názvem sloupce |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; modální okno zamkne stránku, ukáže fázi, procenta a odhad zbývajícího času, Escape ho nezavře; po skončení vše zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |

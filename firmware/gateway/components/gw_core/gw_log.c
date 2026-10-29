@@ -1,15 +1,19 @@
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "esp_attr.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "gw.h"
 
-/* Log lines are teed into a ring buffer in PSRAM so the web UI can show them. */
+/* Log lines are teed into a ring buffer in PSRAM so the web UI can show them. Every line starts with
+ * the time it was logged: unix milliseconds (13 digits) once the clock is set, else "+<ms since boot>",
+ * then a space. OpenThread and continuation lines have no usable time of their own. */
 
 /* A second, smaller copy lives in internal RAM that startup leaves alone, so the log before a
  * software, watchdog or panic restart can be read after it (internal RAM, unlike PSRAM, has no
@@ -81,6 +85,37 @@ static void kept_init(void)
     s_kept.magic = KEPT_MAGIC;
 }
 
+static bool s_line_start = true;
+
+static void stamp_line(void)
+{
+    char ts[24];
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    int n = tv.tv_sec > 1700000000 ? snprintf(ts, sizeof(ts), "%lld%03ld ", (long long)tv.tv_sec, (long)(tv.tv_usec / 1000))
+                                   : snprintf(ts, sizeof(ts), "+%lld ", (long long)(esp_timer_get_time() / 1000));
+    ring_write(ts, n);
+    kept_write(ts, n);
+}
+
+/* A log call may hold several lines or end mid-line: stamp at every line start. */
+static void tee(const char *p, size_t n)
+{
+    while (n) {
+        if (s_line_start) {
+            stamp_line();
+            s_line_start = false;
+        }
+        const char *nl = memchr(p, '\n', n);
+        size_t seg = nl ? (size_t)(nl - p) + 1 : n;
+        ring_write(p, seg);
+        kept_write(p, seg);
+        p += seg;
+        n -= seg;
+        s_line_start = nl != NULL;
+    }
+}
+
 static int log_vprintf(const char *fmt, va_list args)
 {
     if (xPortInIsrContext() || xTaskGetSchedulerState() != taskSCHEDULER_RUNNING ||
@@ -92,9 +127,11 @@ static int log_vprintf(const char *fmt, va_list args)
     int len = vsnprintf(s_line, sizeof(s_line), fmt, copy);
     va_end(copy);
     if (len > 0) {
-        size_t n = (size_t)len < sizeof(s_line) ? (size_t)len : sizeof(s_line) - 1;
-        ring_write(s_line, n);
-        kept_write(s_line, n);
+        bool cut = (size_t)len >= sizeof(s_line);
+        tee(s_line, cut ? sizeof(s_line) - 1 : (size_t)len);
+        if (cut) {
+            tee("\n", 1); /* the end of a cut line (and its newline) is lost: keep the next line apart */
+        }
     }
     xSemaphoreGive(s_lock);
     return s_orig(fmt, args);

@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI24).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI25).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -523,7 +523,8 @@ await test('UI19', 'Diagnostics: the log before the last restart downloads', asy
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#log-prev')]);
   const text = readFileSync(await dl.path(), 'utf8');
   check(dl.suggestedFilename().endsWith('-previous.log'), `file ${dl.suggestedFilename()}`);
-  check(/^[IWE] \(/m.test(text), `log lines (${text.length} B)`);
+  /* "????" for lines of a firmware that did not stamp them yet (the first restart after the update) */
+  check(/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}|\?{4}-\?\?-\?\? \?\?:\?\?:\?\?\.\?{3}) [IWE] \S+: /m.test(text), `log lines with date and time (${text.length} B)`);
 });
 
 await test('UI20', 'Settings backup: export downloads the settings, a foreign file and a cancelled import change nothing', async () => {
@@ -606,6 +607,36 @@ await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certific
   check(await shown('#mq-tls'), 'wss://: TLS options');
   check(['#mq-cid', '#mq-ka', '#mq-base', '#mq-int', '#mq-disc'].every(async s => await page.$(s)), 'advanced options present');
   await page.fill('#mq-uri', uri);
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI25', 'Log: every line has its local time, source, level, tag and search filter it', async () => {
+  await tab('system/diag');
+  await page.waitForFunction(() => document.querySelectorAll('#log .lv-I, #log .lv-W, #log .lv-E').length > 20, null, { timeout: 10000 });
+  const lines = await page.$$eval('#log', b => b[0].textContent.split('\n'));
+  check(lines.every(l => /^(\d+\.\d+\. )?\d\d:\d\d:\d\d\.\d{3} [IWEDV] /.test(l)), `${lines.length} lines, each starting with the time: ${lines[0].slice(0, 60)}`);
+  const known = lines.filter(l => !l.includes('??:')).length;
+  check(known > lines.length * 0.8, `${known} with a wall clock time`);
+  const now = new Date(), last = lines[lines.length - 1].match(/(\d\d):(\d\d):(\d\d)/);
+  const diff = Math.abs((now.getHours() * 3600 + now.getMinutes() * 60 + +now.getSeconds()) - (last[1] * 3600 + last[2] * 60 + +last[3]));
+  check(diff < 120, `last line at ${last[0]}, local time of the browser (${diff} s ago)`);
+  await page.selectOption('#log-lvl', 'WE');
+  check(await page.$$eval('#log .lv-I', x => x.length) === 0, 'warnings and errors: no info lines');
+  await page.selectOption('#log-lvl', 'IWED');
+  await page.selectOption('#log-src', 'network');
+  const tags = await page.$$eval('#log .log-tag', x => [...new Set(x.map(a => a.textContent))]);
+  check(tags.length && tags.every(t => /^(gw_eth|gw_http|gw_mqtt|esp_eth.*|eth_.*|mdns.*|esp-tls.*|transport.*|mqtt_client|httpd.*|netscan|esp_netif.*|sntp|ping_sock|lwip)$/i.test(t)), `network source: ${tags.join(', ')}`);
+  await page.selectOption('#log-src', 'all');
+  await page.click('#log .log-tag');
+  const one = await page.$$eval('#log .log-tag', x => [...new Set(x.map(a => a.textContent))]);
+  check(one.length === 1, `a click on a tag shows only ${one[0]}`);
+  await page.selectOption('#log-tag', '');
+  await page.fill('#log-filter', 'gw_');
+  check(await page.$$eval('#log mark', x => x.length) > 0, 'search highlights matches');
+  await page.fill('#log-filter', '/role (thread|zigbee)/');
+  const rx = await page.$eval('#log-count', x => x.textContent);
+  check(/^\d+ \//.test(rx), `regular expression: ${rx}`);
+  await page.fill('#log-filter', '');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

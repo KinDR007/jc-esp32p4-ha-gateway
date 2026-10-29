@@ -51,6 +51,12 @@
   check; MQTT over WebSocket (`ws://`, `wss://`); client ID, keepalive, base topic, state interval and
   Home Assistant discovery on/off (off removes the entities). Discovery is sent again when Home
   Assistant comes online (`<prefix>/status`). TLS errors name the cause. Tests TC29, UI24.
+- Log viewer (System › Diagnostics): every line carries the time it was logged (the gateway stamps
+  each line in `/api/logs` with unix ms, or `+<ms since boot>` before the clock is set), shown in the
+  browser's local time; OpenThread and continuation lines now have a time too. Filters by source
+  (system, network/MQTT/web, Thread, Zigbee, sound, C6 flashing), level and tag (a click on a tag
+  shows only that tag), search with highlighting or a `/regular expression/`. Downloads (also the log
+  before the last restart) have the full local date and time. Test UI25.
 
 ## v1.4 (2026-10-29)
 
