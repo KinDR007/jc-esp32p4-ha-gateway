@@ -351,10 +351,13 @@ def tc11_auth():
     pw = 'hwtest-' + str(int(time.time()))
     check(http('POST', '/api/settings', {'password': pw})[0] == 200, 'password set')
     check(http('GET', '/api/status')[0] == 401, '401 without credentials')
-    check(http('GET', '/api/status', auth=pw)[0] == 200, '200 with credentials')
+    code, st = http('GET', '/api/status', auth=pw)
+    check(code == 200, '200 with credentials')
+    check(st['auth'] is True, 'status reports the password')
     check(http('GET', '/api/status', auth='wrong')[0] == 401, '401 with a wrong password')
     check(http('POST', '/api/settings', {'password': ''}, auth=pw)[0] == 200, 'password removed')
     check(http('GET', '/api/status')[0] == 200, 'open again')
+    check(status()['auth'] is False, 'status reports no password')
 
 
 def tc12_invalid_uploads():

@@ -253,7 +253,7 @@ static esp_err_t status_get(httpd_req_t *req)
     gw_state_t *st = gw_state();
     const esp_app_desc_t *app = esp_app_get_description();
     esp_chip_info_t chip;
-    char password[2];
+    char password[65];
     cJSON *json = cJSON_CreateObject();
 
     esp_chip_info(&chip);
@@ -270,7 +270,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(json, "chip_revision", chip.revision);
     cJSON_AddNumberToObject(json, "uptime_s", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddStringToObject(json, "reset_reason", reset_reason_name(esp_reset_reason()));
-    cJSON_AddBoolToObject(json, "auth", gw_config_get_str(GW_KEY_PASSWORD, password, sizeof(password)) ||
+    cJSON_AddBoolToObject(json, "auth", gw_config_get_str(GW_KEY_PASSWORD, password, sizeof(password)) &&
                                             password[0]);
 
     cJSON *heap = cJSON_AddObjectToObject(json, "heap");
