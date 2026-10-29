@@ -17,6 +17,8 @@ static const char *TAG = "gw_http";
 
 extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");
 extern const uint8_t index_html_gz_end[] asm("_binary_index_html_gz_end");
+extern const uint8_t p4gw_favicon_ico_start[] asm("_binary_p4gw_favicon_ico_start");
+extern const uint8_t p4gw_favicon_ico_end[] asm("_binary_p4gw_favicon_ico_end");
 
 static httpd_handle_t s_server;
 
@@ -168,6 +170,14 @@ static esp_err_t index_handler(httpd_req_t *req)
     return httpd_resp_send(req, (const char *)index_html_gz_start, index_html_gz_end - index_html_gz_start);
 }
 
+/* Browsers ask for it before the page says anything, and without a password. */
+static esp_err_t favicon_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "image/x-icon");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=604800");
+    return httpd_resp_send(req, (const char *)p4gw_favicon_ico_start, p4gw_favicon_ico_end - p4gw_favicon_ico_start);
+}
+
 /* ---- push to WebSocket clients (the Home Assistant integration) ---- */
 
 /* Handshake: the same password as the API. */
@@ -261,6 +271,8 @@ esp_err_t gw_http_start(void)
 
     httpd_uri_t index = {.uri = "/", .method = HTTP_GET, .handler = index_handler};
     httpd_register_uri_handler(s_server, &index);
+    httpd_uri_t favicon = {.uri = "/favicon.ico", .method = HTTP_GET, .handler = favicon_handler};
+    httpd_register_uri_handler(s_server, &favicon);
     httpd_uri_t ws = {.uri = "/api/ws", .method = HTTP_GET, .handler = ws_handler, .is_websocket = true,
                       .ws_pre_handshake_cb = ws_auth};
     httpd_register_uri_handler(s_server, &ws);

@@ -14,3 +14,4 @@ add_custom_command(OUTPUT ${web_gz}
                    VERBATIM)
 add_custom_target(gw_web DEPENDS ${web_gz})
 target_add_binary_data(${COMPONENT_LIB} ${web_gz} BINARY DEPENDS gw_web)
+target_add_binary_data(${COMPONENT_LIB} ${CMAKE_CURRENT_LIST_DIR}/../../web/p4gw_favicon.ico BINARY)

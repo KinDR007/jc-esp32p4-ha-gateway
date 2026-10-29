@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P4 Gateway</title>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b74fb'/%3E%3Cstop offset='1' stop-color='%239a5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='256' height='256' rx='64' fill='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-width='24' stroke-linecap='round' fill='none'%3E%3Cpath d='M190 76 A80 80 0 0 1 190 180'/%3E%3Cpath d='M66 76 A80 80 0 0 0 66 180'/%3E%3C/g%3E%3Crect x='84' y='84' width='88' height='88' rx='24' fill='%23fff'/%3E%3Crect x='110' y='110' width='36' height='36' rx='9' fill='url(%23g)'/%3E%3C/svg%3E">
 <style>
 :root {
   --bg: #f4f6f9; --panel: #ffffff; --panel-2: #f0f2f6; --text: #18202b; --muted: #5d6878;
@@ -1443,7 +1445,27 @@ advanced:
   };
   return steps;
 }
-views['ha/guide'] = () => `<div class="card guide" data-notr>${haSteps()[activeRole()] || haSteps().none}</div>`;
+/* Native integration (custom_components/p4gw): one-click My Home Assistant links, as HA integrations do. */
+const P4GW_HACS = 'https://my.home-assistant.io/redirect/hacs_repository/?owner=KinDR007&repository=jc-esp32p4-ha-gateway&category=integration';
+const P4GW_ADD = 'https://my.home-assistant.io/redirect/config_flow_start/?domain=p4gw';
+function haIntegration() {
+  const host = esc(ip()), cs = lang === 'cs';
+  const links = `<div class="row">
+    <a class="btn primary" href="${P4GW_HACS}" target="_blank" rel="noopener">${ic('download')}${cs ? 'Otevřít v HACS' : 'Open in HACS'}</a>
+    <a class="btn" href="${P4GW_ADD}" target="_blank" rel="noopener">${ic('plus')}${cs ? 'Přidat integraci' : 'Add integration'}</a></div>`;
+  return cs ? `<h3>Integrace P4 Gateway</h3>
+    <p>Vlastní integrace brány pro Home Assistant: role, zvukové události, teploty, aktualizace firmwaru a tlačítka přímo v HA, bez MQTT brokeru. Tlačítka otevřou vaši instanci HA na správném místě (My Home Assistant).</p>${links}<ol class="steps">
+    <li><b>Otevřít v HACS</b> → <i>Stáhnout</i>, pak restartujte Home Assistant. Bez HACS: zkopírujte složku <code>custom_components/p4gw</code> z repozitáře do <code>/config/custom_components/</code>.</li>
+    <li>Brána se sama objeví v <b>Nastavení → Zařízení a služby → Objeveno</b>; nebo <b>Přidat integraci</b> a adresa <code>${host}</code>. Je-li nastavené heslo webového rozhraní, HA se na něj zeptá.</li>
+    <li>Používáte i MQTT? Vypněte v <b>Home Assistant → MQTT</b> volbu <i>Home Assistant discovery</i>, jinak budou entity v HA dvakrát.</li></ol>`
+  : `<h3>P4 Gateway integration</h3>
+    <p>The gateway's own Home Assistant integration: role, sound events, temperatures, firmware updates and buttons right in HA, no MQTT broker needed. The buttons open your HA instance at the right place (My Home Assistant).</p>${links}<ol class="steps">
+    <li><b>Open in HACS</b> → <i>Download</i>, then restart Home Assistant. Without HACS: copy the folder <code>custom_components/p4gw</code> from the repository into <code>/config/custom_components/</code>.</li>
+    <li>The gateway shows up under <b>Settings → Devices &amp; services → Discovered</b>; or <b>Add integration</b> with the address <code>${host}</code>. With a web UI password set, HA asks for it.</li>
+    <li>Using MQTT as well? Switch off <i>Home Assistant discovery</i> under <b>Home Assistant → MQTT</b>, or every entity shows up twice.</li></ol>`;
+}
+views['ha/guide'] = () => `<div class="card guide" data-notr>${haIntegration()}</div>
+  <div class="card guide" data-notr>${haSteps()[activeRole()] || haSteps().none}</div>`;
 views['ha/esphome'] = () => `<div class="card guide" data-notr>${haSteps().ble}</div>`;
 views['ha/mqtt'] = () => `<div class="card">${h3('transit-connection-variant', 'MQTT (optional)')}
     <p class="muted">Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).</p>

@@ -21,6 +21,14 @@ Status: all roles and transitions pass the automated hardware tests (10/10 regre
 [tests/results/2026-10-28/report.md](tests/results/2026-10-28/report.md)); the OTBR integration
 runs in Home Assistant. Open manual tests are listed in [TODO.md](TODO.md).
 
+## Home Assistant integration
+
+[![Open your Home Assistant instance and open this repository inside HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=KinDR007&repository=jc-esp32p4-ha-gateway&category=integration)
+[![Open your Home Assistant instance and start setting up the P4 Gateway integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=p4gw)
+
+Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
+[docs/home-assistant.md](docs/home-assistant.md#p4-gateway-integration-native-without-mqtt).
+
 ## Documentation
 
 | Document | Content |

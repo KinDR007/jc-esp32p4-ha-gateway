@@ -10,6 +10,12 @@
   `version`) and `/api/ws`, which forwards everything the gateway publishes to MQTT, broker or not,
   through its own queue (a burst of 23 messages arrived whole, one server job per message lost all
   but 6). Tests: `tests/ha_integration` (13, CI with hassfest), TC30.
+- Icon of the gateway (chip with radio waves, `assets/brand/*.svg`, `scripts/gen_brand.sh`): brand
+  images of the integration (`custom_components/p4gw/brand/`, read by Home Assistant 2026 from the
+  integration folder) and the web UI favicon (SVG, plus `/favicon.ico` 16/32/48 px served without
+  a password; 16 and 32 px drawn simplified).
+- Home Assistant › Guide: card of the P4 Gateway integration with one-click My Home Assistant buttons
+  (open the repository in HACS, start the setup); the same badges in README and docs.
 - Fix: `auth` in `/api/status` read the password into a 2-byte buffer, so a set password showed as
   none (the UI warned about a missing password) and a removed one as set. TC11 checks it.
 - C6 slots layout: the Thread RCP, Zigbee router, Zigbee coordinator and scanner firmwares sit in

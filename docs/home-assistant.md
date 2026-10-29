@@ -70,13 +70,19 @@ Like SMLIGHT SLZB devices, the gateway has its own Home Assistant integration
 ([custom_components/p4gw](../custom_components/p4gw)). It talks to the gateway directly: no broker,
 no add-on.
 
-Install (once):
+Install (once), one click each:
 
-- HACS › Integrations › ⋮ › Custom repositories: this repository, category *Integration*, then
-  install **P4 Gateway**; or
-- copy `custom_components/p4gw` into `/config/custom_components/` (e.g. over the SSH add-on).
+[![Open your Home Assistant instance and open this repository inside HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=KinDR007&repository=jc-esp32p4-ha-gateway&category=integration)
+[![Open your Home Assistant instance and start setting up the P4 Gateway integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=p4gw)
 
-Restart Home Assistant. The gateway announces itself over mDNS (`_p4gw._tcp`, TXT `mac`, `version`),
+1. **Open in HACS** adds this repository to HACS; *Download*, then restart Home Assistant.
+   Without HACS: copy `custom_components/p4gw` into `/config/custom_components/` (e.g. over the SSH
+   add-on). HACS installs only from a public repository.
+2. **Add integration** starts the setup (or use the discovered gateway, below).
+
+The web UI shows the same buttons under Home Assistant › Guide.
+
+The gateway announces itself over mDNS (`_p4gw._tcp`, TXT `mac`, `version`),
 so it appears under Settings › Devices › **Discovered**; or add it by hand (Add integration ›
 P4 Gateway, address). With a web UI password set, the flow asks for it (user `admin`); a password
 changed later starts re-authentication.

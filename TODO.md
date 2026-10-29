@@ -26,11 +26,13 @@
 - [x] Síťové okolí: rychlý a úplný sken, doporučení kanálů (TC20, UI09)
 - [ ] Ověřit pojistku startů a 3s pojistku telemetrie na skutečném selhání
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
-- [ ] Integrace P4 Gateway: nasadit do HA (192.168.88.201), přidat bránu ze zeroconf a ověřit entity, push zvukové události a update; pak vypnout MQTT discovery
+- [x] Integrace P4 Gateway nasazena do HA (192.168.88.201), brána přidána ze zeroconf, 65 entit, trvalé push spojení
+- [ ] Integrace P4 Gateway: ověřit v HA UI událost zvuku a průběh aktualizace; vypnout MQTT discovery a přegenerovat ID entit s příponou `_2` (kolidovala s MQTT entitami)
+- [ ] Repozitář je soukromý: tlačítko „Otevřít v HACS“ funguje až po zveřejnění (HACS instaluje jen z veřejných repozitářů)
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
 - [ ] Zjistit, proč embedding YAMNet téhož zvuku kolísá mezi běhy o 0,01–0,07 (TC28; esp-dl jedno jádro, mel deterministický)
 - [ ] M10: naučený zvuk z mikrofonu a spuštění události přehráním (reproduktor Macu byl ztlumený)
-- [ ] Zvuk fáze 5: 24h test se zapnutou detekcí v roli Thread BR běží od 2026-10-29 11:24 (`tests/soak.py`, výsledky `tests/results/2026-10-29/soak_thread_br/`); pak ladění falešných poplachů podle `detections.jsonl` a stejný běh v roli Zigbee
+- [ ] Zvuk fáze 5: 24h test se zapnutou detekcí v roli Thread BR běží od 2026-10-29 15:03 na v1.4-21-gd14e4a5 (`tests/soak.py`, výsledky `tests/results/2026-10-29/soak_thread_br/`); pak ladění falešných poplachů podle `detections.jsonl` a stejný běh v roli Zigbee
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
 - [x] OTA brány: občas reset spojení a restart do starého slotu. Příčina (core dump 2026-10-29): task watchdog, IDLE1 hladověl, na CPU 1 běžel model zvuku zpomalený zápisy do flash (cache vypnutá pro obě jádra). Oprava: zámek `gw_flash_lock`, model během nahrávání a flashování C6 neběží
