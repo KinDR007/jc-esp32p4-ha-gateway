@@ -147,6 +147,22 @@ td.zact .btn { padding: 4px 6px; margin: 1px 0; }
 .zmap .zn.end circle { stroke: var(--muted); fill: var(--muted); }
 .zmap .zn.off circle { fill: var(--panel); stroke-dasharray: 3 3; }
 [data-znode] { cursor: pointer; }
+.map-wrap { position: relative; }
+.map-legend { position: absolute; top: 12px; right: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+.map-legend .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
+.map-legend table { width: auto; }
+.map-legend th { padding: 2px 10px 2px 0; border: 0; text-align: center; }
+.map-legend td { padding: 2px 0; border: 0; color: var(--muted); }
+.map-legend svg { display: block; }
+/* not enough room beside the drawing: the legend takes its own column, on a phone it goes below the map */
+#topo-map, #zmap { container-type: inline-size; }
+@container (max-width: 1300px) {
+  .map-wrap { display: flex; align-items: flex-start; gap: 12px; }
+  .map-wrap svg { flex: 1; min-width: 0; }
+  .map-legend { position: static; flex: none; box-shadow: none; }
+}
+@container (max-width: 640px) { .map-wrap { display: block; } .map-legend { display: inline-block; margin-top: 8px; } }
 .topo text { font: 11px system-ui, sans-serif; fill: var(--muted); }
 .topo .topo-link { stroke-width: 2.5; stroke-opacity: .7; }
 .tmap.focus .topo-link { stroke-opacity: .08; }
@@ -657,6 +673,7 @@ const TIPS = {
   'Flashes': ['Successful C6 reflashes done by the gateway (role switches that change the radio firmware).', 'Úspěšná přeflashování C6 bránou (přepnutí rolí, která mění firmware rádia).'],
   'Heap (internal)': ['Free internal RAM now and the lowest value since the start. A low minimum means memory pressure.', 'Volná interní RAM teď a nejnižší hodnota od startu. Nízké minimum znamená nedostatek paměti.'],
   'PSRAM free': ['Free external PSRAM (32 MB on the board), used by the sound model and buffers.', 'Volná externí PSRAM (32 MB na desce), používá ji model zvuku a buffery.'],
+  'Zigbee Ext PAN ID': ['64-bit identifier of the Zigbee network the router joined.', '64bitový identifikátor Zigbee sítě, do které je router připojený.'],
   'C6 running': ['Firmware bundle currently flashed in the ESP32-C6 radio.', 'Balík firmwaru, který je právě nahraný v rádiu ESP32-C6.'],
   'Running': ['Firmware bundle currently flashed in the ESP32-C6 radio.', 'Balík firmwaru, který je právě nahraný v rádiu ESP32-C6.'],
   'Images': ['C6 firmware images stored on the P4; the one the role needs is flashed automatically.', 'Firmwary C6 uložené v P4; ten, který role potřebuje, se nahraje automaticky.'],
@@ -707,7 +724,8 @@ const TIPS = {
   'Next hop': ['Router ID traffic to this router goes through; 63 means no route.', 'ID routeru, přes který jde provoz k tomuto routeru; 63 znamená bez trasy.'],
   'Path cost': ['Cost of the route, lower is better; 1 is a direct good link.', 'Cena trasy, nižší je lepší; 1 je přímá kvalitní linka.'],
   'LQ in / out': ['Link quality in both directions, 0–3.', 'Kvalita linky oběma směry, 0–3.'],
-  'Link': ['Link speed and duplex of Ethernet; in the router table: a direct radio link to that router.', 'Rychlost a duplex Ethernetu; v tabulce routerů: přímé rádiové spojení s routerem.'],
+  'Link': ['Link speed and duplex of Ethernet.', 'Rychlost a duplex Ethernetu.'],
+  'Router link': ['Yes: this node has a direct radio link to that router (it is a neighbor).', 'Ano: tento uzel má s routerem přímé rádiové spojení (je to jeho soused).'],
   'Network name': ['Human readable name of the Thread network.', 'Čitelný název Thread sítě.'],
   'Network key': ['Encryption key of the network. Anyone with it can join, keep it private.', 'Šifrovací klíč sítě. Kdo ho má, může se připojit; nesdílejte ho.'],
   'TLVs': ['The complete dataset as hex TLVs, the format Home Assistant uses to share networks.', 'Celý dataset jako hex TLV, formát, kterým Home Assistant sdílí sítě.'],
@@ -748,7 +766,8 @@ const TIPS = {
   'Threshold': ['Minimum score (0–1) of one of its sounds to count as heard.', 'Minimální skóre (0–1) některého z jejích zvuků, aby se počítal jako slyšený.'],
   'Sounds': ['Number of YAMNet sounds that trigger the event; hover the number for the list.', 'Počet zvuků YAMNet, které událost spouští; seznam je v bublině nad číslem.'],
   'Count': ['Events since the start of the gateway.', 'Události od startu brány.'],
-  'Score': ['Model confidence 0–100 %.', 'Jistota modelu 0–100 %.'],
+  'Detection score': ['Model confidence 0–100 % for the sound.', 'Jistota modelu 0–100 % pro daný zvuk.'],
+  'Event active': ['Now: the event is going on (one of its sounds is heard above the threshold).', 'teď: událost právě probíhá (některý z jejích zvuků je slyšet nad prahem).'],
   'Level': ['Sound level in dBFS (0 = loudest possible).', 'Hladina zvuku v dBFS (0 = nejhlasitější možná).'],
   'Apply preset': ['Replaces all events and the sound selection with the preset.', 'Nahradí všechny události i výběr zvuků předvolbou.'],
   // home assistant, system
@@ -768,9 +787,16 @@ const TIPS = {
   'Matter Server': ['WebSocket of the Matter Server add-on (Home Assistant), e.g. ws://homeassistant.local:5580/ws. Port 5580 has to be exposed in the add-on (Configuration, Network). Gives vendor, product, name, serial number and device type of each Matter device; they are matched with the map by Thread MAC or IPv6 address.', 'WebSocket doplňku Matter Server (Home Assistant), např. ws://homeassistant.local:5580/ws. Port 5580 musí být v doplňku zpřístupněný (Konfigurace, Síť). Dodá výrobce, produkt, název, sériové číslo a typ každého zařízení Matter; s mapou se párují podle MAC Thread nebo IPv6 adresy.'],
   'Zigbee map': ['Zigbee2MQTT asks every router for its neighbour table (it takes several minutes in a large network) and sends the map; the gateway keeps the last one.', 'Zigbee2MQTT se zeptá každého routeru na tabulku sousedů (ve velké síti to trvá několik minut) a pošle mapu; brána si drží poslední.'],
   'Z2M coordinator': ['Coordinator adapter of this Zigbee2MQTT and its firmware. "this gateway" when Zigbee2MQTT uses this gateway as its coordinator.', 'Koordinátor tohoto Zigbee2MQTT a jeho firmware. „tato brána“, když Zigbee2MQTT používá jako koordinátor tuto bránu.'],
+  'Z2M base topic': ['MQTT base topic of this Zigbee2MQTT instance (base_topic in its configuration).', 'Základní MQTT topic této instance Zigbee2MQTT (base_topic v její konfiguraci).'],
+  'Z2M devices': ['Devices in the Zigbee2MQTT device list, the coordinator included.', 'Zařízení v seznamu Zigbee2MQTT včetně koordinátoru.'],
+  'Zigbee model': ['Vendor and model as Zigbee2MQTT identified the device, with its description.', 'Výrobce a model, jak zařízení rozpoznal Zigbee2MQTT, s popisem.'],
+  'Zigbee type': ['coordinator: runs the network; router: mains powered, forwards traffic; end device: talks only to its parent, often on battery.', 'koordinátor: řídí síť; router: napájený ze sítě, přeposílá provoz; koncové zařízení: komunikuje jen se svým rodičem, často na baterie.'],
+  'Zigbee availability': ['Availability in Zigbee2MQTT (online / offline, needs availability enabled there), plus an available update or an unfinished interview.', 'Dostupnost v Zigbee2MQTT (online / nedostupné, vyžaduje zapnuté availability), k tomu dostupná aktualizace nebo nedokončené načtení zařízení.'],
   'Z2M adapter': ['Serial port setting of Zigbee2MQTT; tcp:// for a network adapter like this gateway.', 'Nastavení sériového portu Zigbee2MQTT; tcp:// pro síťový adaptér jako tato brána.'],
   'LQI': ['Link quality 0–255 as Zigbee2MQTT reports it: from 120 good, 60–120 usable, below 60 weak.', 'Kvalita linky 0–255 podle Zigbee2MQTT: od 120 dobrá, 60–120 použitelná, pod 60 slabá.'],
   'Last seen': ['When Zigbee2MQTT last heard from the device (needs last_seen enabled in Zigbee2MQTT).', 'Kdy Zigbee2MQTT naposledy slyšel zařízení (potřebuje zapnuté last_seen v Zigbee2MQTT).'],
+  'Device Thread role': ['Role of the device in the Thread mesh: router (border router, leader) or end device, always on or sleepy.', 'Role zařízení v Thread síti: router (border router, leader) nebo koncové zařízení, stále zapnuté nebo spící.'],
+  'Device firmware': ['Firmware version of the device from the Matter Server or Thread diagnostics.', 'Verze firmwaru zařízení z Matter Serveru nebo z diagnostiky Thread.'],
   'Matter node': ['Node ID in the Matter Server; Home Assistant shows it in the device info of the Matter integration.', 'ID uzlu v Matter Serveru; Home Assistant ho ukazuje v informacích o zařízení integrace Matter.'],
   // network surroundings
   'Quick scan': ['Energy scan, beacon request and Thread discovery on channels 11–26 through the running Thread role. Only in Thread roles.', 'Měření energie, dotaz na beacony a hledání Thread sítí na kanálech 11–26 přes běžící roli Thread. Jen v rolích Thread.'],
@@ -781,6 +807,8 @@ const TIPS = {
   'Score': ['0–100 from Wi-Fi overlap, noise and existing networks; higher is better for a new network.', '0–100 podle překryvu s Wi-Fi, šumu a existujících sítí; vyšší je pro novou síť lepší.'],
   'Devices': ['Routers (or coordinators) that answered the beacon request or the Thread discovery. Sleeping end devices do not answer.', 'Routery (nebo koordinátory), které odpověděly na dotaz na beacony nebo na hledání Thread sítí. Spící koncová zařízení neodpovídají.'],
   'Open': ['The network accepts new devices right now (permit join / joining allowed).', 'Síť právě přijímá nová zařízení (permit join / připojování povoleno).'],
+  'Wi-Fi channel': ['2.4 GHz Wi-Fi channel (1–13); with the width it gives the overlap with 802.15.4 channels.', 'Kanál Wi-Fi 2,4 GHz (1–13); spolu se šířkou určuje překryv s kanály 802.15.4.'],
+  'Network type': ['Thread or Zigbee, recognised from the beacon; other or 802.15.4 when it cannot be told.', 'Thread nebo Zigbee podle beaconu; jiná nebo 802.15.4, když to nejde rozlišit.'],
   'Width': ['40 MHz Wi-Fi covers twice the band of 20 MHz and disturbs more 802.15.4 channels.', 'Wi-Fi 40 MHz zabírá dvojnásobné pásmo než 20 MHz a ruší víc kanálů 802.15.4.'],
   // roles
   'role:thread_br': ['Thread network with its own border router: Matter-over-Thread devices reach Home Assistant through it.', 'Thread síť s vlastním border routerem: zařízení Matter-over-Thread jsou přes něj dostupná z Home Assistant.'],
@@ -849,7 +877,8 @@ const ic = name => `<svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><pat
 /* (i) with an explanation from TIPS; key defaults to the English label. */
 const tip = key => TIPS[key] ? `<span class="tip" tabindex="0" data-tip="${esc(key)}">${ic('information-outline')}</span>` : '';
 const h3 = (icon, title) => `<h3>${ic(icon)}<span>${title}</span></h3>`;
-const th = label => `<th>${esc(label)}${tip(label)}</th>`;
+/* label or [label, tip key] */
+const th = l => { const [label, key] = Array.isArray(l) ? l : [l, l]; return `<th>${esc(label)}${tip(key)}</th>`; };
 /* pairs: [label, html value, optional tooltip key] */
 const dl = pairs => '<dl>' + pairs.filter(p => p && p[1] !== undefined && p[1] !== null && p[1] !== '')
   .map(([k, v, t]) => `<dt>${esc(k)}${tip(t || k)}</dt><dd>${v}</dd>`).join('') + '</dl>';
@@ -1158,7 +1187,7 @@ async function loadThread() {
           <td>${n.lqi_in}</td><td>${n.age_s} s</td><td>${n.frame_error_pct.toFixed(1)} %</td></tr>`).join('') || '<tr><td colspan="8" class="muted">none</td></tr>'}
       </table></div></div>
       <div class="card wide">${h3('router-wireless', `Routers (${(t.routers || []).length})`)}<div class="table-wrap"><table>
-        <tr>${['ID', 'RLOC16', 'Next hop', 'Path cost', 'LQ in / out', 'Link'].map(th).join('')}</tr>
+        <tr>${['ID', 'RLOC16', 'Next hop', 'Path cost', 'LQ in / out', ['Link', 'Router link']].map(th).join('')}</tr>
         ${(t.routers || []).map(r => `<tr><td>${r.id}</td><td>${esc(r.rloc16)}</td><td>${r.next_hop}</td><td>${r.path_cost}</td>
           <td>${r.lq_in} / ${r.lq_out}</td><td>${r.link ? pill('ok', 'yes') : '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">none</td></tr>'}
       </table></div></div></div>`;
@@ -1417,7 +1446,7 @@ function renderEvents() {
     <td>${e.active ? pill('ok', 'now') : ''}</td><td>${e.count || 0}</td>
     <td>${e.last_ago_s !== undefined ? fmtUptime(e.last_ago_s) + ' ago' : ''}</td>
     <td><button class="btn" data-ev-edit="${i}">${ic('pencil-outline')}Edit</button> <button class="btn" data-ev-yaml="${i}">${ic('home-assistant')}HA automation</button> <button class="btn danger" data-ev-del="${i}">${ic('delete-outline')}Delete</button></td></tr>`).join('');
-  $('#ev-table').innerHTML = `<table><tr>${['On', 'Event', 'Kind', 'Threshold', 'Sounds', 'Active', 'Count', 'Last'].map(th).join('')}<th></th></tr>${rows}</table>`;
+  $('#ev-table').innerHTML = `<table><tr>${['On', 'Event', 'Kind', 'Threshold', 'Sounds', ['Active', 'Event active'], 'Count', 'Last'].map(th).join('')}<th></th></tr>${rows}</table>`;
 }
 
 function renderTree() {
@@ -1458,7 +1487,7 @@ async function loadScoresAndLog() {
   if (sndTick++ % 3 || !$('#snd-log')) return;
   try {
     const log = await api('/api/sound/log');
-    $('#snd-log').innerHTML = log.length ? `<table><tr>${['When', 'Event', 'Sound', 'Score', 'Level', 'Duration'].map(th).join('')}<th></th></tr>${log.map(l => `<tr>
+    $('#snd-log').innerHTML = log.length ? `<table><tr>${['When', 'Event', 'Sound', ['Score', 'Detection score'], 'Level', 'Duration'].map(th).join('')}<th></th></tr>${log.map(l => `<tr>
       <td>${fmtUptime(l.ago_s)} ago</td><td>${l.event ? `<span data-notr>${esc(evName(sndCfg?.events.find(e => e.id === l.event) || { name: l.event }))}</span>` : '<span class="muted">no event</span>'}</td><td data-notr>${esc(l.class_name)}</td>
       <td>${(l.score * 100).toFixed(0)} %</td><td>${l.level_db} dB</td><td>${l.ongoing ? pill('ok', 'ongoing') : l.duration_s ? l.duration_s + ' s' : ''}</td>
       <td><button class="btn" data-log-ignore="${l.class}">${ic('close')}Ignore sound</button>
@@ -1787,6 +1816,10 @@ function placeNodeBox(el, x, y) {
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
   box.style.top = Math.max(8, Math.min(innerHeight - h - 8, y)) + 'px';
 }
+/* static legend in the top right corner of a map, styled like the details box */
+const lgLine = (c, dash) => `<svg width="26" height="12"><line x1="1" y1="6" x2="25" y2="6" stroke="var(--${c})" stroke-width="3"${dash ? ' stroke-dasharray="5 4"' : ''}/></svg>`;
+const lgDot = (r, fill, stroke, dash) => `<svg width="26" height="22"><circle cx="13" cy="11" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2"${dash ? ' stroke-dasharray="3 3"' : ''}/></svg>`;
+const mapLegend = rows => `<div class="map-legend"><div class="nb-title">${L('Legend', 'Legenda')}</div><table>${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table></div>`;
 /* a device on a map: highlight its own links (Thread and Zigbee map) */
 function mapFocus(el, key) {
   const svg = el.closest('svg.tmap, svg.zmap');
@@ -1879,11 +1912,15 @@ async function loadTopology() {
       <text x="${p.x}" y="${p.y + 34}" text-anchor="middle">${esc(label)}</text></g>`;
   }
   box.classList.remove('muted');
-  box.innerHTML = `<svg class="topo tmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
-    <p class="muted">${L('Number = router ID, ★ leader, BR border router. Lines: green good, orange medium, red weak link; dashed = reported by one side only. Small nodes: end devices (hollow = sleepy). Hover a device for details and its links.',
-      'Číslo = ID routeru, ★ leader, BR border router. Čáry: zelená dobrá, oranžová střední, červená slabá linka; přerušovaná = hlásí jen jedna strana. Malé body: koncová zařízení (prázdné = spící). Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.')}</p>`;
+  box.innerHTML = `<div class="map-wrap"><svg class="topo tmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Thread network map">${edges}${children}${nodes}</svg>
+    ${mapLegend([[lgLine('ok'), L('good link (LQ 3)', 'dobrá linka (LQ 3)')], [lgLine('warn'), L('medium link (LQ 2)', 'střední linka (LQ 2)')],
+      [lgLine('bad'), L('weak link (LQ 0–1)', 'slabá linka (LQ 0–1)')], [lgLine('muted', true), L('reported by one side only', 'hlásí jen jedna strana')],
+      [lgDot(8, 'var(--panel-2)', 'var(--accent)'), L('router, number = router ID', 'router, číslo = ID routeru')], [lgDot(8, 'var(--accent)', 'var(--accent)'), L('this gateway', 'tato brána')],
+      ['<span class="warn-text"><b>★</b></span>', 'leader'], ['<span class="warn-text"><b>BR</b></span>', 'border router'],
+      [lgDot(5, 'var(--muted)', 'var(--muted)'), L('end device', 'koncové zařízení')], [lgDot(5, 'var(--panel)', 'var(--muted)'), L('sleepy end device', 'spící koncové zařízení')]])}</div>
+    <p class="muted">${L('Hover a device for details and its links.', 'Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.')}</p>`;
   const devs = [...topoInfo.entries()];
-  $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', 'Thread role', 'RLOC16', 'Matter node', 'Firmware'].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr>
+  $('#topo-devices').innerHTML = `<table><tr>${['Device', 'Vendor', 'Product', 'Device type', ['Thread role', 'Device Thread role'], 'RLOC16', 'Matter node', ['Firmware', 'Device firmware']].map(th).join('')}</tr>${devs.map(([key, v]) => `<tr>
     <td data-notr><b>${esc(v.name || v.fallback)}</b></td><td data-notr>${esc(v.matter?.vendor || v.vendor || '')}</td><td data-notr>${esc(v.matter?.product || v.model || '')}</td>
     <td>${esc(v.matter?.types.join(', ') || '')}</td><td>${esc(v.role)}</td><td>${esc(v.rloc16 || '')}</td><td>${v.matter ? v.matter.node : ''}</td><td data-notr>${esc(v.matter?.sw || v.sw || '')}</td></tr>`).join('')}</table>`;
 }
@@ -1935,10 +1972,10 @@ async function loadZigbeeNet(full) {
   $('#z2m-info').innerHTML = !d.mqtt ? `<span class="warn-text">${L('MQTT is not connected: set it up under Home Assistant › MQTT.', 'MQTT není připojené: nastavte ho v Home Assistant › MQTT.')}</span>`
     : !inst ? L('No Zigbee2MQTT found on the MQTT broker.', 'Na MQTT brokeru nenalezen žádný Zigbee2MQTT.')
     : (d.instances.length > 1 ? `<label class="field"><span>${L('Instance', 'Instance')}</span><select id="z2m-base">${d.instances.map(i => `<option ${i.base === d.base ? 'selected' : ''}>${esc(i.base)}</option>`).join('')}</select></label>` : '') +
-      dl([['Base topic', `<code>${esc(inst.base)}</code>`], ['Version', esc(inst.version)],
+      dl([['Base topic', `<code>${esc(inst.base)}</code>`, 'Z2M base topic'], ['Version', esc(inst.version)],
         ['Coordinator', `${esc(inst.coordinator || '')} <span class="muted">${esc(inst.coordinator_fw || '')}</span>${inst.this_gateway ? ' ' + pill('ok', L('this gateway', 'tato brána')) : ''}`, 'Z2M coordinator'],
         ['Adapter', `<code>${esc(inst.serial || '')}</code>`, 'Z2M adapter'], ['Channel', inst.channel], ['PAN ID', inst.pan_id !== undefined ? '0x' + inst.pan_id.toString(16).padStart(4, '0') : ''],
-        ['Ext PAN ID', esc(inst.epid || '')], ['Devices', d.devices.length]]);
+        ['Ext PAN ID', esc(inst.epid || '')], ['Devices', d.devices.length, 'Z2M devices']]);
   const end = inst?.permit_join_end ? inst.permit_join_end / 1000 : inst?.permit_join_timeout ? d.now + inst.permit_join_timeout : 0;
   const left = inst?.permit_join && end && d.now ? Math.max(0, Math.round(end - d.now)) : 0;
   $('#z2m-join').classList.remove('muted');
@@ -1967,7 +2004,7 @@ function renderZDevices(devs, now) {
   const list = devs.filter(x => !q || [x.name, x.vendor, x.model, x.description, x.ieee].join(' ').toLowerCase().includes(q))
     .sort((a, b) => (order[a.type] ?? 3) - (order[b.type] ?? 3) || a.name.localeCompare(b.name));
   $('#zdev-count').textContent = `${list.length} / ${devs.length}`;
-  $('#zdev').innerHTML = `<table><tr>${['Device', 'Model', 'Type', 'Power', 'LQI', 'Last seen', 'State'].map(th).join('')}<th></th></tr>${list.map(x => `<tr data-zrow="${esc(x.ieee)}">
+  $('#zdev').innerHTML = `<table><tr>${['Device', ['Model', 'Zigbee model'], ['Type', 'Zigbee type'], 'Power', 'LQI', 'Last seen', ['State', 'Zigbee availability']].map(th).join('')}<th></th></tr>${list.map(x => `<tr data-zrow="${esc(x.ieee)}">
     <td data-notr><b>${esc(x.name)}</b>${x.own ? ' ' + pill('ok', L('this gateway', 'tato brána')) : ''}</td>
     <td data-notr style="white-space:normal;min-width:220px">${esc([x.vendor, x.model].filter(Boolean).join(' '))}<div class="muted">${esc(x.description || '')}</div></td>
     <td>${esc(zTypeText(x.type))}</td><td>${esc(zPower(x.power))}${x.battery !== undefined ? ` · ${x.battery} %` : ''}</td>
@@ -2039,9 +2076,12 @@ function renderZMap(map, devs) {
   }
   const failed = nodes.filter(n => n.failed).length;
   box.classList.remove('muted');
-  box.innerHTML = `<svg class="topo zmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zigbee network map">${edges}${dots}</svg>
-    <p class="muted">${L(`${nodes.length} devices, ${pairs.size} links${failed ? `, ${failed} routers did not answer` : ''}. Large node: coordinator, ring: routers, small: end devices next to their parent (hollow = offline). Line colour = LQI (green ≥ 120, orange ≥ 60, red lower). Hover a device to highlight its links.`,
-      `${nodes.length} zařízení, ${pairs.size} linek${failed ? `, ${failed} routerů neodpovědělo` : ''}. Velký uzel: koordinátor, kruh: routery, malé: koncová zařízení u rodiče (prázdné = nedostupné). Barva čáry = LQI (zelená ≥ 120, oranžová ≥ 60, červená méně). Najetím na zařízení zvýrazníte jeho linky.`)}</p>`;
+  box.innerHTML = `<div class="map-wrap"><svg class="topo zmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Zigbee network map">${edges}${dots}</svg>
+    ${mapLegend([[lgLine('ok'), 'LQI ≥ 120'], [lgLine('warn'), 'LQI 60–119'], [lgLine('bad'), 'LQI < 60'],
+      [lgDot(10, 'var(--accent)', 'var(--accent)'), L('coordinator', 'koordinátor')], [lgDot(7, 'var(--accent)', 'var(--accent)'), L('this gateway', 'tato brána')], [lgDot(7, 'var(--panel-2)', 'var(--accent)'), L('router (on the ring)', 'router (na kruhu)')],
+      [lgDot(4, 'var(--muted)', 'var(--muted)'), L('end device, next to its parent', 'koncové zařízení, u svého rodiče')], [lgDot(7, 'var(--panel)', 'var(--accent)', true), L('offline or did not answer', 'nedostupné nebo neodpovědělo')]])}</div>
+    <p class="muted">${L(`${nodes.length} devices, ${pairs.size} links${failed ? `, ${failed} routers did not answer` : ''}. Hover a device for details and its links.`,
+      `${nodes.length} zařízení, ${pairs.size} linek${failed ? `, ${failed} routerů neodpovědělo` : ''}. Najetím na zařízení zobrazíte detaily a zvýrazníte jeho linky.`)}</p>`;
 }
 
 /* details box of a Zigbee device (map or table) */
@@ -2286,7 +2326,7 @@ async function loadNetscan() {
     <td>${c.wifiDbm !== null ? `${c.wifiDbm.toFixed(0)} dBm <span class="muted">${c.aps.length}× ${[...new Set(c.aps.filter(a => a.ssid).sort((a, b) => b.rssi - a.rssi).map(a => esc(a.ssid)))].slice(0, 2).join(', ')}</span>` : last.wifi ? '—' : '<span class="muted">?</span>'}</td>
     <td>${c.nets.map(n => `${n.type === 'zigbee' ? 'Zigbee' : n.type === 'thread' ? 'Thread' : '802.15.4'}${n.own ? ' ★' : ''}`).join(', ') || '—'}</td>
     <td>${ratingPill(c.rating)} <span class="muted">${c.score}</span></td></tr>`).join('')}</table>`;
-  $('#ns-nets').innerHTML = nets.length ? `<table><tr>${['Type', 'Name', 'PAN ID', 'Ext PAN ID', 'Channel', 'Devices', 'Best signal', 'Open'].map(th).join('')}</tr>${nets.map(n => `<tr>
+  $('#ns-nets').innerHTML = nets.length ? `<table><tr>${[['Type', 'Network type'], 'Name', 'PAN ID', 'Ext PAN ID', 'Channel', 'Devices', 'Best signal', 'Open'].map(th).join('')}</tr>${nets.map(n => `<tr>
     <td>${n.type === 'zigbee' ? 'Zigbee' : n.type === 'thread' ? 'Thread' : n.type === 'other' ? L('other', 'jiná') : '802.15.4'}${n.own ? ' ' + pill('ok', L('yours', 'vaše')) : ''}</td>
     <td data-notr>${esc(n.name || '')}</td><td><code>${esc(n.pan)}</code></td><td>${n.epid ? `<code>${esc(n.epid)}</code>` : ''}</td>
     <td>${n.ch}</td><td>${n.devices.size || ''}</td><td>${n.rssi > -128 ? n.rssi + ' dBm' : ''}</td><td>${n.permit ? pill('warn', L('joining open', 'připojování otevřeno')) : ''}</td></tr>`).join('')}</table>`
@@ -2294,7 +2334,7 @@ async function loadNetscan() {
   /* one row per BSSID (results stored before the gateway merged them carry duplicates) */
   const wifi = [...new Map([...(last.wifi || [])].sort((a, b) => a.rssi - b.rssi).map(a => [a.bssid, a])).values()].sort((a, b) => b.rssi - a.rssi);
   $('#ns-wifi').innerHTML = !last.wifi ? `<p class="muted">${L('Only the full scan sees Wi-Fi.', 'Wi-Fi vidí jen úplný sken.')}</p>`
-    : `<table><tr>${['SSID', 'BSSID', 'Channel', 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${wifi.map(a => `<tr>
+    : `<table><tr>${['SSID', 'BSSID', ['Channel', 'Wi-Fi channel'], 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${wifi.map(a => `<tr>
     <td data-notr>${a.ssid ? esc(a.ssid) : `<span class="muted">${L('hidden', 'skrytá')}</span>`}</td><td><code>${esc(a.bssid.match(/../g).join(':'))}</code></td>
     <td>${a.ch}</td><td>${a.ch2 === 'none' ? '20 MHz' : '40 MHz'}</td>
     <td>${meter(Math.max(0, Math.min(100, (a.rssi + 100) * 1.6)), 101, 101).replace(/\d+ %/, a.rssi + ' dBm')}</td>

@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI14).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI15).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
@@ -333,6 +333,7 @@ await test('UI12', 'Zigbee network: Zigbee2MQTT instance, devices with details, 
     check(/IEEE/.test(await page.textContent('#nodebox')), 'device details on hover over the map');
     check(await page.$$eval('#zmap svg.focus .zl.hi', l => l.length) > 0, 'links of the device highlighted');
     check(await boxAtMapCorner('#zmap svg'), 'details box in the top left corner of the map');
+    check(await legendClear('#zmap'), 'legend covers neither the drawing nor the details box');
     await page.mouse.move(2, 2);
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
@@ -382,6 +383,7 @@ await test('UI14', 'Thread map: hovering a router highlights its links, the devi
   const links = await page.$$eval('#topo-map svg .topo-link', l => l.length);
   check(links === 0 || hi > 0, `${hi} of ${links} links highlighted`);
   check(await boxAtMapCorner('#topo-map svg'), 'details box in the top left corner of the map');
+  check(await legendClear('#topo-map'), 'legend covers neither the drawing nor the details box');
   await page.mouse.move(2, 2);
   check(!await page.$('#topo-map svg.focus'), 'highlight gone after leaving the node');
   const row = await page.$('#topo-devices tr:nth-child(2)');
@@ -395,6 +397,43 @@ await test('UI14', 'Thread map: hovering a router highlights its links, the devi
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
+
+await test('UI15', 'info tips: one text per key, tables with the same column names explain their own data', async () => {
+  const src = await page.evaluate(() => fetch('/').then(r => r.text()));
+  const block = src.slice(src.indexOf('const TIPS = {'), src.indexOf('\n};', src.indexOf('const TIPS = {')));
+  const keys = [...block.matchAll(/^  '([^']+)':/gm)].map(m => m[1]);
+  const dup = keys.filter((k, i) => keys.indexOf(k) !== i);
+  check(keys.length > 100 && dup.length === 0, `${keys.length} tip keys, no duplicates ${dup.join(', ')}`);
+  const tips = async sel => page.$$eval(`${sel} th .tip`, t => t.map(x => x.dataset.tip));
+  if (status.role.active.startsWith('thread')) {
+    await tab('thread/topology');
+    await page.waitForSelector('#topo-devices table', { timeout: 30000 });
+    const t = await tips('#topo-devices');
+    check(t.includes('Device firmware') && t.includes('Device Thread role') && !t.includes('Firmware'), `Thread devices: ${t.join(', ')}`);
+  }
+  const d = await page.evaluate(() => fetch('/api/zigbee/net').then(r => r.json()));
+  if (d.base) {
+    await tab('zigbee/network');
+    await page.waitForSelector('#zdev table', { timeout: 20000 });
+    const t = await tips('#zdev');
+    check(['Zigbee model', 'Zigbee type', 'Zigbee availability'].every(k => t.includes(k)) && !t.some(k => ['Model', 'Type', 'State'].includes(k)), `Zigbee devices: ${t.join(', ')}`);
+    const info = await page.$$eval('#z2m-info dt .tip', t => t.map(x => x.dataset.tip));
+    check(info.includes('Z2M base topic') && info.includes('Z2M devices'), `Zigbee2MQTT instance: ${info.join(', ')}`);
+  }
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+// the legend sits beside or over an empty part of the map: no node, label or the details box under it
+async function legendClear(box) {
+  return page.evaluate(box => {
+    const lg = document.querySelector(`${box} .map-legend`);
+    if (!lg || lg.querySelectorAll('tr').length < 5) return false;
+    const a = lg.getBoundingClientRect();
+    const hit = r => r.right > a.left && r.left < a.right && r.bottom > a.top && r.top < a.bottom;
+    return ![...document.querySelectorAll(`${box} svg.topo circle, ${box} svg.topo text`)].some(e => hit(e.getBoundingClientRect()))
+      && !hit(document.querySelector('#nodebox').getBoundingClientRect());
+  }, box);
+}
 
 // the details box sits 12 px from the top left corner of the visible map
 async function boxAtMapCorner(sel) {

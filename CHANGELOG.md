@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Thread and Zigbee maps: a static legend (line colours, node kinds) in the top right corner of the
+  map, styled like the details box; beside the map when the window is narrow, below it on a phone.
+- Info tips fixed where columns share a name but not a meaning: Zigbee device table (model, type,
+  state), Thread device table (role, firmware), Zigbee2MQTT instance (base topic, devices), sound
+  event and log tables, Wi-Fi channel and network type in the scan, router link in Thread topology;
+  the Zigbee router Ext PAN ID got its tip. Test UI15.
+
 ## v1.3 (2026-10-28)
 
 - Thread network map (Thread › Topology): routers with link quality between them, end devices,
