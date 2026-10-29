@@ -1,0 +1,15 @@
+# C6 layout with one slot per role firmware (scripts/pack_c6fw.py --slots). The gateway installs
+# it once; a role switch then only rewrites otadata (8 kB) and the Zigbee network data.
+# Slots ota_0.. take the --slots bundles in order; zb_storage/zb_fct are shared by the
+# coordinator and the router, the gateway keeps each one's network in its c6data snapshots.
+# ESPHome (esp_hosted) keeps its own two-slot layout: it updates the C6 over SDIO itself.
+# Name,      Type, SubType, Offset,   Size
+nvs,         data, nvs,     0x9000,   0x6000
+otadata,     data, ota,     0xf000,   0x2000
+phy_init,    data, phy,     0x11000,  0x1000
+ota_0,       app,  ota_0,   0x20000,  0x60000
+ota_1,       app,  ota_1,   0x80000,  0xC0000
+ota_2,       app,  ota_2,   0x140000, 0xC0000
+ota_3,       app,  ota_3,   0x200000, 0xC0000
+zb_storage,  data, fat,     0x2C0000, 0x4000
+zb_fct,      data, fat,     0x2C4000, 0x400

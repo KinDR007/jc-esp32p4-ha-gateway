@@ -21,7 +21,7 @@ cp firmware/esphome/secrets.yaml.example firmware/esphome/secrets.yaml   # opens
 | `p4gw-factory.bin` | complete flash image (bootloader, partition table, gateway, ESPHome, C6 bundles) |
 | `p4gw.bin` | gateway application for OTA |
 | `esphome.bin` | ESPHome BLE proxy role image |
-| `c6fw.bin` | C6 bundles: ot_rcp, zigbee_ncp, zigbee_router, esp_hosted |
+| `c6fw.bin` | C6 bundles: slots layout (ot_rcp, zigbee_router, zigbee_ncp, scanner), esp_hosted ([c6-slots.md](c6-slots.md)) |
 | `SHA256SUMS` | checksums |
 
 Single parts: `scripts/build_c6.sh <name>`, `scripts/build_gateway.sh`, `scripts/build_esphome.sh`,
@@ -66,7 +66,7 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 | Gateway | UI System → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
 | Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
 | ESPHome image | UI System → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
-| C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`) | header checked before erase, sha256 per bundle; C6 reflashed on next start if its bundle changed |
+| C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
 
 Uploads are refused for the first 60 s after a gateway update, until the new image is confirmed.
 

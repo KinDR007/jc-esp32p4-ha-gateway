@@ -102,7 +102,7 @@ esp_err_t c6fw_read_dir(c6fw_dir_t *dir)
     const esp_partition_t *part = partition(C6FW_SUBTYPE);
     ESP_RETURN_ON_FALSE(part, ESP_ERR_NOT_FOUND, TAG, "no c6fw partition");
     ESP_RETURN_ON_ERROR(esp_partition_read(part, 0, dir, sizeof(*dir)), TAG, "read dir");
-    if (memcmp(dir->magic, C6FW_DIR_MAGIC, 4) != 0 || dir->format != C6FW_FORMAT_VERSION ||
+    if (memcmp(dir->magic, C6FW_DIR_MAGIC, 4) != 0 || dir->format < C6FW_FORMAT_MIN || dir->format > C6FW_FORMAT_VERSION ||
         dir->count > C6FW_MAX_ENTRIES) {
         return ESP_ERR_INVALID_VERSION;
     }
@@ -199,14 +199,19 @@ static void bundle_free(bundle_t *b)
     b->segs = NULL;
 }
 
-static bool bundle_has_preserve(const bundle_t *b)
+static const c6fw_segment_t *bundle_find_flag(const bundle_t *b, uint32_t flag)
 {
     for (uint32_t i = 0; i < b->count; i++) {
-        if (b->segs[i].flags & C6FW_SEG_PRESERVE) {
-            return true;
+        if (b->segs[i].flags & flag) {
+            return &b->segs[i];
         }
     }
-    return false;
+    return NULL;
+}
+
+static bool bundle_has_preserve(const bundle_t *b)
+{
+    return bundle_find_flag(b, C6FW_SEG_PRESERVE) != NULL;
 }
 
 /* ---- ROM loader session ---- */
@@ -460,6 +465,27 @@ static int snapshot_pick_slot(const char *bundle, uint32_t *next_generation)
     return same >= 0 ? same : empty >= 0 ? empty : oldest;
 }
 
+/* Where the C6 really keeps a preserved region: the zb_* data partition of that size in the
+ * partition table on the C6 (it moved between layouts), else the bundle's own address. */
+static uint32_t c6_region_addr(session_t *s, const c6fw_segment_t *seg)
+{
+    uint8_t *table = malloc(0xc00);
+    uint32_t addr = seg->addr;
+    if (table && esp_loader_flash_read(&s->loader, table, 0x8000, 0xc00) == ESP_LOADER_SUCCESS) {
+        for (const uint8_t *e = table; e < table + 0xc00 && e[0] == 0xaa && e[1] == 0x50; e += 32) {
+            uint32_t off, size;
+            memcpy(&off, e + 4, 4);
+            memcpy(&size, e + 8, 4);
+            if (e[2] == 1 && size == seg->size && strncmp((const char *)e + 12, "zb_", 3) == 0) {
+                addr = off;
+                break;
+            }
+        }
+    }
+    free(table);
+    return addr;
+}
+
 static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
 {
     const esp_partition_t *part = partition(C6DATA_SUBTYPE);
@@ -475,8 +501,8 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
     uint32_t data_off = SNAP_DATA_OFFSET, total = 0;
     for (uint32_t i = 0; i < from->count && hdr.count < SNAP_MAX; i++) {
         if (from->segs[i].flags & C6FW_SEG_PRESERVE) {
-            hdr.entries[hdr.count++] = (snap_entry_t){.addr = from->segs[i].addr, .size = from->segs[i].size,
-                                                      .data_off = data_off};
+            hdr.entries[hdr.count++] = (snap_entry_t){.addr = c6_region_addr(s, &from->segs[i]),
+                                                      .size = from->segs[i].size, .data_off = data_off};
             data_off += (from->segs[i].size + FLASH_BLOCK - 1) / FLASH_BLOCK * FLASH_BLOCK;
             total += from->segs[i].size;
         }
@@ -525,9 +551,10 @@ static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
         if (!(seg->flags & C6FW_SEG_PRESERVE)) {
             continue;
         }
+        /* same place, else the same size: snapshots taken in the per-firmware layouts lie elsewhere */
         const snap_entry_t *match = NULL;
         for (uint32_t j = 0; slot >= 0 && j < hdr.count; j++) {
-            if (hdr.entries[j].addr == seg->addr && hdr.entries[j].size == seg->size) {
+            if (hdr.entries[j].size == seg->size && (!match || hdr.entries[j].addr == seg->addr)) {
                 match = &hdr.entries[j];
             }
         }
@@ -588,9 +615,96 @@ esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_
 
 /* ---- flashing ---- */
 
+/* Writes and erases the segments of a bundle; done/total count written bytes for the progress. */
+static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, uint32_t total)
+{
+    esp_err_t err = ESP_OK;
+    const esp_partition_t *part = partition(C6FW_SUBTYPE);
+    for (uint32_t i = 0; i < b->count && err == ESP_OK; i++) {
+        const c6fw_segment_t *seg = &b->segs[i];
+        if (seg->flags & C6FW_SEG_ERASE) {
+            progress(8, "erasing settings area");
+            if (esp_loader_flash_erase_region(&s->loader, seg->addr, seg->size) != ESP_LOADER_SUCCESS) {
+                err = ESP_FAIL;
+            }
+        } else if (seg->flags & C6FW_SEG_WRITE) {
+            char stage[48];
+            snprintf(stage, sizeof(stage), "writing 0x%05lx (%lu kB)", (unsigned long)seg->addr,
+                     (unsigned long)seg->size / 1024);
+            progress(s_progress.percent, stage);
+            part_reader_t r = {.part = part, .base = b->entry.offset + seg->data_off};
+            int from_pct = 10 + (int)(80LL * *done / total);
+            int to_pct = 10 + (int)(80LL * (*done + seg->size) / total);
+            uint8_t *plain = NULL;
+            mem_reader_t mem = {0};
+            if (seg->flags & C6FW_SEG_DEFLATE) {
+                err = inflate_segment(seg, &r, &plain);
+                mem.data = plain;
+            }
+            for (int attempt = 0; attempt < 3 && err == ESP_OK; attempt++) {
+                err = plain ? write_region(s, seg->addr, seg->size, fill_from_memory, &mem, from_pct, to_pct)
+                            : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
+                if (err == ESP_OK) {
+                    break;
+                }
+                ESP_LOGW(TAG, "write 0x%lx failed (%s), retry", (unsigned long)seg->addr, esp_err_to_name(err));
+                err = attempt < 2 ? ESP_OK : err;
+            }
+            free(plain);
+            *done += seg->size;
+        }
+    }
+    return err;
+}
+
+static uint32_t bundle_bytes(const bundle_t *b)
+{
+    uint32_t total = 0;
+    for (uint32_t i = 0; b->segs && i < b->count; i++) {
+        if (b->segs[i].flags & C6FW_SEG_WRITE) {
+            total += b->segs[i].size;
+        }
+    }
+    return total;
+}
+
+/* sha256 of the slots bundle installed on the C6, kept with the chip data */
+static bool slots_installed(const c6fw_entry_t *slots)
+{
+    nvs_handle_t h;
+    uint8_t sha[32];
+    size_t len = sizeof(sha);
+    bool same = false;
+    if (nvs_open(CHIP_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+        same = nvs_get_blob(h, "slots", sha, &len) == ESP_OK && len == sizeof(sha) && memcmp(sha, slots->sha256, len) == 0;
+        nvs_close(h);
+    }
+    return same;
+}
+
+static void slots_record(const c6fw_entry_t *slots)
+{
+    nvs_handle_t h;
+    if (nvs_open(CHIP_NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        if (slots) {
+            nvs_set_blob(h, "slots", slots->sha256, sizeof(slots->sha256));
+        } else {
+            nvs_erase_key(h, "slots");
+        }
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+void c6_slots_invalidate(void)
+{
+    slots_record(NULL);
+}
+
+
 esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
 {
-    bundle_t to = {0}, from = {0};
+    bundle_t to = {0}, from = {0}, base = {0};
     session_t *s = calloc(1, sizeof(session_t));
     esp_err_t err;
 
@@ -628,46 +742,35 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
         }
     }
 
-    uint32_t total = 0, done_bytes = 0;
-    for (uint32_t i = 0; i < to.count; i++) {
-        if (to.segs[i].flags & C6FW_SEG_WRITE) {
-            total += to.segs[i].size;
+    /* A slot bundle needs the layout of the slots bundle it was packed with: install it first. */
+    const c6fw_segment_t *marker = bundle_find_flag(&to, C6FW_SEG_SLOTS);
+    c6fw_entry_t slots_entry;
+    if (marker && (c6fw_find(C6FW_SLOTS_BUNDLE, &slots_entry) != ESP_OK ||
+                   memcmp(slots_entry.sha256, marker->md5, sizeof(marker->md5)) != 0)) {
+        snprintf(s_progress.last_error, sizeof(s_progress.last_error), "bundle %s does not match the slots bundle", entry->name);
+        err = ESP_ERR_INVALID_STATE;
+        goto close;
+    }
+    if (marker && !slots_installed(&slots_entry)) {
+        if ((err = c6fw_verify(&slots_entry)) != ESP_OK || (err = bundle_load(&slots_entry, &base)) != ESP_OK) {
+            snprintf(s_progress.last_error, sizeof(s_progress.last_error), "slots bundle unusable");
+            goto close;
+        }
+        ESP_LOGW(TAG, "installing the slots layout %s", slots_entry.version);
+    }
+    uint32_t done_bytes = 0, total = bundle_bytes(&base) + bundle_bytes(&to);
+    if (base.segs) {
+        slots_record(NULL); /* a partly written layout is not the installed one */
+        err = write_bundle(s, &base, &done_bytes, total);
+        if (err == ESP_OK) {
+            slots_record(&slots_entry);
         }
     }
-    const esp_partition_t *part = partition(C6FW_SUBTYPE);
-    for (uint32_t i = 0; i < to.count && err == ESP_OK; i++) {
-        const c6fw_segment_t *seg = &to.segs[i];
-        if (seg->flags & C6FW_SEG_ERASE) {
-            progress(8, "erasing settings area");
-            if (esp_loader_flash_erase_region(&s->loader, seg->addr, seg->size) != ESP_LOADER_SUCCESS) {
-                err = ESP_FAIL;
-            }
-        } else if (seg->flags & C6FW_SEG_WRITE) {
-            char stage[48];
-            snprintf(stage, sizeof(stage), "writing 0x%05lx (%lu kB)", (unsigned long)seg->addr,
-                     (unsigned long)seg->size / 1024);
-            progress(s_progress.percent, stage);
-            part_reader_t r = {.part = part, .base = entry->offset + seg->data_off};
-            int from_pct = 10 + (int)(80LL * done_bytes / total);
-            int to_pct = 10 + (int)(80LL * (done_bytes + seg->size) / total);
-            uint8_t *plain = NULL;
-            mem_reader_t mem = {0};
-            if (seg->flags & C6FW_SEG_DEFLATE) {
-                err = inflate_segment(seg, &r, &plain);
-                mem.data = plain;
-            }
-            for (int attempt = 0; attempt < 3 && err == ESP_OK; attempt++) {
-                err = plain ? write_region(s, seg->addr, seg->size, fill_from_memory, &mem, from_pct, to_pct)
-                            : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
-                if (err == ESP_OK) {
-                    break;
-                }
-                ESP_LOGW(TAG, "write 0x%lx failed (%s), retry", (unsigned long)seg->addr, esp_err_to_name(err));
-                err = attempt < 2 ? ESP_OK : err;
-            }
-            free(plain);
-            done_bytes += seg->size;
-        }
+    if (err == ESP_OK) {
+        err = write_bundle(s, &to, &done_bytes, total);
+    }
+    if (err == ESP_OK && !marker) {
+        slots_record(NULL); /* a whole-flash bundle replaced the layout */
     }
     if (err == ESP_OK && bundle_has_preserve(&to)) {
         err = snapshot_restore(s, &to);
@@ -681,6 +784,7 @@ close:
 done:
     bundle_free(&to);
     bundle_free(&from);
+    bundle_free(&base);
     free(s);
     if (err == ESP_OK) {
         /* before busy clears: callers (and tests) treat busy == false as "flashing finished" */

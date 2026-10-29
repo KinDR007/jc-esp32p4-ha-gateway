@@ -57,8 +57,9 @@ P4 flash (16 MB, firmware/partitions.csv)
 ```
 
 - Switching stores the role and restarts. On boot the gateway compares the C6 bundle with the
-  one the role needs and reflashes the C6 through its ROM bootloader over JP1. For ESPHome it
-  selects the ESPHome slot and restarts into it.
+  one the role needs and updates the C6 through its ROM bootloader over JP1. The Thread and Zigbee
+  firmwares share one C6 layout with a slot each, so a switch only selects the slot (8 kB,
+  [docs/c6-slots.md](docs/c6-slots.md)). For ESPHome it selects the ESPHome slot and restarts into it.
 - Zigbee network data survives switching (snapshot to `c6data`, restored on return). The Thread
   network lives in P4 NVS and is not touched by C6 flashing.
 - Stability: gateway images confirm themselves after 60 s (else rollback), repeated crashes stop

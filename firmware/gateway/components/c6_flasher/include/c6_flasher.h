@@ -13,12 +13,17 @@ extern "C" {
 /* On-flash format written by scripts/pack_c6fw.py. */
 #define C6FW_DIR_MAGIC "C6FW"
 #define C6FW_BUNDLE_MAGIC "C6BN"
-#define C6FW_FORMAT_VERSION 2
+#define C6FW_FORMAT_VERSION 3 /* 3 adds the slots layout; version 2 images are still read */
+#define C6FW_FORMAT_MIN 2
 #define C6FW_MAX_ENTRIES 8
 #define C6FW_SEG_WRITE 1
 #define C6FW_SEG_ERASE 2
 #define C6FW_SEG_PRESERVE 4
 #define C6FW_SEG_DEFLATE 8 /* stored data is a zlib stream of stored_size bytes */
+/* Marker (no data): the bundle only selects its slot of the layout the "slots" bundle installs;
+ * md5 holds the first 16 bytes of that bundle's sha256. */
+#define C6FW_SEG_SLOTS 16
+#define C6FW_SLOTS_BUNDLE "slots"
 
 typedef struct __attribute__((packed)) {
     char name[16];
@@ -72,9 +77,12 @@ esp_err_t c6fw_verify_all(void);
  * Flashes a bundle to the C6 through its ROM bootloader. When the bundle being replaced
  * (current_name) has PRESERVE segments, their content is first saved to the c6data
  * partition; when the new bundle has them, its saved content is written back (or the
- * region erased if that bundle has no snapshot yet).
+ * region erased if that bundle has no snapshot yet). A bundle with a SLOTS marker first
+ * installs the "slots" bundle when the C6 does not hold that exact layout yet.
  */
 esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name);
+/* Forgets that the slots layout is on the C6: the next slot bundle installs it again. */
+void c6_slots_invalidate(void);
 
 /* Snapshot of a bundle's preserved C6 regions (Zigbee network data), one slot per bundle. */
 esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation);

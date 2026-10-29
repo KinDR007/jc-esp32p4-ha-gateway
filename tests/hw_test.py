@@ -359,15 +359,38 @@ def tc11_auth():
 
 def tc12_invalid_uploads():
     """Broken uploads are rejected and do not damage the stored images."""
+    count = len(status()['c6']['images'])
     code, r = http('POST', '/api/ota/c6fw', raw=b'\x00' * 8192)
     check(code == 400, f'garbage c6fw rejected ({r})')
-    check(len(status()['c6']['images']) == 4, 'stored bundles intact after the rejected upload')
+    check(len(status()['c6']['images']) == count, f'stored bundles intact after the rejected upload ({count})')
     code, r = http('POST', '/api/ota/gateway', raw=b'\xe9' + b'\x00' * 8191)
     check(code == 400, f'garbage gateway image rejected ({r})')
     with open(os.path.join(ROOT, 'dist', 'c6fw.bin'), 'rb') as f:
         code, r = http('POST', '/api/ota/c6fw', raw=f.read(), timeout=120)
     check(code == 200, 'valid c6fw re-uploaded')
-    check(len(status()['c6']['images']) == 4, 'four bundles listed again')
+    check(len(status()['c6']['images']) == count, f'{count} bundles listed again')
+
+
+def tc23_slot_switch():
+    """C6 slots layout: a role switch only selects the slot, the Zigbee router keeps its network."""
+    check('slots' in {i['name'] for i in status()['c6']['images']}, 'c6fw carries the slots layout')
+    if status()['role']['active'] != 'thread_br':
+        switch('thread_br')
+    times = {}
+    for role in ('zigbee_router', 'thread_br'):
+        t0 = time.time()
+        switch(role)
+        times[role] = time.time() - t0
+        text = logs_since(0)
+        check('installing the slots layout' not in text, f'{role}: layout already on the C6, not written again')
+        check(f'C6 now runs {"ot_rcp" if role == "thread_br" else role}' in text, f'{role}: slot selected')
+        if role == 'zigbee_router':
+            r = wait_until('router joined', lambda: (lambda rs: rs if (rs.get('router') or {}).get('joined') else None)(status()['role_status'] or {}), 60)['router']
+            check(True, f'router back in its network: pan {r["pan_id"]}, channel {r["channel"]}')
+        else:
+            rs = wait_until('Thread attached', lambda: (lambda rs: rs if rs.get('role') in ('router', 'leader', 'child') else None)(status()['role_status'] or {}), 60)
+            check(True, f'Thread attached as {rs["role"]}')
+    check(all(t < 60 for t in times.values()), 'switches done in under a minute: ' + ', '.join(f'{k} {v:.0f} s' for k, v in times.items()))
 
 
 def tc13_rcp_reflash():
@@ -377,7 +400,10 @@ def tc13_rcp_reflash():
     check(code == 200, 'reflash requested')
     s = wait_restart(role)
     check(s['role']['active'] == role and not s['role']['maintenance'], f'{role} running again after reflash')
-    check('C6 now runs' in logs_since(0), 'flash log present')
+    text = logs_since(0)
+    check('C6 now runs' in text, 'flash log present')
+    if 'slots' in {i['name'] for i in s['c6']['images']}:
+        check('installing the slots layout' in text, 'forced reflash writes the whole slots layout again')
 
 
 def tc14_sound_service():
@@ -685,7 +711,7 @@ TESTS = [
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),
     ('TC18', tc18_sound_events_detection), ('TC19', tc19_c6_telemetry), ('TC20', tc20_netscan),
-    ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net),
+    ('TC21', tc21_thread_topology), ('TC22', tc22_zigbee_net), ('TC23', tc23_slot_switch),
 ]
 
 

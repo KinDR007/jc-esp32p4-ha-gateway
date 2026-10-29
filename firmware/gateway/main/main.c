@@ -52,6 +52,9 @@ static bool ensure_c6(const char *bundle)
         return false;
     }
     gw_config_set_u8(GW_KEY_C6_TRIES, tries + 1);
+    if (force) {
+        c6_slots_invalidate(); /* "Reflash C6" rewrites the whole slots layout, not only the slot choice */
+    }
     ESP_LOGW(TAG, "C6: %s -> %s %s%s", current[0] ? current : "unknown", entry.name, entry.version,
              force ? " (forced)" : "");
 
