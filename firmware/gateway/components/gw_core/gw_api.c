@@ -147,9 +147,17 @@ static esp_err_t identify_post(httpd_req_t *req)
 static portMUX_TYPE s_c6_tel_mux = portMUX_INITIALIZER_UNLOCKED;
 static char s_c6_tel[GW_C6_TELEMETRY_MAX];
 static int64_t s_c6_tel_us;
+static float s_c6_temp_min = NAN, s_c6_temp_max = NAN; /* since the gateway start, any C6 firmware */
 
 void gw_c6_telemetry_set(const char *json)
 {
+    cJSON *j = cJSON_Parse(json);
+    const cJSON *t = cJSON_GetObjectItem(j, "temp_c");
+    if (cJSON_IsNumber(t)) {
+        s_c6_temp_min = isnan(s_c6_temp_min) || t->valuedouble < s_c6_temp_min ? t->valuedouble : s_c6_temp_min;
+        s_c6_temp_max = isnan(s_c6_temp_max) || t->valuedouble > s_c6_temp_max ? t->valuedouble : s_c6_temp_max;
+    }
+    cJSON_Delete(j);
     portENTER_CRITICAL(&s_c6_tel_mux);
     strlcpy(s_c6_tel, json, sizeof(s_c6_tel));
     s_c6_tel_us = esp_timer_get_time();
@@ -168,6 +176,10 @@ static cJSON *c6_telemetry_json(void)
     cJSON *j = at ? cJSON_Parse(buf) : NULL;
     if (cJSON_IsObject(j)) {
         cJSON_AddNumberToObject(j, "age_s", (double)((esp_timer_get_time() - at) / 1000000));
+        if (!isnan(s_c6_temp_min)) {
+            cJSON_AddNumberToObject(j, "temp_min_c", round(s_c6_temp_min * 10) / 10.0);
+            cJSON_AddNumberToObject(j, "temp_max_c", round(s_c6_temp_max * 10) / 10.0);
+        }
         return j;
     }
     cJSON_Delete(j);

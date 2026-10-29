@@ -671,7 +671,7 @@ const TIPS = {
   'Uptime': ['Time since the last start of the P4.', 'Doba od posledního startu P4.'],
   'Last reset': ['Why the P4 last started: power on, software restart, watchdog, panic…', 'Proč P4 naposledy startovala: zapnutí, softwarový restart, watchdog, pád…'],
   'Temperature': ['Internal temperature sensor of the P4 die, not the room temperature. Min/max since the start, sampled every 2 s.', 'Vnitřní teplotní senzor čipu P4, ne teplota místnosti. Min/max od startu, měřeno každé 2 s.'],
-  'C6 temperature': ['Internal temperature sensor of the C6 die, sent by the radio firmware every 30 s (Thread RCP, Zigbee coordinator and router). Older C6 images and esp-hosted do not report it.', 'Vnitřní teplotní senzor čipu C6, firmware rádia ho posílá každých 30 s (Thread RCP, Zigbee koordinátor i router). Starší firmwary C6 a esp-hosted ho nehlásí.'],
+  'C6 temperature': ['Internal temperature sensor of the C6 die, sent by the radio firmware every 30 s (Thread RCP, Zigbee coordinator and router). Min/max since the gateway start. Older C6 images and esp-hosted do not report it.', 'Vnitřní teplotní senzor čipu C6, firmware rádia ho posílá každých 30 s (Thread RCP, Zigbee koordinátor i router). Min/max od startu brány. Starší firmwary C6 a esp-hosted ho nehlásí.'],
   'C6 memory': ['Free RAM of the C6 now and the lowest value since its start.', 'Volná RAM C6 teď a nejnižší hodnota od jejího startu.'],
   'C6 uptime': ['Time since the C6 last started. Shorter than the gateway uptime means the C6 was reset.', 'Doba od posledního startu C6. Kratší než doba běhu brány znamená, že C6 byla resetována.'],
   'C6 last reset': ['Why the C6 last started: poweron (reset by the gateway), panic or watchdog point to a crash.', 'Proč C6 naposledy startovala: poweron (reset od brány), panic nebo watchdog znamenají pád.'],
@@ -927,7 +927,7 @@ function c6Rows(s, full) {
     ['C6 MAC', chip.mac ? esc(chip.mac) : '<span class="muted">read at the next C6 flashing</span>'],
     ['C6 chip revision', chip.mac ? rev(chip.revision) : tel?.rev !== undefined ? rev(tel.rev) : ''],
     ['C6 flash', chip.flash_size ? fmtBytes(chip.flash_size) : ''], ['Flashes', chip.flashes || ''],
-    ['Temperature', tel?.temp_c != null ? `${tel.temp_c} °C` + (tel.age_s > 90 ? ` <span class="warn-text">(${tel.age_s} s old)</span>` : '')
+    ['Temperature', tel?.temp_c != null ? `${tel.temp_c} °C` + (tel.temp_max_c !== undefined ? ` <span class="muted">(min ${tel.temp_min_c}, max ${tel.temp_max_c})</span>` : '') + (tel.age_s > 90 ? ` <span class="warn-text">(${tel.age_s} s old)</span>` : '')
       : '<span class="muted">not reported by this C6 firmware</span>', 'C6 temperature'],
     ['C6 memory', tel ? `${fmtBytes(tel.heap_free)} free, min ${fmtBytes(tel.heap_min)}` : ''],
     ['C6 uptime', tel ? fmtUptime(tel.uptime_s) : ''], ['C6 last reset', tel ? esc(tel.reset) : ''],
