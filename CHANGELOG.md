@@ -10,6 +10,11 @@
   `version`) and `/api/ws`, which forwards everything the gateway publishes to MQTT, broker or not,
   through its own queue (a burst of 23 messages arrived whole, one server job per message lost all
   but 6). Tests: `tests/ha_integration` (13, CI with hassfest), TC30.
+- Noise in dB(A): A-weighting filter (IEC 61672, within 0.2 dB up to 7 kHz) on the microphone,
+  LAS, LAeq and LAmax over 60 s, calibration by one sound level meter reading (Sound › Live ›
+  Noise level, `spl_reference`, `spl_offset`, `spl_reset` in `/api/sound/config`), kept when the
+  gain changes. Sensors Noise and Noise max (`sound_pressure`, dBA) in the integration and over
+  MQTT; the dBFS level is diagnostic now. Tests: `tests/unit/aweight_test.c` (CI), TC31.
 - Icon of the gateway (chip with radio waves, `assets/brand/*.svg`, `scripts/gen_brand.sh`): brand
   images of the integration (`custom_components/p4gw/brand/`, read by Home Assistant 2026 from the
   integration folder) and the web UI favicon (SVG, plus `/favicon.ico` 16/32/48 px served without

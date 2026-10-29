@@ -52,6 +52,12 @@
       "thread_state": {
         "name": "Stav Threadu"
       },
+      "noise": {
+        "name": "Hluk"
+      },
+      "noise_max": {
+        "name": "Hluk max"
+      },
       "sound_level": {
         "name": "Hladina zvuku"
       },

@@ -28,6 +28,7 @@
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
 - [x] Integrace P4 Gateway nasazena do HA (192.168.88.201), brána přidána ze zeroconf, 65 entit, trvalé push spojení
 - [ ] Integrace P4 Gateway: ověřit v HA UI událost zvuku a průběh aktualizace; vypnout MQTT discovery a přegenerovat ID entit s příponou `_2` (kolidovala s MQTT entitami)
+- [ ] Hlučnost: kalibrovat hlukoměrem nebo aplikací (Zvuk › Živě › Hlučnost); do té doby odhad ±6 dB
 - [ ] Repozitář je soukromý: tlačítko „Otevřít v HACS“ funguje až po zveřejnění (HACS instaluje jen z veřejných repozitářů)
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
 - [ ] Zjistit, proč embedding YAMNet téhož zvuku kolísá mezi běhy o 0,01–0,07 (TC28; esp-dl jedno jádro, mel deterministický)

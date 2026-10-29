@@ -52,6 +52,12 @@
       "thread_state": {
         "name": "Thread state"
       },
+      "noise": {
+        "name": "Noise"
+      },
+      "noise_max": {
+        "name": "Noise max"
+      },
       "sound_level": {
         "name": "Sound level"
       },

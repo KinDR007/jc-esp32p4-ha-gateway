@@ -16,7 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 pytest_plugins = ["pytest_homeassistant_custom_component"]
 
 STATUS = json.loads((Path(__file__).parent / "status.json").read_text())
-SOUND = {"enabled": True, "running": True, "level_db": -60.5}
+SOUND = {"enabled": True, "running": True, "level_db": -60.5,
+         "spl": {"las": 41.2, "laeq": 40.8, "lamax": 52.3, "overload": False, "window_s": 60, "partial": False,
+                 "offset": 135.0, "calibrated": False}}
 EVENTS = [
     {"id": "dog", "name": "Dog barking", "name_cs": "Štěkání psa", "enabled": True, "active": False},
     {"id": "glass", "name": "Glass breaking", "enabled": False, "active": False},

@@ -404,6 +404,32 @@ příčina zatím není známá (esp-dl běží na jednom jádře, výpočet mel
 S 5–10 vzorky stejného zdroje bude shoda vzorků i rezerva vyšší. Živé nahrávání z mikrofonu a spuštění
 události přehraným zvukem čeká na test s reproduktorem u desky (výstup Macu byl ztlumený).
 
+## Hlučnost v dB(A) (2026-10-29)
+
+Brána kromě hladiny v dBFS (digitální hladina vůči plnému rozsahu převodníku, 0 = nejhlasitější
+možný signál) měří akustický tlak v dB(A), tedy totéž co hlukoměr nebo aplikace v telefonu.
+
+- **Váhový filtr A** (IEC 61672) na každém vzorku 16 kHz: póly pod Nyquistovou frekvencí
+  bilineární transformací, dvojpól 12,2 kHz (nad Nyquistem) nahrazen dvoukoeficientovým FIR.
+  Odchylka od normy do 0,2 dB mezi 31,5 Hz a 7 kHz
+  (`components/sound/sound_aweight.c`, test `tests/unit/aweight_test.c`).
+- **Úrovně:** LAS (pomalá odezva, 1 s), LAeq (energetický průměr) a LAmax (nejvyšší 100ms
+  úroveň) za okno 60 s. Do dokončení prvního okna se hlásí průběžné hodnoty (`partial`). První
+  sekunda po startu mikrofonu se nepočítá (lupnutí kodeku). Přebuzení (vzorek ≥ 0,99 FS) se hlásí.
+- **Převod:** `dB(A) = dBFS(A) + posun − zesílení`. Změna zesílení kalibraci zachová.
+  Výchozí posun 135 dB je odhad pro typický analogový mikrofon (−42 dBV/Pa) do ES8311 (plný
+  rozsah asi −1 dBV), chyba asi ±6 dB.
+- **Kalibrace** (Zvuk › Živě › Hlučnost): hlukoměr nebo aplikace (vážení A, pomalá odezva) vedle
+  brány v ustáleném hluku, zadat údaj → posun se dopočítá z aktuální LAS. API
+  `POST /api/sound/config` s `spl_reference` (20–130 dB(A)), `spl_offset` (přímo) nebo
+  `spl_reset`. Posun je v NVS (`snd_spl`) a jde i do zálohy nastavení.
+- **Home Assistant:** senzory *Hluk* (LAeq) a *Hluk max* (LAmax), třída `sound_pressure`,
+  jednotka dBA. Jsou v integraci P4 Gateway i v MQTT (`noise_laeq`, `noise_max` ve stavu).
+  Hladina v dBFS přešla mezi diagnostické.
+- **Meze:** nejtišší měřitelná hodnota je dána šumem mikrofonu a kodeku (v tiché místnosti
+  odhadem 35–40 dB(A) při výchozím odhadu). Pásmo končí na 8 kHz. Jde o orientační měření, ne
+  o certifikovaný hlukoměr. Test TC31.
+
 ## Zdroje
 
 1. YAMNet: https://github.com/tensorflow/models/tree/master/research/audioset/yamnet, třídy: yamnet_class_map.csv

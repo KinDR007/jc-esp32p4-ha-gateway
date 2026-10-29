@@ -22,6 +22,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "sound_aweight.h"
 #include "sound_events.h"
 #include "sound_learn.h"
 #include "sound_mel.h"
@@ -40,12 +41,18 @@ static const char *TAG = "sound";
 #define KEY_GAIN "snd_gain"
 #define KEY_INFER "snd_ai"
 #define KEY_GATE "snd_gate"
+#define KEY_SPL "snd_spl" /* calibration: dB SPL = dBFS(A) + offset - gain */
 
 #define RATE MEL_SAMPLE_RATE
 #define BLOCK 320                 /* 20 ms */
 #define RING_SECONDS 10
 #define RING (RATE * RING_SECONDS) /* int16 mono samples */
 #define LEVEL_BLOCKS 5            /* level over 100 ms */
+/* Sound pressure: without a calibration a typical analog microphone (-42 dBV/Pa) into the ES8311
+ * (full scale about -1 dBV) gives 94 dB SPL at -41 dBFS with no gain. */
+#define SPL_OFFSET_DEFAULT 135.0f
+#define SPL_WINDOW_LEVELS 600 /* LAeq and LAmax over 60 s of 100 ms levels */
+#define SPL_SLOW 0.0952f       /* "slow" time weighting (1 s) per 100 ms level: 1 - exp(-0.1) */
 #define TOP_N 5
 #define CORE 1
 #define CAPTURE_PRIO 6
@@ -73,6 +80,17 @@ static struct {
     uint64_t total; /* samples written, read with samples_total() */
     float level_db, peak_db, floor_db, gate_level_db;
     uint32_t read_errors;
+    /* sound pressure, A-weighted levels in dBFS (spl() makes dB of them) */
+    float spl_offset;
+    bool spl_calibrated;
+    float las_ms;               /* slow mean square */
+    float win_ms;               /* sum of the mean squares in the current window (32-bit: read from other tasks) */
+    int win_levels;
+    float win_max_db;
+    bool win_overload;
+    float laeq_db, lamax_db;    /* last whole window */
+    bool laeq_valid, laeq_overload;
+    int64_t laeq_us;
     /* inference */
     char model_error[96];
     uint32_t model_load_ms;
@@ -201,6 +219,12 @@ static esp_err_t audio_open(void)
     return ESP_OK;
 }
 
+/* dB SPL (A-weighted) of an A-weighted level in dBFS */
+static float spl(float dbfs)
+{
+    return dbfs + s.spl_offset - s.gain_db;
+}
+
 static float to_db(float rms)
 {
     return rms > 1e-6f ? 20.0f * log10f(rms) : -120.0f;
@@ -209,9 +233,13 @@ static float to_db(float rms)
 static void capture_task(void *arg)
 {
     int16_t *stereo = heap_caps_malloc(BLOCK * 2 * sizeof(int16_t), MALLOC_CAP_INTERNAL);
-    double acc = 0;
+    double acc = 0, acc_a = 0;
     int blocks = 0;
     float peak = 0;
+    aweight_t aw;
+    aweight_reset(&aw);
+    int settle = 10; /* levels (1 s) left out of the sound pressure after the start */
+    s.win_max_db = -120.0f;
 
     while (true) {
         if (esp_codec_dev_read(s_codec, stereo, BLOCK * 2 * sizeof(int16_t)) != ESP_CODEC_DEV_OK) {
@@ -226,6 +254,8 @@ static void capture_task(void *arg)
             float f = v / 32768.0f;
             acc += f * f;
             peak = fmaxf(peak, fabsf(f));
+            float a = aweight_step(&aw, f);
+            acc_a += a * a;
         }
         portENTER_CRITICAL(&s_total_mux);
         s.total += BLOCK;
@@ -236,7 +266,34 @@ static void capture_task(void *arg)
             s.peak_db = to_db(peak);
             /* Noise floor: follows quiet levels fast and loud ones slowly. */
             s.floor_db = db < s.floor_db ? db : s.floor_db + 0.01f * (db - s.floor_db);
+
+            float ms = acc_a / (BLOCK * LEVEL_BLOCKS);
+            s.las_ms += SPL_SLOW * (ms - s.las_ms);
+            if (settle > 0) { /* codec start click and the filter settling */
+                settle--;
+                s.las_ms = ms;
+                acc = 0;
+                acc_a = 0;
+                blocks = 0;
+                peak = 0;
+                continue;
+            }
+            s.win_ms += ms;
+            s.win_max_db = fmaxf(s.win_max_db, to_db(sqrtf(ms)));
+            s.win_overload |= peak >= 0.99f;
+            if (++s.win_levels == SPL_WINDOW_LEVELS) {
+                s.laeq_db = to_db(sqrtf(s.win_ms / s.win_levels));
+                s.lamax_db = s.win_max_db;
+                s.laeq_overload = s.win_overload;
+                s.laeq_valid = true;
+                s.laeq_us = esp_timer_get_time();
+                s.win_ms = 0;
+                s.win_levels = 0;
+                s.win_max_db = -120.0f;
+                s.win_overload = false;
+            }
             acc = 0;
+            acc_a = 0;
             blocks = 0;
             peak = 0;
         }
@@ -389,6 +446,32 @@ static esp_err_t start(void)
 
 /* ---------------------------------------------------------------- API */
 
+/* LAeq and LAmax (dBFS) of the last whole window; until there is one, of the window so far. */
+static void spl_window(float *laeq, float *lamax, bool *overload)
+{
+    if (s.laeq_valid) {
+        *laeq = s.laeq_db;
+        *lamax = s.lamax_db;
+        *overload = s.laeq_overload;
+    } else {
+        int n = s.win_levels;
+        *laeq = n ? to_db(sqrtf(s.win_ms / n)) : to_db(sqrtf(s.las_ms));
+        *lamax = n ? s.win_max_db : *laeq;
+        *overload = s.win_overload;
+    }
+}
+
+static void spl_load(void)
+{
+    char text[16];
+    s.spl_offset = SPL_OFFSET_DEFAULT;
+    s.spl_calibrated = false;
+    if (gw_config_get_str(KEY_SPL, text, sizeof(text)) && text[0]) {
+        s.spl_offset = strtof(text, NULL);
+        s.spl_calibrated = true;
+    }
+}
+
 static cJSON *status_json(void)
 {
     cJSON *json = cJSON_CreateObject();
@@ -403,6 +486,18 @@ static cJSON *status_json(void)
         cJSON_AddNumberToObject(json, "floor_db", round((double)(s.floor_db) * 10) / 10.0);
         cJSON_AddNumberToObject(json, "seconds", samples_total() / (double)RATE);
         cJSON_AddNumberToObject(json, "read_errors", s.read_errors);
+        cJSON *p = cJSON_AddObjectToObject(json, "spl");
+        float laeq, lamax;
+        bool overload;
+        spl_window(&laeq, &lamax, &overload);
+        cJSON_AddNumberToObject(p, "las", round((double)spl(to_db(sqrtf(s.las_ms))) * 10) / 10.0);
+        cJSON_AddNumberToObject(p, "laeq", round((double)spl(laeq) * 10) / 10.0);
+        cJSON_AddNumberToObject(p, "lamax", round((double)spl(lamax) * 10) / 10.0);
+        cJSON_AddBoolToObject(p, "overload", overload);
+        cJSON_AddNumberToObject(p, "window_s", SPL_WINDOW_LEVELS / 10);
+        cJSON_AddBoolToObject(p, "partial", !s.laeq_valid);
+        cJSON_AddNumberToObject(p, "offset", round((double)s.spl_offset * 10) / 10.0);
+        cJSON_AddBoolToObject(p, "calibrated", s.spl_calibrated);
     }
     cJSON *model = cJSON_AddObjectToObject(json, "model");
     cJSON_AddNumberToObject(model, "stored_bytes", sound_model_stored_size());
@@ -470,6 +565,37 @@ static esp_err_t config_post(httpd_req_t *req)
         if (s.infer_enabled) {
             s.model_error[0] = '\0';
         }
+    }
+    if (cJSON_IsNumber(v = cJSON_GetObjectItem(body, "spl_reference"))) {
+        /* the reading of a sound level meter (dB(A), slow) next to the gateway right now */
+        if (!s.running || s.las_ms <= 0) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 409, "microphone is off");
+        }
+        if (v->valuedouble < 20 || v->valuedouble > 130) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 400, "reference 20-130 dB(A)");
+        }
+        char text[16];
+        float offset = (float)v->valuedouble - to_db(sqrtf(s.las_ms)) + s.gain_db;
+        snprintf(text, sizeof(text), "%.1f", (double)offset);
+        gw_config_set_str(KEY_SPL, text);
+        spl_load();
+        ESP_LOGI(TAG, "sound pressure calibrated: %.1f dB(A) at offset %s", v->valuedouble, text);
+    }
+    if (cJSON_IsNumber(v = cJSON_GetObjectItem(body, "spl_offset"))) {
+        if (v->valuedouble < 60 || v->valuedouble > 220) {
+            cJSON_Delete(body);
+            return gw_http_send_error(req, 400, "offset 60-220 dB");
+        }
+        char text[16];
+        snprintf(text, sizeof(text), "%.1f", v->valuedouble);
+        gw_config_set_str(KEY_SPL, text);
+        spl_load();
+    }
+    if (cJSON_IsTrue(cJSON_GetObjectItem(body, "spl_reset"))) {
+        gw_config_erase(KEY_SPL);
+        spl_load();
     }
     cJSON_Delete(body);
     cJSON *json = status_json();
@@ -571,12 +697,22 @@ static void level_extra(cJSON *cfg)
     cJSON_AddStringToObject(cfg, "unit_of_measurement", "dBFS");
     cJSON_AddStringToObject(cfg, "state_class", "measurement");
     cJSON_AddStringToObject(cfg, "icon", "mdi:microphone");
+    cJSON_AddStringToObject(cfg, "entity_category", "diagnostic");
+}
+
+static void noise_extra(cJSON *cfg)
+{
+    cJSON_AddStringToObject(cfg, "device_class", "sound_pressure");
+    cJSON_AddStringToObject(cfg, "unit_of_measurement", "dBA");
+    cJSON_AddStringToObject(cfg, "state_class", "measurement");
 }
 
 static void mqtt_discovery(void)
 {
     if (s.running) {
         gw_mqtt_entity("sensor", "sound_level", "Sound level", "{{ value_json.sound_level }}", level_extra);
+        gw_mqtt_entity("sensor", "noise", "Noise", "{{ value_json.noise_laeq }}", noise_extra);
+        gw_mqtt_entity("sensor", "noise_max", "Noise max", "{{ value_json.noise_max }}", noise_extra);
         sound_events_mqtt_discovery();
     }
 }
@@ -585,6 +721,11 @@ static void mqtt_state(cJSON *state)
 {
     if (s.running) {
         cJSON_AddNumberToObject(state, "sound_level", round((double)(s.level_db) * 10) / 10.0);
+        float laeq, lamax;
+        bool overload;
+        spl_window(&laeq, &lamax, &overload);
+        cJSON_AddNumberToObject(state, "noise_laeq", round((double)spl(laeq) * 10) / 10.0);
+        cJSON_AddNumberToObject(state, "noise_max", round((double)spl(lamax) * 10) / 10.0);
     }
 }
 
@@ -630,6 +771,7 @@ esp_err_t sound_init(void)
     s_lock = xSemaphoreCreateMutex();
     s.gain_db = gw_config_get_u8(KEY_GAIN, 30);
     s.gate_db = -(int)gw_config_get_u8(KEY_GATE, 60);
+    spl_load();
     s.infer_enabled = gw_config_get_u8(KEY_INFER, 1);
     gw_http_register("/api/sound/status", HTTP_GET, status_get);
     gw_http_register("/api/sound/config", HTTP_POST, config_post);

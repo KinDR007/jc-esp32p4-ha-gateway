@@ -13,7 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfInformation, UnitOfTemperature
+from homeassistant.const import EntityCategory, UnitOfInformation, UnitOfSoundPressure, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -59,10 +59,29 @@ SENSORS = (
         value=lambda d: (d.status.get("role_status") or {}).get("role"),
     ),
     P4SensorDescription(
+        key="noise",
+        translation_key="noise",
+        device_class=SensorDeviceClass.SOUND_PRESSURE,
+        native_unit_of_measurement=UnitOfSoundPressure.WEIGHTED_DECIBEL_A,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda d: (d.sound.get("spl") or {}).get("laeq"),
+    ),
+    P4SensorDescription(
+        key="noise_max",
+        translation_key="noise_max",
+        device_class=SensorDeviceClass.SOUND_PRESSURE,
+        native_unit_of_measurement=UnitOfSoundPressure.WEIGHTED_DECIBEL_A,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda d: (d.sound.get("spl") or {}).get("lamax"),
+    ),
+    P4SensorDescription(
         key="sound_level",
         translation_key="sound_level",
         native_unit_of_measurement="dBFS",
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
         suggested_display_precision=1,
         value=lambda d: d.sound.get("level_db") if d.sound.get("running") else None,
     ),

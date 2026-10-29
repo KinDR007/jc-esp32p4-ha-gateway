@@ -94,14 +94,15 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 
 | Entity | Notes |
 |---|---|
-| Active role, Thread state, Sound level | sensors |
+| Active role, Thread state | sensors |
+| Noise, Noise max | sound pressure in dB(A) over the last minute (LAeq, LAmax); calibration in the gateway UI, Sound › Live ([details](sound-detection.md)) |
 | Role (select) | switching restarts the gateway; the ESPHome role replaces the gateway firmware, so the entities stay unavailable until the gateway is back |
 | Sound recognition (switch) | microphone and model on/off |
 | `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
 | Firmware (update) | install with progress, from the online update manifest |
 | Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
 | Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |
-| Chip and C6 temperature, Started, IP, C6 firmware, Maintenance reason, heap, CPU load | diagnostic (heap and CPU disabled by default) |
+| Chip and C6 temperature, Started, IP, C6 firmware, Maintenance reason, Sound level (dBFS), heap, CPU load | diagnostic (heap and CPU disabled by default) |
 
 The integration and MQTT discovery can run side by side, but every entity would then exist twice.
 With the integration in use, switch off **Home Assistant discovery** in the gateway MQTT settings
@@ -114,7 +115,8 @@ also in CI), hardware test TC30 (mDNS, WebSocket push, password on the handshake
 
 Broker in the gateway UI (Home Assistant tab). Entities via MQTT discovery: active role, role
 select, maintenance reason, uptime, chip temperature, heap, Ethernet, IP, C6 firmware, Thread state,
-Zigbee host connection, restart button, sound level (dBFS, when the microphone is on).
+Zigbee host connection, restart button, noise and noise max (dB(A)) and sound level (dBFS) when the
+microphone is on.
 Base topic `p4gw/<hostname>/`.
 
 Connection options (Home Assistant › MQTT):

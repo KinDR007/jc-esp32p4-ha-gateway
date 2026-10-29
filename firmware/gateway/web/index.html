@@ -417,7 +417,12 @@ const CS = {
   'Back up the Zigbee network now?': 'Zálohovat Zigbee síť teď?', 'Zigbee backup: the gateway restarts': 'Záloha Zigbee: brána se restartuje', 'No snapshot yet.': 'Zatím žádná záloha.',
   // sound
   'Microphone': 'Mikrofon', 'capturing': 'nahrává', 'restart to start': 'spustí se po restartu', 'off': 'vypnuto',
-  'Gain': 'Zesílení', 'Record last 5 s': 'Nahrát posledních 5 s', 'Audio stays on the device. Only the clip you request here leaves it.': 'Zvuk zůstává v zařízení. Ven jde jen klip, který si tady vyžádáte.',
+  'Gain': 'Zesílení', 'Noise level': 'Hlučnost', 'Microphone is off.': 'Mikrofon je vypnutý.', 'Sound level meter shows, dB(A)': 'Hlukoměr ukazuje, dB(A)',
+  'Calibrate': 'Kalibrovat', 'Default': 'Výchozí', 'Now (slow)': 'Teď (pomalu)', 'Average so far (LAeq)': 'Průměr zatím (LAeq)', 'Max so far': 'Maximum zatím',
+  'Calibration': 'Kalibrace', 'overload: lower the gain': 'přebuzeno: snižte zesílení', 'estimate (±6 dB), not calibrated': 'odhad (±6 dB), nekalibrováno',
+  'Place a sound level meter or a phone app (A weighting, slow) next to the gateway in steady noise, enter its reading and press Calibrate.':
+    'Položte hlukoměr nebo telefon s aplikací (vážení A, pomalá odezva) vedle brány do ustáleného hluku, zadejte jeho údaj a stiskněte Kalibrovat.',
+  'Record last 5 s': 'Nahrát posledních 5 s', 'Audio stays on the device. Only the clip you request here leaves it.': 'Zvuk zůstává v zařízení. Ven jde jen klip, který si tady vyžádáte.',
   'Sound recognition (YAMNet)': 'Rozpoznávání zvuků (YAMNet)', 'Recognition': 'Rozpoznávání', 'Run only above': 'Spouštět jen nad',
   'Upload model': 'Nahrát model', 'Model': 'Model', 'loaded': 'načten', 'not loaded': 'nenačten', 'none, upload yamnet_p4.espdl': 'žádný, nahrajte yamnet_p4.espdl',
   'Load time': 'Načtení', 'Error': 'Chyba', 'Inference': 'Inference', 'CPU (core 1)': 'CPU (jádro 1)', 'Runs / skipped quiet': 'Běhů / přeskočeno (ticho)',
@@ -491,6 +496,7 @@ const CS_RX = [
   [/^Delete (.+)\?$/, 'Smazat $1?'], [/^Run (.+)\?$/, 'Spustit $1?'], [/^Sent (.+)$/, 'Odesláno: $1'], [/^Joining (.+)$/, 'Připojuji do $1'],
   [/^Uploaded(.*)$/, 'Nahráno$1'], [/^Automation: (.+)$/, 'Automatizace: $1'], [/^(\d+) reported, (\d+) ignored( \(unsaved\))?$/, (m, a, b, u) => `${a} hlášených, ${b} ignorovaných${u ? ' (neuloženo)' : ''}`],
   [/^(\d+) Mb\/s$/, '$1 Mb/s'], [/^Neighbors \((\d+)\)$/, 'Sousedé ($1)'], [/^Routers \((\d+)\)$/, 'Routery ($1)'],
+  [/^Average (\d+) min \(LAeq\)$/, 'Průměr $1 min (LAeq)'], [/^Max (\d+) min$/, 'Maximum $1 min'], [/^calibrated, offset (.+) dB$/, 'kalibrováno, posun $1 dB'],
   [/^level (.+) dBFS, peak (.+), noise floor (.+), (\d+) read errors$/, 'hladina $1 dBFS, špička $2, šum $3, chyb čtení $4'],
   [/^(.+) stored,$/, '$1 uloženo,'], [/^(.+) ms avg, (.+) ms max, last (.+) ms$/, 'průměr $1 ms, max $2 ms, poslední $3 ms'],
   [/^(.+) free, min (.+)$/, '$1 volné, min $2'], [/^(.+) \/ (.+), min (.+)$/, '$1 / $2, min $3'], [/^Run only above (.+) dBFS$/, 'Spouštět jen nad $1 dBFS'],
@@ -788,6 +794,7 @@ const TIPS = {
   'Identify': ['Blinks the identify icon in the header for 10 s. Zigbee2MQTT and Home Assistant can trigger the same through the Identify cluster.', 'Na 10 s rozbliká ikonu identifikace v hlavičce. Totéž může vyvolat Zigbee2MQTT a Home Assistant přes cluster Identify.'],
   'Factory reset': ['Erases the network data on the C6; the router has to be joined again.', 'Smaže data sítě na C6; router se musí znovu připojit.'],
   // sound
+  'Calibrate': ['Without calibration the level is an estimate from a typical microphone. One reading of a sound level meter makes it accurate to about 2-3 dB; changing the gain later keeps the calibration.', 'Bez kalibrace je hladina odhad podle typického mikrofonu. Jeden údaj hlukoměru ji zpřesní zhruba na 2-3 dB; pozdější změna zesílení kalibraci zachová.'],
   'Gain': ['Microphone amplifier gain. Raise it when the level meter hardly moves.', 'Zesílení mikrofonu. Zvyšte, když se ukazatel hladiny skoro nehýbe.'],
   'Run only above': ['Recognition is skipped while the sound level is below this value; saves CPU in a quiet room.', 'Rozpoznávání se přeskočí, dokud je hladina pod touto hodnotou; v tiché místnosti šetří CPU.'],
   'Model': ['YAMNet sound classifier stored on the gateway (521 sound classes).', 'Klasifikátor zvuků YAMNet uložený v bráně (521 tříd zvuků).'],
@@ -938,6 +945,7 @@ const ICONS = {
   'upload': 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
   'vector-polyline': 'M2 3V9H4.95L6.95 15H6V21H12V16.41L17.41 11H22V5H16V9.57L10.59 15H9.06L7.06 9H8V3M4 5H6V7H4M18 7H20V9H18M8 17H10V19H8Z',
   'view-dashboard-outline': 'M19,5V7H15V5H19M9,5V11H5V5H9M19,13V19H15V13H19M9,17V19H5V17H9M21,3H13V9H21V3M11,3H3V13H11V3M21,11H13V21H21V11M11,15H3V21H11V15Z',
+  'volume-high': 'M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z',
   'waveform': 'M22 12L20 13L19 14L18 13L17 16L16 13L15 21L14 13L13 15L12 13L11 17L10 13L9 22L8 13L7 19L6 13L5 14L4 13L2 12L4 11L5 10L6 11L7 5L8 11L9 2L10 11L11 7L12 11L13 9L14 11L15 3L16 11L17 8L18 11L19 10L20 11L22 12Z',
   'wrench-outline': 'M22.61,19L13.53,9.91C14.46,7.57 14,4.81 12.09,2.91C9.79,0.61 6.21,0.4 3.66,2.26L7.5,6.11L6.08,7.5L2.25,3.69C0.39,6.23 0.6,9.82 2.9,12.11C4.76,13.97 7.47,14.46 9.79,13.59L18.9,22.7C19.29,23.09 19.92,23.09 20.31,22.7L22.61,20.4C23,20 23,19.39 22.61,19M19.61,20.59L10.15,11.13C9.54,11.58 8.86,11.85 8.15,11.95C6.79,12.15 5.36,11.74 4.32,10.7C3.37,9.76 2.93,8.5 3,7.26L6.09,10.35L10.33,6.11L7.24,3C8.5,2.95 9.73,3.39 10.68,4.33C11.76,5.41 12.17,6.9 11.92,8.29C11.8,9 11.5,9.66 11.04,10.25L20.5,19.7L19.61,20.59Z',
   'zigbee': 'M4.06,6.15C3.97,6.17 3.88,6.22 3.8,6.28C2.66,7.9 2,9.87 2,12A10,10 0 0,0 12,22C15,22 17.68,20.68 19.5,18.6L17,18.85C14.25,19.15 11.45,19.19 8.66,18.96C7.95,18.94 7.24,18.76 6.59,18.45C5.73,18.06 5.15,17.23 5.07,16.29C5.06,16.13 5.12,16 5.23,15.87L7.42,13.6L15.03,5.7V5.6H10.84C8.57,5.64 6.31,5.82 4.06,6.15M20.17,17.5C20.26,17.47 20.35,17.44 20.43,17.39C21.42,15.83 22,14 22,12A10,10 0 0,0 12,2C9.22,2 6.7,3.13 4.89,4.97H5.17C8.28,4.57 11.43,4.47 14.56,4.65C15.5,4.64 16.45,4.82 17.33,5.17C18.25,5.53 18.89,6.38 19,7.37C19,7.53 18.93,7.7 18.82,7.82L9.71,17.19L9,17.95V18.06H13.14C15.5,18 17.84,17.81 20.17,17.5Z',
@@ -1527,6 +1535,11 @@ views['sound/live'] = () => `<div class="grid">
     <div id="snd-levels" class="muted" style="margin-top:6px"></div>
     <div class="row" style="margin-top:10px"><button class="btn" id="snd-clip">${ic('microphone')}Record last 5 s</button><audio id="snd-audio" controls class="hidden" style="max-width:100%"></audio></div>
     <p class="muted">Audio stays on the device. Only the clip you request here leaves it.</p></div>
+  <div class="card">${h3('volume-high', 'Noise level')}
+    <div id="snd-spl" class="muted">Microphone is off.</div>
+    <label class="field" style="margin-top:10px"><span>Sound level meter shows, dB(A)${tip('Calibrate')}</span><input type="number" id="snd-spl-ref" min="20" max="130" step="0.1" placeholder="45.0"></label>
+    <div class="row"><button class="btn" id="snd-spl-cal">${ic('check')}Calibrate</button><button class="btn" id="snd-spl-reset">Default</button></div>
+    <p class="muted">Place a sound level meter or a phone app (A weighting, slow) next to the gateway in steady noise, enter its reading and press Calibrate.</p></div>
   <div class="card">${h3('brain', 'Sound recognition (YAMNet)')}
     <div class="row"><label><input type="checkbox" id="snd-ai"> Recognition</label></div>
     <label class="field" style="margin-top:10px"><span>Run only above <b id="snd-gate-v"></b> dBFS${tip('Run only above')}</span><input type="range" id="snd-gate" min="-90" max="-10" step="5"></label>
@@ -1780,6 +1793,12 @@ async function loadSound() {
     $('#snd-meter').style.width = Math.max(0, Math.min(100, (st.level_db + 90) / 90 * 100)) + '%';
     $('#snd-levels').textContent = `level ${st.level_db} dBFS, peak ${st.peak_db}, noise floor ${st.floor_db}, ${st.read_errors} read errors`;
   }
+  const p = st.spl;
+  $('#snd-spl').innerHTML = p ? dl([
+    ['Now (slow)', `<b>${p.las} dB(A)</b>`],
+    [p.partial ? 'Average so far (LAeq)' : `Average ${p.window_s / 60} min (LAeq)`, `${p.laeq} dB(A)`],
+    [p.partial ? 'Max so far' : `Max ${p.window_s / 60} min`, `${p.lamax} dB(A)${p.overload ? ' ' + pill('warn', 'overload: lower the gain') : ''}`],
+    ['Calibration', p.calibrated ? pill('ok', `calibrated, offset ${p.offset} dB`) : pill('warn', 'estimate (±6 dB), not calibrated')]]) : 'Microphone is off.';
   const m = st.model, inf = st.inference;
   $('#snd-model').innerHTML = dl([
     ['Model', m.stored_bytes ? `${fmtBytes(m.stored_bytes)} stored, ${m.loaded ? pill('ok', 'loaded') : pill('warn', 'not loaded')}` : pill('bad', 'none, upload yamnet_p4.espdl')],
@@ -2881,6 +2900,16 @@ document.addEventListener('click', async e => {
     } else if (t.dataset.logNew !== undefined) {
       const c = +t.dataset.logNew;
       openEditor(-1, { id: clsName(c).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 23), name: clsName(c), kind: 'impulse', threshold: 0.5, windows: 1, hold_s: 3, cooldown_s: 30, classes: [c], suppress: [], enabled: true });
+    } else if (t.id === 'snd-spl-cal') {
+      const ref = parseFloat($('#snd-spl-ref').value);
+      if (!(ref >= 20 && ref <= 130)) throw new Error(L('enter the reading, 20-130 dB(A)', 'zadejte údaj hlukoměru, 20-130 dB(A)'));
+      await api('/api/sound/config', { json: { spl_reference: ref } });
+      toast(L('Calibrated', 'Zkalibrováno'));
+      loadSound();
+    } else if (t.id === 'snd-spl-reset') {
+      await api('/api/sound/config', { json: { spl_reset: true } });
+      toast(L('Default calibration', 'Výchozí kalibrace'));
+      loadSound();
     } else if (t.id === 'snd-clip') {
       const res = await fetch('/api/sound/clip?seconds=5', { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
       if (!res.ok) throw new Error((await res.json()).error || res.statusText);

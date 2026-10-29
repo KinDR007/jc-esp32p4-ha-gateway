@@ -117,6 +117,11 @@ async def test_entities(hass: HomeAssistant, gateway) -> None:
     assert hass.states.get(entity_id(hass, "sensor", "role")).state == "thread_br"
     assert hass.states.get(entity_id(hass, "sensor", "thread_state")).state == "router"
     assert hass.states.get(entity_id(hass, "sensor", "sound_level")).state == "-60.5"
+    noise = hass.states.get(entity_id(hass, "sensor", "noise"))
+    assert noise.state == "40.8"
+    assert noise.attributes["unit_of_measurement"] == "dBA"
+    assert noise.attributes["device_class"] == "sound_pressure"
+    assert hass.states.get(entity_id(hass, "sensor", "noise_max")).state == "52.3"
     assert float(hass.states.get(entity_id(hass, "sensor", "temperature")).state) == gateway.status["temperature_c"]
     assert hass.states.get(entity_id(hass, "select", "desired_role")).state == "thread_br"
     assert hass.states.get(entity_id(hass, "binary_sensor", "ethernet")).state == STATE_ON

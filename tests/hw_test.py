@@ -1095,6 +1095,35 @@ def tc30_ha_integration_interface():
         check(http('POST', '/api/settings', {'password': ''}, auth=pw)[0] == 200, 'password removed')
 
 
+def tc31_sound_pressure():
+    """Sound pressure in dB(A): plausible levels, calibration by a reference reading and by an offset, reset."""
+    st = http('GET', '/api/sound/status')[1]
+    check(st.get('running'), 'microphone running')
+    p = st['spl']
+    check(all(k in p for k in ('las', 'laeq', 'lamax', 'overload', 'window_s', 'offset', 'calibrated')), f'spl reported: {p}')
+    check(20 <= p['laeq'] <= 110 and p['lamax'] >= p['laeq'] - 0.5, f'plausible levels: LAeq {p["laeq"]}, LAmax {p["lamax"]} dB(A)')
+    original = p['offset'] if p['calibrated'] else None
+    try:
+        code, r = http('POST', '/api/sound/config', {'spl_reference': 5})
+        check(code == 400, f'reference out of range rejected ({r})')
+        ref = round(p['las'] + 10, 1)
+        code, r = http('POST', '/api/sound/config', {'spl_reference': ref})
+        check(code == 200 and r['spl']['calibrated'], 'calibrated by a reference reading')
+        check(abs(r['spl']['las'] - ref) <= 1.5, f'level now reads the reference: {r["spl"]["las"]} vs {ref} dB(A)')
+        check(abs(r['spl']['offset'] - (p['offset'] + 10)) <= 1.5, f'offset moved by the difference: {p["offset"]} -> {r["spl"]["offset"]}')
+        code, r = http('POST', '/api/sound/config', {'spl_offset': 140.5})
+        check(code == 200 and r['spl']['offset'] == 140.5, 'offset set directly')
+        status()  # no restart needed, still answering
+        check(http('GET', '/api/sound/status')[1]['spl']['offset'] == 140.5, 'calibration kept')
+        code, r = http('POST', '/api/sound/config', {'spl_reset': True})
+        check(code == 200 and not r['spl']['calibrated'] and r['spl']['offset'] == 135, 'reset to the default estimate')
+    finally:
+        if original is not None:
+            http('POST', '/api/sound/config', {'spl_offset': original})
+        else:
+            http('POST', '/api/sound/config', {'spl_reset': True})
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1107,6 +1136,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
+    ('TC31', tc31_sound_pressure),
 ]
 
 

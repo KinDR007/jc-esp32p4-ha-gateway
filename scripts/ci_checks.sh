@@ -8,6 +8,9 @@ trap 'rm -rf "$tmp"' EXIT
 echo "== unit tests"
 cc -std=c11 -Wall -Wextra -Werror -o "$tmp/zb_filter_test" tests/unit/zb_filter_test.c
 "$tmp/zb_filter_test"
+cc -std=c11 -Wall -Wextra -Werror -I firmware/gateway/components/sound -o "$tmp/aweight_test" \
+    tests/unit/aweight_test.c firmware/gateway/components/sound/sound_aweight.c -lm
+"$tmp/aweight_test"
 
 echo "== python syntax"
 python3 -m py_compile scripts/*.py tests/*.py tests/zha/*.py tests/ha_integration/*.py custom_components/p4gw/*.py
