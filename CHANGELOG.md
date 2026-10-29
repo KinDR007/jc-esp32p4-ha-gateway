@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- C6 flashing: a dialog locks the web UI from the restart until the role runs, with the stage,
+  a smooth progress bar and the remaining time (`elapsed_s` in `/api/status` c6.flash). The
+  gateway waits for its IP address before flashing and the page polls with a short timeout while
+  the board restarts, so the progress shows from the first percent (it used to appear around 50 %:
+  the flash ran before the network was up). Sound detection stays on: the write is limited by the
+  460800 Bd UART (~42 kB/s), not by the CPU. Test UI11.
+- Menu: Thread pages and Zigbee Information/Diagnostics open only in their role; Zigbee network
+  and backups keep working in any role. A link to a closed page opens the first one that works.
+  Test UI16.
+- Thread and Matter logos (selfh.st/icons, CC BY 4.0) for the Thread section, the Thread roles and
+  the Matter Server.
+- Network maps: zoom with the wheel or +/−, drag to move, home for the whole map; L (or the
+  button) arranges the nodes by signal strength (stress majorization over the link quality, a
+  stronger link is a shorter edge) and back to the ring. Test UI17.
 - Thread and Zigbee maps: a static legend (line colours, node kinds) in the top right corner of the
   map, styled like the details box; beside the map when the window is narrow, below it on a phone.
 - Info tips fixed where columns share a name but not a meaning: Zigbee device table (model, type,

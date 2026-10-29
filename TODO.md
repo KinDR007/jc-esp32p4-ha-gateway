@@ -29,6 +29,8 @@
 - [ ] Zvuk fáze 5: ladění falešných poplachů, 24h test se zapnutou detekcí
 - [ ] Ruční testy M01–M08 (HA OTBR + Matter, Zigbee2MQTT, router v síti, MQTT, výpadky, 7 dní)
 - [ ] Sledovat jednorázové zablokování HTTP po záloze C6 (TC03, 1. běh, nereprodukováno)
+- [ ] OTA brány 2026-10-29: první upload bez odpovědi, brána se restartovala do starého slotu; druhý pokus OK (souvisí s jednorázovým resetem spojení při OTA)
+- [ ] Ověřit modální okno flashování i při úplném skenu okolí a přepnutí role (ověřeno jen Přeflashovat C6)
 - [ ] Volitelně balík `esp_hosted_factory` z backups/c6_factory_app_network_adapter.bin
 - [x] Vysílací výkon C6 (Thread, Zigbee router, Zigbee2MQTT) a Identify s ikonou v hlavičce (UI13)
 - [ ] Ověřit zápis výkonu ze Zigbee2MQTT (`analog_output` / `tx_power`), MQTT broker vyžaduje přihlášení
