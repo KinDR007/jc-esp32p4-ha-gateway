@@ -252,27 +252,6 @@
    }
   ]
  },
- "system/firmware": {
-  "page": "system_firmware",
-  "cards": [
-   {
-    "title": "GATEWAY FIRMWARE",
-    "file": "system_firmware__1"
-   },
-   {
-    "title": "ESPHOME IMAGE",
-    "file": "system_firmware__2"
-   },
-   {
-    "title": "C6 FIRMWARE BUNDLE",
-    "file": "system_firmware__3"
-   },
-   {
-    "title": "ONLINE UPDATE",
-    "file": "system_firmware__4"
-   }
-  ]
- },
  "system/diag": {
   "page": "system_diag",
   "cards": [
@@ -559,6 +538,37 @@
    {
     "title": "ZIGBEE ROUTER",
     "file": "zigbee_diag__router__1"
+   }
+  ]
+ },
+ "system/firmware/online": {
+  "page": "system_firmware_online",
+  "cards": [
+   {
+    "title": "ONLINE UPDATE",
+    "file": "system_firmware_online__1"
+   },
+   {
+    "title": "RELEASES FOR THIS GATEWAY",
+    "file": "system_firmware_online__2"
+   }
+  ]
+ },
+ "system/firmware/manual": {
+  "page": "system_firmware_manual",
+  "cards": [
+   {
+    "title": "MANUAL UPDATE",
+    "file": "system_firmware_manual__1"
+   }
+  ]
+ },
+ "system/firmware/settings": {
+  "page": "system_firmware_settings",
+  "cards": [
+   {
+    "title": "UPDATE SETTINGS",
+    "file": "system_firmware_settings__1"
    }
   ]
  }

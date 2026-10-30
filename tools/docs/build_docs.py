@@ -32,6 +32,8 @@ OWN_TITLES = {
     "THREAD BORDER ROUTER → HOME ASSISTANT": ("Thread border router → Home Assistant", "Thread border router → Home Assistant"),
     "ZIGBEE COORDINATOR → ZIGBEE2MQTT (RECOMMENDED)": ("Zigbee coordinator → Zigbee2MQTT (recommended)", "Zigbee koordinátor → Zigbee2MQTT (doporučeno)"),
     "ESPHOME BLE PROXY ROLE": ("ESPHome BLE proxy role", "Role ESPHome BLE proxy"), "ESPHOME IMAGE": ("ESPHome image", "Obraz ESPHome"),
+    "RELEASES FOR THIS GATEWAY": ("Releases for this gateway", "Vydání pro tuto bránu"),
+    "UPDATE SETTINGS": ("Update settings", "Nastavení aktualizací"), "MANUAL UPDATE": ("Manual update", "Ruční aktualizace"),
 }
 
 
@@ -309,21 +311,34 @@ PAGES = [
        <li>Stránka se otevře na nové adrese; do 120 s potvrďte lištu nahoře. Bez potvrzení se vrátí předchozí nastavení samo.</li>
        <li>Zigbee2MQTT používá adresu: změňte ji i tam. Integrace P4 Gateway novou adresu najde přes mDNS.</li></ol>"""),
      ["system_lan"]),
-    ("system/firmware", "upload", T("System › Firmware", "Systém › Firmware"),
-     T("Updates of all parts.", "Aktualizace všech částí."),
-     {"ONLINE UPDATE": T("Manifest URL (<b>GitHub Releases</b> fills in the address of the latest release), check, then the gateway firmware and the <b>C6 package</b> separately: versions installed and offered of every C6 firmware, build (commit, date, ESP-IDF) and release notes. <b>Releases for this gateway</b>: older releases that run on the flash layout of the board, the gateway or the C6 package installable separately (rollback).",
-                         "URL manifestu (<b>GitHub Releases</b> doplní adresu posledního vydání), kontrola, pak zvlášť firmware brány a <b>balík C6</b>: nainstalované a nabízené verze všech firmwarů C6, sestavení (commit, datum, ESP-IDF) a poznámky k vydání. <b>Vydání pro tuto bránu</b>: starší vydání, která běží na layoutu flash desky, bránu nebo balík C6 jde nainstalovat zvlášť (návrat zpět)."),
-      "MANUAL UPDATE": T("Upload without internet: <code>p4gw.bin</code> (written to the other slot, confirmed after 60 s, otherwise rolled back), <code>c6fw.bin</code> (the C6 gets the new firmware on the next start) and <code>esphome.bin</code> for the ESPHome role.",
-                         "Nahrání bez internetu: <code>p4gw.bin</code> (zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí), <code>c6fw.bin</code> (C6 dostane nový firmware při dalším startu) a <code>esphome.bin</code> pro roli ESPHome.")},
-     T("""<ol><li>Set the manifest URL (your web server, or <b>GitHub Releases</b> once the repository is public) and press <b>Check</b>.</li>
-       <li><b>Install gateway firmware</b> first when both are newer: a C6 package of a newer format is offered only to a gateway that reads it.</li>
-       <li><b>Install C6 package</b>: the gateway downloads it into RAM, checks its sha256 against the manifest, stores it and restarts; the C6 then gets the new firmware (about 2 minutes without Thread or Zigbee).</li></ol>
-       <p>Without internet the same works by uploading <code>c6fw.bin</code> in the Manual update card. Also from Home Assistant (<i>C6 radio firmware</i> update entity) and Telegram (<code>/update</code>, <code>/install c6</code>).</p>""",
-       """<ol><li>Nastavte URL manifestu (vlastní webový server, nebo <b>GitHub Releases</b>, až bude repozitář veřejný) a stiskněte <b>Zkontrolovat</b>.</li>
-       <li>Když jsou novější obě části, instalujte nejdřív <b>firmware brány</b>: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.</li>
-       <li><b>Instalovat balík C6</b>: brána ho stáhne do RAM, ověří sha256 proti manifestu, uloží a restartuje se; C6 pak dostane nový firmware (asi 2 minuty bez Thread nebo Zigbee).</li></ol>
-       <p>Bez internetu to samé jde nahráním <code>c6fw.bin</code> v kartě Ruční aktualizace. Také z Home Assistant (entita aktualizace <i>Firmware rádia C6</i>) a z Telegramu (<code>/update</code>, <code>/install c6</code>).</p>"""),
-     ["system_firmware"]),
+    ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
+     T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
+     {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",
+                         "Nainstalovaná a nabízená verze firmwaru brány a <b>balíku C6</b> se stavem a tlačítkem <b>Instalovat</b>; <b>Zkontrolovat</b> přečte manifest hned. <i>Firmwary v balíku C6</i> ukazuje každý firmware C6 nainstalovaný a nabízený."),
+      "RELEASES FOR THIS GATEWAY": T("Releases that run on the flash layout of the board, one expandable row each with its notes, build and link: <b>Gateway</b> and <b>C6</b> install that release (an older one is a rollback), <b>Reflash</b> writes the installed one again.",
+                                     "Vydání, která běží na layoutu flash desky, každé jako rozbalovací řádek s poznámkami, sestavením a odkazem: <b>Brána</b> a <b>C6</b> nainstalují dané vydání (starší je návrat zpět), <b>Přeflashovat</b> zapíše nainstalované znovu.")},
+     T("""<ol><li><b>Install</b> the gateway first when both are newer: a C6 package of a newer format is offered only to a gateway that reads it.</li>
+       <li>C6 package: the gateway downloads it into RAM, checks its sha256 against the manifest, stores it and restarts; the C6 then gets the new firmware (about 2 minutes without Thread or Zigbee).</li>
+       <li>Rollback: open <b>Releases for this gateway</b> and press <b>Gateway</b> or <b>C6</b> at an older release. Settings stay; functions added later are missing until the next update.</li></ol>
+       <p>Also from Home Assistant (<i>Firmware</i> and <i>C6 radio firmware</i> update entities, <code>update.install</code> with <code>version</code>) and Telegram (<code>/update</code>, <code>/releases</code>, <code>/install</code>, <code>/install c6</code>, <code>/install v1.6</code>).</p>""",
+       """<ol><li>Když jsou novější obě části, <b>instalujte</b> nejdřív bránu: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.</li>
+       <li>Balík C6: brána ho stáhne do RAM, ověří sha256 proti manifestu, uloží a restartuje se; C6 pak dostane nový firmware (asi 2 minuty bez Thread nebo Zigbee).</li>
+       <li>Návrat zpět: v <b>Vydání pro tuto bránu</b> stiskněte u staršího vydání <b>Brána</b> nebo <b>C6</b>. Nastavení zůstane; později přidané funkce chybí do další aktualizace.</li></ol>
+       <p>Také z Home Assistant (entity aktualizace <i>Firmware</i> a <i>Firmware rádia C6</i>, <code>update.install</code> s <code>version</code>) a z Telegramu (<code>/update</code>, <code>/releases</code>, <code>/install</code>, <code>/install c6</code>, <code>/install v1.6</code>).</p>"""),
+     ["system_firmware_online"]),
+    ("system/firmware/manual", "upload", T("System › Firmware › Manual update", "Systém › Firmware › Ruční aktualizace"),
+     T("Uploads without internet.", "Nahrání bez internetu."),
+     {"MANUAL UPDATE": T("<code>p4gw.bin</code> (written to the other slot, confirmed after 60 s, otherwise rolled back), <code>c6fw.bin</code> (the C6 gets the new firmware on the next start; also when the gateway asks for it in maintenance) and <code>esphome.bin</code> for the ESPHome role.",
+                         "<code>p4gw.bin</code> (zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí), <code>c6fw.bin</code> (C6 dostane nový firmware při dalším startu; také když o něj brána v údržbě žádá) a <code>esphome.bin</code> pro roli ESPHome.")},
+     T("<p>The files come from a GitHub release or from <code>scripts/build_all.sh</code>.</p>", "<p>Soubory jsou ve vydání na GitHubu nebo z <code>scripts/build_all.sh</code>.</p>"),
+     ["system_firmware_manual"]),
+    ("system/firmware/settings", "tune-variant", T("System › Firmware › Settings", "Systém › Firmware › Nastavení"),
+     T("Where the online update looks.", "Kde online aktualizace hledá."),
+     {"UPDATE SETTINGS": T("Manifest URL: <b>GitHub Releases</b> fills in the address of the latest release (the default), your own web server works too; saved empty turns the online update off. Checked every 6 hours, nothing is installed without a request.",
+                           "URL manifestu: <b>GitHub Releases</b> doplní adresu posledního vydání (výchozí), funguje i vlastní webový server; uloženo prázdné online aktualizaci vypne. Kontroluje se každých 6 hodin, bez vyžádání se nic neinstaluje.")},
+     T("<p>Own server: <code>scripts/make_update_manifest.py</code> writes <code>manifest.json</code> next to <code>p4gw.bin</code> and <code>c6fw.bin</code> (docs/installation.md).</p>",
+       "<p>Vlastní server: <code>scripts/make_update_manifest.py</code> zapíše <code>manifest.json</code> vedle <code>p4gw.bin</code> a <code>c6fw.bin</code> (docs/installation.md).</p>"),
+     ["system_firmware_settings"]),
     ("system/diag", "stethoscope", T("System › Diagnostics", "Systém › Diagnostika"),
      T("Tools when something does not work.", "Nástroje, když něco nefunguje."),
      {"PING": T("Ping a host from the gateway.", "Ping na hostitele z brány."),

@@ -153,7 +153,7 @@ messages.
 
 
 Firmware update entity (`update.<host>_firmware`): installed and offered gateway version from the
-online update manifest (System › Firmware › Online update), *Install* downloads it into the other
+online update manifest (System › Firmware › Settings), *Install* downloads it into the other
 gateway slot and restarts. Without a manifest URL it always shows the installed version.
 An older release that runs on the board (attribute `available_versions`) is installed with
 `update.install` and `version: v1.6` (rollback); the *C6 radio firmware* entity takes the package id

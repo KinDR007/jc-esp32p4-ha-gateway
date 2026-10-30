@@ -727,7 +727,7 @@ static void cmd_update(const char *args, bool cz, char *out, size_t len)
         n += snprintf(out + n, len - n, cz ? "\n\n<b>Poznámky k vydání</b>\n%s" : "\n\n<b>Release notes</b>\n%s", notes);
     }
     if (!GW_JSON_STR(u, "url") || !GW_JSON_STR(u, "url")[0]) {
-        snprintf(out + n, len - n, "%s", cz ? "\n\nAdresa manifestu není nastavená (Systém › Firmware)." : "\n\nNo manifest URL set (System › Firmware).");
+        snprintf(out + n, len - n, "%s", cz ? "\n\nAdresa manifestu není nastavená (Systém › Firmware › Nastavení)." : "\n\nNo manifest URL set (System › Firmware › Settings).");
     }
     cJSON_Delete(u);
 }

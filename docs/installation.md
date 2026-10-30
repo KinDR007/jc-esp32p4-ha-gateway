@@ -41,7 +41,7 @@ flash. They are needed only to install the layout on the C6 (first start, after 
 package (`c6fw.bin`) in a PSRAM buffer that survives a software restart: put there by an online
 update, an upload in the web UI or, when it is missing (after a power cut), downloaded at start from
 the manifest (by default the latest GitHub release). Without internet and without the package the
-gateway stays in maintenance and asks for `c6fw.bin` (System › Firmware). Switching between the
+gateway stays in maintenance and asks for `c6fw.bin` (System › Firmware › Manual update). Switching between the
 Thread and Zigbee roles needs only the small bundles and works offline.
 
 Migration v2 → v3 over USB, once: `scripts/migrate_layout_v3.sh <port>` (after the gateway runs
@@ -82,7 +82,7 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 | Gateway | UI System → Firmware → Manual update → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
 | Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
 | ESPHome image | UI System → Firmware → Manual update → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
-| Gateway, online | UI System → Firmware → Online update, or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
+| Gateway, online | UI System → Firmware → Online update (URL in System → Firmware → Settings), or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
 | C6 firmware | UI System → Firmware → Manual update → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
 | C6 firmware, online | UI System → Firmware → Online update → **Install C6 package**, the *C6 radio firmware* update entity in Home Assistant, or Telegram `/install c6` | downloaded into PSRAM, sha256 of the file compared with the manifest and the header checked before the c6fw partition is erased; then a restart updates the C6 |
 | Older release (rollback) | UI System → Firmware → Online update → *Releases for this gateway*, `update.install` with `version` in Home Assistant, or Telegram `/releases`, `/install v1.6`, `/install c6 v1.6` | only releases whose manifest names the flash layout of the board; the manifest of the picked release is checked again before the download |

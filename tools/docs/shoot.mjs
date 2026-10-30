@@ -1,19 +1,21 @@
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 /* Screenshots of the web UI for documentation/ (dark theme, English).
  *   P4GW_URL=http://<gateway> P4GW_USER=<admin> P4GW_PASS=<password> PHASE=thread \
  *   node <browser-automation skill>/browser.mjs $P4GW_URL --script tools/docs/shoot.mjs
  * PHASE: thread (all pages, tooltips, dialogs; Thread border router role), zigbee (Zigbee coordinator role),
- * router (Zigbee router role). The account must be an admin without two-factor sign-in.
+ * router (Zigbee router role), firmware (the System › Firmware pages only). The account must be an admin without two-factor sign-in.
  * Then python3 tools/docs/build_docs.py. */
-const OUT = new URL('../../documentation/screenshots/', import.meta.url).pathname;
+const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
   thread: [['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/backups', 'zigbee/network',
     'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'sound/learn', 'ha/guide', 'ha/mqtt', 'ha/esphome', 'system/info',
-    'system/lan', 'system/firmware', 'system/diag', 'system/netscan', 'system/settings', 'system/maint', 'system/notify',
+    'system/lan', 'system/firmware/online', 'system/firmware/manual', 'system/firmware/settings', 'system/diag', 'system/netscan', 'system/settings', 'system/maint', 'system/notify',
     'system/users/list', 'system/users/roles', 'system/users/tokens', 'system/users/requests', 'system/users/policy', 'profile'], '', true],
   zigbee: [['overview', 'role', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'zigbee/network', 'ha/guide'], '__zigbee', false],
   router: [['overview', 'zigbee/info', 'zigbee/diag'], '__router', false],
+  firmware: [['system/firmware/online', 'system/firmware/manual', 'system/firmware/settings'], '', false],
 };
 const [ROUTES, SUFFIX, EXTRAS] = PHASES[process.env.PHASE || 'thread'];
 const shot = (page, name, opts = {}) => page.screenshot({ path: OUT + name + '.jpg', type: 'jpeg', quality: 82, ...opts });

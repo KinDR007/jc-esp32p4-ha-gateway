@@ -5,8 +5,10 @@
 - Web UI: releases for this gateway as expandable rows (version, date, C6 package, install buttons)
   with the release notes formatted (lists, bold, code); the list carries the whole notes, notes cut at
   1000 characters end with "…".
-- Web UI, System › Firmware: the online update first, the uploads (gateway, C6 package, ESPHome)
-  below it in one *Manual update* tile.
+- Web UI, System › Firmware has subpages: *Online update* (gateway and C6 package in one aligned
+  table: installed, offered, state, install; firmwares of the C6 package expandable; releases for
+  this gateway in their own tile, **Reflash** writes the installed release again), *Manual update*
+  (uploads of the gateway, C6 package and ESPHome in one tile) and *Settings* (manifest URL).
 
 ## v1.7 (2026-10-30)
 
