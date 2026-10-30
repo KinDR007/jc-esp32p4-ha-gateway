@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Users, roles and permissions (System › User management, docs/users.md): admin, user and viewer
+  roles with a level per page (hidden, read, edit) and own levels per user, enforced by the server for
+  every API URI; sign-in with a session cookie, lock after failed attempts, forced password change,
+  two-factor sign-in (TOTP, QR code, 10 recovery codes, required per role), password reset requests
+  to the admins, API tokens for Home Assistant and scripts, HTTP Basic for accounts without 2FA. The
+  single admin password of older versions becomes the account `admin`. Notifications (`gw_notify`,
+  topic `notify` on MQTT and `/api/ws`) for security events. Dependency `espressif/qrcode` 0.1.0~2.
+  Tests: TC34, TC11 and TC30 updated.
+
 - Home Assistant integration **P4 Gateway** (`custom_components/p4gw`, HACS), modelled on the
   SMLIGHT integration: found by zeroconf, password in the config flow and re-authentication, REST
   polling plus push over a WebSocket, so it needs no MQTT broker. Sensors, role select, sound

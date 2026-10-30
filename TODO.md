@@ -16,6 +16,9 @@
 - [x] Oddělené datasety Thread rolí (TC16), komprimované C6 balíky, potvrzení obrazu při restartu z UI
 
 ## Čeká
+- [x] Uživatelé, role, oprávnění per stránka a uživatel, 2FA (TOTP, záložní kódy), API tokeny, žádosti o reset hesla (etapa 1, TC34, docs/users.md)
+- [ ] Uživatelé etapa 2: integrace HA přes API token (config flow, reauth) a notifikace v HA (persistentní notifikace, událost) z tématu `notify`
+- [ ] Uživatelé etapa 3: Telegram bot (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
 - [ ] Ověřit automatickou noční zálohu Zigbee (02:00–03:00 UTC) v roli router; v testu TC26 ověřena jen záloha na požádání
 - [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)
 - [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18

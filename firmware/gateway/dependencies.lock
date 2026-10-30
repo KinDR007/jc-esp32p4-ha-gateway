@@ -101,6 +101,13 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.14.1
+  espressif/qrcode:
+    component_hash: 3b493771bc5d6ad30cbf87c25bf784aada8a08c941504355b55d6b75518ed7bc
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.1.0~2
   espressif/usb_host_cdc_acm:
     component_hash: 5bc1372b46de79ccae1dd17de48e30dfa1e8ab75269c2ebf54da01370f9e42fb
     dependencies:
@@ -159,7 +166,8 @@ direct_dependencies:
 - espressif/esp-serial-flasher
 - espressif/esp_codec_dev
 - espressif/mdns
+- espressif/qrcode
 - idf
-manifest_hash: 37fcd3d8b7a8d6b005d768795d2ff71a17985143fc5206e2b82226fbc3f20714
+manifest_hash: 848855dfc8d97aefc805bfb4fed912f6da8e9433c09f08813f3d009460ecc5f3
 target: esp32p4
 version: 2.0.0

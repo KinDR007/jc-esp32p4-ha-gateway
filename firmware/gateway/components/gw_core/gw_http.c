@@ -8,7 +8,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "gw.h"
-#include "mbedtls/base64.h"
 
 static const char *TAG = "gw_http";
 
@@ -24,63 +23,28 @@ static httpd_handle_t s_server;
 
 typedef struct {
     esp_err_t (*handler)(httpd_req_t *);
+    const char *uri;
+    bool public;
 } route_ctx_t;
-
-static bool constant_time_equal(const char *a, const char *b)
-{
-    size_t la = strlen(a), lb = strlen(b);
-    unsigned diff = la ^ lb;
-    for (size_t i = 0; i < la; i++) {
-        diff |= (unsigned char)a[i] ^ (unsigned char)(i < lb ? b[i] : 0);
-    }
-    return diff == 0;
-}
-
-/* HTTP Basic auth with user "admin" once a password is set in the UI. */
-static bool authorized(httpd_req_t *req)
-{
-    char password[65];
-    if (!gw_config_get_str(GW_KEY_PASSWORD, password, sizeof(password)) || password[0] == '\0') {
-        return true;
-    }
-    char header[160];
-    unsigned char decoded[128];
-    size_t decoded_len = 0;
-    bool ok = false;
-
-    if (httpd_req_get_hdr_value_str(req, "Authorization", header, sizeof(header)) == ESP_OK &&
-        strncmp(header, "Basic ", 6) == 0 &&
-        mbedtls_base64_decode(decoded, sizeof(decoded) - 1, &decoded_len, (const unsigned char *)header + 6,
-                              strlen(header + 6)) == 0) {
-        decoded[decoded_len] = '\0';
-        char *sep = strchr((char *)decoded, ':');
-        if (sep) {
-            *sep = '\0';
-            ok = strcmp((char *)decoded, "admin") == 0 && constant_time_equal(sep + 1, password);
-        }
-    }
-    if (!ok) {
-        /* No WWW-Authenticate challenge: the UI shows its own login form. */
-        gw_http_send_error(req, 401, "unauthorized");
-    }
-    return ok;
-}
 
 static esp_err_t route_handler(httpd_req_t *req)
 {
     route_ctx_t *ctx = req->user_ctx;
-    if (!authorized(req)) {
+    if (!ctx->public && !gw_auth_check(req, ctx->uri)) {
         return ESP_OK;
     }
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     return ctx->handler(req);
 }
 
-esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *))
+static esp_err_t register_route(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *),
+                                bool public)
 {
     route_ctx_t *ctx = malloc(sizeof(*ctx));
     ESP_RETURN_ON_FALSE(ctx, ESP_ERR_NO_MEM, TAG, "no mem");
     ctx->handler = handler;
+    ctx->uri = uri;
+    ctx->public = public;
     httpd_uri_t route = {.uri = uri, .method = method, .handler = route_handler, .user_ctx = ctx};
     esp_err_t err = httpd_register_uri_handler(s_server, &route);
     if (err != ESP_OK) {
@@ -88,6 +52,16 @@ esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*h
         free(ctx);
     }
     return err;
+}
+
+esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *))
+{
+    return register_route(uri, method, handler, false);
+}
+
+esp_err_t gw_http_register_public(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *))
+{
+    return register_route(uri, method, handler, true);
 }
 
 esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json)
@@ -109,7 +83,7 @@ esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message)
         int code;
         const char *text;
     } statuses[] = {
-        {400, "400 Bad Request"}, {401, "401 Unauthorized"}, {404, "404 Not Found"}, {409, "409 Conflict"},
+        {400, "400 Bad Request"}, {401, "401 Unauthorized"}, {403, "403 Forbidden"}, {404, "404 Not Found"}, {409, "409 Conflict"},
         {413, "413 Payload Too Large"}, {500, "500 Internal Server Error"}, {503, "503 Service Unavailable"},
     };
     const char *status_text = "500 Internal Server Error";
@@ -180,10 +154,10 @@ static esp_err_t favicon_handler(httpd_req_t *req)
 
 /* ---- push to WebSocket clients (the Home Assistant integration) ---- */
 
-/* Handshake: the same password as the API. */
+/* Handshake: the same sign-in as the API (token, session or Basic). */
 static esp_err_t ws_auth(httpd_req_t *req)
 {
-    return authorized(req) ? ESP_OK : ESP_FAIL;
+    return gw_auth_check(req, "/api/ws") ? ESP_OK : ESP_FAIL;
 }
 
 /* Clients only listen: frames they send are read and dropped (pings are answered by the server). */

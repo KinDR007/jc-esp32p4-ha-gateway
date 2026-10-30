@@ -253,7 +253,6 @@ static esp_err_t status_get(httpd_req_t *req)
     gw_state_t *st = gw_state();
     const esp_app_desc_t *app = esp_app_get_description();
     esp_chip_info_t chip;
-    char password[65];
     cJSON *json = cJSON_CreateObject();
 
     esp_chip_info(&chip);
@@ -270,8 +269,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(json, "chip_revision", chip.revision);
     cJSON_AddNumberToObject(json, "uptime_s", (double)(esp_timer_get_time() / 1000000));
     cJSON_AddStringToObject(json, "reset_reason", reset_reason_name(esp_reset_reason()));
-    cJSON_AddBoolToObject(json, "auth", gw_config_get_str(GW_KEY_PASSWORD, password, sizeof(password)) &&
-                                            password[0]);
+    cJSON_AddBoolToObject(json, "auth", gw_auth_enabled());
 
     cJSON *heap = cJSON_AddObjectToObject(json, "heap");
     cJSON_AddNumberToObject(heap, "internal_free", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
@@ -821,6 +819,10 @@ static esp_err_t settings_post(httpd_req_t *req)
     const cJSON *snap_days = cJSON_GetObjectItem(body, "zigbee_backup_days");
     const char *update_url = GW_JSON_STR(body, "update_url");
     esp_err_t err = ESP_OK;
+    if (password) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 400, "passwords are set in the user management (/api/users)");
+    }
     if (update_url) {
         if (strlen(update_url) > 200 ||
             (update_url[0] && strncmp(update_url, "http://", 7) != 0 && strncmp(update_url, "https://", 8) != 0)) {
@@ -856,13 +858,6 @@ static esp_err_t settings_post(httpd_req_t *req)
             return gw_http_send_error(req, 400, "hostname: lowercase letters, digits and inner dashes, max 31");
         }
         err = gw_config_set_str(GW_KEY_HOSTNAME, hostname);
-    }
-    if (password && err == ESP_OK) {
-        if (strlen(password) > 64) {
-            cJSON_Delete(body);
-            return gw_http_send_error(req, 400, "password max 64 characters");
-        }
-        err = gw_config_set_str(GW_KEY_PASSWORD, password);
     }
     cJSON_Delete(body);
     if (err != ESP_OK) {

@@ -130,11 +130,29 @@ size_t gw_log_read(uint32_t *seq, char *out, size_t len);
 /* Last 16 KiB of log of the run before the last restart (not after a power-on); 0 when none. */
 size_t gw_log_previous(const char **text);
 
+/* ---- users and permissions (gw_auth.c) ---- */
+void gw_auth_init(void);
+void gw_auth_register(void);
+/* true when at least one user exists (else the gateway is open) */
+bool gw_auth_enabled(void);
+/* Identifies the client of req and checks its right to the registered uri; sends 401/403 and
+ * returns false when it has none. Runs in the HTTP server task. */
+bool gw_auth_check(httpd_req_t *req, const char *uri);
+/* name of the user or API token of the request being handled, "" when open */
+const char *gw_auth_who(void);
+int gw_auth_request_count(void);
+
+/* ---- notifications (gw_notify.c): security, system, network, sound ---- */
+typedef enum { GW_NOTIFY_INFO, GW_NOTIFY_WARNING, GW_NOTIFY_CRITICAL } gw_notify_level_t;
+void gw_notify(const char *topic, gw_notify_level_t level, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+
 /* ---- HTTP ---- */
 esp_err_t gw_http_start(void);
 httpd_handle_t gw_http_server(void);
 /* Registers an API handler behind the auth check. */
 esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *));
+/* Without sign-in (the login page). */
+esp_err_t gw_http_register_public(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *));
 esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
 /* Sends {"topic","payload"} to the clients of /api/ws (what goes to MQTT, without a broker). */
 void gw_http_push(const char *topic, const char *payload);

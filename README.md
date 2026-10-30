@@ -35,6 +35,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 |---|---|
 | [docs/hardware.md](docs/hardware.md) | board, chip revision, **JP1 jumpers**, pinout, USB notes |
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
+| [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
 | [docs/zadani.md](docs/zadani.md) | original assignment and feasibility analysis (Czech) |
 | [docs/sound-detection.md](docs/sound-detection.md) | sound event detection: research and proposal (Czech, pending) |
@@ -98,8 +99,7 @@ custom_components/p4gw Home Assistant integration (HACS), tests in tests/ha_inte
 
 Port 80, single page embedded in the firmware with a left menu (sections and sub pages, deep links
 `#section/page`), in Czech or English with a light, dark or system
-theme (switches in the header, remembered by the browser). HTTP Basic auth (user `admin`) once a password is
-set. Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/logs/previous` (each line starts with unix ms or `+<ms since boot>`), `/api/ota/{gateway,esphome,c6fw}`,
+theme (switches in the header, remembered by the browser). Sign-in once an account exists (users, roles, 2FA and API tokens: [docs/users.md](docs/users.md)). Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/logs/previous` (each line starts with unix ms or `+<ms since boot>`), `/api/ota/{gateway,esphome,c6fw}`,
 `/api/c6/{backup,reflash,zigbee-snapshot}` (GET download, POST back up now), `/api/thread/{status,dataset,cli}`,
 `/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/net/{lan,lan/confirm,traffic}`, `/api/reboot` (`{"full": true}` resets the C6 too), `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/update/{check,install}`, `/api/tools/ping`, `/api/coredump`, `/api/ws` (WebSocket push for the Home Assistant integration).
 The OTBR REST API for Home Assistant is on port 8081 (Thread border router role).
@@ -107,7 +107,7 @@ The OTBR REST API for Home Assistant is on port 8081 (Thread border router role)
 ## Licenses
 
 Third-party sources are fetched at build time and not included: esp-thread-br and esp-hosted-mcu
-(Apache-2.0), esp-coordinator (MIT), esp-serial-flasher (Apache-2.0), esp-zigbee-lib /
+(Apache-2.0), esp-coordinator (MIT), esp-serial-flasher (Apache-2.0), espressif/qrcode (Apache-2.0, qrcodegen MIT), esp-zigbee-lib /
 esp-zboss-lib (Espressif license, binary). Web UI icons: Material Design Icons (Apache-2.0), Thread
 and Matter logos from selfh.st/icons (CC BY 4.0; trademarks of Thread Group and the Connectivity
 Standards Alliance). Own code: no license file yet (all rights reserved).

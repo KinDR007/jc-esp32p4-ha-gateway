@@ -35,7 +35,7 @@ def log(msg):
     print(f'  {time.strftime("%H:%M:%S")} {msg}', flush=True)
 
 
-def http(method, path, body=None, raw=None, timeout=30, port=80, auth=None):
+def http(method, path, body=None, raw=None, timeout=30, port=80, auth=None, user='admin'):
     url = f'http://{ARGS.host}:{port}{path}'
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
     req = urllib.request.Request(url, data=data, method=method)
@@ -43,7 +43,7 @@ def http(method, path, body=None, raw=None, timeout=30, port=80, auth=None):
         req.add_header('Content-Type', 'application/json')
     if auth:
         import base64
-        req.add_header('Authorization', 'Basic ' + base64.b64encode(f'admin:{auth}'.encode()).decode())
+        req.add_header('Authorization', 'Basic ' + base64.b64encode(f'{user}:{auth}'.encode()).decode())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             payload = res.read()
@@ -347,17 +347,20 @@ def tc10_ota_rollback_slots():
 
 
 def tc11_auth():
-    """Password protects the API; it can be removed again."""
+    """An admin account protects the API (Basic auth for clients of older versions); deleting it opens the gateway again."""
     pw = 'hwtest-' + str(int(time.time()))
-    check(http('POST', '/api/settings', {'password': pw})[0] == 200, 'password set')
-    check(http('GET', '/api/status')[0] == 401, '401 without credentials')
-    code, st = http('GET', '/api/status', auth=pw)
-    check(code == 200, '200 with credentials')
-    check(st['auth'] is True, 'status reports the password')
-    check(http('GET', '/api/status', auth='wrong')[0] == 401, '401 with a wrong password')
-    check(http('POST', '/api/settings', {'password': ''}, auth=pw)[0] == 200, 'password removed')
+    check(http('POST', '/api/settings', {'password': pw})[0] == 400, 'the old single password is refused (user management instead)')
+    check(http('POST', '/api/users', {'name': 'hwtest', 'role': 'admin', 'password': pw})[0] == 200, 'admin account created')
+    try:
+        check(http('GET', '/api/status')[0] == 401, '401 without credentials')
+        code, st = http('GET', '/api/status', auth=pw, user='hwtest')
+        check(code == 200, '200 with credentials')
+        check(st['auth'] is True, 'status reports sign-in')
+        check(http('GET', '/api/status', auth='wrong', user='hwtest')[0] == 401, '401 with a wrong password')
+    finally:
+        check(http('POST', '/api/users/delete', {'name': 'hwtest'}, auth=pw, user='hwtest')[0] == 200, 'account deleted')
     check(http('GET', '/api/status')[0] == 200, 'open again')
-    check(status()['auth'] is False, 'status reports no password')
+    check(status()['auth'] is False, 'status reports no sign-in')
 
 
 def tc12_invalid_uploads():
@@ -1004,14 +1007,16 @@ def mdns_query(service, timeout=3):
 class WsClient:
     """Minimal WebSocket client (text frames from the server, no masking needed on receive)."""
 
-    def __init__(self, path, auth=None):
+    def __init__(self, path, auth=None, token=None):
         import base64
         self.sock = socket.create_connection((ARGS.host, 80), timeout=10)
         key = base64.b64encode(os.urandom(16)).decode()
         hdr = f'GET {path} HTTP/1.1\r\nHost: {ARGS.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' \
               f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n'
         if auth:
-            hdr += 'Authorization: Basic ' + base64.b64encode(f'admin:{auth}'.encode()).decode() + '\r\n'
+            hdr += 'Authorization: Basic ' + base64.b64encode(auth.encode()).decode() + '\r\n'
+        if token:
+            hdr += f'Authorization: Bearer {token}\r\n'
         self.sock.sendall((hdr + '\r\n').encode())
         resp = b''
         while b'\r\n\r\n' not in resp:
@@ -1083,16 +1088,21 @@ def tc30_ha_integration_interface():
     check('tc30_test' not in {e['id'] for e in http('GET', '/api/sound/events')[1]['events']}, 'events restored')
 
     pw = 'hwtest-' + str(int(time.time()))
-    check(http('POST', '/api/settings', {'password': pw})[0] == 200, 'password set')
+    check(http('POST', '/api/users', {'name': 'hwtest', 'role': 'admin', 'password': pw})[0] == 200, 'admin account created')
     try:
         ws = WsClient('/api/ws')
         check(ws.status != 101, f'handshake without credentials refused ({ws.status})')
         ws.close()
-        ws = WsClient('/api/ws', auth=pw)
+        ws = WsClient('/api/ws', auth=f'hwtest:{pw}')
         check(ws.status == 101, 'handshake with credentials')
         ws.close()
+        code, r = http('POST', '/api/tokens', {'name': 'hwtest', 'role': 'viewer'}, auth=pw, user='hwtest')
+        ws = WsClient('/api/ws', token=r['token'])
+        check(ws.status == 101, 'handshake with an API token')
+        ws.close()
     finally:
-        check(http('POST', '/api/settings', {'password': ''}, auth=pw)[0] == 200, 'password removed')
+        http('POST', '/api/tokens/delete', {'name': 'hwtest'}, auth=pw, user='hwtest')
+        check(http('POST', '/api/users/delete', {'name': 'hwtest'}, auth=pw, user='hwtest')[0] == 200, 'account deleted')
 
 
 def tc31_sound_pressure():
@@ -1177,6 +1187,158 @@ def tc33_full_restart():
     check(abs(p4 - c6) < 30, f'C6 restarted with the P4 (P4 {p4} s, C6 {c6} s)')
 
 
+class Client:
+    """HTTP client with a session cookie, a Bearer token or Basic auth."""
+    def __init__(self, token=None, basic=None):
+        self.cookie, self.token, self.basic = None, token, basic
+
+    def req(self, method, path, body=None):
+        url = f'http://{ARGS.host}{path}'
+        data = json.dumps(body).encode() if body is not None else None
+        r = urllib.request.Request(url, data=data, method=method)
+        if body is not None:
+            r.add_header('Content-Type', 'application/json')
+        if self.cookie:
+            r.add_header('Cookie', self.cookie)
+        if self.token:
+            r.add_header('Authorization', 'Bearer ' + self.token)
+        if self.basic:
+            import base64
+            r.add_header('Authorization', 'Basic ' + base64.b64encode(self.basic.encode()).decode())
+        try:
+            with urllib.request.urlopen(r, timeout=30) as res:
+                code, payload, headers = res.status, res.read(), res.headers
+        except urllib.error.HTTPError as err:
+            code, payload, headers = err.code, err.read(), err.headers
+        c = headers.get('Set-Cookie')
+        if c and c.startswith('p4s='):
+            self.cookie = c.split(';')[0] if 'Max-Age=0' not in c else None
+        try:
+            return code, json.loads(payload)
+        except ValueError:
+            return code, payload
+
+
+def totp_now(secret_b32, offset=0):
+    import base64, hmac, hashlib, struct
+    key = base64.b32decode(secret_b32 + '=' * (-len(secret_b32) % 8))
+    counter = int(time.time()) // 30 + offset
+    mac = hmac.new(key, struct.pack('>Q', counter), hashlib.sha1).digest()
+    o = mac[19] & 15
+    return '%06d' % ((struct.unpack('>I', mac[o:o + 4])[0] & 0x7fffffff) % 1000000)
+
+
+def tc34_users():
+    """Users: first admin, sign-in, lock, permissions per role and user, Basic and tokens, 2FA with recovery codes, reset request, back to open."""
+    open_ = Client()
+    code, st = open_.req('GET', '/api/auth/state')
+    if st['enabled']:
+        raise Fail('the gateway already has users: TC34 needs an open gateway')
+    pw_a, pw_v = 'tc34-Admin-pass', 'tc34-Viewer-pass'
+    created_token = None
+    try:
+        code, r = open_.req('POST', '/api/users', {'name': 'tc34admin', 'role': 'viewer', 'password': pw_a})
+        check(code == 400, f'first account must be an admin ({r})')
+        code, r = open_.req('POST', '/api/users', {'name': 'tc34admin', 'role': 'admin', 'password': pw_a})
+        check(code == 200 and not r['must_change'], 'first admin created without a forced password change')
+        check(open_.req('GET', '/api/status')[0] == 401, 'sign-in required from now on')
+        check(status_open_flag() is True, '/api/status auth flag set')
+
+        admin = Client()
+        check(admin.req('POST', '/api/auth/login', {'user': 'tc34admin', 'password': 'wrong'})[0] == 401, 'wrong password: 401')
+        code, r = admin.req('POST', '/api/auth/login', {'user': 'tc34admin', 'password': pw_a})
+        check(code == 200 and admin.cookie and r['role'] == 'admin', 'admin signed in, session cookie set')
+        check(admin.req('GET', '/api/status')[0] == 200, 'session works')
+
+        code, r = admin.req('POST', '/api/users', {'name': 'tc34viewer', 'role': 'viewer', 'password': 'short'})
+        check(code == 400, f'short password rejected ({r.get("error")})')
+        code, r = admin.req('POST', '/api/users', {'name': 'tc34viewer', 'role': 'viewer', 'password': pw_v})
+        check(code == 200 and r['must_change'], 'viewer created, must change the password')
+
+        viewer = Client()
+        code, r = viewer.req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v})
+        check(code == 200 and r['must_change'], 'viewer signed in with a pending password change')
+        code, r = viewer.req('GET', '/api/thread/status')
+        check(code == 403 and r['error'] == 'password_change_required', 'API blocked until the password is changed')
+        pw_v2 = pw_v + '2'
+        check(viewer.req('POST', '/api/auth/password', {'old': pw_v, 'new': pw_v2})[0] == 200, 'viewer changed the password')
+        check(viewer.req('GET', '/api/status')[0] == 200, 'viewer reads the status')
+        check(viewer.req('GET', '/api/thread/dataset')[0] == 403, 'viewer: Thread network key hidden (403)')
+        check(viewer.req('POST', '/api/identify', {'seconds': 1})[0] == 403, 'viewer: no edit on the overview (403)')
+        check(viewer.req('GET', '/api/users')[0] == 403, 'viewer: no user management (403)')
+        # own permission of one user beats the role
+        check(admin.req('POST', '/api/users', {'name': 'tc34viewer', 'levels': {'overview': 2}})[0] == 200, 'own level: viewer may edit the overview')
+        check(viewer.req('POST', '/api/identify', {'seconds': 1})[0] == 200, 'own level applies')
+        admin.req('POST', '/api/users', {'name': 'tc34viewer', 'levels': {'overview': -1}})
+        check(viewer.req('POST', '/api/identify', {'seconds': 1})[0] == 403, 'back to the role level')
+
+        # Basic auth (clients of older versions) and tokens
+        check(Client(basic=f'tc34viewer:{pw_v2}').req('GET', '/api/status')[0] == 200, 'Basic auth for a user without 2FA')
+        code, r = admin.req('POST', '/api/tokens', {'name': 'tc34', 'role': 'viewer'})
+        check(code == 200 and r['token'].startswith('p4gw_'), 'API token created')
+        created_token = 'tc34'
+        tok = Client(token=r['token'])
+        check(tok.req('GET', '/api/thread/status')[0] == 200, 'viewer token reads the Thread status')
+        check(tok.req('GET', '/api/status')[0] == 200, 'token: status')
+        check(tok.req('POST', '/api/reboot', {})[0] == 403, 'viewer token cannot restart (403)')
+        check(Client(token='p4gw_' + '0' * 40).req('GET', '/api/status')[0] == 401, 'unknown token: 401')
+
+        # 2FA for the viewer
+        code, setup = viewer.req('POST', '/api/auth/totp/setup', {})
+        check(code == 200 and setup['secret'] and '<svg' in setup.get('qr_svg', ''), 'TOTP setup with a QR code')
+        check(viewer.req('POST', '/api/auth/totp/enable', {'code': '000000'})[0] == 400, 'wrong code rejected')
+        code, r = viewer.req('POST', '/api/auth/totp/enable', {'code': totp_now(setup['secret'])})
+        check(code == 200 and len(r['recovery_codes']) == 10, '2FA on, 10 recovery codes')
+        recovery = r['recovery_codes']
+        check(Client(basic=f'tc34viewer:{pw_v2}').req('GET', '/api/status')[0] == 401, 'Basic refused with 2FA on')
+        v2 = Client()
+        code, r = v2.req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v2})
+        check(code == 200 and r.get('code_required') and not v2.cookie, 'password alone asks for the code')
+        time.sleep(31)  # the code used for enabling may not be replayed
+        code, r = v2.req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v2, 'code': totp_now(setup['secret'])})
+        check(code == 200 and v2.cookie, 'signed in with the authenticator code')
+        v3 = Client()
+        code, r = v3.req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v2, 'code': recovery[0]})
+        check(code == 200, 'signed in with a recovery code')
+        code, r = Client().req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v2, 'code': recovery[0]})
+        check(code == 401, 'a recovery code works only once')
+        code, me = v3.req('GET', '/api/auth/me')
+        check(me['recovery_left'] == 9, '9 recovery codes left')
+
+        # lock after failed sign-ins
+        for _ in range(5):
+            Client().req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': 'nope'})
+        code, r = Client().req('POST', '/api/auth/login', {'user': 'tc34viewer', 'password': pw_v2})
+        check(code == 403 and r['error'] == 'locked', f'locked after 5 failures (retry in {r.get("retry_s")} s)')
+        code, users = admin.req('GET', '/api/users')
+        check(any(u['name'] == 'tc34viewer' and u['locked'] for u in users['users']), 'admin sees the lock')
+
+        # forgotten password
+        check(Client().req('POST', '/api/auth/reset-request', {'user': 'tc34viewer'})[0] == 200, 'reset requested')
+        code, me = admin.req('GET', '/api/auth/me')
+        check(me['requests'] >= 1, f'admin sees {me["requests"]} request(s)')
+        code, r = admin.req('POST', '/api/users', {'name': 'tc34viewer', 'password': 'tc34-Temp-pass', 'totp_reset': True, 'unlock': True})
+        check(code == 200 and r['must_change'] and not r['totp'] and not r['locked'], 'admin set a temporary password, 2FA off, unlocked')
+        check(admin.req('GET', '/api/auth/me')[1]['requests'] == me['requests'] - 1, 'request answered')
+        check(v2.req('GET', '/api/status')[0] == 401, 'old sessions of the user ended')
+
+        # the last admin stays
+        check(admin.req('POST', '/api/users', {'name': 'tc34admin', 'role': 'user'})[0] == 400, 'last admin cannot be demoted')
+        check(admin.req('POST', '/api/users/delete', {'name': 'tc34admin'})[0] == 400, 'last admin cannot be deleted while users exist')
+    finally:
+        admin = Client(basic=f'tc34admin:{pw_a}')
+        if created_token:
+            admin.req('POST', '/api/tokens/delete', {'name': created_token})
+        admin.req('POST', '/api/users/delete', {'name': 'tc34viewer'})
+        admin.req('POST', '/api/users/delete', {'name': 'tc34admin'})
+        admin.req('POST', '/api/auth/requests/dismiss', {'name': 'tc34viewer'})
+    check(Client().req('GET', '/api/auth/state')[1]['enabled'] is False, 'test users removed, the gateway is open again')
+
+
+def status_open_flag():
+    return Client(basic='tc34admin:tc34-Admin-pass').req('GET', '/api/status')[1]['auth']
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1189,7 +1351,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users),
 ]
 
 

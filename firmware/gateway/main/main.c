@@ -285,8 +285,10 @@ void app_main(void)
     bool boot_loop = gw_boot_loop_detected();
     ESP_ERROR_CHECK(gw_eth_init(st->hostname));
     init_mdns(st->hostname);
+    gw_auth_init();
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
+    gw_auth_register();
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
     netscan_init();

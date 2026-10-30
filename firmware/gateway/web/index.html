@@ -85,6 +85,23 @@ header.flashing #flash-strip { display: block; }
 .seg .flag { display: block; width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
 .seg button:not(.on) .flag { opacity: .55; }
 #side-reboot { justify-content: center; }
+.side-user { display: flex; align-items: center; gap: 8px; }
+.side-user a { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none;
+  padding: 6px 8px; border-radius: 8px; overflow: hidden; }
+.side-user a:hover { background: var(--panel-2); }
+.side-user a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-user small { color: var(--muted); }
+.side-user button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 8px; display: inline-flex; }
+.side-user button:hover { color: var(--bad); background: var(--panel-2); }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; margin-left: auto; }
+#side .subs .subs { margin-left: 10px; }
+.login-err { color: var(--bad); min-height: 1.2em; margin: 4px 0 8px; }
+.qr { width: 200px; height: 200px; border-radius: 8px; background: #fff; padding: 4px; }
+.codes { display: grid; grid-template-columns: repeat(2, max-content); gap: 4px 24px; font: 15px ui-monospace, monospace; }
+.perm-table select { padding: 3px 6px; }
+.perm-table td, .perm-table th { white-space: nowrap; }
+.readonly-note { display: flex; align-items: center; gap: 8px; }
 #lan-banner { position: sticky; top: 52px; z-index: 15; margin: 0; border-radius: 0; border-width: 0 0 1px; }
 .spark { width: 100%; height: 120px; display: block; }
 .spark .rx { stroke: var(--ok); } .spark .tx { stroke: var(--accent); }
@@ -296,6 +313,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
       <button data-lang="cs"><svg class="flag" viewBox="0 0 6 4" preserveAspectRatio="none"><rect width="6" height="4" fill="#d7141a"/><rect width="6" height="2" fill="#fff"/><path d="M0 0 3 2 0 4z" fill="#11457e"/></svg></button>
       <button data-lang="en"><svg class="flag" viewBox="0 0 60 30" preserveAspectRatio="none"><clipPath id="flag-gb"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" clip-path="url(#flag-gb)" stroke="#c8102e" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></svg></button>
     </div><div class="seg" id="seg-theme" data-notr></div></div>
+    <div class="side-user hidden" id="side-user" data-notr></div>
     <button class="btn" id="side-reboot" data-notr></button>
   </div></nav>
   <div id="scrim"></div>
@@ -304,14 +322,10 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 <div id="toast"></div>
 <div id="tipbox" role="tooltip"></div>
 <div id="nodebox" role="tooltip"></div>
-<dialog id="login">
-  <form method="dialog" id="login-form">
-    <h3 style="margin-top:0">Sign in</h3>
-    <p class="muted">The gateway is password protected (user <code>admin</code>).</p>
-    <label class="field"><span>Password</span><input type="password" id="login-pass" autocomplete="current-password"></label>
-    <div class="row"><button class="btn primary" value="ok">Sign in</button></div>
-  </form>
+<dialog id="login" data-notr>
+  <form id="login-form" autocomplete="on"></form>
 </dialog>
+<dialog id="form-dlg" style="max-width:720px" data-notr><form id="form-dlg-form" method="dialog"></form></dialog>
 <dialog id="ev-dlg" style="max-width:640px">
   <form method="dialog" id="ev-form">
     <h3 style="margin-top:0" id="ev-title">Event</h3>
@@ -370,8 +384,8 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 'use strict';
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-let auth = null;
-try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */ }
+/* signed-in user from /api/auth/me: name, role, levels per page; open when the gateway has no users */
+let me = null;
 
 
 /* ---------------- language and theme ----------------
@@ -380,6 +394,8 @@ try { auth = sessionStorage.getItem('auth'); } catch (e) { /* storage blocked */
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
+  'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
+  'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
   'Overview': 'Přehled', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Zigbee2MQTT': 'Zigbee2MQTT',
   'Request a new map': 'Vyžádat novou mapu', 'Zigbee devices': 'Zigbee zařízení', 'Base topic': 'Základní topic', 'Coordinator': 'Koordinátor',
   'Adapter': 'Adaptér', 'Last seen': 'Naposledy viděno', 'Power': 'Napájení', 'LQI': 'LQI', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
@@ -623,6 +639,18 @@ function setTheme(t) {
   if (uiReady) renderPrefs();
 }
 
+/* signed-in user at the bottom of the menu: link to the own account, sign-out */
+function renderUser() {
+  const el = $('#side-user');
+  const show = !!me && !me.open;
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+  const roles = { admin: L('admin', 'správce'), user: L('user', 'uživatel'), viewer: L('viewer', 'divák') };
+  el.innerHTML = `<a href="#profile" title="${L('My account', 'Můj účet')}">${ic('account-circle-outline')}<span>${esc(me.name)} <small>${roles[me.role] || esc(me.role)}</small></span>
+    ${me.requests ? `<span class="badge">${me.requests}</span>` : ''}</a>
+    <button id="side-logout" title="${L('Sign out', 'Odhlásit')}" aria-label="${L('Sign out', 'Odhlásit')}">${ic('logout')}</button>`;
+}
+
 /* bottom of the menu: flags for the language, icons for the theme, restart of the whole gateway */
 function renderPrefs() {
   $('#seg-theme').innerHTML = [['system', ic('theme-light-dark'), L('Theme of the system', 'Podle systému')], ['light', ic('white-balance-sunny'), L('Light', 'Světlý')],
@@ -633,6 +661,8 @@ function renderPrefs() {
     b.title = b.dataset.lang === 'cs' ? 'Čeština' : 'English';
   });
   $('#side-reboot').innerHTML = ic('restart') + L('Restart', 'Restartovat');
+  $('#side-reboot').classList.toggle('hidden', perm('system/maint') < 2);
+  renderUser();
 }
 
 let savedTheme = 'system';
@@ -656,31 +686,136 @@ const ROLES = {
 
 async function api(path, opts = {}) {
   const headers = Object.assign({}, opts.headers || {});
-  if (auth) headers.Authorization = 'Basic ' + auth;
   if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
   const res = await fetch(path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers, body: opts.body,
     signal: opts.timeout ? AbortSignal.timeout(opts.timeout) : undefined });
-  if (res.status === 401) { await login(); return api(path, opts); }
+  if (res.status === 401 && !opts.noLogin) { await login(); return api(path, opts); }
   const type = res.headers.get('Content-Type') || '';
   const data = type.includes('json') ? await res.json() : await res.text();
+  if (res.status === 403 && !opts.noLogin && ['password_change_required', 'totp_setup_required'].includes(data?.error)) {
+    await accountSetup(data.error);
+    return api(path, opts);
+  }
+  if (res.status === 403 && data?.error === 'forbidden') throw new Error(L('You do not have the right to do this', 'K této akci nemáte oprávnění'));
   if (!res.ok) throw new Error((data && data.error) || res.statusText);
   return opts.raw ? { data, res } : data;
 }
 
+/* Sign-in dialog: name and password, then the authenticator code when the account has 2FA;
+ * "Forgot password" sends a reset request to the admins. */
 let loginPromise = null;
 function login() {
   if (loginPromise) return loginPromise;
   loginPromise = new Promise(resolve => {
-    const dlg = $('#login');
-    dlg.onclose = () => {
-      auth = btoa('admin:' + $('#login-pass').value);
-      try { sessionStorage.setItem('auth', auth); } catch (e) { /* storage blocked */ }
-      loginPromise = null;
-      resolve();
+    const dlg = $('#login'), form = $('#login-form');
+    let step = 'password', user = '', password = '';
+    const draw = (err = '') => {
+      const host = esc(status?.hostname || location.hostname);
+      form.innerHTML = step === 'reset'
+        ? `<h3 style="margin-top:0">${L('Forgotten password', 'Zapomenuté heslo')}</h3>
+          <p class="muted">${L('The admins of the gateway get a request to set you a new password.', 'Správci brány dostanou žádost, aby vám nastavili nové heslo.')}</p>
+          <label class="field"><span>${L('User name', 'Uživatelské jméno')}</span><input type="text" id="lg-user" value="${esc(user)}" autocomplete="username" required></label>
+          <div class="login-err">${esc(err)}</div>
+          <div class="row"><button class="btn primary" type="submit">${ic('send')}${L('Send request', 'Odeslat žádost')}</button>
+            <button class="btn" type="button" id="lg-back">${L('Back', 'Zpět')}</button></div>`
+        : `<h3 style="margin-top:0">${L('Sign in', 'Přihlášení')} <small class="muted" style="font-weight:400">${host}</small></h3>
+          <label class="field"><span>${L('User name', 'Uživatelské jméno')}</span><input type="text" id="lg-user" value="${esc(user)}" autocomplete="username" required ${step === 'code' ? 'disabled' : ''}></label>
+          <label class="field"><span>${L('Password', 'Heslo')}</span><input type="password" id="lg-pass" autocomplete="current-password" required ${step === 'code' ? 'disabled' : ''}></label>
+          ${step === 'code' ? `<label class="field"><span>${L('Code from the authenticator app (or a recovery code)', 'Kód z aplikace Authenticator (nebo záložní kód)')}</span>
+            <input type="text" id="lg-code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" required></label>` : ''}
+          <label><input type="checkbox" id="lg-remember"> ${L('Stay signed in on this device', 'Zůstat přihlášen na tomto zařízení')}</label>
+          <div class="login-err">${esc(err)}</div>
+          <div class="row"><button class="btn primary" type="submit">${ic('login')}${L('Sign in', 'Přihlásit')}</button>
+            <button class="btn" type="button" id="lg-forgot">${L('Forgot password', 'Zapomenuté heslo')}</button></div>`;
+      if (step === 'code') $('#lg-pass').value = password;
+      ($('#lg-code') || (user ? $('#lg-pass') : $('#lg-user')))?.focus();
+      $('#lg-forgot') && ($('#lg-forgot').onclick = () => { user = $('#lg-user').value.trim(); step = 'reset'; draw(); });
+      $('#lg-back') && ($('#lg-back').onclick = () => { step = 'password'; draw(); });
     };
+    form.onsubmit = async ev => {
+      ev.preventDefault();
+      if (step === 'reset') {
+        user = $('#lg-user').value.trim();
+        try {
+          await api('/api/auth/reset-request', { json: { user }, noLogin: true });
+          step = 'password';
+          draw(L('Request sent. An admin sets you a new password.', 'Žádost odeslána. Správce vám nastaví nové heslo.'));
+        } catch (e) { draw(e.message); }
+        return;
+      }
+      if (step === 'password') { user = $('#lg-user').value.trim(); password = $('#lg-pass').value; }
+      const body = { user, password, remember: $('#lg-remember').checked };
+      if (step === 'code') body.code = $('#lg-code').value.trim();
+      try {
+        const r = await api('/api/auth/login', { json: body, noLogin: true });
+        if (r.code_required) {
+          step = 'code';
+          return draw(r.clock_set ? '' : L('The gateway clock is not set: use a recovery code.', 'Hodiny brány nejsou nastavené: použijte záložní kód.'));
+        }
+        me = r;
+        dlg.close();
+        loginPromise = null;
+        renderUser();
+        renderNav();
+        resolve();
+      } catch (e) {
+        if (step === 'code' && /user or password/.test(e.message)) step = 'password';
+        draw({ 'invalid user or password': L('Wrong name or password', 'Chybné jméno nebo heslo'), 'invalid code': L('Wrong code', 'Chybný kód'),
+          locked: L('Too many attempts, the account is locked for a while', 'Příliš mnoho pokusů, účet je na chvíli zamčený'),
+          'account disabled': L('The account is disabled', 'Účet je zablokovaný') }[e.message] || e.message);
+      }
+    };
+    dlg.oncancel = ev => ev.preventDefault();
+    draw();
     dlg.showModal();
   });
   return loginPromise;
+}
+
+/* A forced step after sign-in: a new password (set by an admin) or 2FA required for the role. */
+let setupPromise = null;
+function accountSetup(why) {
+  if (setupPromise) return setupPromise;
+  setupPromise = (async () => {
+    if (why === 'password_change_required') {
+      await formDialog(L('Set a new password', 'Nastavte nové heslo'), `<p class="muted">${L('An admin set your password; choose your own now.', 'Heslo vám nastavil správce; zvolte si teď vlastní.')}</p>
+        <label class="field"><span>${L('Current password', 'Současné heslo')}</span><input type="password" name="old" autocomplete="current-password" required></label>
+        <label class="field"><span>${L('New password', 'Nové heslo')}</span><input type="password" name="new" autocomplete="new-password" required></label>
+        <label class="field"><span>${L('New password again', 'Nové heslo znovu')}</span><input type="password" name="new2" autocomplete="new-password" required></label>`,
+        async v => {
+          if (v.new !== v.new2) throw new Error(L('The passwords differ', 'Hesla se liší'));
+          me = await api('/api/auth/password', { json: { old: v.old, new: v.new }, noLogin: true });
+        }, { required: true });
+    } else {
+      await totpSetup(true);
+    }
+    me = await api('/api/auth/me', { noLogin: true });
+    setupPromise = null;
+    renderUser();
+    renderNav();
+  })();
+  return setupPromise;
+}
+
+/* Generic modal form: fields by name; submit resolves after save(values) succeeds, errors stay in the dialog. */
+function formDialog(title, html, save, opts = {}) {
+  return new Promise(resolve => {
+    const dlg = $('#form-dlg'), form = $('#form-dlg-form');
+    form.innerHTML = `<h3 style="margin-top:0">${title}</h3>${html}<div class="login-err" id="fd-err"></div>
+      <div class="row"><button class="btn primary" type="submit">${ic('check')}${opts.ok || L('Save', 'Uložit')}</button>
+      ${opts.required ? '' : `<button class="btn" type="button" id="fd-cancel">${L('Cancel', 'Zrušit')}</button>`}</div>`;
+    const done = v => { dlg.close(); resolve(v); };
+    $('#fd-cancel') && ($('#fd-cancel').onclick = () => done(null));
+    dlg.oncancel = ev => { ev.preventDefault(); if (!opts.required) done(null); };
+    form.onsubmit = async ev => {
+      ev.preventDefault();
+      const v = {};
+      form.querySelectorAll('[name]').forEach(el => { v[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
+      try { done(await save(v) ?? v); } catch (e) { $('#fd-err').textContent = e.message; }
+    };
+    dlg.showModal();
+    form.querySelector('input:not([type=checkbox]), select')?.focus();
+  });
 }
 
 function confirmDialog(title, text) {
@@ -956,12 +1091,17 @@ const TIPS = {
 // Generated by tools/web/gen_icons.mjs from @mdi/js 7.4.47 (Apache-2.0) and custom_icons.mjs, do not edit.
 const ICONS = {
   'access-point-network': 'M4.93,3.93C3.12,5.74 2,8.24 2,11C2,13.76 3.12,16.26 4.93,18.07L6.34,16.66C4.89,15.22 4,13.22 4,11C4,8.79 4.89,6.78 6.34,5.34L4.93,3.93M19.07,3.93L17.66,5.34C19.11,6.78 20,8.79 20,11C20,13.22 19.11,15.22 17.66,16.66L19.07,18.07C20.88,16.26 22,13.76 22,11C22,8.24 20.88,5.74 19.07,3.93M7.76,6.76C6.67,7.85 6,9.35 6,11C6,12.65 6.67,14.15 7.76,15.24L9.17,13.83C8.45,13.11 8,12.11 8,11C8,9.89 8.45,8.89 9.17,8.17L7.76,6.76M16.24,6.76L14.83,8.17C15.55,8.89 16,9.89 16,11C16,12.11 15.55,13.11 14.83,13.83L16.24,15.24C17.33,14.15 18,12.65 18,11C18,9.35 17.33,7.85 16.24,6.76M12,9A2,2 0 0,0 10,11A2,2 0 0,0 12,13A2,2 0 0,0 14,11A2,2 0 0,0 12,9M11,15V19H10A1,1 0 0,0 9,20H2V22H9A1,1 0 0,0 10,23H14A1,1 0 0,0 15,22H22V20H15A1,1 0 0,0 14,19H13V15H11Z',
+  'account-circle-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M7.07,18.28C7.5,17.38 10.12,16.5 12,16.5C13.88,16.5 16.5,17.38 16.93,18.28C15.57,19.36 13.86,20 12,20C10.14,20 8.43,19.36 7.07,18.28M18.36,16.83C16.93,15.09 13.46,14.5 12,14.5C10.54,14.5 7.07,15.09 5.64,16.83C4.62,15.5 4,13.82 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,13.82 19.38,15.5 18.36,16.83M12,6C10.06,6 8.5,7.56 8.5,9.5C8.5,11.44 10.06,13 12,13C13.94,13 15.5,11.44 15.5,9.5C15.5,7.56 13.94,6 12,6M12,11A1.5,1.5 0 0,1 10.5,9.5A1.5,1.5 0 0,1 12,8A1.5,1.5 0 0,1 13.5,9.5A1.5,1.5 0 0,1 12,11Z',
+  'account-group-outline': 'M12,5A3.5,3.5 0 0,0 8.5,8.5A3.5,3.5 0 0,0 12,12A3.5,3.5 0 0,0 15.5,8.5A3.5,3.5 0 0,0 12,5M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M5.5,8A2.5,2.5 0 0,0 3,10.5C3,11.44 3.53,12.25 4.29,12.68C4.65,12.88 5.06,13 5.5,13C5.94,13 6.35,12.88 6.71,12.68C7.08,12.47 7.39,12.17 7.62,11.81C6.89,10.86 6.5,9.7 6.5,8.5C6.5,8.41 6.5,8.31 6.5,8.22C6.2,8.08 5.86,8 5.5,8M18.5,8C18.14,8 17.8,8.08 17.5,8.22C17.5,8.31 17.5,8.41 17.5,8.5C17.5,9.7 17.11,10.86 16.38,11.81C16.5,12 16.63,12.15 16.78,12.3C16.94,12.45 17.1,12.58 17.29,12.68C17.65,12.88 18.06,13 18.5,13C18.94,13 19.35,12.88 19.71,12.68C20.47,12.25 21,11.44 21,10.5A2.5,2.5 0 0,0 18.5,8M12,14C9.66,14 5,15.17 5,17.5V19H19V17.5C19,15.17 14.34,14 12,14M4.71,14.55C2.78,14.78 0,15.76 0,17.5V19H3V17.07C3,16.06 3.69,15.22 4.71,14.55M19.29,14.55C20.31,15.22 21,16.06 21,17.07V19H24V17.5C24,15.76 21.22,14.78 19.29,14.55M12,16C13.53,16 15.24,16.5 16.23,17H7.77C8.76,16.5 10.47,16 12,16Z',
+  'account-multiple-outline': 'M13.07 10.41A5 5 0 0 0 13.07 4.59A3.39 3.39 0 0 1 15 4A3.5 3.5 0 0 1 15 11A3.39 3.39 0 0 1 13.07 10.41M5.5 7.5A3.5 3.5 0 1 1 9 11A3.5 3.5 0 0 1 5.5 7.5M7.5 7.5A1.5 1.5 0 1 0 9 6A1.5 1.5 0 0 0 7.5 7.5M16 17V19H2V17S2 13 9 13 16 17 16 17M14 17C13.86 16.22 12.67 15 9 15S4.07 16.31 4 17M15.95 13A5.32 5.32 0 0 1 18 17V19H22V17S22 13.37 15.94 13Z',
+  'account-plus-outline': 'M15,4A4,4 0 0,0 11,8A4,4 0 0,0 15,12A4,4 0 0,0 19,8A4,4 0 0,0 15,4M15,5.9C16.16,5.9 17.1,6.84 17.1,8C17.1,9.16 16.16,10.1 15,10.1A2.1,2.1 0 0,1 12.9,8A2.1,2.1 0 0,1 15,5.9M4,7V10H1V12H4V15H6V12H9V10H6V7H4M15,13C12.33,13 7,14.33 7,17V20H23V17C23,14.33 17.67,13 15,13M15,14.9C17.97,14.9 21.1,16.36 21.1,17V18.1H8.9V17C8.9,16.36 12,14.9 15,14.9Z',
   'backup-restore': 'M12,3A9,9 0 0,0 3,12H0L4,16L8,12H5A7,7 0 0,1 12,5A7,7 0 0,1 19,12A7,7 0 0,1 12,19C10.5,19 9.09,18.5 7.94,17.7L6.5,19.14C8.04,20.3 9.94,21 12,21A9,9 0 0,0 21,12A9,9 0 0,0 12,3M14,12A2,2 0 0,0 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12Z',
   'bell-ring-outline': 'M10,21H14A2,2 0 0,1 12,23A2,2 0 0,1 10,21M21,19V20H3V19L5,17V11C5,7.9 7.03,5.17 10,4.29C10,4.19 10,4.1 10,4A2,2 0 0,1 12,2A2,2 0 0,1 14,4C14,4.1 14,4.19 14,4.29C16.97,5.17 19,7.9 19,11V17L21,19M17,11A5,5 0 0,0 12,6A5,5 0 0,0 7,11V18H17V11M19.75,3.19L18.33,4.61C20.04,6.3 21,8.6 21,11H23C23,8.07 21.84,5.25 19.75,3.19M1,11H3C3,8.6 3.96,6.3 5.67,4.61L4.25,3.19C2.16,5.25 1,8.07 1,11Z',
   'bluetooth': 'M14.88,16.29L13,18.17V14.41M13,5.83L14.88,7.71L13,9.58M17.71,7.71L12,2H11V9.58L6.41,5L5,6.41L10.59,12L5,17.58L6.41,19L11,14.41V22H12L17.71,16.29L13.41,12L17.71,7.71Z',
   'book-open-variant': 'M12 21.5C10.65 20.65 8.2 20 6.5 20C4.85 20 3.15 20.3 1.75 21.05C1.65 21.1 1.6 21.1 1.5 21.1C1.25 21.1 1 20.85 1 20.6V6C1.6 5.55 2.25 5.25 3 5C4.11 4.65 5.33 4.5 6.5 4.5C8.45 4.5 10.55 4.9 12 6C13.45 4.9 15.55 4.5 17.5 4.5C18.67 4.5 19.89 4.65 21 5C21.75 5.25 22.4 5.55 23 6V20.6C23 20.85 22.75 21.1 22.5 21.1C22.4 21.1 22.35 21.1 22.25 21.05C20.85 20.3 19.15 20 17.5 20C15.8 20 13.35 20.65 12 21.5M12 8V19.5C13.35 18.65 15.8 18 17.5 18C18.7 18 19.9 18.15 21 18.5V7C19.9 6.65 18.7 6.5 17.5 6.5C15.8 6.5 13.35 7.15 12 8M13 11.5C14.11 10.82 15.6 10.5 17.5 10.5C18.41 10.5 19.26 10.59 20 10.78V9.23C19.13 9.08 18.29 9 17.5 9C15.73 9 14.23 9.28 13 9.84V11.5M17.5 11.67C15.79 11.67 14.29 11.93 13 12.46V14.15C14.11 13.5 15.6 13.16 17.5 13.16C18.54 13.16 19.38 13.24 20 13.4V11.9C19.13 11.74 18.29 11.67 17.5 11.67M20 14.57C19.13 14.41 18.29 14.33 17.5 14.33C15.67 14.33 14.17 14.6 13 15.13V16.82C14.11 16.16 15.6 15.83 17.5 15.83C18.54 15.83 19.38 15.91 20 16.07V14.57Z',
   'brain': 'M21.33,12.91C21.42,14.46 20.71,15.95 19.44,16.86L20.21,18.35C20.44,18.8 20.47,19.33 20.27,19.8C20.08,20.27 19.69,20.64 19.21,20.8L18.42,21.05C18.25,21.11 18.06,21.14 17.88,21.14C17.37,21.14 16.89,20.91 16.56,20.5L14.44,18C13.55,17.85 12.71,17.47 12,16.9C11.5,17.05 11,17.13 10.5,17.13C9.62,17.13 8.74,16.86 8,16.34C7.47,16.5 6.93,16.57 6.38,16.56C5.59,16.57 4.81,16.41 4.08,16.11C2.65,15.47 1.7,14.07 1.65,12.5C1.57,11.78 1.69,11.05 2,10.39C1.71,9.64 1.68,8.82 1.93,8.06C2.3,7.11 3,6.32 3.87,5.82C4.45,4.13 6.08,3 7.87,3.12C9.47,1.62 11.92,1.46 13.7,2.75C14.12,2.64 14.56,2.58 15,2.58C16.36,2.55 17.65,3.15 18.5,4.22C20.54,4.75 22,6.57 22.08,8.69C22.13,9.8 21.83,10.89 21.22,11.82C21.29,12.18 21.33,12.54 21.33,12.91M16.33,11.5C16.9,11.57 17.35,12 17.35,12.57A1,1 0 0,1 16.35,13.57H15.72C15.4,14.47 14.84,15.26 14.1,15.86C14.35,15.95 14.61,16 14.87,16.07C20,16 19.4,12.87 19.4,12.82C19.34,11.39 18.14,10.27 16.71,10.33A1,1 0 0,1 15.71,9.33A1,1 0 0,1 16.71,8.33C17.94,8.36 19.12,8.82 20.04,9.63C20.09,9.34 20.12,9.04 20.12,8.74C20.06,7.5 19.5,6.42 17.25,6.21C16,3.25 12.85,4.89 12.85,5.81V5.81C12.82,6.04 13.06,6.53 13.1,6.56A1,1 0 0,1 14.1,7.56C14.1,8.11 13.65,8.56 13.1,8.56V8.56C12.57,8.54 12.07,8.34 11.67,8C11.19,8.31 10.64,8.5 10.07,8.56V8.56C9.5,8.61 9.03,8.21 9,7.66C8.92,7.1 9.33,6.61 9.88,6.56C10.04,6.54 10.82,6.42 10.82,5.79V5.79C10.82,5.13 11.07,4.5 11.5,4C10.58,3.75 9.59,4.08 8.59,5.29C6.75,5 6,5.25 5.45,7.2C4.5,7.67 4,8 3.78,9C4.86,8.78 5.97,8.87 7,9.25C7.5,9.44 7.78,10 7.59,10.54C7.4,11.06 6.82,11.32 6.3,11.13C5.57,10.81 4.75,10.79 4,11.07C3.68,11.34 3.68,11.9 3.68,12.34C3.68,13.08 4.05,13.77 4.68,14.17C5.21,14.44 5.8,14.58 6.39,14.57C6.24,14.31 6.11,14.04 6,13.76C5.81,13.22 6.1,12.63 6.64,12.44C7.18,12.25 7.77,12.54 7.96,13.08C8.36,14.22 9.38,15 10.58,15.13C11.95,15.06 13.17,14.25 13.77,13C14,11.62 15.11,11.5 16.33,11.5M18.33,18.97L17.71,17.67L17,17.83L18,19.08L18.33,18.97M13.68,10.36C13.7,9.83 13.3,9.38 12.77,9.33C12.06,9.29 11.37,9.53 10.84,10C10.27,10.58 9.97,11.38 10,12.19A1,1 0 0,0 11,13.19C11.57,13.19 12,12.74 12,12.19C12,11.92 12.07,11.65 12.23,11.43C12.35,11.33 12.5,11.28 12.66,11.28C13.21,11.31 13.68,10.9 13.68,10.36Z',
   'bridge': 'M7,14V10.91C6.28,10.58 5.61,10.18 5,9.71V14H7M5,18H3V16H1V14H3V7H5V8.43C6.8,10 9.27,11 12,11C14.73,11 17.2,10 19,8.43V7H21V14H23V16H21V18H19V16H5V18M17,10.91V14H19V9.71C18.39,10.18 17.72,10.58 17,10.91M16,14V11.32C15.36,11.55 14.69,11.72 14,11.84V14H16M13,14V11.96L12,12L11,11.96V14H13M10,14V11.84C9.31,11.72 8.64,11.55 8,11.32V14H10Z',
+  'cellphone-key': 'M7 1C5.9 1 5 1.9 5 3V7H7V4H17V20H7V17H5V21C5 22.1 5.9 23 7 23H17C18.1 23 19 22.1 19 21V3C19 1.9 18.1 1 17 1H7M6 9C4.3 9 3 10.3 3 12S4.3 15 6 15C7.3 15 8.4 14.2 8.8 13H11V15H13V13H15V11H8.8C8.4 9.8 7.3 9 6 9M6 11C6.6 11 7 11.4 7 12S6.6 13 6 13 5 12.6 5 12 5.4 11 6 11Z',
   'check': 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z',
   'chip': 'M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z',
   'clock-outline': 'M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z',
@@ -977,6 +1117,7 @@ const ICONS = {
   'download': 'M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z',
   'ear-hearing': 'M17,20C16.71,20 16.44,19.94 16.24,19.85C15.53,19.5 15.03,18.97 14.53,17.47C14,15.91 13.06,15.18 12.14,14.47C11.35,13.86 10.53,13.23 9.82,11.94C9.29,11 9,9.93 9,9C9,6.2 11.2,4 14,4C16.8,4 19,6.2 19,9H21C21,5.07 17.93,2 14,2C10.07,2 7,5.07 7,9C7,10.26 7.38,11.65 8.07,12.9C9,14.55 10.05,15.38 10.92,16.05C11.73,16.67 12.31,17.12 12.63,18.1C13.23,19.92 14,20.94 15.36,21.65C15.87,21.88 16.43,22 17,22A4,4 0 0,0 21,18H19A2,2 0 0,1 17,20M7.64,2.64L6.22,1.22C4.23,3.21 3,5.96 3,9C3,12.04 4.23,14.79 6.22,16.78L7.63,15.37C6,13.74 5,11.5 5,9C5,6.5 6,4.26 7.64,2.64M11.5,9A2.5,2.5 0 0,0 14,11.5A2.5,2.5 0 0,0 16.5,9A2.5,2.5 0 0,0 14,6.5A2.5,2.5 0 0,0 11.5,9Z',
   'ethernet': 'M7,15H9V18H11V15H13V18H15V15H17V18H19V9H15V6H9V9H5V18H7V15M4.38,3H19.63C20.94,3 22,4.06 22,5.38V19.63A2.37,2.37 0 0,1 19.63,22H4.38C3.06,22 2,20.94 2,19.63V5.38C2,4.06 3.06,3 4.38,3Z',
+  'eye-outline': 'M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5C8.24,6.5 4.83,8.64 3.18,12Z',
   'graph-outline': 'M19.5 17C19.36 17 19.24 17 19.11 17.04L17.5 13.8C17.95 13.35 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.61 9.5 15.5 9.5 15.35 9.54L13.74 6.3C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.2 9.79 5.84 10.26 6.29L8.65 9.54C8.5 9.5 8.39 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.04 13.34 6.5 13.79L4.89 17.04C4.76 17 4.64 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.63 14.46L10.26 17.71C9.79 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.8C10.45 13.35 10.75 12.71 10.75 12C10.75 11.3 10.46 10.67 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7C12.13 7 12.26 7 12.39 6.96L14 10.21C13.54 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.13 14.46L17.76 17.71C17.29 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17M4.5 20.5C3.95 20.5 3.5 20.05 3.5 19.5S3.95 18.5 4.5 18.5 5.5 18.95 5.5 19.5 5.05 20.5 4.5 20.5M13 19.5C13 20.05 12.55 20.5 12 20.5S11 20.05 11 19.5 11.45 18.5 12 18.5 13 18.95 13 19.5M7.25 12C7.25 11.45 7.7 11 8.25 11S9.25 11.45 9.25 12 8.8 13 8.25 13 7.25 12.55 7.25 12M11 4.5C11 3.95 11.45 3.5 12 3.5S13 3.95 13 4.5 12.55 5.5 12 5.5 11 5.05 11 4.5M14.75 12C14.75 11.45 15.2 11 15.75 11S16.75 11.45 16.75 12 16.3 13 15.75 13 14.75 12.55 14.75 12M19.5 20.5C18.95 20.5 18.5 20.05 18.5 19.5S18.95 18.5 19.5 18.5 20.5 18.95 20.5 19.5 20.05 20.5 19.5 20.5Z',
   'harddisk': 'M6,2H18A2,2 0 0,1 20,4V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V4A2,2 0 0,1 6,2M12,4A6,6 0 0,0 6,10C6,13.31 8.69,16 12.1,16L11.22,13.77C10.95,13.29 11.11,12.68 11.59,12.4L12.45,11.9C12.93,11.63 13.54,11.79 13.82,12.27L15.74,14.69C17.12,13.59 18,11.9 18,10A6,6 0 0,0 12,4M12,9A1,1 0 0,1 13,10A1,1 0 0,1 12,11A1,1 0 0,1 11,10A1,1 0 0,1 12,9M7,18A1,1 0 0,0 6,19A1,1 0 0,0 7,20A1,1 0 0,0 8,19A1,1 0 0,0 7,18M12.09,13.27L14.58,19.58L17.17,18.08L12.95,12.77L12.09,13.27Z',
   'history': 'M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3',
@@ -989,6 +1130,9 @@ const ICONS = {
   'lan-pending': 'M4,1C2.89,1 2,1.89 2,3V7C2,8.11 2.89,9 4,9H1V11H13V9H10C11.11,9 12,8.11 12,7V3C12,1.89 11.11,1 10,1H4M4,3H10V7H4V3M3,12V14H5V12H3M14,13C12.89,13 12,13.89 12,15V19C12,20.11 12.89,21 14,21H11V23H23V21H20C21.11,21 22,20.11 22,19V15C22,13.89 21.11,13 20,13H14M3,15V17H5V15H3M14,15H20V19H14V15M3,18V20H5V18H3M6,18V20H8V18H6M9,18V20H11V18H9Z',
   'lightbulb-on-outline': 'M20,11H23V13H20V11M1,11H4V13H1V11M13,1V4H11V1H13M4.92,3.5L7.05,5.64L5.63,7.05L3.5,4.93L4.92,3.5M16.95,5.63L19.07,3.5L20.5,4.93L18.37,7.05L16.95,5.63M12,6A6,6 0 0,1 18,12C18,14.22 16.79,16.16 15,17.2V19A1,1 0 0,1 14,20H10A1,1 0 0,1 9,19V17.2C7.21,16.16 6,14.22 6,12A6,6 0 0,1 12,6M14,21V22A1,1 0 0,1 13,23H11A1,1 0 0,1 10,22V21H14M11,18H13V15.87C14.73,15.43 16,13.86 16,12A4,4 0 0,0 12,8A4,4 0 0,0 8,12C8,13.86 9.27,15.43 11,15.87V18Z',
   'lock-outline': 'M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
+  'lock-reset': 'M12.63,2C18.16,2 22.64,6.5 22.64,12C22.64,17.5 18.16,22 12.63,22C9.12,22 6.05,20.18 4.26,17.43L5.84,16.18C7.25,18.47 9.76,20 12.64,20A8,8 0 0,0 20.64,12A8,8 0 0,0 12.64,4C8.56,4 5.2,7.06 4.71,11H7.47L3.73,14.73L0,11H2.69C3.19,5.95 7.45,2 12.63,2M15.59,10.24C16.09,10.25 16.5,10.65 16.5,11.16V15.77C16.5,16.27 16.09,16.69 15.58,16.69H10.05C9.54,16.69 9.13,16.27 9.13,15.77V11.16C9.13,10.65 9.54,10.25 10.04,10.24V9.23C10.04,7.7 11.29,6.46 12.81,6.46C14.34,6.46 15.59,7.7 15.59,9.23V10.24M12.81,7.86C12.06,7.86 11.44,8.47 11.44,9.23V10.24H14.19V9.23C14.19,8.47 13.57,7.86 12.81,7.86Z',
+  'login': 'M11 7L9.6 8.4L12.2 11H2V13H12.2L9.6 15.6L11 17L16 12L11 7M20 19H12V21H20C21.1 21 22 20.1 22 19V5C22 3.9 21.1 3 20 3H12V5H20V19Z',
+  'logout': 'M17 7L15.59 8.41L18.17 11H8V13H18.17L15.59 15.58L17 17L22 12M4 5H12V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H12V19H4V5Z',
   'matter': 'M7.94 7.25c0.84 0.68 1.84 1.14 2.91 1.34V2.89l1.16-0.67 1.16 0.67v5.69c1.07-0.19 2.07-0.65 2.91-1.34l2.1 1.21c-3.42 3.38-8.93 3.38-12.35 0zm2.56 14.52C11.71 17.12 8.96 12.35 4.32 11.08v2.43c1.01 0.39 1.91 1.02 2.61 1.85L2 18.21v1.34l1.16 0.66 4.93-2.84c0.37 1.02 0.47 2.12 0.3 3.18zm9.19-10.69C15.05 12.35 12.3 17.12 13.52 21.77l2.11-1.22c-0.17-1.07-0.07-2.16 0.3-3.18l4.92 2.84 1.16-0.67v-1.34l-4.93-2.84c0.7-0.83 1.6-1.46 2.61-1.85z',
   'memory': 'M17,17H7V7H17M21,11V9H19V7C19,5.89 18.1,5 17,5H15V3H13V5H11V3H9V5H7C5.89,5 5,5.89 5,7V9H3V11H5V13H3V15H5V17A2,2 0 0,0 7,19H9V21H11V19H13V21H15V19H17A2,2 0 0,0 19,17V15H21V13H19V11M13,13H11V11H13M15,9H9V15H15V9Z',
   'menu': 'M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z',
@@ -999,13 +1143,18 @@ const ICONS = {
   'play': 'M8,5.14V19.14L19,12.14L8,5.14Z',
   'playlist-check': 'M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z',
   'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+  'qrcode': 'M3,11H5V13H3V11M11,5H13V9H11V5M9,11H13V15H11V13H9V11M15,11H17V13H19V11H21V13H19V15H21V19H19V21H17V19H13V21H11V17H15V15H17V13H15V11M19,19V15H17V19H19M15,3H21V9H15V3M17,5V7H19V5H17M3,3H9V9H3V3M5,5V7H7V5H5M3,15H9V21H3V15M5,17V19H7V17H5Z',
   'radar': 'M19.07,4.93L17.66,6.34C19.1,7.79 20,9.79 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12C4,7.92 7.05,4.56 11,4.07V6.09C8.16,6.57 6,9.03 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12C18,10.34 17.33,8.84 16.24,7.76L14.83,9.17C15.55,9.9 16,10.9 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12C8,10.14 9.28,8.59 11,8.14V10.28C10.4,10.63 10,11.26 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.26 13.6,10.62 13,10.28V2H12A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,9.24 20.88,6.74 19.07,4.93Z',
   'record-circle-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z',
   'refresh': 'M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z',
   'restart': 'M12,4C14.1,4 16.1,4.8 17.6,6.3C20.7,9.4 20.7,14.5 17.6,17.6C15.8,19.5 13.3,20.2 10.9,19.9L11.4,17.9C13.1,18.1 14.9,17.5 16.2,16.2C18.5,13.9 18.5,10.1 16.2,7.7C15.1,6.6 13.5,6 12,6V10.6L7,5.6L12,0.6V4M6.3,17.6C3.7,15 3.3,11 5.1,7.9L6.6,9.4C5.5,11.6 5.9,14.4 7.8,16.2C8.3,16.7 8.9,17.1 9.6,17.4L9,19.4C8,19 7.1,18.4 6.3,17.6Z',
+  'restore': 'M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z',
   'router-network': 'M5 9C3.9 9 3 9.9 3 11V15C3 16.11 3.9 17 5 17H11V19H10C9.45 19 9 19.45 9 20H2V22H9C9 22.55 9.45 23 10 23H14C14.55 23 15 22.55 15 22H22V20H15C15 19.45 14.55 19 14 19H13V17H19C20.11 17 21 16.11 21 15V11C21 9.9 20.11 9 19 9H5M6 12H8V14H6V12M9.5 12H11.5V14H9.5V12M13 12H15V14H13V12Z',
   'router-wireless': 'M20.2,5.9L21,5.1C19.6,3.7 17.8,3 16,3C14.2,3 12.4,3.7 11,5.1L11.8,5.9C13,4.8 14.5,4.2 16,4.2C17.5,4.2 19,4.8 20.2,5.9M19.3,6.7C18.4,5.8 17.2,5.3 16,5.3C14.8,5.3 13.6,5.8 12.7,6.7L13.5,7.5C14.2,6.8 15.1,6.5 16,6.5C16.9,6.5 17.8,6.8 18.5,7.5L19.3,6.7M19,13H17V9H15V13H5A2,2 0 0,0 3,15V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V15A2,2 0 0,0 19,13M8,18H6V16H8V18M11.5,18H9.5V16H11.5V18M15,18H13V16H15V18Z',
   'school-outline': 'M12 3L1 9L5 11.18V17.18L12 21L19 17.18V11.18L21 10.09V17H23V9L12 3M18.82 9L12 12.72L5.18 9L12 5.28L18.82 9M17 16L12 18.72L7 16V12.27L12 15L17 12.27V16Z',
+  'send': 'M2,21L23,12L2,3V10L17,12L2,14V21Z',
+  'shield-account-outline': 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,3.18L19,6.3V11.22C19,12.92 18.5,14.65 17.65,16.17C16,14.94 13.26,14.5 12,14.5C10.74,14.5 8,14.94 6.35,16.17C5.5,14.65 5,12.92 5,11.22V6.3L12,3.18M12,6A3.5,3.5 0 0,0 8.5,9.5A3.5,3.5 0 0,0 12,13A3.5,3.5 0 0,0 15.5,9.5A3.5,3.5 0 0,0 12,6M12,8A1.5,1.5 0 0,1 13.5,9.5A1.5,1.5 0 0,1 12,11A1.5,1.5 0 0,1 10.5,9.5A1.5,1.5 0 0,1 12,8M12,16.5C13.57,16.5 15.64,17.11 16.53,17.84C15.29,19.38 13.7,20.55 12,21C10.3,20.55 8.71,19.38 7.47,17.84C8.37,17.11 10.43,16.5 12,16.5Z',
+  'shield-lock-outline': 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M14.8,11V9.5C14.8,8.1 13.4,7 12,7C10.6,7 9.2,8.1 9.2,9.5V11C8.6,11 8,11.6 8,12.2V15.7C8,16.4 8.6,17 9.2,17H14.7C15.4,17 16,16.4 16,15.8V12.3C16,11.6 15.4,11 14.8,11M13.5,11H10.5V9.5C10.5,8.7 11.2,8.2 12,8.2C12.8,8.2 13.5,8.7 13.5,9.5V11Z',
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
@@ -1013,6 +1162,7 @@ const ICONS = {
   'theme-light-dark': 'M7.5,2C5.71,3.15 4.5,5.18 4.5,7.5C4.5,9.82 5.71,11.85 7.53,13C4.46,13 2,10.54 2,7.5A5.5,5.5 0 0,1 7.5,2M19.07,3.5L20.5,4.93L4.93,20.5L3.5,19.07L19.07,3.5M12.89,5.93L11.41,5L9.97,6L10.39,4.3L9,3.24L10.75,3.12L11.33,1.47L12,3.1L13.73,3.13L12.38,4.26L12.89,5.93M9.59,9.54L8.43,8.81L7.31,9.59L7.65,8.27L6.56,7.44L7.92,7.35L8.37,6.06L8.88,7.33L10.24,7.36L9.19,8.23L9.59,9.54M19,13.5A5.5,5.5 0 0,1 13.5,19C12.28,19 11.15,18.6 10.24,17.93L17.93,10.24C18.6,11.15 19,12.28 19,13.5M14.6,20.08L17.37,18.93L17.13,22.28L14.6,20.08M18.93,17.38L20.08,14.61L22.28,17.15L18.93,17.38M20.08,12.42L18.94,9.64L22.28,9.88L20.08,12.42M9.63,18.93L12.4,20.08L9.87,22.27L9.63,18.93Z',
   'thread': 'M12 2C6.48 2 2 6.49 2 12c0 5.48 4.43 9.94 9.89 10V12.01h-3.27c-0.97 0-1.77 0.79-1.77 1.77s0.79 1.77 1.77 1.77v2.18c-2.18 0-3.95-1.77-3.95-3.94 0-2.18 1.77-3.95 3.95-3.95h3.27v-1.1c0-1.81 1.47-3.28 3.28-3.28s3.28 1.47 3.28 3.28-1.47 3.28-3.28 3.28h-1.1v9.77C18.59 20.83 22 16.8 22 12 22 6.49 17.52 2 12 2m4.27 6.73c0-0.61-0.5-1.1-1.1-1.1-0.61 0-1.1 0.5-1.1 1.1v1.1h1.1c0.61 0 1.1-0.49 1.1-1.1',
   'transit-connection-variant': 'M18,11H14.82C14.4,9.84 13.3,9 12,9C10.7,9 9.6,9.84 9.18,11H6C5.67,11 4,10.9 4,9V8C4,6.17 5.54,6 6,6H16.18C16.6,7.16 17.7,8 19,8A3,3 0 0,0 22,5A3,3 0 0,0 19,2C17.7,2 16.6,2.84 16.18,4H6C4.39,4 2,5.06 2,8V9C2,11.94 4.39,13 6,13H9.18C9.6,14.16 10.7,15 12,15C13.3,15 14.4,14.16 14.82,13H18C18.33,13 20,13.1 20,15V16C20,17.83 18.46,18 18,18H7.82C7.4,16.84 6.3,16 5,16A3,3 0 0,0 2,19A3,3 0 0,0 5,22C6.3,22 7.4,21.16 7.82,20H18C19.61,20 22,18.93 22,16V15C22,12.07 19.61,11 18,11M19,4A1,1 0 0,1 20,5A1,1 0 0,1 19,6A1,1 0 0,1 18,5A1,1 0 0,1 19,4M5,20A1,1 0 0,1 4,19A1,1 0 0,1 5,18A1,1 0 0,1 6,19A1,1 0 0,1 5,20Z',
+  'tune-variant': 'M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z',
   'upload': 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
   'vector-polyline': 'M2 3V9H4.95L6.95 15H6V21H12V16.41L17.41 11H22V5H16V9.57L10.59 15H9.06L7.06 9H8V3M4 5H6V7H4M18 7H20V9H18M8 17H10V19H8Z',
   'view-dashboard-outline': 'M19,5V7H15V5H19M9,5V11H5V5H9M19,13V19H15V13H19M9,17V19H5V17H9M21,3H13V9H21V3M11,3H3V13H11V3M21,11H13V21H21V11M11,15H3V21H11V15Z',
@@ -1087,38 +1237,56 @@ const NAV = [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
     { id: 'firmware', label: 'Firmware', icon: 'upload' },
     { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' }, { id: 'netscan', label: 'Network surroundings', icon: 'radar' },
-    { id: 'settings', label: 'Settings', icon: 'cog-outline' }, { id: 'maint', label: 'Maintenance', icon: 'wrench-outline' }] },
+    { id: 'settings', label: 'Settings', icon: 'cog-outline' }, { id: 'maint', label: 'Maintenance', icon: 'wrench-outline' },
+    { id: 'users', label: 'User management', icon: 'account-group-outline', admin: true, subs: [
+      { id: 'list', label: 'Users', icon: 'account-multiple-outline' }, { id: 'roles', label: 'Roles and permissions', icon: 'shield-account-outline' },
+      { id: 'tokens', label: 'API tokens', icon: 'key-outline' }, { id: 'requests', label: 'Reset requests', icon: 'lock-reset' },
+      { id: 'policy', label: 'Security', icon: 'shield-lock-outline' }] }] },
+  { id: 'profile', label: 'My account', icon: 'account-circle-outline', hidden: true },
 ];
 /* routes of the previous single-level tabs */
 const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbee/info', sound: 'sound/live', ha: 'ha/guide', system: 'system/info' };
 
 let tab = 'overview', sub = '';
+/* routes: section, section/page or section/page/subpage (System › User management › …) */
 function parseRoute(route) {
   route = OLD_ROUTES[route] || route;
-  const [t, s] = (route || '').split('/');
+  const [t, s, s2] = (route || '').split('/');
   const sec = NAV.find(n => n.id === t) || NAV[0];
-  return [sec.id, sec.subs ? (sec.subs.find(x => x.id === s) || sec.subs[0]).id : ''];
+  if (!sec.subs) return [sec.id, ''];
+  const x = sec.subs.find(y => y.id === s) || sec.subs[0];
+  return [sec.id, x.subs ? `${x.id}/${(x.subs.find(y => y.id === s2) || x.subs[0]).id}` : x.id];
 }
 function route() { return sub ? `${tab}/${sub}` : tab; }
 function sectionActive(id) { return id === 'thread' ? isThread() : id === 'zigbee' ? isZigbee() : true; }
 /* pages marked role: true open only in their role; Zigbee2MQTT over MQTT and network backups work in any role */
 function pageEnabled(sec, s) {
-  const p = NAV.find(n => n.id === sec)?.subs?.find(x => x.id === s);
-  return !status || !p?.role || sectionActive(sec);
+  const p = NAV.find(n => n.id === sec)?.subs?.find(x => x.id === (s || '').split('/')[0]);
+  return (!status || !p?.role || sectionActive(sec)) && perm(s ? `${sec}/${s}` : sec) > 0;
 }
 const firstPage = n => n.subs?.find(x => pageEnabled(n.id, x.id));
+/* level of the signed-in user on a page: 0 hidden, 1 read, 2 edit; user management only for admins */
+function perm(page) {
+  if (!me || me.open || me.role === 'admin') return 2;
+  if (page.startsWith('system/users')) return 0;
+  return me.levels?.[page] ?? 2;
+}
 const needsRole = id => L(`Only with the ${id === 'thread' ? 'Thread' : 'Zigbee'} role active`, `Jen při aktivní roli ${id === 'thread' ? 'Thread' : 'Zigbee'}`);
 
 let navRole = null;
 function renderNav() {
   navRole = activeRole();
-  $('#side-nav').innerHTML = NAV.map(n => {
+  const sub1 = (sub || '').split('/')[0];
+  $('#side-nav').innerHTML = NAV.filter(n => !n.hidden && (n.subs ? n.subs.some(x => perm(`${n.id}/${x.id}`) > 0) : perm(n.id) > 0)).map(n => {
     const first = firstPage(n), off = status && !sectionActive(n.id) ? 'off' : '';
     const link = n.subs && !first
       ? `<a data-route="${n.id}" class="off" aria-disabled="true" title="${needsRole(n.id)}">${ic(n.icon)}<span>${n.label}</span></a>`
       : `<a href="#${n.subs ? n.id + '/' + first.id : n.id}" data-route="${n.id}" class="${n.id === tab ? (n.subs ? 'on' : 'cur') : ''} ${off}">${ic(n.icon)}<span>${n.label}</span></a>`;
-    const subs = n.subs && n.id === tab ? `<div class="subs">${n.subs.map(x => pageEnabled(n.id, x.id)
-      ? `<a href="#${n.id}/${x.id}" data-route="${n.id}/${x.id}" class="${x.id === sub ? 'cur' : ''}">${ic(x.icon)}<span>${x.label}</span></a>`
+    const badge = x => x.id === 'users' && me?.requests ? `<span class="badge" title="${L('Password reset requests', 'Žádosti o reset hesla')}">${me.requests}</span>` : '';
+    const subs = n.subs && n.id === tab ? `<div class="subs">${n.subs.filter(x => perm(`${n.id}/${x.id}`) > 0).map(x => pageEnabled(n.id, x.id)
+      ? `<a href="#${n.id}/${x.id}" data-route="${n.id}/${x.id}" class="${x.id === sub1 ? (x.subs ? 'on' : 'cur') : ''}">${ic(x.icon)}<span>${x.label}</span>${badge(x)}</a>`
+        + (x.subs && x.id === sub1 ? `<div class="subs">${x.subs.map(y => `<a href="#${n.id}/${x.id}/${y.id}" data-route="${n.id}/${x.id}/${y.id}"
+          class="${sub === `${x.id}/${y.id}` ? 'cur' : ''}">${ic(y.icon)}<span>${y.label}</span>${y.id === 'requests' && me?.requests ? `<span class="badge">${me.requests}</span>` : ''}</a>`).join('')}</div>` : '')
       : `<a data-route="${n.id}/${x.id}" class="off" aria-disabled="true" title="${needsRole(n.id)}">${ic(x.icon)}<span>${x.label}</span></a>`).join('')}</div>` : '';
     return link + subs;
   }).join('');
@@ -1303,7 +1471,8 @@ function maintenanceBanner() {
   let html = '';
 
   if (r.maintenance) html += `<div class="alert bad"><b>Maintenance mode:</b> ${esc(r.maintenance)}</div>`;
-  if (!status.auth) html += `<div class="alert">No password set. Anyone on the LAN can switch roles and read the Thread network key. Set one under <b>System</b>.</div>`;
+  if (!status.auth) html += `<div class="alert" data-notr>${L('No user account yet: anyone on the LAN can switch roles and read the Thread network key. Create an admin account under',
+    'Zatím žádný uživatelský účet: kdokoli v LAN může přepínat role a číst klíč sítě Thread. Vytvořte účet správce v')} <a href="#system/users/list">${L('System › User management', 'Systém › Správa uživatelů')}</a>.</div>`;
   return html;
 }
 
@@ -2916,9 +3085,8 @@ views['system/settings'] = () => `<div class="grid"><div class="card">${h3('home
     <p class="muted">${L('Empty: the map uses the Matter Server add-on on the Home Assistant host found in the network.', 'Prázdné: mapa použije doplněk Matter Server na hostiteli Home Assistant nalezeném v síti.')}</p></div>
   <div class="card">${h3('cog-outline', 'Settings')}
     <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
-    <label class="field"><span>New web UI password (user admin)</span><input type="password" id="set-pass" autocomplete="new-password"></label>
-    <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button>
-      <button class="btn danger" id="set-nopass" ${status.auth ? '' : 'disabled'}>${ic('lock-outline')}Remove password</button></div></div>
+    <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button></div>
+    <p class="muted">${L('Accounts and passwords:', 'Účty a hesla:')} <a href="#system/users/list">${L('System › User management', 'Systém › Správa uživatelů')}</a></p></div>
   <div class="card">${h3('backup-restore', 'Settings backup')}
     <div class="row"><button class="btn" id="set-export">${ic('download')}Export</button>
       <label><input type="checkbox" id="set-secrets"> Include passwords</label></div>
@@ -3025,6 +3193,289 @@ function renderTraffic(t) {
     <p class="muted" style="margin-bottom:0">${L('Counted per Ethernet frame by port; the counting adds a few header reads per frame and does not delay Thread or Zigbee.',
       'Počítáno po ethernetových rámcích podle portu; počítání přidá jen pár čtení hlavičky na rámec a Thread ani Zigbee nezdržuje.')}</p>`;
 }
+
+/* ---------------- users and permissions ---------------- */
+const ROLE_NAMES = () => ({ admin: L('Admin', 'Správce'), user: L('User', 'Uživatel'), viewer: L('Viewer', 'Divák') });
+const LEVELS = () => [L('Hidden', 'Skryto'), L('Read', 'Číst'), L('Edit', 'Upravovat')];
+const fmtTime = t => t ? new Date(t * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '–';
+/* label of a permission page: "Thread › Settings" */
+function pageLabel(page) {
+  const [t, s1] = page.split('/'), sec = NAV.find(n => n.id === t), x = sec?.subs?.find(y => y.id === s1);
+  const tr = v => (lang === 'cs' && CS[v]) || v;
+  return sec ? tr(sec.label) + (x ? ' › ' + tr(x.label) : '') : page;
+}
+function genPassword() {
+  const a = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(14));
+  return [...r].map(v => a[v % a.length]).join('');
+}
+
+views['system/users/list'] = () => `<div class="card">${h3('account-multiple-outline', L('Users', 'Uživatelé'))}
+  <div class="row" style="margin-bottom:12px"><button class="btn primary" id="usr-new">${ic('account-plus-outline')}${L('New user', 'Nový uživatel')}</button></div>
+  <div id="usr-box" class="table-wrap muted">${L('Loading…', 'Načítám…')}</div>
+  <p class="muted" data-notr>${L('Only admins create accounts. A new user changes the password at the first sign-in. Admins always have every right; the last admin cannot be removed.',
+    'Účty vytváří jen správce. Nový uživatel si při prvním přihlášení změní heslo. Správce má vždy všechna práva; posledního správce nejde odebrat.')}</p></div>`;
+views['system/users/roles'] = () => `<div class="card">${h3('shield-account-outline', L('Roles and permissions', 'Role a oprávnění'))}
+  <p class="muted" data-notr>${L('What each role sees and may change, page by page. A user can have own levels (Users › Edit); admins have every right.',
+    'Co která role vidí a smí měnit, po stránkách. Uživatel může mít vlastní úrovně (Uživatelé › Upravit); správce má všechna práva.')}</p>
+  <div id="roles-box" class="table-wrap muted">${L('Loading…', 'Načítám…')}</div></div>`;
+views['system/users/tokens'] = () => `<div class="card">${h3('key-outline', L('API tokens', 'API tokeny'))}
+  <p class="muted" data-notr>${L('For Home Assistant and scripts: header Authorization: Bearer <token>. A token has a role, no 2FA, and is shown only once.',
+    'Pro Home Assistant a skripty: hlavička Authorization: Bearer <token>. Token má roli, nemá 2FA a zobrazí se jen jednou.')}</p>
+  <div class="row" style="margin-bottom:12px"><button class="btn primary" id="tok-new">${ic('plus')}${L('New token', 'Nový token')}</button></div>
+  <div id="tok-box" class="table-wrap muted">${L('Loading…', 'Načítám…')}</div></div>`;
+views['system/users/requests'] = () => `<div class="card">${h3('lock-reset', L('Password reset requests', 'Žádosti o reset hesla'))}
+  <p class="muted" data-notr>${L('Sent from the sign-in page (Forgot password). Set a temporary password; the user changes it at the next sign-in.',
+    'Odeslané z přihlašovací stránky (Zapomenuté heslo). Nastavte dočasné heslo; uživatel si ho při dalším přihlášení změní.')}</p>
+  <div id="req-box" class="table-wrap muted">${L('Loading…', 'Načítám…')}</div></div>`;
+views['system/users/policy'] = () => `<div class="card">${h3('shield-lock-outline', L('Sign-in security', 'Zabezpečení přihlášení'))}
+  <div id="pol-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>`;
+
+async function loadUsersPage() {
+  const r = route();
+  try {
+    if (r === 'system/users/list') renderUsers(await api('/api/users'));
+    if (r === 'system/users/roles') renderRoles(await api('/api/auth/roles'));
+    if (r === 'system/users/tokens') renderTokens(await api('/api/tokens'));
+    if (r === 'system/users/requests') renderRequests(await api('/api/auth/requests'));
+    if (r === 'system/users/policy') renderPolicy(await api('/api/auth/policy'));
+  } catch (e) { toast(e.message); }
+}
+
+let usersData = null;
+function renderUsers(d) {
+  usersData = d;
+  const box = $('#usr-box');
+  if (!box) return;
+  box.classList.remove('muted');
+  const state = u => u.disabled ? pill('bad', L('disabled', 'zablokován')) : u.locked ? pill('warn', L('locked', 'zamčen'))
+    : u.must_change ? pill('warn', L('must change password', 'musí změnit heslo')) : pill('ok', L('active', 'aktivní'));
+  box.innerHTML = d.users.length ? `<table data-notr><thead><tr><th>${L('Name', 'Jméno')}</th><th>${L('Role', 'Role')}</th><th>2FA</th><th>${L('State', 'Stav')}</th>
+    <th>${L('Last sign-in', 'Poslední přihlášení')}</th><th>${L('Sessions', 'Relace')}</th><th></th></tr></thead><tbody>
+    ${d.users.map(u => `<tr><td><b>${esc(u.name)}</b>${me?.name === u.name ? ` <small class="muted">(${L('you', 'vy')})</small>` : ''}
+      ${Object.keys(u.levels).length ? ` <small class="muted" title="${L('own permissions', 'vlastní oprávnění')}">${ic('tune-variant')}</small>` : ''}</td>
+      <td>${ROLE_NAMES()[u.role]}</td><td>${u.totp ? pill('ok', L(`on, ${u.recovery_left} recovery codes`, `zapnuto, ${u.recovery_left} záložních kódů`)) : pill('', L('off', 'vypnuto'))}</td>
+      <td>${state(u)}</td><td>${fmtTime(u.last_login)}</td><td>${u.sessions}</td>
+      <td><button class="btn" data-usr-edit="${esc(u.name)}">${ic('pencil-outline')}${L('Edit', 'Upravit')}</button>
+        <button class="btn danger" data-usr-del="${esc(u.name)}">${ic('delete-outline')}</button></td></tr>`).join('')}</tbody></table>`
+    : `<p>${L('No users yet: the gateway is open. Create the first account, it becomes the admin.', 'Zatím žádní uživatelé: brána je otevřená. Vytvořte první účet, stane se správcem.')}</p>`;
+}
+
+async function userNew() {
+  const first = !usersData?.users.length, pw = genPassword();
+  const v = await formDialog(L('New user', 'Nový uživatel'), `
+    <label class="field"><span>${L('User name (a-z, 0-9, . _ -)', 'Uživatelské jméno (a-z, 0-9, . _ -)')}</span><input type="text" name="name" required pattern="[a-z0-9._\\-]{2,31}" autocomplete="off"></label>
+    <label class="field"><span>${L('Role', 'Role')}</span><select name="role" ${first ? 'disabled' : ''}>${Object.entries(ROLE_NAMES()).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
+    <label class="field"><span>${first ? L('Password', 'Heslo') : L('Temporary password (tell it to the user)', 'Dočasné heslo (sdělte ho uživateli)')}</span>
+      <input type="${first ? 'password' : 'text'}" name="password" value="${first ? '' : pw}" required autocomplete="new-password"></label>
+    ${first ? `<p class="muted">${L('The first account is an admin. After saving, sign in with it.', 'První účet je správce. Po uložení se jím přihlaste.')}</p>`
+      : `<label><input type="checkbox" name="must_change" checked> ${L('Must change the password at the first sign-in', 'Při prvním přihlášení musí změnit heslo')}</label>`}`,
+    v => api('/api/users', { json: { name: v.name.trim(), role: first ? 'admin' : v.role, password: v.password, must_change: first ? false : v.must_change } }));
+  if (!v) return;
+  toast(L('User created', 'Uživatel vytvořen'));
+  if (first) { me = null; location.reload(); return; }
+  loadUsersPage();
+}
+
+async function userEdit(name) {
+  const u = usersData.users.find(x => x.name === name), pages = usersData.pages;
+  const v = await formDialog(L('Edit user', 'Upravit uživatele') + ' ' + esc(name), `
+    <label class="field"><span>${L('Role', 'Role')}</span><select name="role">${Object.entries(ROLE_NAMES()).map(([k, n]) => `<option value="${k}" ${u.role === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+    <label><input type="checkbox" name="disabled" ${u.disabled ? 'checked' : ''}> ${L('Account disabled', 'Účet zablokován')}</label>
+    <label class="field" style="margin-top:10px"><span>${L('New password (empty: unchanged)', 'Nové heslo (prázdné: beze změny)')}</span><input type="text" name="password" autocomplete="off" placeholder="${genPassword()}"></label>
+    <label><input type="checkbox" name="must_change" checked> ${L('Must change the new password at the next sign-in', 'Nové heslo musí při dalším přihlášení změnit')}</label><br>
+    ${u.totp ? `<label><input type="checkbox" name="totp_reset"> ${L('Turn off two-factor sign-in (lost phone)', 'Vypnout dvoufázové přihlášení (ztracený telefon)')}</label><br>` : ''}
+    ${u.locked ? `<label><input type="checkbox" name="unlock" checked> ${L('Unlock the account', 'Odemknout účet')}</label><br>` : ''}
+    <details style="margin-top:10px" ${Object.keys(u.levels).length ? 'open' : ''}><summary>${L('Own permissions (instead of the role)', 'Vlastní oprávnění (místo role)')}</summary>
+      <div class="table-wrap" style="max-height:320px;overflow:auto"><table class="perm-table"><tbody>
+      ${pages.map(pg => `<tr><td>${esc(pageLabel(pg))}</td><td><select name="lv:${pg}"><option value="-1">${L('as the role', 'podle role')}</option>
+        ${LEVELS().map((t, i) => `<option value="${i}" ${u.levels[pg] === i ? 'selected' : ''}>${t}</option>`).join('')}</select></td></tr>`).join('')}
+      </tbody></table></div></details>`,
+    v => {
+      const body = { name, role: v.role, disabled: v.disabled, levels: {} };
+      if (v.password) { body.password = v.password; body.must_change = v.must_change; }
+      if (v.totp_reset) body.totp_reset = true;
+      if (v.unlock) body.unlock = true;
+      for (const pg of pages) body.levels[pg] = +v['lv:' + pg];
+      return api('/api/users', { json: body });
+    });
+  if (v) { toast(L('Saved', 'Uloženo')); loadUsersPage(); }
+}
+
+function renderRoles(d) {
+  const box = $('#roles-box');
+  if (!box) return;
+  box.classList.remove('muted');
+  const sel = (role, pg) => `<select data-role-lv="${role}:${pg}">${LEVELS().map((t, i) => `<option value="${i}" ${d[role][pg] === i ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  box.innerHTML = `<table class="perm-table" data-notr><thead><tr><th>${L('Page', 'Stránka')}</th><th>${ROLE_NAMES().admin}</th><th>${ROLE_NAMES().user}</th><th>${ROLE_NAMES().viewer}</th></tr></thead><tbody>
+    ${Object.keys(d.user).map(pg => `<tr><td>${esc(pageLabel(pg))}</td><td class="muted">${LEVELS()[2]}</td><td>${sel('user', pg)}</td><td>${sel('viewer', pg)}</td></tr>`).join('')}
+    <tr><td>${L('User management', 'Správa uživatelů')}</td><td class="muted">${LEVELS()[2]}</td><td class="muted">${LEVELS()[0]}</td><td class="muted">${LEVELS()[0]}</td></tr></tbody></table>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="roles-save">${ic('check')}${L('Save', 'Uložit')}</button>
+      <button class="btn" id="roles-reset">${ic('restore')}${L('Defaults', 'Výchozí')}</button></div>`;
+}
+
+function renderTokens(list) {
+  const box = $('#tok-box');
+  if (!box) return;
+  box.classList.remove('muted');
+  box.innerHTML = list.length ? `<table data-notr><thead><tr><th>${L('Name', 'Název')}</th><th>${L('Role', 'Role')}</th><th>${L('Created', 'Vytvořen')}</th><th>${L('Last used', 'Naposledy použit')}</th><th></th></tr></thead><tbody>
+    ${list.map(t => `<tr><td><b>${esc(t.name)}</b></td><td>${ROLE_NAMES()[t.role]}</td><td>${fmtTime(t.created)}</td>
+      <td>${t.used_s_ago >= 0 ? L(`${fmtUptime(t.used_s_ago)} ago`, `před ${fmtUptime(t.used_s_ago)}`) : L('not since start', 'od startu ne')}</td>
+      <td><button class="btn danger" data-tok-del="${esc(t.name)}">${ic('delete-outline')}${L('Revoke', 'Zneplatnit')}</button></td></tr>`).join('')}</tbody></table>`
+    : `<p>${L('No tokens.', 'Žádné tokeny.')}</p>`;
+}
+
+function renderRequests(list) {
+  const box = $('#req-box');
+  if (!box) return;
+  box.classList.remove('muted');
+  box.innerHTML = list.length ? `<table data-notr><thead><tr><th>${L('User', 'Uživatel')}</th><th>${L('Time', 'Čas')}</th><th>${L('From', 'Odkud')}</th><th></th></tr></thead><tbody>
+    ${list.map(q => `<tr><td><b>${esc(q.name)}</b></td><td>${fmtTime(q.time)}</td><td>${esc(q.ip)}</td>
+      <td><button class="btn primary" data-req-set="${esc(q.name)}">${ic('lock-reset')}${L('Set password', 'Nastavit heslo')}</button>
+        <button class="btn" data-req-dismiss="${esc(q.name)}">${L('Dismiss', 'Zamítnout')}</button></td></tr>`).join('')}</tbody></table>`
+    : `<p>${L('No requests.', 'Žádné žádosti.')}</p>`;
+}
+
+function renderPolicy(p) {
+  const box = $('#pol-box');
+  if (!box) return;
+  box.classList.remove('muted');
+  const num = (k, label, min, max) => `<label class="field"><span>${label}</span><input type="number" id="pol-${k}" min="${min}" max="${max}" value="${p[k]}"></label>`;
+  box.innerHTML = `<div class="grid" data-notr><div>
+    ${num('idle_h', L('Sign-out after inactivity (hours)', 'Odhlášení po nečinnosti (hodiny)'), 1, 720)}
+    ${num('remember_d', L('"Stay signed in" lasts (days, 0 = not offered)', '„Zůstat přihlášen“ platí (dny, 0 = nenabízet)'), 0, 365)}
+    ${num('password_min', L('Minimum password length', 'Minimální délka hesla'), 8, 64)}</div><div>
+    ${num('lock_attempts', L('Failed sign-ins before the account locks', 'Neúspěšná přihlášení do zamčení účtu'), 3, 20)}
+    ${num('lock_min', L('Lock duration (minutes)', 'Doba zamčení (minuty)'), 1, 1440)}
+    <div class="field"><span class="muted" style="font-size:12px">${L('Two-factor sign-in required for', 'Dvoufázové přihlášení povinné pro')}</span>
+      ${Object.entries(ROLE_NAMES()).map(([k, n]) => `<label style="margin-right:14px"><input type="checkbox" data-pol-totp="${k}" ${p.totp_required.includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</div>
+    </div></div><div class="row"><button class="btn primary" id="pol-save">${ic('check')}${L('Save', 'Uložit')}</button></div>`;
+}
+
+/* ---- own account ---- */
+views['profile'] = () => `<div class="grid"><div class="card">${h3('account-circle-outline', L('Account', 'Účet'))}<div id="prof-info"></div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="prof-pass">${ic('key-outline')}${L('Change password', 'Změnit heslo')}</button>
+      <button class="btn" id="prof-revoke">${ic('logout')}${L('Sign out other sessions', 'Odhlásit ostatní relace')}</button></div></div>
+  <div class="card">${h3('cellphone-key', L('Two-factor sign-in', 'Dvoufázové přihlášení'))}<div id="prof-totp"></div></div></div>`;
+
+async function loadProfile() {
+  try { me = await api('/api/auth/me'); } catch (e) { return toast(e.message); }
+  if (me.open) {
+    $('#prof-info').innerHTML = `<p data-notr>${L('The gateway has no users yet.', 'Brána zatím nemá uživatele.')} <a href="#system/users/list">${L('Create the admin account', 'Vytvořte účet správce')}</a>.</p>`;
+    $('#prof-totp').innerHTML = '';
+    return;
+  }
+  let sessions = [];
+  try { sessions = await api('/api/auth/sessions'); } catch (e) { /* tokens have none */ }
+  $('#prof-info').innerHTML = `<div data-notr>${dl([[L('Name', 'Jméno'), `<b>${esc(me.name)}</b>`], [L('Role', 'Role'), ROLE_NAMES()[me.role]],
+    [L('Active sessions', 'Aktivní relace'), sessions.length]])}</div>`;
+  $('#prof-totp').innerHTML = `<div data-notr>${me.totp
+    ? `<p>${pill('ok', L('on', 'zapnuto'))} ${L(`${me.recovery_left} recovery codes left.`, `Zbývá ${me.recovery_left} záložních kódů.`)}</p>
+      ${me.totp_required ? `<p class="muted">${L('Required for your role.', 'Pro vaši roli povinné.')}</p>` : `<button class="btn danger" id="totp-off">${L('Turn off', 'Vypnout')}</button>`}`
+    : `<p>${pill('', L('off', 'vypnuto'))} ${me.totp_required ? `<b class="warn-text">${L('Required for your role.', 'Pro vaši roli povinné.')}</b>` : ''}</p>
+      <p class="muted">${L('Sign-in then also asks for a 6-digit code from Google Authenticator or a similar app.', 'Přihlášení si pak vyžádá i 6místný kód z aplikace Google Authenticator nebo podobné.')}</p>
+      <button class="btn primary" id="totp-on">${ic('qrcode')}${L('Set up', 'Nastavit')}</button>`}</div>`;
+}
+
+/* QR code, confirmation by a code, then the recovery codes (shown once) */
+async function totpSetup(required) {
+  const d = await api('/api/auth/totp/setup', { method: 'POST', noLogin: required });
+  const v = await formDialog(L('Two-factor sign-in', 'Dvoufázové přihlášení'), `
+    ${required ? `<p class="warn-text">${L('Your role requires two-factor sign-in.', 'Vaše role vyžaduje dvoufázové přihlášení.')}</p>` : ''}
+    <p>${L('1. Scan the code with Google Authenticator (or Microsoft Authenticator, 1Password, Aegis…).', '1. Naskenujte kód aplikací Google Authenticator (nebo Microsoft Authenticator, 1Password, Aegis…).')}</p>
+    <div class="row" style="align-items:flex-start;gap:18px"><div class="qr">${d.qr_svg || ''}</div>
+      <div><p class="muted" style="margin-top:0">${L('Or enter the key by hand:', 'Nebo zadejte klíč ručně:')}</p><code style="word-break:break-all">${esc(d.secret.replace(/(.{4})/g, '$1 ').trim())}</code></div></div>
+    ${d.clock_set ? '' : `<p class="bad-text">${L('The gateway clock is not set (no internet for SNTP): codes cannot be checked now.', 'Hodiny brány nejsou nastavené (bez internetu pro SNTP): kódy teď nejde ověřit.')}</p>`}
+    <label class="field" style="margin-top:12px"><span>${L('2. Enter the 6-digit code from the app', '2. Zadejte 6místný kód z aplikace')}</span>
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></label>`,
+    val => api('/api/auth/totp/enable', { json: { code: val.code.trim() }, noLogin: required }), { ok: L('Turn on', 'Zapnout'), required });
+  if (!v) return;
+  const codes = v.recovery_codes || [];
+  await formDialog(L('Recovery codes', 'Záložní kódy'), `<p>${L('Keep these codes safe. Each one signs you in once instead of the app code, for example after losing the phone. They are shown only now.',
+    'Uložte si tyto kódy. Každý vás jednou přihlásí místo kódu z aplikace, třeba po ztrátě telefonu. Zobrazují se jen teď.')}</p>
+    <div class="codes" data-notr>${codes.map(c => `<span>${c}</span>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><button class="btn" type="button" id="codes-copy">${ic('content-copy')}${L('Copy', 'Kopírovat')}</button>
+      <button class="btn" type="button" id="codes-save">${ic('download')}${L('Download', 'Stáhnout')}</button></div>`, () => true, { ok: L('I have saved them', 'Mám uloženo'), required: true });
+}
+document.addEventListener('click', e => {
+  const codes = [...document.querySelectorAll('#form-dlg .codes span')].map(x => x.textContent).join('\n');
+  if (e.target.closest('#codes-copy')) copyText(codes).then(() => toast(L('Copied', 'Zkopírováno')));
+  if (e.target.closest('#codes-save')) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([`P4 Gateway ${status?.hostname || ''} – ${me?.name || ''}\n${codes}\n`], { type: 'text/plain' }));
+    a.download = `p4gw-recovery-codes-${me?.name || ''}.txt`;
+    a.click();
+  }
+});
+
+/* actions of the user pages */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  try {
+    if (b.id === 'usr-new') await userNew();
+    else if (b.dataset.usrEdit) await userEdit(b.dataset.usrEdit);
+    else if (b.dataset.usrDel) {
+      if (!await confirmDialog(L('Delete the user?', 'Smazat uživatele?'), b.dataset.usrDel)) return;
+      await api('/api/users/delete', { json: { name: b.dataset.usrDel } });
+      loadUsersPage();
+    } else if (b.id === 'roles-save') {
+      const body = { user: {}, viewer: {} };
+      document.querySelectorAll('[data-role-lv]').forEach(sel => { const [r, pg] = sel.dataset.roleLv.split(':'); body[r][pg] = +sel.value; });
+      renderRoles(await api('/api/auth/roles', { json: body }));
+      toast(L('Saved', 'Uloženo'));
+    } else if (b.id === 'roles-reset') {
+      if (!await confirmDialog(L('Default permissions?', 'Výchozí oprávnění?'), L('The user and viewer roles get their default levels.', 'Role uživatel a divák dostanou výchozí úrovně.'))) return;
+      renderRoles(await api('/api/auth/roles', { json: { reset: true } }));
+    } else if (b.id === 'tok-new') {
+      const v = await formDialog(L('New API token', 'Nový API token'), `
+        <label class="field"><span>${L('Name (for example home-assistant)', 'Název (například home-assistant)')}</span><input type="text" name="name" maxlength="31" required></label>
+        <label class="field"><span>${L('Role', 'Role')}</span><select name="role">${Object.entries(ROLE_NAMES()).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>`,
+        val => api('/api/tokens', { json: { name: val.name.trim(), role: val.role } }), { ok: L('Create', 'Vytvořit') });
+      if (!v) return;
+      await formDialog(L('API token', 'API token'), `<p>${L('Copy the token now, it is not shown again:', 'Zkopírujte si token teď, znovu se nezobrazí:')}</p>
+        <textarea rows="2" readonly style="width:100%;font-family:ui-monospace,monospace" data-notr>${esc(v.token)}</textarea>`,
+        () => copyText(v.token).then(() => toast(L('Copied', 'Zkopírováno'))), { ok: L('Copy and close', 'Zkopírovat a zavřít') });
+      loadUsersPage();
+    } else if (b.dataset.tokDel) {
+      if (!await confirmDialog(L('Revoke the token?', 'Zneplatnit token?'), L('Clients using it lose access at once.', 'Klienti, kteří ho používají, ihned ztratí přístup.'))) return;
+      renderTokens(await api('/api/tokens/delete', { json: { name: b.dataset.tokDel } }));
+    } else if (b.dataset.reqSet) {
+      const name = b.dataset.reqSet;
+      const v = await formDialog(L('Set a password for', 'Nastavit heslo pro') + ' ' + esc(name), `
+        <label class="field"><span>${L('Temporary password (tell it to the user)', 'Dočasné heslo (sdělte ho uživateli)')}</span><input type="text" name="password" value="${genPassword()}" required></label>
+        <label><input type="checkbox" name="must_change" checked> ${L('Must change it at the next sign-in', 'Při dalším přihlášení ho musí změnit')}</label>`,
+        val => api('/api/users', { json: { name, password: val.password, must_change: val.must_change } }));
+      if (v) { toast(L('Password set', 'Heslo nastaveno')); loadUsersPage(); loadMe(); }
+    } else if (b.dataset.reqDismiss) {
+      renderRequests(await api('/api/auth/requests/dismiss', { json: { name: b.dataset.reqDismiss } }));
+      loadMe();
+    } else if (b.id === 'pol-save') {
+      const body = { totp_required: [...document.querySelectorAll('[data-pol-totp]:checked')].map(x => x.dataset.polTotp) };
+      for (const k of ['idle_h', 'remember_d', 'password_min', 'lock_attempts', 'lock_min']) body[k] = +$('#pol-' + k).value;
+      renderPolicy(await api('/api/auth/policy', { json: body }));
+      toast(L('Saved', 'Uloženo'));
+    } else if (b.id === 'prof-pass') {
+      const v = await formDialog(L('Change password', 'Změnit heslo'), `
+        <label class="field"><span>${L('Current password', 'Současné heslo')}</span><input type="password" name="old" autocomplete="current-password" required></label>
+        <label class="field"><span>${L('New password', 'Nové heslo')}</span><input type="password" name="new" autocomplete="new-password" required></label>
+        <label class="field"><span>${L('New password again', 'Nové heslo znovu')}</span><input type="password" name="new2" autocomplete="new-password" required></label>`,
+        async val => { if (val.new !== val.new2) throw new Error(L('The passwords differ', 'Hesla se liší')); return api('/api/auth/password', { json: { old: val.old, new: val.new } }); });
+      if (v) toast(L('Password changed; other sessions were signed out', 'Heslo změněno; ostatní relace byly odhlášeny'));
+    } else if (b.id === 'prof-revoke') {
+      await api('/api/auth/sessions/revoke', { method: 'POST' });
+      toast(L('Other sessions signed out', 'Ostatní relace odhlášeny'));
+      loadProfile();
+    } else if (b.id === 'totp-on') {
+      await totpSetup(false);
+      loadProfile();
+    } else if (b.id === 'totp-off') {
+      const v = await formDialog(L('Turn off two-factor sign-in', 'Vypnout dvoufázové přihlášení'), `
+        <label class="field"><span>${L('Current password', 'Současné heslo')}</span><input type="password" name="password" autocomplete="current-password" required></label>`,
+        val => api('/api/auth/totp/disable', { json: { password: val.password } }), { ok: L('Turn off', 'Vypnout') });
+      if (v) loadProfile();
+    }
+  } catch (err) { toast(err.message); }
+});
 
 views['system/maint'] = () => maintenanceBanner() + `<div class="grid"><div class="card">${h3('wrench-outline', 'Maintenance')}
     <div class="row"><button class="btn" id="sys-reboot">${ic('restart')}Restart</button>${tip('Restart')}</div>
@@ -3163,7 +3614,7 @@ document.addEventListener('click', async e => {
       toast(L('Default calibration', 'Výchozí kalibrace'));
       loadSound();
     } else if (t.id === 'snd-clip') {
-      const res = await fetch('/api/sound/clip?seconds=5', { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
+      const res = await fetch('/api/sound/clip?seconds=5');
       if (!res.ok) throw new Error((await res.json()).error || res.statusText);
       const audio = $('#snd-audio');
       audio.src = URL.createObjectURL(await res.blob());
@@ -3305,19 +3756,12 @@ document.addEventListener('click', async e => {
     } else if (t.id === 'set-save') {
       const body = {};
       if ($('#set-host').value.trim() !== status.hostname) body.hostname = $('#set-host').value.trim();
-      if ($('#set-pass').value) body.password = $('#set-pass').value;
       await api('/api/settings', { json: body });
-      if (body.password) {
-        auth = btoa('admin:' + body.password);
-        try { sessionStorage.setItem('auth', auth); } catch (err) { /* storage blocked */ }
-      }
       toast(body.hostname ? 'Saved, restart to apply the hostname' : 'Saved');
-    } else if (t.id === 'set-nopass') {
-      if (!await confirmDialog('Remove the password?', 'Anyone on the LAN can then switch roles and read the Thread network key.')) return;
-      await api('/api/settings', { json: { password: '' } });
-      auth = null;
-      try { sessionStorage.removeItem('auth'); } catch (err) { /* storage blocked */ }
-      toast('Password removed');
+    } else if (t.id === 'side-logout') {
+      await api('/api/auth/logout', { method: 'POST' });
+      me = null;
+      location.reload();
     } else if (t.id === 'side-reboot') {
       if (!await confirmDialog(L('Restart the gateway?', 'Restartovat bránu?'), L('The C6 radio and right after it the P4 restart. Thread or Zigbee is back in about 15 s; devices reconnect on their own.',
         'Restartuje se rádio C6 a hned po něm P4. Thread nebo Zigbee naběhne asi za 15 s, zařízení se připojí sama.'))) return;
@@ -3374,7 +3818,7 @@ document.addEventListener('click', e => {
   if (ln) {
     e.preventDefault();
     if (ln.dataset.lnPlay) {
-      fetch('/api/sound/learn/sample?slot=' + ln.dataset.lnPlay, { headers: auth ? { Authorization: 'Basic ' + auth } : {} })
+      fetch('/api/sound/learn/sample?slot=' + ln.dataset.lnPlay)
         .then(r => r.ok ? r.blob() : Promise.reject(new Error(r.statusText))).then(b => new Audio(URL.createObjectURL(b)).play())
         .catch(err => toast('Error: ' + err.message));
     } else {
@@ -3396,7 +3840,7 @@ document.addEventListener('keydown', e => {
 });
 
 async function download(path, name) {
-  const res = await fetch(path, { headers: auth ? { Authorization: 'Basic ' + auth } : {} });
+  const res = await fetch(path);
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).error || msg; } catch (e) { /* not JSON */ }
@@ -3416,7 +3860,6 @@ function upload(kind) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/ota/' + kind);
-    if (auth) xhr.setRequestHeader('Authorization', 'Basic ' + auth);
     xhr.upload.onprogress = e => { prog.firstElementChild.style.width = (e.loaded / e.total * 100) + '%'; };
     xhr.onload = () => {
       let r = {};
@@ -3618,14 +4061,20 @@ document.addEventListener('input', e => {
 const PASSIVE = ['overview', 'role', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'system/info'];
 
 function pageTitle() {
-  const sec = NAV.find(n => n.id === tab), s = sec.subs?.find(x => x.id === sub);
-  return `<h2 class="page-title">${ic(s?.icon || sec.icon)}<span>${sec.label}</span>${s ? `<small>›</small><small>${s.label}</small>` : ''}</h2>`;
+  const [s1, s2] = (sub || '').split('/');
+  const sec = NAV.find(n => n.id === tab), s = sec.subs?.find(x => x.id === s1), t = s?.subs?.find(x => x.id === s2);
+  const ro = perm(route()) === 1 ? `<div class="alert readonly-note" data-notr>${ic('eye-outline')}${L('Read only: your account cannot change this page.', 'Jen ke čtení: váš účet tuto stránku nemůže měnit.')}</div>` : '';
+  return `<h2 class="page-title">${ic(t?.icon || s?.icon || sec.icon)}<span>${sec.label}</span>${s ? `<small>›</small><small>${s.label}</small>` : ''}${t ? `<small>›</small><small>${t.label}</small>` : ''}</h2>${ro}`;
 }
 
 function render(full) {
   if (!status) return;
   /* a page of a role that is not active (bookmark, role switched meanwhile): the first page that works */
-  if (!pageEnabled(tab, sub)) return go(firstPage(NAV.find(n => n.id === tab)) ? `${tab}/${firstPage(NAV.find(n => n.id === tab)).id}` : 'overview', true);
+  if (!pageEnabled(tab, sub)) {
+    const fp = firstPage(NAV.find(n => n.id === tab));
+    const any = NAV.find(n => !n.hidden && (n.subs ? firstPage(n) : perm(n.id) > 0));
+    return go(fp ? `${tab}/${fp.id}` : any ? (any.subs ? `${any.id}/${firstPage(any).id}` : any.id) : 'profile', true);
+  }
   if (navRole !== activeRole()) renderNav();
   renderHeader();
   const main = $('#main');
@@ -3634,6 +4083,7 @@ function render(full) {
   if (full || (PASSIVE.includes(route()) && !editing)) {
     if (full) renderNav();
     main.innerHTML = pageTitle() + views[route()]();
+    if (perm(route()) === 1) main.querySelectorAll('button.primary, button.danger').forEach(b => { b.disabled = true; });
     if (tab === 'thread') { loadThread(); if (sub === 'settings') { loadDataset(false); loadThreadTxPower(); } if (sub === 'topology') loadTopology(); }
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
@@ -3645,6 +4095,8 @@ function render(full) {
       if (!trafficTimer) trafficTimer = setInterval(loadTraffic, 2000);
     }
     if (route() === 'system/settings') loadHaFound();
+    if (route().startsWith('system/users/')) loadUsersPage();
+    if (route() === 'profile') loadProfile();
     if (route() === 'zigbee/network') loadZigbeeNet(true);
     if (tab === 'sound') {
       loadSound(); loadSoundConfig().catch(err => toast('Error: ' + err.message));
@@ -3656,7 +4108,12 @@ function render(full) {
   }
 }
 
+let meTick = 0;
 async function poll() {
+  /* admins see new reset requests within half a minute */
+  if (me && !me.open && me.role === 'admin' && ++meTick % 6 === 0) {
+    api('/api/auth/me').then(m => { if (m.requests !== me.requests) { me = m; renderUser(); renderNav(); } else me = m; }).catch(() => {});
+  }
   if (!restarting) {
     try { status = await api('/api/status'); render(false); } catch (e) { setTag('#hdr-role', 'bad', ic('close'), 'offline', L('Gateway', 'Brána'), [[L('State', 'Stav'), L('does not answer', 'neodpovídá')]]); }
   }
@@ -3665,9 +4122,13 @@ async function poll() {
 
 uiReady = true;
 renderPrefs();
-renderNav();
+async function loadMe() {
+  try { me = await api('/api/auth/me'); } catch (e) { me = null; }
+  renderPrefs();
+  renderNav();
+}
 history.replaceState(null, '', '#' + route());
-poll().then(() => render(true));
+loadMe().then(poll).then(() => render(true));
 setInterval(pollLog, 1500);
 </script>
 </body>
