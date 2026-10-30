@@ -3,6 +3,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "c6_flasher.h"
 #include "gw.h"
 
 static const char *TAG = "gw_boot";
@@ -68,14 +69,28 @@ void gw_restart_on_failure(void)
     esp_restart();
 }
 
+static bool s_restart_c6;
+
 static void restart_task(void *arg)
 {
     vTaskDelay(pdMS_TO_TICKS((uint32_t)(uintptr_t)arg));
+    if (s_restart_c6) {
+        /* held in reset until the P4 restart releases the pin (CHIP_PU has its own pull-up) */
+        ESP_LOGW(TAG, "C6 reset");
+        c6_hold_reset(true);
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
     esp_restart();
 }
 
 void gw_restart_later(uint32_t delay_ms)
 {
+    gw_restart_later_full(delay_ms, false);
+}
+
+void gw_restart_later_full(uint32_t delay_ms, bool c6)
+{
+    s_restart_c6 = c6;
     /* A requested restart proves the new image runs well enough to serve requests; without
      * this, a restart within the first minute after an update would roll it back. */
     const esp_partition_t *running = esp_ota_get_running_partition();

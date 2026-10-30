@@ -1124,6 +1124,59 @@ def tc31_sound_pressure():
             http('POST', '/api/sound/config', {'spl_reset': True})
 
 
+def tc32_lan_settings_traffic():
+    """Header links, traffic counters, LAN settings: validation, revert when not confirmed, confirm, back to DHCP."""
+    s = status()
+    ln = s['links']
+    check(ln['mqtt'] in ('off', 'connected', 'disconnected') and ln['internet'] in (True, False, None), f'links reported: {ln}')
+    e = s['eth']
+    check(e['mode'] in ('dhcp', 'static') and e['netmask'] and e['link_mode'], f'eth mode {e["mode"]}, mask {e["netmask"]}')
+    t1 = http('GET', '/api/net/traffic')[1]
+    for _ in range(5):
+        status()
+    t2 = http('GET', '/api/net/traffic')[1]
+    check(t2['services']['web']['rx'] > t1['services']['web']['rx'] and t2['tx'] > t1['tx'],
+          f'web traffic counted: {t1["services"]["web"]["rx"]} -> {t2["services"]["web"]["rx"]} B')
+    check(t2['rx'] == sum(v['rx'] for v in t2['services'].values()), 'totals are the sum of the services')
+    for body, why in (({'mode': 'static', 'ip': e['ipv4'], 'mask': '255.0.255.0'}, 'netmask'),
+                      ({'mode': 'static', 'ip': e['ipv4'], 'mask': '255.255.255.0', 'gw': '10.255.255.1'}, 'gateway outside'),
+                      ({'mode': 'static', 'mask': '255.255.255.0'}, 'no address'), ({'link': '1000full'}, 'link mode')):
+        check(http('POST', '/api/net/lan', body)[0] == 400, f'rejected: {why}')
+    check(http('POST', '/api/net/lan/confirm')[0] == 409, 'confirm without a pending change: 409')
+    original = http('GET', '/api/net/lan')[1]
+    fixed = {'mode': 'static', 'ip': e['ipv4'], 'mask': e['netmask'], 'gw': e['gateway'], 'dns1': e['dns'][0] if e['dns'] else ''}
+    try:
+        # the same address, so the test keeps reaching the gateway; not confirmed -> previous settings
+        check(http('POST', '/api/net/lan', fixed)[0] == 200, 'static settings applied')
+        s = wait_until('static mode', lambda: (lambda x: x if x['eth']['mode'] == 'static' else None)(status()), 15, 1)
+        check(0 < s['eth']['confirm_s'] <= 120, f'waits for confirmation ({s["eth"]["confirm_s"]} s)')
+        wait_until('revert', lambda: (lambda x: x if x['eth']['confirm_s'] == 0 else None)(status()), 140, 5)
+        check(status()['eth']['mode'] == original['mode'], f'not confirmed: back to {original["mode"]}')
+        check(http('POST', '/api/net/lan', fixed)[0] == 200, 'static settings applied again')
+        time.sleep(2)
+        code, r = http('POST', '/api/net/lan/confirm')
+        check(code == 200 and r['mode'] == 'static' and r['confirm_s'] == 0, 'confirmed and stored')
+        wait_until('internet', lambda: status()['links']['internet'] is True, 90, 5)
+        check(True, 'internet reachable with the static address (DNS kept beside the Thread DNS64 server)')
+    finally:
+        restore = {k: v for k, v in original.items() if k != 'confirm_s'}
+        http('POST', '/api/net/lan', restore)
+        time.sleep(3)
+        http('POST', '/api/net/lan/confirm')
+    check(status()['eth']['mode'] == original['mode'], f'settings restored ({original["mode"]})')
+
+
+def tc33_full_restart():
+    """Restart from the menu: the C6 is reset right before the P4, the role comes back."""
+    s = status()
+    role = s['role']['active']
+    check(http('POST', '/api/reboot', {'full': True})[0] == 200, 'full restart accepted')
+    s = wait_restart(role)
+    tel = wait_until('C6 telemetry', lambda: (lambda x: x['c6'].get('telemetry') and x['c6']['telemetry']['age_s'] < 40 and x)(status()), 90, 5)
+    p4, c6 = tel['uptime_s'], tel['c6']['telemetry']['uptime_s'] + tel['c6']['telemetry']['age_s']
+    check(abs(p4 - c6) < 30, f'C6 restarted with the P4 (P4 {p4} s, C6 {c6} s)')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1136,7 +1189,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart),
 ]
 
 

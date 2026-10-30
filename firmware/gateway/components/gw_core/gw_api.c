@@ -438,10 +438,53 @@ static esp_err_t role_post(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
+/* {"full": true} also resets the C6 just before the P4 restarts */
 static esp_err_t reboot_post(httpd_req_t *req)
 {
-    gw_restart_later(500);
+    cJSON *body = req->content_len ? gw_http_read_json(req) : NULL;
+    if (req->content_len && !body) {
+        return ESP_OK;
+    }
+    bool full = cJSON_IsTrue(cJSON_GetObjectItem(body, "full"));
+    cJSON_Delete(body);
+    if (full && c6_progress()->busy) {
+        return gw_http_send_error(req, 409, "C6 flashing in progress");
+    }
+    gw_restart_later_full(500, full);
     return gw_http_send_json(req, cJSON_CreateObject());
+}
+
+static esp_err_t lan_get(httpd_req_t *req)
+{
+    return gw_http_send_json(req, gw_lan_status());
+}
+
+static esp_err_t lan_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    char err[80];
+    esp_err_t res = gw_lan_set(body, err, sizeof(err));
+    cJSON_Delete(body);
+    if (res != ESP_OK) {
+        return gw_http_send_error(req, res == ESP_ERR_INVALID_ARG ? 400 : 500, err);
+    }
+    return gw_http_send_json(req, gw_lan_status());
+}
+
+static esp_err_t lan_confirm_post(httpd_req_t *req)
+{
+    if (gw_lan_confirm() != ESP_OK) {
+        return gw_http_send_error(req, 409, "no LAN change waits for confirmation");
+    }
+    return gw_http_send_json(req, gw_lan_status());
+}
+
+static esp_err_t traffic_get(httpd_req_t *req)
+{
+    return gw_http_send_json(req, gw_eth_traffic());
 }
 
 /* ---- uploads ---- */
@@ -1029,6 +1072,10 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/logs/previous", HTTP_GET, logs_previous_get);
     gw_http_register("/api/role", HTTP_POST, role_post);
     gw_http_register("/api/reboot", HTTP_POST, reboot_post);
+    gw_http_register("/api/net/lan", HTTP_GET, lan_get);
+    gw_http_register("/api/net/lan", HTTP_POST, lan_post);
+    gw_http_register("/api/net/lan/confirm", HTTP_POST, lan_confirm_post);
+    gw_http_register("/api/net/traffic", HTTP_GET, traffic_get);
     gw_http_register("/api/settings", HTTP_POST, settings_post);
     gw_http_register("/api/settings/export", HTTP_GET, settings_export_get);
     gw_http_register("/api/settings/import", HTTP_POST, settings_import_post);

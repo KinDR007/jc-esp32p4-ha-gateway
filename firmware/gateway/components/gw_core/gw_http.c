@@ -12,7 +12,7 @@
 
 static const char *TAG = "gw_http";
 
-#define MAX_HANDLERS 64
+#define MAX_HANDLERS 80
 #define MAX_JSON_BODY 4096
 
 extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");

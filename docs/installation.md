@@ -90,6 +90,21 @@ Web UI (Role), MQTT (`p4gw/<host>/role/set`), API `POST /api/role {"role": ...}`
 role, the *Gateway role* select and *Return to gateway* button. Typical times measured on the
 board: Thread roles 13–15 s, Zigbee roles 25–27 s (C6 flash), ESPHome hand-over about 60 s.
 
+## LAN settings
+
+**System › LAN** (or `POST /api/net/lan`): DHCP (default) or a static IPv4 address with netmask, gateway
+and up to two DNS servers, and the link mode (autonegotiation or a fixed 100/10 Mb/s, full or half
+duplex). A change applies at once and has to be confirmed within 120 s (`POST /api/net/lan/confirm`,
+the banner in the web UI), from the new address when it changes; otherwise the previous settings come
+back, also after a restart in between. Thread and Zigbee keep running; a new link mode restarts the
+link for a few seconds. Zigbee2MQTT connects to the address, so a new one has to go into its
+configuration too; the P4 Gateway integration follows it over mDNS.
+
+The same page shows the Ethernet traffic since boot and its rate, in total and per service (web UI and
+API, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, Thread traffic routed by the border router).
+Frames are counted by port in the input and output path of the interface, without copying or delaying
+them.
+
 ## Recovery
 
 | Situation | Action |
@@ -101,6 +116,7 @@ board: Thread roles 13–15 s, Zigbee roles 25–27 s (C6 flash), ESPHome hand-o
 | Repeated crashes, cause unknown | **System → Diagnostics → Log before the last restart** (last 16 KiB of the previous run, gone after a power cut) |
 | New board, erased NVS | **System → Settings → Settings backup**: export (with passwords if wanted) beforehand, import on the new board. Zigbee network data is not part of it: it lives on the C6 and in the old board's `c6data` (downloadable under Zigbee › Network backups, not restorable on another board yet) |
 | Restore factory C6 | write the full C6 backup with esptool over a USB-UART on JP1 20/22, IO9 (pin 24) to GND; the factory app can also be extracted from the P4 factory backup (embedded `network_adapter` image at 0x5f0000 of the tested board) |
+| Static LAN address that does not work | not confirmed: it reverts after 120 s by itself; confirmed: the gateway is still reachable over IPv6 as `<host>.local`, or import a settings backup without the `lan` key |
 | Restore factory P4 | `esptool --chip esp32p4 write-flash 0 backups/p4_backup.bin` |
 
 ## Tests

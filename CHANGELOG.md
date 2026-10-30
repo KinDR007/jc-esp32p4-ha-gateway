@@ -21,6 +21,16 @@
   a password; 16 and 32 px drawn simplified).
 - Home Assistant › Guide: card of the P4 Gateway integration with one-click My Home Assistant buttons
   (open the repository in HACS, start the setup); the same badges in README and docs.
+- Web UI: header tags have icons and a box with details on hover (the box of the network maps);
+  language (flags) and theme (icons) moved to the bottom of the menu, with a Restart button that, after
+  a confirmation, resets the C6 and right after it the P4 (`/api/reboot {"full": true}`).
+- LAN settings (System › LAN): DHCP or static IPv4 with DNS servers, link speed and duplex; a change
+  must be confirmed within 120 s, else the previous settings come back. Static DNS servers also go to
+  the backup entries of the lwIP list, whose first entry the OpenThread DNS64 client overwrites with
+  the NAT64 server (without that, a static address with one DNS server lost name resolution).
+- Ethernet traffic (System › LAN): bytes and packets since boot and live rate, in total and per service,
+  counted by port in the input and output functions of the interface; graph of the last 5 minutes.
+  Tests: TC32, TC33.
 - Web UI header in the style of SMLIGHT: status tags (outlined when working, grey when off) for LAN,
   the active role, its client (Zigbee2MQTT or OTBR REST), the P4 Gateway integration (`/api/ws`
   clients), MQTT and internet; device uptime with the Zigbee2MQTT session or C6 uptime below it, and the

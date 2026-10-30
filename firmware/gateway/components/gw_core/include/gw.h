@@ -53,6 +53,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
 #define GW_KEY_UPDATE_URL "upd_url" /* str, manifest of the online update, empty = off */
+#define GW_KEY_LAN "lan"            /* str JSON, LAN settings (gw_lan_set), none = DHCP */
 #define GW_KEY_ZB_SNAP_DAYS "zb_snap_days" /* u8, automatic Zigbee network backup every n days, 0 = off */
 #define GW_ZB_SNAP_DAYS_DEFAULT 7
 #define GW_KEY_ZB_SNAP_REQ "zb_snap_req" /* u8, back up the Zigbee network data on the next start */
@@ -95,6 +96,8 @@ void gw_boot_mark_stable(void);
 esp_err_t gw_boot_select_esphome(void);
 /* Restarts after a short delay so pending HTTP responses get out. */
 void gw_restart_later(uint32_t delay_ms);
+/* Same, and resets the C6 just before (a restart of the whole hardware). */
+void gw_restart_later_full(uint32_t delay_ms, bool c6);
 /* Restart to recover from a failure (C6 radio lost). Counts as an unstable boot for gw_boot_loop_detected(),
  * unlike a requested restart, so a failure that comes back after every start ends in maintenance mode. */
 void gw_restart_on_failure(void) __attribute__((noreturn));
@@ -105,6 +108,13 @@ esp_netif_t *gw_eth_netif(void);
 /* Waits for an IPv4 or global IPv6 address. */
 bool gw_eth_wait_ip(TickType_t timeout);
 cJSON *gw_eth_status(void);
+/* Bytes and packets through the Ethernet interface since boot, in total and per service. */
+cJSON *gw_eth_traffic(void);
+/* LAN settings: DHCP or static IPv4, link mode. A change applies at once and must be confirmed
+ * (gw_lan_confirm) within 120 s, else the stored settings come back. */
+esp_err_t gw_lan_set(const cJSON *json, char *err, size_t err_len);
+esp_err_t gw_lan_confirm(void);
+cJSON *gw_lan_status(void);
 
 /* ---- internet reachability (TCP to github.com:443 every minute) ---- */
 void gw_inet_start(void);
