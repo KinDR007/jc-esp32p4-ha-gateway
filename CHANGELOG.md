@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.7 (2026-10-30)
+
+Home Assistant integration 1.3.0 (install a given version).
+
 - Online update: older releases can be installed (rollback), the gateway firmware and the C6 package
   separately. Each release carries `releases.json`; the gateway offers only the releases whose manifest
   names its flash layout (`layouts`, from v1.6), so on layout v3 nothing older than v1.6. Web UI
