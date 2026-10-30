@@ -75,7 +75,7 @@ Install (once), one click each:
 [![Open your Home Assistant instance and open this repository inside HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=KinDR007&repository=jc-esp32p4-ha-gateway&category=integration)
 [![Open your Home Assistant instance and start setting up the P4 Gateway integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=p4gw)
 
-1. **Open in HACS** adds this repository to HACS; *Download*, then restart Home Assistant.
+1. **Open HACS repository on My** adds this repository to HACS; *Download*, then restart Home Assistant.
    Without HACS: copy `custom_components/p4gw` into `/config/custom_components/` (e.g. over the SSH
    add-on). HACS installs only from a public repository.
 2. **Add integration** starts the setup (or use the discovered gateway, below).

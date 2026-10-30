@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
  *   P4GW_URL=http://<gateway> P4GW_USER=<admin> P4GW_PASS=<password> PHASE=thread \
  *   node <browser-automation skill>/browser.mjs $P4GW_URL --script tools/docs/shoot.mjs
  * PHASE: thread (all pages, tooltips, dialogs; Thread border router role), zigbee (Zigbee coordinator role),
- * router (Zigbee router role), firmware (the System › Firmware pages only). The account must be an admin without two-factor sign-in.
+ * router (Zigbee router role), firmware (the System › Firmware pages only); P4GW_ROUTES="a/b c" shoots only those pages. The account must be an admin without two-factor sign-in.
  * Then python3 tools/docs/build_docs.py. */
 const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
@@ -17,7 +17,10 @@ const PHASES = {
   router: [['overview', 'zigbee/info', 'zigbee/diag'], '__router', false],
   firmware: [['system/firmware/online', 'system/firmware/manual', 'system/firmware/settings'], '', false],
 };
-const [ROUTES, SUFFIX, EXTRAS] = PHASES[process.env.PHASE || 'thread'];
+const [PHASE_ROUTES, SUFFIX, EXTRAS] = PHASES[process.env.PHASE || 'thread'];
+/* P4GW_ROUTES="ha/guide system/info": only these pages of the phase (no tooltips or dialogs) */
+const ROUTES = process.env.P4GW_ROUTES ? process.env.P4GW_ROUTES.split(/\s+/) : PHASE_ROUTES;
+const ALL = !process.env.P4GW_ROUTES && EXTRAS;
 const shot = (page, name, opts = {}) => page.screenshot({ path: OUT + name + '.jpg', type: 'jpeg', quality: 82, ...opts });
 export default async function run(page) {
   const meta = existsSync(OUT + 'index.json') ? JSON.parse(readFileSync(OUT + 'index.json', 'utf8')) : {};
@@ -28,7 +31,7 @@ export default async function run(page) {
   await page.reload();
   await page.waitForSelector('#lg-user', { timeout: 30000 });
   await page.waitForTimeout(800);
-  if (EXTRAS) await shot(page, 'login');
+  if (ALL) await shot(page, 'login');
   await page.fill('#lg-user', process.env.P4GW_USER);
   await page.fill('#lg-pass', process.env.P4GW_PASS);
   await page.click('#login button[type=submit]');
@@ -64,7 +67,7 @@ export default async function run(page) {
     }
     done.push(r);
   }
-  if (EXTRAS) {
+  if (ALL) {
     await page.evaluate(() => { location.hash = 'overview'; });
     await page.waitForTimeout(3000);
     for (const [id, name] of [['#hdr-eth', 'tip_lan'], ['#hdr-role', 'tip_role'], ['#hdr-peer', 'tip_peer'], ['#hdr-ha', 'tip_ha'], ['#hdr-inet', 'tip_internet'], ['#hdr-uptime', 'tip_uptime']]) {

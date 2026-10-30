@@ -273,7 +273,7 @@ PAGES = [
     ("ha/guide", "book-open-variant", T("Home Assistant › Guide", "Home Assistant › Návod"),
      T("Steps for Home Assistant with the current address of the gateway; one-click buttons for the integration.",
        "Postup pro Home Assistant se současnou adresou brány; tlačítka na jedno kliknutí pro integraci."),
-     {"P4 GATEWAY INTEGRATION": T("Open in HACS, start the setup.", "Otevřít v HACS, spustit nastavení."),
+     {"P4 GATEWAY INTEGRATION": T("Open the HACS repository, add the integration (My Home Assistant buttons).", "Otevřít repozitář HACS, přidat integraci (tlačítka My Home Assistant)."),
       "THREAD BORDER ROUTER → HOME ASSISTANT": T("OTBR integration URL, Thread and Matter steps.", "URL integrace OTBR, kroky pro Thread a Matter."),
       "ZIGBEE COORDINATOR → ZIGBEE2MQTT (RECOMMENDED)": T("Zigbee2MQTT configuration.", "Konfigurace Zigbee2MQTT.")},
      None, ["ha_guide", "ha_guide__zigbee"]),
@@ -413,7 +413,7 @@ PAGES = [
 
 HA = T(
     """<h3>P4 Gateway integration</h3>
-    <ol><li>Install: <b>Open in HACS</b> (Home Assistant › Guide) or copy <code>custom_components/p4gw</code> to <code>/config/custom_components/</code>; restart Home Assistant.</li>
+    <ol><li>Install: <b>Open HACS repository</b> (Home Assistant › Guide) or copy <code>custom_components/p4gw</code> to <code>/config/custom_components/</code>; restart Home Assistant.</li>
     <li>The gateway appears under Settings › Devices & services › <b>Discovered</b> (mDNS <code>_p4gw._tcp</code>), or add it: Add integration › P4 Gateway › address.</li>
     <li>With user accounts on the gateway it asks for an <b>API token</b>: create one under System › User management › API tokens (role admin, or user when the integration should not restart or update) and paste it. The token does not depend on any user or their 2FA.</li>
     <li><b>Configure</b> (integration options): per topic from which level a persistent notification appears (off, critical only, warnings and critical, all).</li></ol>
@@ -434,7 +434,7 @@ advanced:
     <h3>ESPHome BLE proxy</h3>
     <p>Role › ESPHome BLE proxy; Home Assistant discovers the ESPHome node, enter its API key. Back with the <i>Gateway role</i> select and <i>Return to gateway</i>.</p>""",
     """<h3>Integrace P4 Gateway</h3>
-    <ol><li>Instalace: <b>Otevřít v HACS</b> (Home Assistant › Návod) nebo zkopírujte <code>custom_components/p4gw</code> do <code>/config/custom_components/</code>; restartujte Home Assistant.</li>
+    <ol><li>Instalace: <b>Otevřít repozitář HACS</b> (Home Assistant › Návod) nebo zkopírujte <code>custom_components/p4gw</code> do <code>/config/custom_components/</code>; restartujte Home Assistant.</li>
     <li>Brána se objeví v Nastavení › Zařízení a služby › <b>Objeveno</b> (mDNS <code>_p4gw._tcp</code>), nebo ji přidejte: Přidat integraci › P4 Gateway › adresa.</li>
     <li>Když má brána uživatelské účty, integrace chce <b>API token</b>: vytvořte ho v Systém › Správa uživatelů › API tokeny (role správce, nebo uživatel, když integrace nemá restartovat ani aktualizovat) a vložte ho. Token nezávisí na žádném uživateli ani jeho 2FA.</li>
     <li><b>Konfigurovat</b> (volby integrace): pro každé téma, od jaké úrovně se zobrazí trvalé oznámení (vypnuto, jen kritické, varování a kritické, vše).</li></ol>

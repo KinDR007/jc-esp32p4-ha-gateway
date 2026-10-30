@@ -183,6 +183,12 @@ pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-si
 pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+/* buttons in the style of the My Home Assistant badges */
+.my-badge { display: inline-flex; align-items: center; gap: 14px; padding: 6px 6px 6px 20px; border-radius: 999px; background: #58b9ed;
+  color: #fff; font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; }
+.my-badge:hover { filter: brightness(1.08); }
+.my-badge .my { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 999px; background: #f2f4f9; color: #58b9ed; font-weight: 700; }
+.my-badge .my svg { width: 16px; height: 16px; }
 .rel { border-top: 1px solid var(--border); }
 .rel:last-of-type { border-bottom: 1px solid var(--border); }
 .rel > summary { display: grid; grid-template-columns: 12px 210px 100px 240px 1fr; align-items: center; gap: 6px 12px; padding: 8px 4px; cursor: pointer; list-style: none; }
@@ -1795,17 +1801,18 @@ const P4GW_HACS = 'https://my.home-assistant.io/redirect/hacs_repository/?owner=
 const P4GW_ADD = 'https://my.home-assistant.io/redirect/config_flow_start/?domain=p4gw';
 function haIntegration() {
   const host = esc(ip()), cs = lang === 'cs';
-  const links = `<div class="row">
-    <a class="btn primary" href="${P4GW_HACS}" target="_blank" rel="noopener">${ic('download')}${cs ? 'Otevřít v HACS' : 'Open in HACS'}</a>
-    <a class="btn" href="${P4GW_ADD}" target="_blank" rel="noopener">${ic('plus')}${cs ? 'Přidat integraci' : 'Add integration'}</a></div>`;
+  const my = `<span class="my">MY${ic('home-assistant')}</span>`;
+  const links = `<div class="row" style="gap:10px">
+    <a class="my-badge" href="${P4GW_HACS}" target="_blank" rel="noopener">${cs ? 'Otevřít repozitář HACS v' : 'Open HACS repository on'}${my}</a>
+    <a class="my-badge" href="${P4GW_ADD}" target="_blank" rel="noopener">${cs ? 'Přidat integraci do' : 'Add integration to'}${my}</a></div>`;
   return cs ? `<h3>Integrace P4 Gateway</h3>
     <p>Vlastní integrace brány pro Home Assistant: role, zvukové události, teploty, aktualizace firmwaru a tlačítka přímo v HA, bez MQTT brokeru. Tlačítka otevřou vaši instanci HA na správném místě (My Home Assistant).</p>${links}<ol class="steps">
-    <li><b>Otevřít v HACS</b> → <i>Stáhnout</i>, pak restartujte Home Assistant. Bez HACS: zkopírujte složku <code>custom_components/p4gw</code> z repozitáře do <code>/config/custom_components/</code>.</li>
+    <li><b>Otevřít repozitář HACS</b> → <i>Stáhnout</i>, pak restartujte Home Assistant. Bez HACS: zkopírujte složku <code>custom_components/p4gw</code> z repozitáře do <code>/config/custom_components/</code>.</li>
     <li>Brána se sama objeví v <b>Nastavení → Zařízení a služby → Objeveno</b>; nebo <b>Přidat integraci</b> a adresa <code>${host}</code>. Je-li nastavené heslo webového rozhraní, HA se na něj zeptá.</li>
     <li>Používáte i MQTT? Vypněte v <b>Home Assistant → MQTT</b> volbu <i>Home Assistant discovery</i>, jinak budou entity v HA dvakrát.</li></ol>`
   : `<h3>P4 Gateway integration</h3>
     <p>The gateway's own Home Assistant integration: role, sound events, temperatures, firmware updates and buttons right in HA, no MQTT broker needed. The buttons open your HA instance at the right place (My Home Assistant).</p>${links}<ol class="steps">
-    <li><b>Open in HACS</b> → <i>Download</i>, then restart Home Assistant. Without HACS: copy the folder <code>custom_components/p4gw</code> from the repository into <code>/config/custom_components/</code>.</li>
+    <li><b>Open HACS repository</b> → <i>Download</i>, then restart Home Assistant. Without HACS: copy the folder <code>custom_components/p4gw</code> from the repository into <code>/config/custom_components/</code>.</li>
     <li>The gateway shows up under <b>Settings → Devices &amp; services → Discovered</b>; or <b>Add integration</b> with the address <code>${host}</code>. With a web UI password set, HA asks for it.</li>
     <li>Using MQTT as well? Switch off <i>Home Assistant discovery</i> under <b>Home Assistant → MQTT</b>, or every entity shows up twice.</li></ol>`;
 }

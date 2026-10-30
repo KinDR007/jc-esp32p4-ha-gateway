@@ -9,6 +9,8 @@
   table: installed, offered, state, install; firmwares of the C6 package expandable; releases for
   this gateway in their own tile, **Reflash** writes the installed release again), *Manual update*
   (uploads of the gateway, C6 package and ESPHome in one tile) and *Settings* (manifest URL).
+- Web UI, Home Assistant › Guide: the HACS and *Add integration* buttons look like the My Home
+  Assistant badges.
 
 ## v1.7 (2026-10-30)
 
