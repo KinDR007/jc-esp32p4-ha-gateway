@@ -677,6 +677,29 @@ static esp_err_t log_get(httpd_req_t *req)
     return gw_http_send_json(req, arr);
 }
 
+/* /events: the last detections */
+static void bot_events(const char *args, bool cz, char *out, size_t len)
+{
+    int64_t now = esp_timer_get_time();
+    size_t n = snprintf(out, len, "%s", cz ? "<b>Poslední detekce</b>\n" : "<b>Last detections</b>\n");
+    int shown = 0;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    for (int k = 1; k <= LOG_SIZE && shown < 10 && n + 80 < len; k++) {
+        const log_entry_t *l = &s_log[(s_log_next - k + LOG_SIZE) % LOG_SIZE];
+        if (!l->at_us) {
+            break;
+        }
+        int ago = (int)((now - l->at_us) / 1000000);
+        n += snprintf(out + n, len - n, "%s, %s %.0f %% · %s %d %s\n", l->id, cls_name(l->cls), (double)l->score * 100,
+                      cz ? "před" : "", ago >= 3600 ? ago / 3600 : ago / 60, ago >= 3600 ? "h" : "min");
+        shown++;
+    }
+    xSemaphoreGive(s_lock);
+    if (!shown) {
+        snprintf(out + n, len - n, "%s", cz ? "Žádné." : "None.");
+    }
+}
+
 esp_err_t sound_events_init(const char *(*class_name)(int index))
 {
     s_class_name = class_name;
@@ -712,5 +735,6 @@ esp_err_t sound_events_init(const char *(*class_name)(int index))
     gw_http_register("/api/sound/classes", HTTP_GET, classes_get);
     gw_http_register("/api/sound/scores", HTTP_GET, scores_get);
     gw_http_register("/api/sound/log", HTTP_GET, log_get);
+    gw_bot_command("events", "last sound detections", "poslední detekce zvuků", "sound/log", 1, false, bot_events);
     return ESP_OK;
 }

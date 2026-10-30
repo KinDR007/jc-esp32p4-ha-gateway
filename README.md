@@ -36,6 +36,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 | [docs/hardware.md](docs/hardware.md) | board, chip revision, **JP1 jumpers**, pinout, USB notes |
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
 | [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |
+| [docs/notifications.md](docs/notifications.md) | notifications, Home Assistant, Telegram bot and its commands |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
 | [docs/zadani.md](docs/zadani.md) | original assignment and feasibility analysis (Czech) |
 | [docs/sound-detection.md](docs/sound-detection.md) | sound event detection: research and proposal (Czech, pending) |

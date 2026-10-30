@@ -291,6 +291,7 @@ void app_main(void)
     ESP_ERROR_CHECK(gw_api_register());
     gw_auth_register();
     gw_notify_register();
+    gw_telegram_start();
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
     netscan_init();

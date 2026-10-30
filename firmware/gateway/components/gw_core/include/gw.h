@@ -152,6 +152,14 @@ void gw_notify_register(void);
 /* one more consumer of every notification (the Telegram bot); called in the notifying task */
 void gw_notify_set_listener(void (*listener)(const char *topic, gw_notify_level_t level, const char *text));
 
+/* ---- Telegram bot (gw_telegram.c) ---- */
+void gw_telegram_start(void);
+/* A command answers in out (Telegram HTML); czech: the user reads Czech. */
+typedef void (*gw_bot_fn)(const char *args, bool czech, char *out, size_t len);
+/* /name for users with level (1 read, 2 edit) on page; confirm: changes something (button, TOTP). */
+void gw_bot_command(const char *name, const char *help_en, const char *help_cs, const char *page, int level,
+                    bool confirm, gw_bot_fn fn);
+
 /* ---- HTTP ---- */
 esp_err_t gw_http_start(void);
 httpd_handle_t gw_http_server(void);
@@ -176,6 +184,8 @@ esp_err_t gw_api_register(void);
 /* The running role adds its summary to /api/status under "role_status". */
 void gw_api_set_role_status(cJSON *(*provider)(void));
 cJSON *gw_api_role_status(void);
+/* Stores the role and restarts (also from the Telegram bot); err says why not. */
+esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len);
 bool gw_api_temperature(float *celsius);
 
 /*

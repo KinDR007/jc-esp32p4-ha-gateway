@@ -17,6 +17,7 @@
 #include "mbedtls/sha256.h"
 #include "qrcode.h"
 #include "gw.h"
+#include "gw_auth_priv.h"
 
 static const char *TAG = "gw_auth";
 
@@ -86,6 +87,7 @@ typedef struct {
     uint8_t recovery[RECOVERY_CODES][16]; /* sha256 of each code, first 16 bytes; zero = used */
     uint8_t levels[PAGES];                /* own level per page, 0xff = the role's */
     int64_t created, last_login;          /* unix time, 0 unknown */
+    gw_tg_prefs_t tg;                     /* Telegram chat and notification settings */
     /* runtime only */
     uint8_t fails;
     int64_t locked_until_us;
@@ -391,6 +393,15 @@ static void save_user(int i)
     }
     cJSON_AddNumberToObject(j, "created", (double)u->created);
     cJSON_AddNumberToObject(j, "last_login", (double)u->last_login);
+    cJSON *tg = cJSON_AddObjectToObject(j, "tg");
+    cJSON_AddNumberToObject(tg, "chat", (double)u->tg.chat);
+    cJSON *tl = cJSON_AddArrayToObject(tg, "levels");
+    for (int t = 0; t < GW_TG_TOPICS; t++) {
+        cJSON_AddItemToArray(tl, cJSON_CreateNumber(u->tg.levels[t]));
+    }
+    cJSON_AddNumberToObject(tg, "quiet_from", u->tg.quiet_from);
+    cJSON_AddNumberToObject(tg, "quiet_to", u->tg.quiet_to);
+    cJSON_AddStringToObject(tg, "lang", u->tg.lang);
     char *text = cJSON_PrintUnformatted(j);
     cJSON_Delete(j);
     if (text) {
@@ -436,6 +447,26 @@ static void load_user(int i)
     const cJSON *n;
     u->created = cJSON_IsNumber(n = cJSON_GetObjectItem(j, "created")) ? (int64_t)n->valuedouble : 0;
     u->last_login = cJSON_IsNumber(n = cJSON_GetObjectItem(j, "last_login")) ? (int64_t)n->valuedouble : 0;
+    gw_tg_prefs_default(&u->tg);
+    const cJSON *tg = cJSON_GetObjectItem(j, "tg");
+    if (tg) {
+        u->tg.chat = cJSON_IsNumber(n = cJSON_GetObjectItem(tg, "chat")) ? (int64_t)n->valuedouble : 0;
+        for (int t = 0; t < GW_TG_TOPICS; t++) {
+            const cJSON *l = cJSON_GetArrayItem(cJSON_GetObjectItem(tg, "levels"), t);
+            if (cJSON_IsNumber(l) && l->valueint >= 0 && l->valueint <= 3) {
+                u->tg.levels[t] = l->valueint;
+            }
+        }
+        if (cJSON_IsNumber(n = cJSON_GetObjectItem(tg, "quiet_from"))) {
+            u->tg.quiet_from = n->valueint;
+        }
+        if (cJSON_IsNumber(n = cJSON_GetObjectItem(tg, "quiet_to"))) {
+            u->tg.quiet_to = n->valueint;
+        }
+        if (GW_JSON_STR(tg, "lang")) {
+            strlcpy(u->tg.lang, GW_JSON_STR(tg, "lang"), sizeof(u->tg.lang));
+        }
+    }
     cJSON_Delete(j);
 }
 
@@ -721,6 +752,7 @@ void gw_auth_init(void)
         u->used = true;
         strlcpy(u->name, "admin", sizeof(u->name));
         u->role = ROLE_ADMIN;
+        gw_tg_prefs_default(&u->tg);
         u->created = now_unix();
         set_password(u, old);
         save_user(0);
@@ -813,6 +845,10 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/auth/totp/disable", -1, "self", 1},
     {"/api/auth/sessions", -1, "self", 1},
     {"/api/auth/sessions/revoke", -1, "self", 1},
+    {"/api/auth/telegram", -1, "self", 1},
+    {"/api/auth/telegram/pair", -1, "self", 1},
+    {"/api/auth/telegram/unpair", -1, "self", 1},
+    {"/api/auth/telegram/test", -1, "self", 1},
 };
 
 static const auth_rule_t *rule_for(const char *uri, int method)
@@ -1513,6 +1549,7 @@ static esp_err_t users_post(httpd_req_t *req)
         u->used = true;
         strlcpy(u->name, name, sizeof(u->name));
         u->role = role;
+        gw_tg_prefs_default(&u->tg);
         /* the first account is the one creating it: no forced change */
         const cJSON *mc = cJSON_GetObjectItem(body, "must_change");
         u->must_change = user_count() > 1 && !cJSON_IsFalse(mc);
@@ -1825,4 +1862,95 @@ void gw_auth_register(void)
     gw_http_register("/api/tokens", HTTP_GET, tokens_get);
     gw_http_register("/api/tokens", HTTP_POST, tokens_post);
     gw_http_register("/api/tokens/delete", HTTP_POST, tokens_delete_post);
+}
+
+/* ---- for the Telegram bot (gw_auth_priv.h) ---- */
+
+void gw_tg_prefs_default(gw_tg_prefs_t *p)
+{
+    memset(p, 0, sizeof(*p));
+    p->levels[GW_TG_SECURITY] = 2; /* warnings and critical */
+    p->levels[GW_TG_SYSTEM] = 2;
+    p->levels[GW_TG_NETWORK] = 2;
+    p->levels[GW_TG_SOUND] = 1; /* critical (alarms, glass) */
+    p->quiet_from = p->quiet_to = -1;
+    strlcpy(p->lang, "cs", sizeof(p->lang));
+}
+
+void gw_auth_lock(void)
+{
+    xSemaphoreTakeRecursive(s_lock, portMAX_DELAY);
+}
+
+void gw_auth_unlock(void)
+{
+    xSemaphoreGiveRecursive(s_lock);
+}
+
+int gw_auth_users_max(void)
+{
+    return AUTH_USERS;
+}
+
+bool gw_auth_user_valid(int i)
+{
+    return i >= 0 && i < AUTH_USERS && s_users[i].used && !s_users[i].disabled;
+}
+
+const char *gw_auth_user_name(int i)
+{
+    return s_users[i].name;
+}
+
+bool gw_auth_user_admin(int i)
+{
+    return s_users[i].role == ROLE_ADMIN;
+}
+
+bool gw_auth_user_totp(int i)
+{
+    return s_users[i].totp;
+}
+
+bool gw_auth_user_code(int i, const char *code)
+{
+    return s_users[i].totp && check_code(&s_users[i], s_users[i].secret, code, false);
+}
+
+/* level of user i on a page; "admin" pages only for admins */
+int gw_auth_user_level(int i, const char *page)
+{
+    if (strcmp(page, "admin") == 0) {
+        return s_users[i].role == ROLE_ADMIN ? 2 : 0;
+    }
+    if (strcmp(page, "*") == 0) {
+        return 2;
+    }
+    int p = page_index(page);
+    return p < 0 ? 0 : level_of(s_users[i].role, &s_users[i], p);
+}
+
+gw_tg_prefs_t *gw_auth_user_tg(int i)
+{
+    return &s_users[i].tg;
+}
+
+void gw_auth_user_save(int i)
+{
+    save_user(i);
+}
+
+int gw_auth_user_by_chat(int64_t chat)
+{
+    for (int i = 0; i < AUTH_USERS; i++) {
+        if (gw_auth_user_valid(i) && chat && s_users[i].tg.chat == chat) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int gw_auth_current_user(void)
+{
+    return s_cur.user;
 }

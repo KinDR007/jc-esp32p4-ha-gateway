@@ -766,6 +766,43 @@ static esp_err_t learn_embed(const int16_t *audio, float *embedding)
     return err;
 }
 
+/* ---- Telegram commands ---- */
+
+static void bot_noise(const char *args, bool cz, char *out, size_t len)
+{
+    if (!s.running) {
+        strlcpy(out, cz ? "Mikrofon je vypnutý." : "The microphone is off.", len);
+        return;
+    }
+    float laeq, lamax;
+    bool overload;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    spl_window(&laeq, &lamax, &overload);
+    float las = to_db(sqrtf(s.las_ms));
+    xSemaphoreGive(s_lock);
+    snprintf(out, len, cz ? "<b>Hluk</b>\nTeď: %.1f dB(A)\nLAeq 60 s: %.1f dB(A)\nMax 60 s: %.1f dB(A)%s%s"
+                          : "<b>Noise</b>\nNow: %.1f dB(A)\nLAeq 60 s: %.1f dB(A)\nMax 60 s: %.1f dB(A)%s%s",
+             (double)spl(las), (double)spl(laeq), (double)spl(lamax), overload ? (cz ? "\nPřebuzeno" : "\nOverload") : "",
+             s.spl_calibrated ? "" : (cz ? "\n(nekalibrováno, ±6 dB)" : "\n(not calibrated, ±6 dB)"));
+}
+
+/* /sound on|off: the recognition (the microphone and the noise level keep running) */
+static void bot_sound(const char *args, bool cz, char *out, size_t len)
+{
+    if (strcmp(args, "on") != 0 && strcmp(args, "off") != 0) {
+        snprintf(out, len, cz ? "Rozpoznávání je %s. Použijte /sound on nebo /sound off." : "Recognition is %s. Use /sound on or /sound off.",
+                 s.infer_enabled ? (cz ? "zapnuté" : "on") : (cz ? "vypnuté" : "off"));
+        return;
+    }
+    s.infer_enabled = strcmp(args, "on") == 0;
+    gw_config_set_u8(KEY_INFER, s.infer_enabled);
+    if (s.infer_enabled) {
+        s.model_error[0] = '\0';
+    }
+    strlcpy(out, s.infer_enabled ? (cz ? "Rozpoznávání zvuků zapnuto." : "Sound recognition on.")
+                                 : (cz ? "Rozpoznávání zvuků vypnuto." : "Sound recognition off."), len);
+}
+
 esp_err_t sound_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
@@ -774,6 +811,9 @@ esp_err_t sound_init(void)
     spl_load();
     s.infer_enabled = gw_config_get_u8(KEY_INFER, 1);
     gw_http_register("/api/sound/status", HTTP_GET, status_get);
+    gw_bot_command("noise", "noise level in dB(A)", "hlučnost v dB(A)", "sound/live", 1, false, bot_noise);
+    gw_bot_command("sound", "sound recognition on or off (/sound on, /sound off)", "rozpoznávání zvuků (/sound on, /sound off)",
+                   "sound/live", 2, true, bot_sound);
     gw_http_register("/api/sound/config", HTTP_POST, config_post);
     gw_http_register("/api/sound/clip", HTTP_GET, clip_get);
     gw_http_register("/api/ota/model", HTTP_POST, model_upload);

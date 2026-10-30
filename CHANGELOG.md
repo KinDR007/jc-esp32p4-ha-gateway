@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Telegram bot (System › Notifications, My account › Telegram, docs/notifications.md): notifications
+  to chats paired with user accounts (level per topic, quiet hours, /mute for sounds, Czech or English)
+  and commands with the user's rights (/status /lan /thread /zigbee /noise /events /update /install
+  /restart /identify /role /sound), changing ones with a confirmation button and the authenticator code
+  for accounts with 2FA. Long-poll over one kept TLS connection. Time zone setting for quiet hours.
+  Tests: TC35; hw_test `--token` for gateways with accounts (TC11 and TC34 need an open gateway).
 - Home Assistant integration 1.1.0: API token instead of the admin password (config flow and
   re-authentication; old entries keep the password while the admin has no 2FA), Notification event
   entity and persistent notifications per topic and level (options), notifications missed during a

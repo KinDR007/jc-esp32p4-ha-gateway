@@ -44,6 +44,8 @@ def http(method, path, body=None, raw=None, timeout=30, port=80, auth=None, user
     if auth:
         import base64
         req.add_header('Authorization', 'Basic ' + base64.b64encode(f'{user}:{auth}'.encode()).decode())
+    elif ARGS.token:
+        req.add_header('Authorization', 'Bearer ' + ARGS.token)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             payload = res.read()
@@ -348,6 +350,9 @@ def tc10_ota_rollback_slots():
 
 def tc11_auth():
     """An admin account protects the API (Basic auth for clients of older versions); deleting it opens the gateway again."""
+    if http('GET', '/api/auth/state')[1]['enabled']:
+        log('skipped: the gateway has user accounts (TC11 needs an open gateway)')
+        return
     pw = 'hwtest-' + str(int(time.time()))
     check(http('POST', '/api/settings', {'password': pw})[0] == 400, 'the old single password is refused (user management instead)')
     check(http('POST', '/api/users', {'name': 'hwtest', 'role': 'admin', 'password': pw})[0] == 200, 'admin account created')
@@ -1015,8 +1020,8 @@ class WsClient:
               f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n'
         if auth:
             hdr += 'Authorization: Basic ' + base64.b64encode(auth.encode()).decode() + '\r\n'
-        if token:
-            hdr += f'Authorization: Bearer {token}\r\n'
+        if token or (ARGS.token and not auth):
+            hdr += f'Authorization: Bearer {token or ARGS.token}\r\n'
         self.sock.sendall((hdr + '\r\n').encode())
         resp = b''
         while b'\r\n\r\n' not in resp:
@@ -1233,7 +1238,8 @@ def tc34_users():
     open_ = Client()
     code, st = open_.req('GET', '/api/auth/state')
     if st['enabled']:
-        raise Fail('the gateway already has users: TC34 needs an open gateway')
+        log('skipped: the gateway has user accounts (TC34 needs an open gateway)')
+        return
     pw_a, pw_v = 'tc34-Admin-pass', 'tc34-Viewer-pass'
     created_token = None
     try:
@@ -1339,6 +1345,28 @@ def status_open_flag():
     return Client(basic='tc34admin:tc34-Admin-pass').req('GET', '/api/status')[1]['auth']
 
 
+def tc35_telegram():
+    """Telegram bot settings: validation, an invalid token reaches Telegram and is refused (TLS works), own settings need a user."""
+    code, t = http('GET', '/api/telegram')
+    check(code == 200 and 'state' in t, f'bot state {t.get("state")}')
+    before = {'enabled': t['enabled'], 'tz': t['tz']}
+    check(http('POST', '/api/telegram', {'token': 'no-colon'})[0] == 400, 'malformed token rejected')
+    check(http('POST', '/api/telegram', {'tz': ''})[0] == 400, 'empty time zone rejected')
+    if t['token_set']:
+        log('a real token is set: the invalid-token check is skipped to keep it')
+    else:
+        try:
+            check(http('POST', '/api/telegram', {'token': '123456:tc35-invalid', 'enabled': True})[0] == 200, 'invalid token stored, bot on')
+            t = wait_until('answer from Telegram', lambda: (lambda x: x if x['state'] == 'error' else None)(http('GET', '/api/telegram')[1]), 40)
+            check('401' in t['error'], f'Telegram refused the token over TLS: {t["error"]}')
+        finally:
+            http('POST', '/api/telegram', {'token': '', 'enabled': before['enabled']})
+        check(http('GET', '/api/telegram')[1]['state'] == 'off', 'bot off again')
+    code, r = http('GET', '/api/auth/telegram')
+    check(code in (409, 200), f'own Telegram settings: {code} (409 for a token, open gateway)')
+    check(http('POST', '/api/auth/telegram/pair')[0] == 409, 'pairing refused while the bot does not run or without a user')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1351,7 +1379,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram),
 ]
 
 
@@ -1360,6 +1388,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--host', default='p4gw.local')
     p.add_argument('--only', nargs='*')
+    p.add_argument('--token', help='API token (role admin) of a gateway with user accounts')
     p.add_argument('--esphome-key')
     p.add_argument('--list', action='store_true')
     p.add_argument('--report', help='write results as JSON')

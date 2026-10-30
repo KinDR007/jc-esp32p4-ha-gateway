@@ -394,45 +394,62 @@ static esp_err_t logs_previous_get(httpd_req_t *req)
     return httpd_resp_send(req, text, n);
 }
 
-static esp_err_t role_post(httpd_req_t *req)
+/* Stores the role and restarts; ESP_ERR_INVALID_ARG unknown role, ESP_ERR_INVALID_STATE with err set. */
+esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len)
 {
-    cJSON *body = gw_http_read_json(req);
-    if (!body) {
-        return ESP_OK;
-    }
     gw_role_t role;
-    bool ok = gw_role_from_name(GW_JSON_STR(body, "role"), &role) && role != GW_ROLE_NONE;
-    bool skip_backup = cJSON_IsTrue(cJSON_GetObjectItem(body, "skip_backup"));
-    cJSON_Delete(body);
-    if (!ok) {
-        return gw_http_send_error(req, 400, "unknown role");
+    if (!gw_role_from_name(name, &role) || role == GW_ROLE_NONE) {
+        snprintf(err, err_len, "unknown role");
+        return ESP_ERR_INVALID_ARG;
     }
     char flashed[16];
     bool factory_c6 = !gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed));
     if (factory_c6 && role != GW_ROLE_ESPHOME && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
         if (!skip_backup) {
-            return gw_http_send_error(req, 409, "c6_backup_required");
+            snprintf(err, err_len, "c6_backup_required");
+            return ESP_ERR_INVALID_STATE;
         }
         gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     }
     if (c6_progress()->busy) {
-        return gw_http_send_error(req, 409, "C6 flashing in progress");
+        snprintf(err, err_len, "C6 flashing in progress");
+        return ESP_ERR_INVALID_STATE;
     }
     if (role == GW_ROLE_ESPHOME) {
         const esp_partition_t *part =
             esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_2, NULL);
         esp_app_desc_t desc;
         if (!part || esp_ota_get_partition_description(part, &desc) != ESP_OK) {
-            return gw_http_send_error(req, 409, "no ESPHome image uploaded");
+            snprintf(err, err_len, "no ESPHome image uploaded");
+            return ESP_ERR_INVALID_STATE;
         }
     }
     gw_config_set_u8(GW_KEY_ROLE, role);
     gw_config_set_u8(GW_KEY_C6_TRIES, 0);
     ESP_LOGW(TAG, "role switch to %s requested", gw_role_name(role));
-    cJSON *json = cJSON_CreateObject();
-    cJSON_AddStringToObject(json, "role", gw_role_name(role));
-    cJSON_AddBoolToObject(json, "restarting", true);
+    gw_notify("system", GW_NOTIFY_INFO, "Role switch to %s requested by %s, restarting", gw_role_name(role),
+              gw_auth_who()[0] ? gw_auth_who() : "the web UI");
     gw_restart_later(500);
+    return ESP_OK;
+}
+
+static esp_err_t role_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    char name[24], err[64];
+    strlcpy(name, GW_JSON_STR(body, "role") ? GW_JSON_STR(body, "role") : "", sizeof(name));
+    bool skip_backup = cJSON_IsTrue(cJSON_GetObjectItem(body, "skip_backup"));
+    cJSON_Delete(body);
+    esp_err_t res = gw_api_role_switch(name, skip_backup, err, sizeof(err));
+    if (res != ESP_OK) {
+        return gw_http_send_error(req, res == ESP_ERR_INVALID_ARG ? 400 : 409, err);
+    }
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddStringToObject(json, "role", name);
+    cJSON_AddBoolToObject(json, "restarting", true);
     return gw_http_send_json(req, json);
 }
 
