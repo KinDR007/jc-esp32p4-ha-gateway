@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v1.6 (2026-10-30)
+
+**Flash layout v3 needs one USB flash to free the space** (`scripts/migrate_layout_v3.sh <port>`, keeps
+settings, Thread network, users and recordings). Without it v1.6 runs on the old layout as before.
+Gateways on v1.5 cannot read GitHub releases (redirect bug): upload this `p4gw.bin` once by hand.
+
 - Fix: the online update did not follow redirects, so the manifest and the C6 package of a GitHub
   release (github.com answers 302 to its CDN) could not be read; v1.5 gateways have to be updated once
   by hand (upload `p4gw.bin`), later ones follow up to 5 redirects. Larger HTTP buffers for the long

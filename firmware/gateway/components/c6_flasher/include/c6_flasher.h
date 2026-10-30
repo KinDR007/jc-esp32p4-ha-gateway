@@ -87,6 +87,8 @@ bool c6fw_available(const c6fw_entry_t *entry);
 uint8_t *c6fw_stage_buffer(uint32_t *capacity);
 esp_err_t c6fw_stage_commit(uint32_t len);
 bool c6fw_stage_load(void);
+/* sha256 of the whole package last stored (c6fw_stage_commit), false when unknown */
+bool c6fw_package_sha(uint8_t sha[32]);
 
 /*
  * Flashes a bundle to the C6 through its ROM bootloader. When the bundle being replaced

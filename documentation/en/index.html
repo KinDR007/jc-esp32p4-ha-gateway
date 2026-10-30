@@ -37,7 +37,8 @@
     <li>Open <code>http://p4gw-xxxxxx.local/</code> (the name ends with the last digits of the MAC). The gateway starts in maintenance mode.</li>
     <li><b>System › Maintenance › Back up C6 flash</b> (about 3.5 min) and keep the file: it is the only copy of the factory C6 firmware.</li>
     <li><b>System › User management › Users › New user</b>: the first account is the admin. From then on the gateway asks for sign-in.</li>
-    <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol></section>
+    <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol>
+    <p class="note"><b>Flash layout v3</b> (from v1.6): the P4 keeps only the small C6 bundles; the large C6 firmwares come from the release package, which the gateway downloads when the C6 needs them (or an upload of <code>c6fw.bin</code>). Boards with the older layout move once over USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (settings, Thread network, users and recordings stay).</p></section>
 <section class="card wide" id="ui"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M19,5V7H15V5H19M9,5V11H5V5H9M19,13V19H15V13H19M9,17V19H5V17H9M21,3H13V9H21V3M11,3H3V13H11V3M21,11H13V21H21V11M11,15H3V21H11V15Z"/></svg><span>Web UI basics</span></h3><p><b>Header</b>: status tags, outlined when the link works and grey when it is off. Point at a tag (or tap it) for
     details. From the left: LAN, the active role, its client (Zigbee2MQTT or Home Assistant over the OTBR REST API), the
     P4 Gateway integration (HA), MQTT and internet; on the right the uptime of the gateway with the Zigbee2MQTT session or
@@ -264,7 +265,8 @@ advanced:
     <tr><td>Static address that does not work</td><td>Not confirmed: back after 120 s by itself. Confirmed: <code>http://&lt;host&gt;.local/</code> over IPv6, or import a settings backup.</td></tr>
     <tr><td>Forgotten password</td><td>Forgot password on the sign-in page; an admin sets a temporary one.</td></tr>
     <tr><td>Lost phone with the authenticator</td><td>A recovery code instead of the app code, or an admin turns off 2FA (Users › Edit).</td></tr>
-    <tr><td>New board</td><td>System › Settings › Settings backup: export (with passwords) and import on the new board.</td></tr></tbody></table></section>
+    <tr><td>New board</td><td>System › Settings › Settings backup: export (with passwords) and import on the new board.</td></tr>
+    <tr><td>Maintenance: "the C6 firmware package is not on the gateway"</td><td>The C6 needs its large firmwares (first start, C6 update, reflash, ESPHome) and the package is neither in RAM nor downloadable: connect the gateway to the internet, or upload <code>c6fw.bin</code> of the release under System › Firmware and restart.</td></tr></tbody></table></section>
 <p class="muted foot">Screenshots: firmware v1.4, dark theme, English. The board, network names and addresses are those of the test setup.</p>
 </main></div>
 <div id="lightbox" hidden><img alt=""></div>

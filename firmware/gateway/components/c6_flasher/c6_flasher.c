@@ -143,6 +143,7 @@ esp_err_t c6fw_find(const char *name, c6fw_entry_t *entry)
  * (slot choices); the large ones (the slots layout, esp-hosted) are C6FW_REMOTE and read from the
  * package in PSRAM: staged in a noinit buffer, which a software restart keeps, after a download or an
  * upload. */
+#define CHIP_NVS_NS "c6chip"
 #define STAGE_MAX (2304 * 1024)
 #define STAGE_MAGIC 0x4b505336 /* "6SPK" */
 #define LOCAL_MAX_BUNDLE (32 * 1024)
@@ -298,10 +299,35 @@ static esp_err_t pkg_store(const uint8_t *pkg, uint32_t len)
     if (err == ESP_OK) {
         err = c6fw_verify_all();
     }
+    nvs_handle_t h;
+    if (nvs_open(CHIP_NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        /* which package this is: the partition alone no longer tells with layout v3 */
+        uint8_t sha[32];
+        mbedtls_sha256(pkg, len, sha, 0);
+        if (err == ESP_OK) {
+            nvs_set_blob(h, "pkg", sha, sizeof(sha));
+        } else {
+            nvs_erase_key(h, "pkg");
+        }
+        nvs_commit(h);
+        nvs_close(h);
+    }
     if (err != ESP_OK) {
         esp_partition_erase_range(part, 0, FLASH_BLOCK); /* never leave a half-written directory that parses */
     }
     return err;
+}
+
+bool c6fw_package_sha(uint8_t sha[32])
+{
+    nvs_handle_t h;
+    size_t len = 32;
+    bool ok = false;
+    if (nvs_open(CHIP_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+        ok = nvs_get_blob(h, "pkg", sha, &len) == ESP_OK && len == 32;
+        nvs_close(h);
+    }
+    return ok;
 }
 
 uint8_t *c6fw_stage_buffer(uint32_t *capacity)
@@ -399,7 +425,6 @@ typedef struct {
 
 /* ---------------------------------------------------------------- chip info */
 
-#define CHIP_NVS_NS "c6chip"
 static c6_chip_t s_chip;
 static bool s_chip_loaded;
 

@@ -127,7 +127,8 @@ INSTALL = T(
     <li>Open <code>http://p4gw-xxxxxx.local/</code> (the name ends with the last digits of the MAC). The gateway starts in maintenance mode.</li>
     <li><b>System › Maintenance › Back up C6 flash</b> (about 3.5 min) and keep the file: it is the only copy of the factory C6 firmware.</li>
     <li><b>System › User management › Users › New user</b>: the first account is the admin. From then on the gateway asks for sign-in.</li>
-    <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol>""",
+    <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol>
+    <p class="note"><b>Flash layout v3</b> (from v1.6): the P4 keeps only the small C6 bundles; the large C6 firmwares come from the release package, which the gateway downloads when the C6 needs them (or an upload of <code>c6fw.bin</code>). Boards with the older layout move once over USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (settings, Thread network, users and recordings stay).</p>""",
     """<ol>
     <li>Zazálohujte tovární flash P4 (obsahuje i tovární aplikaci C6):<br><code>scripts/backup_flash.sh /dev/cu.wchusbserial* esp32p4 backups/p4_backup.bin</code></li>
     <li>Zapojte tři propojky JP1 (viz výše).</li>
@@ -135,7 +136,8 @@ INSTALL = T(
     <li>Otevřete <code>http://p4gw-xxxxxx.local/</code> (název končí posledními číslicemi MAC). Brána naběhne v režimu údržby.</li>
     <li><b>Systém › Údržba › Zálohovat flash C6</b> (asi 3,5 min) a soubor si uschovejte: je to jediná kopie továrního firmwaru C6.</li>
     <li><b>Systém › Správa uživatelů › Uživatelé › Nový uživatel</b>: první účet je správce. Od té chvíle brána vyžaduje přihlášení.</li>
-    <li><b>Role</b>: zvolte roli. Role Zigbee nahrají firmware do C6 (asi 25 s), role Thread trvají asi 15 s.</li></ol>""")
+    <li><b>Role</b>: zvolte roli. Role Zigbee nahrají firmware do C6 (asi 25 s), role Thread trvají asi 15 s.</li></ol>
+    <p class="note"><b>Rozložení flash v3</b> (od v1.6): P4 drží jen malé balíky C6; velké firmwary C6 pocházejí z balíku vydání, který brána stáhne, když je C6 potřebuje (nebo nahrání <code>c6fw.bin</code>). Desky se starším rozložením se jednorázově převedou přes USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (nastavení, síť Thread, uživatelé i nahrávky zůstanou).</p>""")
 
 UI_BASICS = T(
     """<p><b>Header</b>: status tags, outlined when the link works and grey when it is off. Point at a tag (or tap it) for
@@ -482,7 +484,8 @@ RECOVERY = T(
     <tr><td>Static address that does not work</td><td>Not confirmed: back after 120 s by itself. Confirmed: <code>http://&lt;host&gt;.local/</code> over IPv6, or import a settings backup.</td></tr>
     <tr><td>Forgotten password</td><td>Forgot password on the sign-in page; an admin sets a temporary one.</td></tr>
     <tr><td>Lost phone with the authenticator</td><td>A recovery code instead of the app code, or an admin turns off 2FA (Users › Edit).</td></tr>
-    <tr><td>New board</td><td>System › Settings › Settings backup: export (with passwords) and import on the new board.</td></tr></tbody></table>""",
+    <tr><td>New board</td><td>System › Settings › Settings backup: export (with passwords) and import on the new board.</td></tr>
+    <tr><td>Maintenance: "the C6 firmware package is not on the gateway"</td><td>The C6 needs its large firmwares (first start, C6 update, reflash, ESPHome) and the package is neither in RAM nor downloadable: connect the gateway to the internet, or upload <code>c6fw.bin</code> of the release under System › Firmware and restart.</td></tr></tbody></table>""",
     """<table><thead><tr><th>Situace</th><th>Co dělat</th></tr></thead><tbody>
     <tr><td>Role nenaběhne</td><td>UI ukáže režim údržby s důvodem; zvolte jinou roli nebo příčinu odstraňte a restartujte.</td></tr>
     <tr><td>C6 neodpovídá</td><td>Zkontrolujte propojky JP1, Systém › Údržba › Přeflashovat C6.</td></tr>
@@ -491,7 +494,8 @@ RECOVERY = T(
     <tr><td>Nefunkční statická adresa</td><td>Nepotvrzená: po 120 s se vrátí sama. Potvrzená: <code>http://&lt;host&gt;.local/</code> přes IPv6, nebo import zálohy nastavení.</td></tr>
     <tr><td>Zapomenuté heslo</td><td>Zapomenuté heslo na přihlašovací stránce; správce nastaví dočasné.</td></tr>
     <tr><td>Ztracený telefon s Authenticatorem</td><td>Záložní kód místo kódu z aplikace, nebo správce vypne 2FA (Uživatelé › Upravit).</td></tr>
-    <tr><td>Nová deska</td><td>Systém › Nastavení › Záloha nastavení: export (s hesly) a import na nové desce.</td></tr></tbody></table>""")
+    <tr><td>Nová deska</td><td>Systém › Nastavení › Záloha nastavení: export (s hesly) a import na nové desce.</td></tr>
+    <tr><td>Údržba: „the C6 firmware package is not on the gateway“</td><td>C6 potřebuje velké firmwary (první start, aktualizace C6, přeflashování, ESPHome) a balík není v RAM ani ke stažení: připojte bránu k internetu, nebo v Systém › Firmware nahrajte <code>c6fw.bin</code> z vydání a restartujte.</td></tr></tbody></table>""")
 
 LABELS = {
     "title": T("P4 Gateway documentation", "Dokumentace P4 Gateway"),

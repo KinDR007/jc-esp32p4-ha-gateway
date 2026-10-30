@@ -22,10 +22,10 @@
 - [ ] Telegram: ověřit se skutečným botem (párování, notifikace, příkazy s potvrzením a TOTP)
 - [x] Uživatelé etapa 3: Telegram bot
 - [x] Online aktualizace C6 (krok A): manifest s balíkem C6, stažení do PSRAM, HA, Telegram, CI vydání, TC36
-- [ ] Zveřejnit repozitář (rozhodnutí uživatele), pak první GitHub Release (tag `v1.5`) a výchozí URL manifestu GitHub Releases
+- [x] Repozitář veřejný, vydání v1.5 a v1.6 na GitHubu, výchozí URL manifestu GitHub Releases
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
-- [ ] Krok B na desce: `scripts/migrate_layout_v3.sh` (čeká na potvrzení uživatele), pak test přepnutí rolí offline, reinstalace layoutu C6 z PSRAM a stažení po výpadku napájení; pak vydání v1.6
-- [ ] Nasadit integraci 1.2.0 do HA (entita Firmware rádia C6) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
+- [x] Krok B na desce: migrace na layout v3 (2026-10-30), stažení balíku při startu, reinstalace layoutu z PSRAM, přepnutí rolí bez stahování, TC04/05/12/35/36; vydání v1.6
+- [x] Integrace 1.2.0 v HA (entita Firmware rádia C6, přihlášení tokenem) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
 - [ ] Ověřit automatickou noční zálohu Zigbee (02:00–03:00 UTC) v roli router; v testu TC26 ověřena jen záloha na požádání
 - [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)
 - [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18
@@ -39,7 +39,7 @@
 - [x] Integrace P4 Gateway nasazena do HA (192.168.88.201), brána přidána ze zeroconf, 65 entit, trvalé push spojení
 - [ ] Integrace P4 Gateway: ověřit v HA UI událost zvuku a průběh aktualizace; vypnout MQTT discovery a přegenerovat ID entit s příponou `_2` (kolidovala s MQTT entitami)
 - [ ] Hlučnost: kalibrovat hlukoměrem nebo aplikací (Zvuk › Živě › Hlučnost); do té doby odhad ±6 dB
-- [ ] Repozitář je soukromý: tlačítko „Otevřít v HACS“ funguje až po zveřejnění (HACS instaluje jen z veřejných repozitářů)
+- [ ] Ověřit instalaci integrace přes HACS z veřejného repozitáře
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
 - [ ] Zjistit, proč embedding YAMNet téhož zvuku kolísá mezi běhy o 0,01–0,07 (TC28; esp-dl jedno jádro, mel deterministický)
 - [ ] M10: naučený zvuk z mikrofonu a spuštění události přehráním (reproduktor Macu byl ztlumený)
@@ -55,3 +55,4 @@
 - [x] Chyba: Zigbee router po návratu z jiné role nebyl v síti. Se sloty C6 (NVS se při přepnutí
       nemaže) se vrátil do sítě ve všech ~12 přepnutích 2026-10-29; hlídá TC23.
 - [ ] Ověřit HA cestu k "active dataset TLVs" v aktuální verzi HA (text v UI)
+- [ ] Role ESPHome na layoutu v3: návrat potřebuje balík C6 (stažení); ověřit celou cestu tam a zpět

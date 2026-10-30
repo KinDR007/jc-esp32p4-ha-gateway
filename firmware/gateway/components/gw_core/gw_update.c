@@ -165,10 +165,13 @@ static void c6_installed_id(void)
         return;
     }
     uint32_t end = 0;
+    bool whole = true;
     for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
-        end = MAX(end, dir.entries[i].offset + dir.entries[i].size);
+        whole &= dir.entries[i].offset != C6FW_REMOTE;
+        end = MAX(end, whole ? dir.entries[i].offset + dir.entries[i].size : 0);
     }
-    if (c6_partition_sha((end + 0xfff) & ~0xfff, sha)) {
+    /* layout v3 holds a part only: the sha256 recorded when the package was stored */
+    if (c6fw_package_sha(sha) || (whole && c6_partition_sha((end + 0xfff) & ~0xfff, sha))) {
         snprintf(s_up.c6.installed_id, sizeof(s_up.c6.installed_id), "%02x%02x%02x%02x", sha[0], sha[1], sha[2], sha[3]);
     }
 }
@@ -197,7 +200,7 @@ static void c6_offer(const char *manifest_url, const cJSON *c6)
     s_up.c6.size = size->valueint;
     s_up.c6.bundles = cJSON_Duplicate(cJSON_GetObjectItem(c6, "bundles"), true);
     uint8_t have[32];
-    s_up.c6.current = c6_partition_sha(s_up.c6.size, have) && memcmp(have, sha, 32) == 0;
+    s_up.c6.current = (c6fw_package_sha(have) || c6_partition_sha(s_up.c6.size, have)) && memcmp(have, sha, 32) == 0;
     if (!s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
         memcpy(s_up.c6.notified, sha, 32);
         gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware update available (%lu kB)", (unsigned long)(s_up.c6.size / 1024));
@@ -569,7 +572,8 @@ void gw_update_c6_changed(void)
     }
     xSemaphoreTake(s_up.lock, portMAX_DELAY);
     uint8_t have[32];
-    s_up.c6.current = s_up.c6.offered && c6_partition_sha(s_up.c6.size, have) && memcmp(have, s_up.c6.sha256, 32) == 0;
+    s_up.c6.current = s_up.c6.offered && (c6fw_package_sha(have) || c6_partition_sha(s_up.c6.size, have)) &&
+                      memcmp(have, s_up.c6.sha256, 32) == 0;
     c6_installed_id();
     xSemaphoreGive(s_up.lock);
 }
