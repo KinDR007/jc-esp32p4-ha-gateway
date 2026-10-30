@@ -342,7 +342,9 @@ static esp_err_t status_get(httpd_req_t *req)
         }
     }
 
-    cJSON_AddItemToObject(json, "hw", hw_json());
+    cJSON *hw = hw_json();
+    cJSON_AddNumberToObject(hw, "http_register_errors", gw_http_register_errors());
+    cJSON_AddItemToObject(json, "hw", hw);
     cJSON_AddItemToObject(json, "update", gw_update_status());
     cJSON_AddNumberToObject(json, "identify_s", gw_identify_left());
     cJSON *links = cJSON_AddObjectToObject(json, "links");

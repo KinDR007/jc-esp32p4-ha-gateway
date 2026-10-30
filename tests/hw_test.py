@@ -1347,6 +1347,7 @@ def status_open_flag():
 
 def tc35_telegram():
     """Telegram bot settings: validation, an invalid token reaches Telegram and is refused (TLS works), own settings need a user."""
+    check(status()['hw'].get('http_register_errors') == 0, 'every HTTP handler registered (table not full)')
     code, t = http('GET', '/api/telegram')
     check(code == 200 and 'state' in t, f'bot state {t.get("state")}')
     before = {'enabled': t['enabled'], 'tz': t['tz']}

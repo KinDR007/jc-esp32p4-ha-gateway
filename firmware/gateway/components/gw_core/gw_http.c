@@ -11,7 +11,9 @@
 
 static const char *TAG = "gw_http";
 
-#define MAX_HANDLERS 80
+/* every gw_http_register call in the firmware plus 3 own (index, favicon, ws), with room to grow;
+ * a full table drops the handlers registered last (role APIs at role start), see http_register_errors */
+#define MAX_HANDLERS 128
 #define MAX_JSON_BODY 4096
 
 extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");
@@ -20,6 +22,7 @@ extern const uint8_t p4gw_favicon_ico_start[] asm("_binary_p4gw_favicon_ico_star
 extern const uint8_t p4gw_favicon_ico_end[] asm("_binary_p4gw_favicon_ico_end");
 
 static httpd_handle_t s_server;
+static int s_register_errors;
 
 typedef struct {
     esp_err_t (*handler)(httpd_req_t *);
@@ -49,6 +52,7 @@ static esp_err_t register_route(const char *uri, httpd_method_t method, esp_err_
     esp_err_t err = httpd_register_uri_handler(s_server, &route);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "register %s: %s", uri, esp_err_to_name(err));
+        s_register_errors++;
         free(ctx);
     }
     return err;
@@ -270,4 +274,9 @@ esp_err_t gw_http_start(void)
 httpd_handle_t gw_http_server(void)
 {
     return s_server;
+}
+
+int gw_http_register_errors(void)
+{
+    return s_register_errors;
 }

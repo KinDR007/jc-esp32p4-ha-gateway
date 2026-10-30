@@ -167,6 +167,8 @@ httpd_handle_t gw_http_server(void);
 esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *));
 /* Without sign-in (the login page). */
 esp_err_t gw_http_register_public(const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *));
+/* handlers that could not be registered (full table): must stay 0 */
+int gw_http_register_errors(void);
 esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
 /* Sends {"topic","payload"} to the clients of /api/ws (what goes to MQTT, without a broker). */
 void gw_http_push(const char *topic, const char *payload);
