@@ -25,6 +25,14 @@
 - [x] Repozitář veřejný, vydání v1.5 a v1.6 na GitHubu, výchozí URL manifestu GitHub Releases
 - [x] Návrat na starší vydání (jen kompatibilní s layoutem desky): releases.json, UI, HA, Telegram, TC37; ověřen rollback v1.6-dirty → v1.6 → zpět a balík C6 z v1.6
 - [ ] Ověřit /releases a /install v… se skutečným Telegram botem a update.install s verzí v UI HA
+- [ ] Dvě rádia (plán docs/dual-radio.md): F0 ověření HW (zapojení XIAO, pady EN/BOOT, záloha továrního FW, RF přepínač, přesun Zigbee sítě s IEEE adresou)
+- [ ] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, regrese s rádiem A
+- [ ] Dvě rádia F2: detekce a test zapojení externího C6 (TC38)
+- [ ] Dvě rádia F3: role per rádio (TC39 Thread + Zigbee současně)
+- [ ] Dvě rádia F4: příznak desky a anténa ve firmwarech C6, c6fw.boards ve vydání, flash per rádio
+- [ ] Dvě rádia F5: přesun Zigbee sítě mezi rádii (TC40)
+- [ ] Dvě rádia F6: ESPHome BLE proxy jako role C6 (Wi-Fi + BLE), zrušení ESPHome role na P4
+- [ ] Dvě rádia F7–F8: UI, REST, MQTT, HA, Telegram, dokumentace, soak
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
 - [x] Krok B na desce: migrace na layout v3 (2026-10-30), stažení balíku při startu, reinstalace layoutu z PSRAM, přepnutí rolí bez stahování, TC04/05/12/35/36; vydání v1.6
 - [x] Integrace 1.2.0 v HA (entita Firmware rádia C6, přihlášení tokenem) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
