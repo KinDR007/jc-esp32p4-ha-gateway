@@ -547,7 +547,7 @@ const CS = {
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
-  'next boot': 'příští start', 'Gateway firmware': 'Firmware brány', 'ESPHome image': 'ESPHome image', 'C6 firmware bundle': 'Balík firmwaru C6',
+  'next boot': 'příští start', 'Gateway firmware': 'Firmware brány', 'ESPHome image': 'ESPHome image', 'C6 firmware bundle': 'Balík firmwaru C6', 'Manual update': 'Ruční aktualizace',
   'p4gw.bin, written to the inactive slot; rolls back automatically if it does not start.': 'p4gw.bin, zapíše se do neaktivního slotu; když nenaběhne, automaticky se vrátí předchozí.',
   'firmware.ota.bin of the ESPHome BLE proxy build for this board.': 'firmware.ota.bin ze sestavení ESPHome BLE proxy pro tuto desku.',
   'c6fw.bin from scripts/build_all.sh. The C6 is reflashed on the next start if its image changed.': 'c6fw.bin ze scripts/build_all.sh. C6 se při příštím startu přeflashuje, pokud se jeho image změnil.',
@@ -2232,14 +2232,16 @@ views['system/info'] = () => {
 };
 
 views['system/firmware'] = () => {
-  const upload = (id, title, hint) => `<div class="card">${title}<p class="muted">${hint}</p>
+  const upload = (id, title, hint) => `<div><h4 style="margin:0 0 6px;display:flex;align-items:center;gap:6px">${title}</h4><p class="muted">${hint}</p>
     <div class="row"><input type="file" id="${id}-file"><button class="btn primary" data-upload="${id}">${ic('upload')}Upload</button></div>
     <div class="progress hidden" id="${id}-prog" style="margin-top:10px"><div></div></div></div>`;
   return maintenanceBanner() + `<div class="grid">
-    ${upload('gateway', h3('developer-board', 'Gateway firmware'), 'p4gw.bin, written to the inactive slot; rolls back automatically if it does not start.')}
-    ${upload('esphome', h3('bluetooth', 'ESPHome image'), 'firmware.ota.bin of the ESPHome BLE proxy build for this board.')}
-    ${upload('c6fw', h3('chip', 'C6 firmware bundle'), 'c6fw.bin from scripts/build_all.sh. The C6 is reflashed on the next start if its image changed.')}
     ${updateCard()}
+    <div class="card wide">${h3('upload', 'Manual update')}<div class="grid" style="margin-top:4px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      ${upload('gateway', `${ic('developer-board')}<span>Gateway firmware</span>`, 'p4gw.bin, written to the inactive slot; rolls back automatically if it does not start.')}
+      ${upload('c6fw', `${ic('chip')}<span>C6 firmware bundle</span>`, 'c6fw.bin from scripts/build_all.sh. The C6 is reflashed on the next start if its image changed.')}
+      ${upload('esphome', `${ic('bluetooth')}<span>ESPHome image</span>`, 'firmware.ota.bin of the ESPHome BLE proxy build for this board.')}
+    </div></div>
   </div>`;
 };
 

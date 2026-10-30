@@ -79,11 +79,11 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 
 | What | How | Safety |
 |---|---|---|
-| Gateway | UI System → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
+| Gateway | UI System → Firmware → Manual update → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
 | Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
-| ESPHome image | UI System → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
+| ESPHome image | UI System → Firmware → Manual update → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
 | Gateway, online | UI System → Firmware → Online update, or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
-| C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
+| C6 firmware | UI System → Firmware → Manual update → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
 | C6 firmware, online | UI System → Firmware → Online update → **Install C6 package**, the *C6 radio firmware* update entity in Home Assistant, or Telegram `/install c6` | downloaded into PSRAM, sha256 of the file compared with the manifest and the header checked before the c6fw partition is erased; then a restart updates the C6 |
 | Older release (rollback) | UI System → Firmware → Online update → *Releases for this gateway*, `update.install` with `version` in Home Assistant, or Telegram `/releases`, `/install v1.6`, `/install c6 v1.6` | only releases whose manifest names the flash layout of the board; the manifest of the picked release is checked again before the download |
 

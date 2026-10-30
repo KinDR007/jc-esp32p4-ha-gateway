@@ -311,19 +311,18 @@ PAGES = [
      ["system_lan"]),
     ("system/firmware", "upload", T("System › Firmware", "Systém › Firmware"),
      T("Updates of all parts.", "Aktualizace všech částí."),
-     {"GATEWAY FIRMWARE": T("Upload <code>p4gw.bin</code>: written to the other slot, confirmed after 60 s, otherwise rolled back.", "Nahrání <code>p4gw.bin</code>: zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí."),
-      "ESPHOME IMAGE": T("Upload <code>esphome.bin</code> for the ESPHome role.", "Nahrání <code>esphome.bin</code> pro roli ESPHome."),
-      "C6 FIRMWARE BUNDLE": T("Upload <code>c6fw.bin</code>; the C6 gets the new firmware on the next start.", "Nahrání <code>c6fw.bin</code>; C6 dostane nový firmware při dalším startu."),
-      "ONLINE UPDATE": T("Manifest URL (<b>GitHub Releases</b> fills in the address of the latest release), check, then the gateway firmware and the <b>C6 package</b> separately: versions installed and offered of every C6 firmware, build (commit, date, ESP-IDF) and release notes. <b>Releases for this gateway</b>: older releases that run on the flash layout of the board, the gateway or the C6 package installable separately (rollback).",
-                         "URL manifestu (<b>GitHub Releases</b> doplní adresu posledního vydání), kontrola, pak zvlášť firmware brány a <b>balík C6</b>: nainstalované a nabízené verze všech firmwarů C6, sestavení (commit, datum, ESP-IDF) a poznámky k vydání. <b>Vydání pro tuto bránu</b>: starší vydání, která běží na layoutu flash desky, bránu nebo balík C6 jde nainstalovat zvlášť (návrat zpět).")},
+     {"ONLINE UPDATE": T("Manifest URL (<b>GitHub Releases</b> fills in the address of the latest release), check, then the gateway firmware and the <b>C6 package</b> separately: versions installed and offered of every C6 firmware, build (commit, date, ESP-IDF) and release notes. <b>Releases for this gateway</b>: older releases that run on the flash layout of the board, the gateway or the C6 package installable separately (rollback).",
+                         "URL manifestu (<b>GitHub Releases</b> doplní adresu posledního vydání), kontrola, pak zvlášť firmware brány a <b>balík C6</b>: nainstalované a nabízené verze všech firmwarů C6, sestavení (commit, datum, ESP-IDF) a poznámky k vydání. <b>Vydání pro tuto bránu</b>: starší vydání, která běží na layoutu flash desky, bránu nebo balík C6 jde nainstalovat zvlášť (návrat zpět)."),
+      "MANUAL UPDATE": T("Upload without internet: <code>p4gw.bin</code> (written to the other slot, confirmed after 60 s, otherwise rolled back), <code>c6fw.bin</code> (the C6 gets the new firmware on the next start) and <code>esphome.bin</code> for the ESPHome role.",
+                         "Nahrání bez internetu: <code>p4gw.bin</code> (zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí), <code>c6fw.bin</code> (C6 dostane nový firmware při dalším startu) a <code>esphome.bin</code> pro roli ESPHome.")},
      T("""<ol><li>Set the manifest URL (your web server, or <b>GitHub Releases</b> once the repository is public) and press <b>Check</b>.</li>
        <li><b>Install gateway firmware</b> first when both are newer: a C6 package of a newer format is offered only to a gateway that reads it.</li>
        <li><b>Install C6 package</b>: the gateway downloads it into RAM, checks its sha256 against the manifest, stores it and restarts; the C6 then gets the new firmware (about 2 minutes without Thread or Zigbee).</li></ol>
-       <p>Without internet the same works by uploading <code>c6fw.bin</code> in the C6 firmware bundle card. Also from Home Assistant (<i>C6 radio firmware</i> update entity) and Telegram (<code>/update</code>, <code>/install c6</code>).</p>""",
+       <p>Without internet the same works by uploading <code>c6fw.bin</code> in the Manual update card. Also from Home Assistant (<i>C6 radio firmware</i> update entity) and Telegram (<code>/update</code>, <code>/install c6</code>).</p>""",
        """<ol><li>Nastavte URL manifestu (vlastní webový server, nebo <b>GitHub Releases</b>, až bude repozitář veřejný) a stiskněte <b>Zkontrolovat</b>.</li>
        <li>Když jsou novější obě části, instalujte nejdřív <b>firmware brány</b>: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.</li>
        <li><b>Instalovat balík C6</b>: brána ho stáhne do RAM, ověří sha256 proti manifestu, uloží a restartuje se; C6 pak dostane nový firmware (asi 2 minuty bez Thread nebo Zigbee).</li></ol>
-       <p>Bez internetu to samé jde nahráním <code>c6fw.bin</code> v kartě Balík firmwaru C6. Také z Home Assistant (entita aktualizace <i>Firmware rádia C6</i>) a z Telegramu (<code>/update</code>, <code>/install c6</code>).</p>"""),
+       <p>Bez internetu to samé jde nahráním <code>c6fw.bin</code> v kartě Ruční aktualizace. Také z Home Assistant (entita aktualizace <i>Firmware rádia C6</i>) a z Telegramu (<code>/update</code>, <code>/install c6</code>).</p>"""),
      ["system_firmware"]),
     ("system/diag", "stethoscope", T("System › Diagnostics", "Systém › Diagnostika"),
      T("Tools when something does not work.", "Nástroje, když něco nefunguje."),
