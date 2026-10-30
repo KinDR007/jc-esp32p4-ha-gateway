@@ -102,3 +102,6 @@ CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64=y
 
 # Online update: the manifest and image may come from a plain HTTP server in the LAN (e.g. Home Assistant /local)
 CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP=y
+
+# C6 package staged in PSRAM across software restarts (c6fw_stage_*)
+CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY=y

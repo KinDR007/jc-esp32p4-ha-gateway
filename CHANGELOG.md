@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Flash layout v3: the c6fw partition shrinks from 2 MB to 64 kB (directory and the small bundles,
+  so Thread/Zigbee role switches stay offline) and the model partition grows to 6 MB. The large C6
+  firmwares are read from the whole package in a PSRAM buffer that survives software restarts
+  (`EXT_RAM_NOINIT_ATTR`, kept clear of the PSRAM timing tuning pattern at 0x80, cache written back);
+  missing after a power cut, the gateway downloads it from the manifest when the C6 needs it.
+  Uploads and online updates go through that buffer. Migration over USB:
+  `scripts/migrate_layout_v3.sh`; v1.6 runs on layout v2 too. `scripts/c6fw_local.py` builds the
+  small image for the factory image and `flash_p4.sh`.
+
 ## v1.5 (2026-10-30)
 
 - Online update: the manifest URL defaults to the latest GitHub release of the project

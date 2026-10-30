@@ -63,7 +63,8 @@ P4 flash (16 MB, firmware/partitions.csv)
   nvs       settings: role, Thread network, MQTT, password
   gw_a/gw_b gateway firmware A/B, OTA with rollback
   esphome   ESPHome BLE proxy image
-  c6fw      C6 firmware bundles
+  c6fw      directory of the C6 package and its small bundles (64 kB; the large firmwares come
+            from the package in PSRAM: online update, upload, or downloaded when needed)
   c6data    Zigbee network snapshots taken before leaving a Zigbee role
   coredump
 ```

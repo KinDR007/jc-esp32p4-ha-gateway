@@ -40,6 +40,6 @@ done < <(tail -n +2 build/gateway/flash_args)
 esptool --chip esp32p4 merge-bin -o dist/p4gw-factory.bin --flash-mode dio --flash-size 16MB \
     "${gw_args[@]}" \
     "$(part_offset esphome)" dist/esphome.bin \
-    "$(part_offset c6fw)" dist/c6fw.bin "${model_args[@]}"
+    "$(part_offset c6fw)" dist/c6fw-local.bin "${model_args[@]}"
 ( cd dist && shasum -a 256 *.bin *.espdl 2>/dev/null > SHA256SUMS )
 ls -l dist

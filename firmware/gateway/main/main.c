@@ -38,6 +38,12 @@ static bool ensure_c6(const char *bundle)
 
     esp_err_t err = c6fw_find(bundle, &entry);
     if (err != ESP_OK) {
+        /* no package at all yet (a factory image without one): the release offers it */
+        if (gw_eth_wait_ip(pdMS_TO_TICKS(30000)) && gw_update_fetch_c6() == ESP_OK) {
+            err = c6fw_find(bundle, &entry);
+        }
+    }
+    if (err != ESP_OK) {
         gw_set_maintenance("C6 image '%s' missing in the c6fw partition (%s), upload c6fw.bin", bundle,
                            esp_err_to_name(err));
         return false;
@@ -64,6 +70,21 @@ static bool ensure_c6(const char *bundle)
     /* Flash only once the web UI is reachable (it polls once a second), so it shows the whole progress. */
     if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
         vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+    /* The large firmwares (slots layout, esp-hosted) live only in the package in PSRAM when the c6fw
+     * partition is small: after a power cut it is gone and the release has to provide it again. */
+    if (!c6_flash_ready(&entry)) {
+        ESP_LOGW(TAG, "C6 firmwares for %s not on the gateway, fetching the package", entry.name);
+        err = gw_eth_wait_ip(pdMS_TO_TICKS(30000)) ? gw_update_fetch_c6() : ESP_ERR_TIMEOUT;
+        if (err == ESP_OK && c6fw_find(bundle, &entry) != ESP_OK) {
+            err = ESP_ERR_NOT_FOUND;
+        }
+        if (err != ESP_OK || !c6_flash_ready(&entry)) {
+            gw_config_set_u8(GW_KEY_C6_TRIES, tries); /* not a failed flash */
+            gw_set_maintenance("the C6 firmware package is not on the gateway (%s): connect it to the internet "
+                               "(online update) or upload c6fw.bin under System > Firmware", esp_err_to_name(err));
+            return false;
+        }
     }
     gw_flash_lock();
     err = c6_flash_bundle(&entry, current);
@@ -267,6 +288,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     c6_init_pins();
+    c6fw_stage_load(); /* a C6 package downloaded or uploaded before a software restart */
 
     gw_role_t def_role = GW_ROLE_THREAD_BR;
     gw_role_from_name(CONFIG_GW_DEFAULT_ROLE, &def_role);

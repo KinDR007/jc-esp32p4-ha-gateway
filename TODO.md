@@ -23,7 +23,8 @@
 - [x] Uživatelé etapa 3: Telegram bot
 - [x] Online aktualizace C6 (krok A): manifest s balíkem C6, stažení do PSRAM, HA, Telegram, CI vydání, TC36
 - [ ] Zveřejnit repozitář (rozhodnutí uživatele), pak první GitHub Release (tag `v1.5`) a výchozí URL manifestu GitHub Releases
-- [ ] Krok B: zrušit oddíl `c6fw` (2 MB) a flashovat C6 přímo z PSRAM; jen přes USB, až bude místo potřeba (např. větší zvukový model)
+- [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
+- [ ] Krok B na desce: `scripts/migrate_layout_v3.sh` (čeká na potvrzení uživatele), pak test přepnutí rolí offline, reinstalace layoutu C6 z PSRAM a stažení po výpadku napájení; pak vydání v1.6
 - [ ] Nasadit integraci 1.2.0 do HA (entita Firmware rádia C6) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
 - [ ] Ověřit automatickou noční zálohu Zigbee (02:00–03:00 UTC) v roli router; v testu TC26 ověřena jen záloha na požádání
 - [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)

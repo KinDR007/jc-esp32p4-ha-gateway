@@ -24,6 +24,8 @@ extern "C" {
  * md5 holds the first 16 bytes of that bundle's sha256. */
 #define C6FW_SEG_SLOTS 16
 #define C6FW_SLOTS_BUNDLE "slots"
+/* entry offset of a bundle the c6fw partition does not hold: it is read from the package in PSRAM */
+#define C6FW_REMOTE 0xFFFFFFFFu
 
 typedef struct __attribute__((packed)) {
     char name[16];
@@ -70,8 +72,21 @@ esp_err_t c6fw_read_dir(c6fw_dir_t *dir);
 esp_err_t c6fw_find(const char *name, c6fw_entry_t *entry);
 /* Recomputes the bundle sha256 and compares it to the directory. */
 esp_err_t c6fw_verify(const c6fw_entry_t *entry);
-/* Validates a complete c6fw image held in the partition (after an upload). */
+/* Validates the bundles the partition (or the PSRAM package) holds. */
 esp_err_t c6fw_verify_all(void);
+/* The data of the bundle can be read now (in the partition, or remote and in the PSRAM package). */
+bool c6fw_available(const c6fw_entry_t *entry);
+
+/*
+ * A whole package (c6fw.bin) goes into a PSRAM buffer that a software restart keeps:
+ * fill c6fw_stage_buffer(), then c6fw_stage_commit() checks it (directory, sha256 of every bundle)
+ * and stores it in the c6fw partition: whole when it fits, else the directory and the small bundles,
+ * the large ones read from PSRAM when the C6 is flashed. c6fw_stage_load() at start takes over a
+ * package staged before a software restart.
+ */
+uint8_t *c6fw_stage_buffer(uint32_t *capacity);
+esp_err_t c6fw_stage_commit(uint32_t len);
+bool c6fw_stage_load(void);
 
 /*
  * Flashes a bundle to the C6 through its ROM bootloader. When the bundle being replaced
@@ -81,6 +96,8 @@ esp_err_t c6fw_verify_all(void);
  * installs the "slots" bundle when the C6 does not hold that exact layout yet.
  */
 esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name);
+/* Everything c6_flash_bundle() would write for entry is readable now (else a package is needed). */
+bool c6_flash_ready(const c6fw_entry_t *entry);
 /* Forgets that the slots layout is on the C6: the next slot bundle installs it again. */
 void c6_slots_invalidate(void);
 

@@ -309,27 +309,15 @@ static esp_err_t install(void)
     return ESP_OK;
 }
 
-/* c6fw.bin into PSRAM, checked against the manifest (sha256) and its own header before the c6fw
- * partition is erased; the C6 itself is reflashed by the boot sequence after the restart. */
-static esp_err_t install_c6(void)
+/* c6fw.bin into the PSRAM staging buffer, checked against the manifest (sha256) and then bundle by
+ * bundle while it is stored (c6fw_stage_commit); the C6 itself is flashed at the next start. */
+static esp_err_t download_c6(const char *url, const uint8_t want[32], uint32_t size)
 {
-    char url[URL_MAX];
-    uint8_t want[32];
-    uint32_t size;
-    xSemaphoreTake(s_up.lock, portMAX_DELAY);
-    strlcpy(url, s_up.c6.url, sizeof(url));
-    memcpy(want, s_up.c6.sha256, 32);
-    size = s_up.c6.size;
-    xSemaphoreGive(s_up.lock);
-    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
-    if (!part || size > part->size) {
-        set_error("%s", "the C6 package does not fit the c6fw partition");
+    uint32_t capacity;
+    uint8_t *data = c6fw_stage_buffer(&capacity);
+    if (size > capacity) {
+        set_error("%s", "the C6 package is larger than the staging buffer");
         return ESP_ERR_INVALID_SIZE;
-    }
-    uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-    if (!data) {
-        set_error("%s", "no PSRAM for the C6 package");
-        return ESP_ERR_NO_MEM;
     }
     esp_http_client_config_t cfg;
     esp_http_client_handle_t client = http_open(url, &cfg);
@@ -358,41 +346,75 @@ static esp_err_t install_c6(void)
         set_error("cannot download the C6 package (%s)", esp_err_to_name(err));
     }
     esp_http_client_cleanup(client);
-    uint8_t sha[32];
     if (err == ESP_OK && got != size) {
         set_error("%s", "C6 package incomplete");
         err = ESP_ERR_INVALID_SIZE;
     }
     if (err == ESP_OK) {
+        uint8_t sha[32];
         mbedtls_sha256(data, size, sha, 0);
         if (memcmp(sha, want, 32) != 0) {
             set_error("%s", "C6 package sha256 does not match the manifest");
             err = ESP_ERR_INVALID_CRC;
-        } else if (memcmp(data, C6FW_DIR_MAGIC, 4) != 0 || ((uint32_t *)data)[1] != C6FW_FORMAT_VERSION) {
-            set_error("%s", "not a C6 package of this format");
-            err = ESP_ERR_INVALID_VERSION;
         }
     }
     if (err == ESP_OK) {
         s_up.c6.percent = 92;
-        err = esp_partition_erase_range(part, 0, (size + 0xfff) & ~0xfff);
-        for (uint32_t off = 0; err == ESP_OK && off < size; off += 4096) {
-            err = esp_partition_write(part, off, data + off, size - off < 4096 ? size - off : 4096);
-        }
-        if (err == ESP_OK) {
-            err = c6fw_verify_all();
-        }
+        err = c6fw_stage_commit(size);
         if (err != ESP_OK) {
-            esp_partition_erase_range(part, 0, 0x1000); /* never leave a half-written package that parses */
             set_error("C6 package not stored: %s", esp_err_to_name(err));
         }
     }
-    free(data);
+    return err;
+}
+
+static esp_err_t install_c6(void)
+{
+    char url[URL_MAX];
+    uint8_t want[32];
+    uint32_t size;
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    strlcpy(url, s_up.c6.url, sizeof(url));
+    memcpy(want, s_up.c6.sha256, 32);
+    size = s_up.c6.size;
+    xSemaphoreGive(s_up.lock);
+    esp_err_t err = download_c6(url, want, size);
     if (err == ESP_OK) {
         s_up.c6.current = true;
+        c6_installed_id();
         ESP_LOGW(TAG, "C6 package stored (%lu bytes), the C6 is updated after the restart", (unsigned long)size);
         gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware downloaded; the gateway restarts and updates the C6");
     }
+    return err;
+}
+
+esp_err_t gw_update_fetch_c6(void)
+{
+    /* the start-up sequence asks before the update task checked: check here */
+    if (!s_up.lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    check();
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    bool offered = s_up.c6.offered;
+    char url[URL_MAX];
+    uint8_t want[32];
+    uint32_t size = s_up.c6.size;
+    strlcpy(url, s_up.c6.url, sizeof(url));
+    memcpy(want, s_up.c6.sha256, 32);
+    xSemaphoreGive(s_up.lock);
+    if (!offered) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    ESP_LOGW(TAG, "downloading the C6 package (%lu kB) to flash the C6", (unsigned long)(size / 1024));
+    esp_err_t err = download_c6(url, want, size);
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    s_up.c6.percent = 0;
+    if (err == ESP_OK) {
+        s_up.c6.current = true;
+        c6_installed_id();
+    }
+    xSemaphoreGive(s_up.lock);
     return err;
 }
 

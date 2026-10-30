@@ -21,18 +21,34 @@ cp firmware/esphome/secrets.yaml.example firmware/esphome/secrets.yaml   # opens
 | `p4gw-factory.bin` | complete flash image (bootloader, partition table, gateway, ESPHome, C6 bundles) |
 | `p4gw.bin` | gateway application for OTA |
 | `esphome.bin` | ESPHome BLE proxy role image |
-| `c6fw.bin` | C6 bundles: slots layout (ot_rcp, zigbee_router, zigbee_ncp, scanner), esp_hosted ([c6-slots.md](c6-slots.md)) |
+| `c6fw.bin` | C6 package: slots layout (ot_rcp, zigbee_router, zigbee_ncp, scanner), esp_hosted ([c6-slots.md](c6-slots.md)) |
+| `c6fw-local.bin` | the part of it the c6fw partition holds (factory image) |
 | `SHA256SUMS` | checksums |
 
 Single parts: `scripts/build_c6.sh <name>`, `scripts/build_gateway.sh`, `scripts/build_esphome.sh`,
 `scripts/pack_c6fw.py`.
 
-## Flash layout (v2)
+## Flash layout (v3)
 
-[firmware/partitions.csv](../firmware/partitions.csv): `nvs` (settings, Thread network), `gw_a`/`gw_b`
-(3 MB each, gateway A/B with rollback), `esphome` (2 MB), `c6fw` (2 MB, deflate-compressed C6
-bundles), `c6data` (Zigbee network snapshots, one slot per Zigbee firmware), `model` (4 MB, YAMNet),
-`sounds` (1.56 MB, learning mode recordings), `coredump`.
+[firmware/partitions.csv](../firmware/partitions.csv): `nvs` (settings, Thread network, users), `gw_a`/`gw_b`
+(3 MB each, gateway A/B with rollback), `esphome` (2 MB), `c6fw` (64 kB: directory of the C6 package
+and its small bundles), `c6data` (Zigbee network snapshots, one slot per Zigbee firmware), `model`
+(6 MB, YAMNet uses 4), `sounds` (1.56 MB, learning mode recordings), `coredump`.
+
+The large C6 firmwares (the slots layout with all role firmwares, esp-hosted) are not kept in the P4
+flash. They are needed only to install the layout on the C6 (first start, after a C6 update, after
+"Reflash C6", after a C6 failure) and for the ESPHome role. The gateway then reads them from the whole
+package (`c6fw.bin`) in a PSRAM buffer that survives a software restart: put there by an online
+update, an upload in the web UI or, when it is missing (after a power cut), downloaded at start from
+the manifest (by default the latest GitHub release). Without internet and without the package the
+gateway stays in maintenance and asks for `c6fw.bin` (System › Firmware). Switching between the
+Thread and Zigbee roles needs only the small bundles and works offline.
+
+Migration v2 → v3 over USB, once: `scripts/migrate_layout_v3.sh <port>` (after the gateway runs
+v1.6 or later). It backs up NVS and the Zigbee snapshots, writes the v3 partition table, the small
+c6fw image (`scripts/c6fw_local.py`), the snapshots at their new place and the model; settings, the
+Thread network, users, both gateway slots, ESPHome and the learned sounds stay. Gateway v1.6 also runs
+on layout v2 (the whole package then stays in c6fw as before).
 
 Migration from v1 (first install on 2026-10-28): `scripts/flash_p4.sh <port>` writes every image but
 keeps NVS, so the role, Thread network, password and MQTT survive. The C6 is reflashed on the next

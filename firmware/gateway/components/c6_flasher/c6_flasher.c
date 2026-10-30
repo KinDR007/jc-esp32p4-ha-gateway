@@ -8,6 +8,8 @@
 #include "driver/gpio.h"
 #include "esp32_port.h"
 #include "esp_check.h"
+#include "esp_attr.h"
+#include "esp_cache.h"
 #include "esp_heap_caps.h"
 #include "esp_loader.h"
 #include "esp_log.h"
@@ -116,7 +118,7 @@ esp_err_t c6fw_read_dir(c6fw_dir_t *dir)
         c6fw_entry_t *e = &dir->entries[i];
         e->name[sizeof(e->name) - 1] = '\0';
         e->version[sizeof(e->version) - 1] = '\0';
-        if (e->offset + e->size > part->size) {
+        if (e->offset != C6FW_REMOTE && e->offset + e->size > part->size) {
             return ESP_ERR_INVALID_SIZE;
         }
     }
@@ -136,9 +138,68 @@ esp_err_t c6fw_find(const char *name, c6fw_entry_t *entry)
     return ESP_ERR_NOT_FOUND;
 }
 
+/* ---- the whole package in PSRAM ----
+ * With a c6fw partition too small for the package, it keeps the directory and the small bundles
+ * (slot choices); the large ones (the slots layout, esp-hosted) are C6FW_REMOTE and read from the
+ * package in PSRAM: staged in a noinit buffer, which a software restart keeps, after a download or an
+ * upload. */
+#define STAGE_MAX (2304 * 1024)
+#define STAGE_MAGIC 0x4b505336 /* "6SPK" */
+#define LOCAL_MAX_BUNDLE (32 * 1024)
+
+typedef struct {
+    /* the noinit section starts the PSRAM, and the timing tuning at every start writes its test
+     * pattern at PSRAM 0x80 (MSPI_TIMING_PSRAM_TEST_DATA_ADDR, 128 bytes): keep clear of it */
+    uint8_t tuning_area[4096];
+    uint32_t magic;
+    uint32_t len;
+    uint32_t crc;
+    uint8_t data[STAGE_MAX];
+} stage_t;
+
+static EXT_RAM_NOINIT_ATTR stage_t s_stage;
+static const uint8_t *s_pkg; /* validated package in PSRAM, NULL when none */
+static uint32_t s_pkg_len;
+
+/* offset of entry e (same name and sha256) in the PSRAM package */
+static bool pkg_find(const c6fw_entry_t *e, uint32_t *offset)
+{
+    if (!s_pkg) {
+        return false;
+    }
+    const c6fw_dir_t *dir = (const c6fw_dir_t *)s_pkg;
+    for (uint32_t i = 0; i < dir->count && i < C6FW_MAX_ENTRIES; i++) {
+        const c6fw_entry_t *p = &dir->entries[i];
+        if (strncmp(p->name, e->name, sizeof(p->name)) == 0 && memcmp(p->sha256, e->sha256, 32) == 0 &&
+            p->offset + p->size <= s_pkg_len) {
+            *offset = p->offset;
+            return true;
+        }
+    }
+    return false;
+}
+
+static esp_err_t fw_read(const c6fw_entry_t *e, uint32_t off, void *buf, size_t n)
+{
+    uint32_t base;
+    if (pkg_find(e, &base)) {
+        memcpy(buf, s_pkg + base + off, n);
+        return ESP_OK;
+    }
+    if (e->offset == C6FW_REMOTE) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    return esp_partition_read(partition(C6FW_SUBTYPE), e->offset + off, buf, n);
+}
+
+bool c6fw_available(const c6fw_entry_t *e)
+{
+    uint32_t base;
+    return e->offset != C6FW_REMOTE || pkg_find(e, &base);
+}
+
 esp_err_t c6fw_verify(const c6fw_entry_t *entry)
 {
-    const esp_partition_t *part = partition(C6FW_SUBTYPE);
     uint8_t *buf = malloc(FLASH_BLOCK);
     uint8_t digest[32];
     esp_err_t err = ESP_OK;
@@ -149,7 +210,7 @@ esp_err_t c6fw_verify(const c6fw_entry_t *entry)
     mbedtls_sha256_starts(&ctx, 0);
     for (uint32_t pos = 0; pos < entry->size && err == ESP_OK; pos += FLASH_BLOCK) {
         size_t n = entry->size - pos < FLASH_BLOCK ? entry->size - pos : FLASH_BLOCK;
-        err = esp_partition_read(part, entry->offset + pos, buf, n);
+        err = fw_read(entry, pos, buf, n);
         mbedtls_sha256_update(&ctx, buf, n);
     }
     mbedtls_sha256_finish(&ctx, digest);
@@ -166,9 +227,123 @@ esp_err_t c6fw_verify_all(void)
     c6fw_dir_t dir;
     ESP_RETURN_ON_ERROR(c6fw_read_dir(&dir), TAG, "directory");
     for (uint32_t i = 0; i < dir.count; i++) {
-        ESP_RETURN_ON_ERROR(c6fw_verify(&dir.entries[i]), TAG, "bundle %s", dir.entries[i].name);
+        if (c6fw_available(&dir.entries[i])) {
+            ESP_RETURN_ON_ERROR(c6fw_verify(&dir.entries[i]), TAG, "bundle %s", dir.entries[i].name);
+        }
     }
     return ESP_OK;
+}
+
+/* Checks a package in memory: directory, format and the sha256 of every bundle. */
+static esp_err_t pkg_check(const uint8_t *pkg, uint32_t len)
+{
+    const c6fw_dir_t *dir = (const c6fw_dir_t *)pkg;
+    if (len < sizeof(*dir) || memcmp(dir->magic, C6FW_DIR_MAGIC, 4) != 0 || dir->format != C6FW_FORMAT_VERSION ||
+        dir->count == 0 || dir->count > C6FW_MAX_ENTRIES) {
+        return ESP_ERR_INVALID_VERSION;
+    }
+    if (esp_rom_crc32_le(0, pkg, offsetof(c6fw_dir_t, crc32)) != dir->crc32) {
+        return ESP_ERR_INVALID_CRC;
+    }
+    for (uint32_t i = 0; i < dir->count; i++) {
+        const c6fw_entry_t *e = &dir->entries[i];
+        uint8_t sha[32];
+        if (e->offset == C6FW_REMOTE || e->offset + e->size > len) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        mbedtls_sha256(pkg + e->offset, e->size, sha, 0);
+        if (memcmp(sha, e->sha256, 32) != 0) {
+            return ESP_ERR_INVALID_CRC;
+        }
+    }
+    return ESP_OK;
+}
+
+/* Writes the package to the c6fw partition: whole when it fits, else the directory with the small
+ * bundles and the large ones marked C6FW_REMOTE. */
+static esp_err_t pkg_store(const uint8_t *pkg, uint32_t len)
+{
+    const esp_partition_t *part = partition(C6FW_SUBTYPE);
+    ESP_RETURN_ON_FALSE(part, ESP_ERR_NOT_FOUND, TAG, "no c6fw partition");
+    esp_err_t err;
+    if (len <= part->size) {
+        err = esp_partition_erase_range(part, 0, (len + FLASH_BLOCK - 1) / FLASH_BLOCK * FLASH_BLOCK);
+        for (uint32_t off = 0; err == ESP_OK && off < len; off += FLASH_BLOCK) {
+            err = esp_partition_write(part, off, pkg + off, len - off < FLASH_BLOCK ? len - off : FLASH_BLOCK);
+        }
+    } else {
+        uint8_t *img = heap_caps_calloc(1, part->size, MALLOC_CAP_SPIRAM);
+        ESP_RETURN_ON_FALSE(img, ESP_ERR_NO_MEM, TAG, "no mem");
+        c6fw_dir_t *dir = (c6fw_dir_t *)img;
+        memcpy(dir, pkg, sizeof(*dir));
+        uint32_t cursor = FLASH_BLOCK;
+        for (uint32_t i = 0; i < dir->count; i++) {
+            c6fw_entry_t *e = &dir->entries[i];
+            if (e->size <= LOCAL_MAX_BUNDLE && cursor + e->size <= part->size) {
+                memcpy(img + cursor, pkg + e->offset, e->size);
+                e->offset = cursor;
+                cursor = (cursor + e->size + 15) & ~15u;
+            } else {
+                e->offset = C6FW_REMOTE;
+            }
+        }
+        dir->crc32 = esp_rom_crc32_le(0, img, offsetof(c6fw_dir_t, crc32));
+        uint32_t used = (cursor + FLASH_BLOCK - 1) / FLASH_BLOCK * FLASH_BLOCK;
+        err = esp_partition_erase_range(part, 0, used);
+        if (err == ESP_OK) {
+            err = esp_partition_write(part, 0, img, used);
+        }
+        free(img);
+    }
+    if (err == ESP_OK) {
+        err = c6fw_verify_all();
+    }
+    if (err != ESP_OK) {
+        esp_partition_erase_range(part, 0, FLASH_BLOCK); /* never leave a half-written directory that parses */
+    }
+    return err;
+}
+
+uint8_t *c6fw_stage_buffer(uint32_t *capacity)
+{
+    s_stage.magic = 0;
+    s_pkg = NULL;
+    *capacity = STAGE_MAX;
+    return s_stage.data;
+}
+
+esp_err_t c6fw_stage_commit(uint32_t len)
+{
+    if (len == 0 || len > STAGE_MAX) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    ESP_RETURN_ON_ERROR(pkg_check(s_stage.data, len), TAG, "package");
+    s_stage.len = len;
+    s_stage.crc = esp_rom_crc32_le(0, s_stage.data, len);
+    s_stage.magic = STAGE_MAGIC;
+    /* PSRAM sits behind a write-back cache: write it out, a restart would drop what is still cached */
+    esp_cache_msync(&s_stage.magic, offsetof(stage_t, data) - offsetof(stage_t, magic) + len,
+                    ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+    s_pkg = s_stage.data;
+    s_pkg_len = len;
+    esp_err_t err = pkg_store(s_stage.data, len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "package not stored: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
+bool c6fw_stage_load(void)
+{
+    if (s_stage.magic != STAGE_MAGIC || s_stage.len == 0 || s_stage.len > STAGE_MAX ||
+        esp_rom_crc32_le(0, s_stage.data, s_stage.len) != s_stage.crc) {
+        s_stage.magic = 0;
+        return false;
+    }
+    s_pkg = s_stage.data;
+    s_pkg_len = s_stage.len;
+    ESP_LOGI(TAG, "C6 package kept in PSRAM across the restart (%lu B)", (unsigned long)s_stage.len);
+    return true;
 }
 
 /* ---- bundle access ---- */
@@ -181,18 +356,17 @@ typedef struct {
 
 static esp_err_t bundle_load(const c6fw_entry_t *entry, bundle_t *b)
 {
-    const esp_partition_t *part = partition(C6FW_SUBTYPE);
     char magic[4];
 
     b->entry = *entry;
     b->segs = NULL;
-    ESP_RETURN_ON_ERROR(esp_partition_read(part, entry->offset, magic, 4), TAG, "read");
-    ESP_RETURN_ON_ERROR(esp_partition_read(part, entry->offset + 4, &b->count, 4), TAG, "read");
+    ESP_RETURN_ON_ERROR(fw_read(entry, 0, magic, 4), TAG, "read");
+    ESP_RETURN_ON_ERROR(fw_read(entry, 4, &b->count, 4), TAG, "read");
     ESP_RETURN_ON_FALSE(memcmp(magic, C6FW_BUNDLE_MAGIC, 4) == 0 && b->count > 0 && b->count < 32,
                         ESP_ERR_INVALID_VERSION, TAG, "bad bundle header");
     b->segs = calloc(b->count, sizeof(c6fw_segment_t));
     ESP_RETURN_ON_FALSE(b->segs, ESP_ERR_NO_MEM, TAG, "no mem");
-    return esp_partition_read(part, entry->offset + 8, b->segs, b->count * sizeof(c6fw_segment_t));
+    return fw_read(entry, 8, b->segs, b->count * sizeof(c6fw_segment_t));
 }
 
 static void bundle_free(bundle_t *b)
@@ -353,6 +527,18 @@ typedef struct {
     const uint8_t *data;
 } mem_reader_t;
 
+/* data of a segment of a c6fw bundle (partition or PSRAM package) */
+typedef struct {
+    const c6fw_entry_t *entry;
+    uint32_t base;
+} fw_reader_t;
+
+static uint32_t fill_from_fw(void *ctx, uint32_t pos, uint8_t *buf, uint32_t n)
+{
+    fw_reader_t *r = ctx;
+    return fw_read(r->entry, r->base + pos, buf, n) == ESP_OK ? n : 0;
+}
+
 static uint32_t fill_from_memory(void *ctx, uint32_t pos, uint8_t *buf, uint32_t n)
 {
     memcpy(buf, ((mem_reader_t *)ctx)->data + pos, n);
@@ -363,14 +549,14 @@ static uint32_t fill_from_memory(void *ctx, uint32_t pos, uint8_t *buf, uint32_t
  * Bundles are stored zlib-compressed; the P4 inflates a segment into PSRAM, checks its MD5 and
  * writes it uncompressed (the C6 ROM loader's own inflate produced wrong data here).
  */
-static esp_err_t inflate_segment(const c6fw_segment_t *seg, const part_reader_t *r, uint8_t **out)
+static esp_err_t inflate_segment(const c6fw_segment_t *seg, const fw_reader_t *r, uint8_t **out)
 {
     uint8_t *packed = heap_caps_malloc(seg->stored_size, MALLOC_CAP_SPIRAM);
     uint8_t *plain = heap_caps_malloc(seg->size, MALLOC_CAP_SPIRAM);
     esp_err_t err = packed && plain ? ESP_OK : ESP_ERR_NO_MEM;
 
     if (err == ESP_OK) {
-        err = esp_partition_read(r->part, r->base, packed, seg->stored_size);
+        err = fw_read(r->entry, r->base, packed, seg->stored_size);
     }
     if (err == ESP_OK) {
         /* The decompressor state is ~11 KB: on the heap, not on the caller's stack. */
@@ -660,7 +846,6 @@ esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_
 static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, uint32_t total)
 {
     esp_err_t err = ESP_OK;
-    const esp_partition_t *part = partition(C6FW_SUBTYPE);
     for (uint32_t i = 0; i < b->count && err == ESP_OK; i++) {
         const c6fw_segment_t *seg = &b->segs[i];
         if (seg->flags & C6FW_SEG_ERASE) {
@@ -673,7 +858,7 @@ static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, u
             snprintf(stage, sizeof(stage), "writing 0x%05lx (%lu kB)", (unsigned long)seg->addr,
                      (unsigned long)seg->size / 1024);
             progress(s_progress.percent, stage);
-            part_reader_t r = {.part = part, .base = b->entry.offset + seg->data_off};
+            fw_reader_t r = {.entry = &b->entry, .base = seg->data_off};
             int from_pct = 10 + (int)(80LL * *done / total);
             int to_pct = 10 + (int)(80LL * (*done + seg->size) / total);
             uint8_t *plain = NULL;
@@ -684,7 +869,7 @@ static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, u
             }
             for (int attempt = 0; attempt < 3 && err == ESP_OK; attempt++) {
                 err = plain ? write_region(s, seg->addr, seg->size, fill_from_memory, &mem, from_pct, to_pct)
-                            : write_region(s, seg->addr, seg->size, fill_from_partition, &r, from_pct, to_pct);
+                            : write_region(s, seg->addr, seg->size, fill_from_fw, &r, from_pct, to_pct);
                 if (err == ESP_OK) {
                     break;
                 }
@@ -742,6 +927,20 @@ void c6_slots_invalidate(void)
     slots_record(NULL);
 }
 
+
+bool c6_flash_ready(const c6fw_entry_t *entry)
+{
+    bundle_t b = {0};
+    if (!c6fw_available(entry) || bundle_load(entry, &b) != ESP_OK) {
+        bundle_free(&b);
+        return false;
+    }
+    const c6fw_segment_t *marker = bundle_find_flag(&b, C6FW_SEG_SLOTS);
+    c6fw_entry_t slots;
+    bool ready = !marker || (c6fw_find(C6FW_SLOTS_BUNDLE, &slots) == ESP_OK && (slots_installed(&slots) || c6fw_available(&slots)));
+    bundle_free(&b);
+    return ready;
+}
 
 esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
 {
