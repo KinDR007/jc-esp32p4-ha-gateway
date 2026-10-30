@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.5 (2026-10-30)
+
+- Online update: the manifest URL defaults to the latest GitHub release of the project
+  (`releases/latest/download/manifest.json`); release notes carry the commits since the previous tag.
 - Online update of the C6 radio firmwares: the manifest offers the C6 package (`c6fw`: URL, sha256,
   size, format, firmware versions) and the build (commit, date, ESP-IDF, CI run); the gateway compares
   it with its c6fw partition and on request downloads it into PSRAM, checks sha256 and header, stores

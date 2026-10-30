@@ -93,9 +93,10 @@ The ESPHome image is still uploaded in the UI (CI does not build it, it needs th
 Releases: pushing a tag `v*` runs `.github/workflows/release.yml`: it builds `p4gw.bin` and `c6fw.bin`,
 takes the notes from the CHANGELOG section of the tag (or *Unreleased*, `scripts/release_notes.py`)
 and publishes a GitHub release with `manifest.json` (absolute URLs of the tag). The gateway reads
-`https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json` (button
-*GitHub Releases*) once the repository is public; a private repository needs a token the gateway does
-not have.
+`https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json`: the
+default while no URL is saved (button *GitHub Releases* puts it back; a saved empty URL turns the
+online update off). The release text holds the CHANGELOG section and the commits since the previous
+tag (`scripts/release_notes.py`); the manifest only the section.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`): `scripts/ci_checks.sh` (unit test, Python and web
 UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 firmwares,

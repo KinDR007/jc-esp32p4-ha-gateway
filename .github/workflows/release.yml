@@ -35,8 +35,10 @@ jobs:
         shell: bash
         run: |
           python3 scripts/release_notes.py "$TAG" > notes.md
+          # the gateway shows the notes without the commit list
+          python3 scripts/release_notes.py "$TAG" --no-commits > notes-short.md
           url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          python3 scripts/make_update_manifest.py --notes-file notes.md \
+          python3 scripts/make_update_manifest.py --notes-file notes-short.md \
             --release-url "$url/releases/tag/$TAG" --base-url "$url/releases/download/$TAG" \
             --ci "$url/actions/runs/$GITHUB_RUN_ID"
           sha256sum dist/p4gw.bin dist/c6fw.bin > dist/SHA256SUMS

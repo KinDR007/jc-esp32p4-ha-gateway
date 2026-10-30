@@ -24,6 +24,16 @@ static const char *TAG = "gw_update";
 #define MANIFEST_MAX 8192
 #define URL_MAX 256
 #define C6FW_SUBTYPE 0x40
+/* releases of the project (.github/workflows/release.yml); used while no URL is stored, "" stored = off */
+#define DEFAULT_URL "https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json"
+
+static bool manifest_url(char *url, size_t len)
+{
+    if (!gw_config_get_str(GW_KEY_UPDATE_URL, url, len)) {
+        strlcpy(url, DEFAULT_URL, len);
+    }
+    return url[0] != '\0';
+}
 
 /* Offered update, from the last manifest check. */
 static struct {
@@ -177,7 +187,7 @@ static void c6_offer(const char *manifest_url, const cJSON *c6)
 static void check(void)
 {
     char url[URL_MAX];
-    if (!gw_config_get_str(GW_KEY_UPDATE_URL, url, sizeof(url)) || !url[0]) {
+    if (!manifest_url(url, sizeof(url))) {
         xSemaphoreTake(s_up.lock, portMAX_DELAY);
         s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
         c6_offer(NULL, NULL);
@@ -449,7 +459,7 @@ static void update_task(void *arg)
 static esp_err_t check_post(httpd_req_t *req)
 {
     char url[URL_MAX];
-    if (!gw_config_get_str(GW_KEY_UPDATE_URL, url, sizeof(url)) || !url[0]) {
+    if (!manifest_url(url, sizeof(url))) {
         return gw_http_send_error(req, 409, "no update URL set");
     }
     /* the task checks: a request here would block the web server (and never reach a manifest on this gateway) */
@@ -571,8 +581,9 @@ cJSON *gw_update_status(void)
 {
     cJSON *j = state_json();
     char url[URL_MAX];
-    gw_config_get_str(GW_KEY_UPDATE_URL, url, sizeof(url));
+    manifest_url(url, sizeof(url));
     cJSON_AddStringToObject(j, "url", url);
+    cJSON_AddStringToObject(j, "default_url", DEFAULT_URL);
     cJSON_AddNumberToObject(j, "percent", s_up.percent);
     cJSON_AddNumberToObject(j, "checked", (double)s_up.checked);
     cJSON_AddBoolToObject(j, "checking", s_up.checking);

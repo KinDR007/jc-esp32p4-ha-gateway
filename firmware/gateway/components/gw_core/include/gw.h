@@ -52,7 +52,7 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
-#define GW_KEY_UPDATE_URL "upd_url" /* str, manifest of the online update, empty = off */
+#define GW_KEY_UPDATE_URL "upd_url" /* str, manifest of the online update; absent = GitHub releases, empty = off */
 #define GW_KEY_LAN "lan"            /* str JSON, LAN settings (gw_lan_set), none = DHCP */
 #define GW_KEY_ZB_SNAP_DAYS "zb_snap_days" /* u8, automatic Zigbee network backup every n days, 0 = off */
 #define GW_ZB_SNAP_DAYS_DEFAULT 7
