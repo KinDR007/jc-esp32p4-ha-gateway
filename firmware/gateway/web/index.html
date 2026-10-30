@@ -175,6 +175,9 @@ code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 #nodebox table { width: auto; }
 #nodebox th { color: var(--muted); font-weight: 400; padding: 2px 12px 2px 0; border: 0; vertical-align: top; white-space: nowrap; }
 #nodebox td { padding: 2px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+/* header boxes: short values, each on one line */
+#nodebox.htip { max-width: calc(100vw - 16px); }
+#nodebox.htip td { white-space: nowrap; overflow-wrap: normal; }
 [data-node] { cursor: pointer; }
 .topo { width: 100%; max-height: 640px; display: block; }
 .zmap { max-height: 760px; }
@@ -1271,13 +1274,22 @@ function showHdrTip(el) {
   const box = $('#nodebox');
   box.innerHTML = `<div class="nb-title">${esc(t.title)}</div><table>${t.rows.filter(x => x[1] !== undefined && x[1] !== null && x[1] !== '')
     .map(x => `<tr><th>${esc(x[0])}</th><td>${x[1]}</td></tr>`).join('')}</table>`;
+  /* measured at the left edge first: placed near the right edge, a fixed box shrinks to the space left
+   * there and wraps every value; tags in the right half align the box to their right edge */
+  box.classList.add('htip');
+  box.style.left = '0px';
   box.style.display = 'block';
-  const rc = el.getBoundingClientRect();
-  box.style.left = Math.max(8, Math.min(innerWidth - box.offsetWidth - 8, rc.left)) + 'px';
+  const rc = el.getBoundingClientRect(), w = box.offsetWidth;
+  const x = rc.left + rc.width / 2 > innerWidth / 2 ? rc.right - w : rc.left;
+  box.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
   box.style.top = rc.bottom + 8 + 'px';
 }
 document.addEventListener('mouseover', e => { const el = e.target.closest('[data-htip]'); if (el) showHdrTip(el); });
-document.addEventListener('mouseout', e => { if (e.target.closest('[data-htip]')) $('#nodebox').style.display = 'none'; });
+document.addEventListener('mouseout', e => {
+  if (!e.target.closest('[data-htip]')) return;
+  $('#nodebox').style.display = 'none';
+  $('#nodebox').classList.remove('htip');
+});
 document.addEventListener('click', e => { const el = e.target.closest('[data-htip]'); if (el) showHdrTip(el); });
 /* seconds since Home Assistant last called the OTBR REST API, null when never */
 function haAge(rs) {
@@ -2219,6 +2231,7 @@ function showNodeBox(el, ev) {
 }
 /* Over a map the box always sits in the top left corner of the map; elsewhere next to the pointer. */
 function placeNodeBox(el, x, y) {
+  $('#nodebox').classList.remove('htip');
   const box = $('#nodebox'), w = box.offsetWidth, h = box.offsetHeight;
   const svg = el.closest('svg.tmap, svg.zmap');
   if (svg) {
