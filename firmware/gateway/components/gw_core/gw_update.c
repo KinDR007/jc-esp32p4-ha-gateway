@@ -79,9 +79,29 @@ static esp_http_client_handle_t http_open(const char *url, esp_http_client_confi
     cfg->url = url;
     cfg->timeout_ms = 15000;
     cfg->crt_bundle_attach = esp_crt_bundle_attach;
-    cfg->buffer_size = 2048;
+    cfg->buffer_size = 4096; /* GitHub redirects with a Location header of about 1 kB */
+    cfg->buffer_size_tx = 2048;
     cfg->keep_alive_enable = true;
     return esp_http_client_init(cfg);
+}
+
+/* Opens a GET and follows redirects (GitHub release assets: github.com -> 302 -> CDN); returns the
+ * final status, or -1 when the connection failed (err set). */
+static int http_get(esp_http_client_handle_t client, esp_err_t *err)
+{
+    for (int hop = 0; hop < 5; hop++) {
+        if ((*err = esp_http_client_open(client, 0)) != ESP_OK) {
+            return -1;
+        }
+        esp_http_client_fetch_headers(client);
+        int status = esp_http_client_get_status_code(client);
+        if (status != 301 && status != 302 && status != 303 && status != 307 && status != 308) {
+            return status;
+        }
+        esp_http_client_set_redirection(client);
+        esp_http_client_close(client);
+    }
+    return 310; /* too many redirects */
 }
 
 /* "p4gw.bin" relative to the manifest URL, or an absolute URL. */
@@ -198,10 +218,11 @@ static void check(void)
     esp_http_client_handle_t client = http_open(url, &cfg);
     char *body = heap_caps_calloc(1, MANIFEST_MAX + 1, MALLOC_CAP_SPIRAM);
     int status = 0, len = 0;
-    esp_err_t err = client && body ? esp_http_client_open(client, 0) : ESP_ERR_NO_MEM;
+    esp_err_t err = client && body ? ESP_OK : ESP_ERR_NO_MEM;
     if (err == ESP_OK) {
-        esp_http_client_fetch_headers(client);
-        status = esp_http_client_get_status_code(client);
+        status = http_get(client, &err);
+    }
+    if (err == ESP_OK) {
         for (int n; len < MANIFEST_MAX && (n = esp_http_client_read(client, body + len, MANIFEST_MAX - len)) > 0;) {
             len += n;
         }
@@ -256,6 +277,7 @@ static esp_err_t install(void)
     http.timeout_ms = 15000;
     http.crt_bundle_attach = esp_crt_bundle_attach;
     http.buffer_size = 4096;
+    http.buffer_size_tx = 2048; /* the request after GitHub's redirect carries a URL of about 1 kB */
     http.keep_alive_enable = true;
     /* esp_https_ota would take the next OTA partition, which after gw_b is the esphome slot */
     esp_https_ota_config_t cfg = {.http_config = &http, .partition.staging = gw_other_gateway_slot()};
@@ -321,11 +343,10 @@ static esp_err_t download_c6(const char *url, const uint8_t want[32], uint32_t s
     }
     esp_http_client_config_t cfg;
     esp_http_client_handle_t client = http_open(url, &cfg);
-    esp_err_t err = client ? esp_http_client_open(client, 0) : ESP_ERR_NO_MEM;
+    esp_err_t err = client ? ESP_OK : ESP_ERR_NO_MEM;
     uint32_t got = 0;
+    int status = err == ESP_OK ? http_get(client, &err) : -1;
     if (err == ESP_OK) {
-        esp_http_client_fetch_headers(client);
-        int status = esp_http_client_get_status_code(client);
         if (status != 200) {
             char code[16];
             snprintf(code, sizeof(code), "%d", status);

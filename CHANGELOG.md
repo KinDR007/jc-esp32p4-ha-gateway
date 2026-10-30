@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: the online update did not follow redirects, so the manifest and the C6 package of a GitHub
+  release (github.com answers 302 to its CDN) could not be read; v1.5 gateways have to be updated once
+  by hand (upload `p4gw.bin`), later ones follow up to 5 redirects. Larger HTTP buffers for the long
+  redirect URL.
+
 - Flash layout v3: the c6fw partition shrinks from 2 MB to 64 kB (directory and the small bundles,
   so Thread/Zigbee role switches stay offline) and the model partition grows to 6 MB. The large C6
   firmwares are read from the whole package in a PSRAM buffer that survives software restarts
