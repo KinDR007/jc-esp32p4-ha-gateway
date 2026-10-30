@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Web UI: releases for this gateway as expandable rows (version, date, C6 package, install buttons)
+  with the release notes formatted (lists, bold, code); the list carries the whole notes, notes cut at
+  1000 characters end with "…".
+
 ## v1.7 (2026-10-30)
 
 Home Assistant integration 1.3.0 (install a given version).

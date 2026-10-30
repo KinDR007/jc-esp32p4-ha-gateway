@@ -183,6 +183,14 @@ pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-si
 pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
   overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.rel { border-top: 1px solid var(--border); }
+.rel:last-of-type { border-bottom: 1px solid var(--border); }
+.rel > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 8px 4px; cursor: pointer; list-style: none; }
+.rel > summary::-webkit-details-marker { display: none; }
+.rel > summary::before { content: '›'; width: 10px; color: var(--muted); transition: transform .15s; }
+.rel[open] > summary::before { transform: rotate(90deg); }
+.rel .rel-body { padding: 0 4px 12px 26px; max-width: 900px; }
+.rel .rel-body p { margin: 6px 0; } .rel .rel-body ul { margin: 6px 0; padding-left: 18px; } .rel .rel-body li { margin: 3px 0; }
 .log { height: 420px; white-space: pre; overflow: auto; }
 .lv-E, .lv-Em { color: var(--bad); } .lv-W, .lv-Wm { color: var(--warn); } .lv-I, .lv-D, .lv-V { color: var(--muted); }
 .log-tag { color: var(--accent); text-decoration: none; } .log mark { background: var(--warn); color: var(--bg); }
@@ -2262,22 +2270,50 @@ function updateCard() {
       <div class="table-wrap"><table><thead><tr><th>${L('Firmware', 'Firmware')}</th><th>${L('Installed', 'Nainstalováno')}</th><th>${L('Offered', 'Nabízeno')}</th></tr></thead><tbody>${c6rows}</tbody></table></div>
       <div class="row" style="margin-top:8px"><button class="btn primary" id="upd-install-c6" ${c6.available && !c6.in_progress && !u.in_progress ? '' : 'disabled'}>${ic('chip')}${L('Install C6 package', 'Instalovat balík C6')}</button></div>
       ${c6.in_progress ? bar(c6.percent) : ''}</div></div>
-      ${u.release_summary ? `<h4 style="margin:14px 0 6px">${L('Release notes', 'Poznámky k vydání')}</h4><p style="white-space:pre-wrap" data-notr>${esc(u.release_summary)}</p>` : ''}
+      ${u.release_summary && !(u.releases || []).length ? `<h4 style="margin:14px 0 6px">${L('Release notes', 'Poznámky k vydání')}</h4><div class="rel-notes" data-notr>${mdLite(u.release_summary)}</div>` : ''}
       ${releasesTable(u)}
       <p class="muted">${L('Checked', 'Zkontrolováno')} ${new Date(u.checked * 1000).toLocaleString()}. ${L('Install the gateway first: a C6 package of a newer format is offered only to the gateway that reads it.', 'Nejdřív instalujte bránu: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.')}</p>` : ''}</div>`;
 }
 
-/* Releases of releases.json that run on the flash layout of this board: installing an older one is a rollback. */
+/* Release notes (Markdown of the CHANGELOG): paragraphs, "- " lists, **bold**, *italic*, `code`. */
+function mdLite(text) {
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*([^*\s][^*]*)\*/g, '<i>$1</i>');
+  const blocks = [];
+  let cur = null;
+  for (const line of String(text || '').split('\n')) {
+    if (!line.trim()) { cur = null; continue; }
+    if (/^\s*[-*] /.test(line)) blocks.push(cur = { li: true, text: line.replace(/^\s*[-*] /, '') });
+    else if (cur) cur.text += ' ' + line.trim();
+    else blocks.push(cur = { li: false, text: line.trim() });
+  }
+  let html = '', list = false;
+  for (const b of blocks) {
+    if (b.li !== list) { html += b.li ? '<ul>' : '</ul>'; list = b.li; }
+    html += b.li ? `<li>${inline(b.text)}</li>` : `<p>${inline(b.text)}</p>`;
+  }
+  return html + (list ? '</ul>' : '');
+}
+
+/* Releases of releases.json that run on the flash layout of this board, one expandable row each:
+ * installing an older one is a rollback. The offered release is open while it is newer. */
 function releasesTable(u) {
   const rel = u.releases || [], c6 = u.c6 || {}, busy = u.in_progress || c6.in_progress;
   if (!rel.length) return '';
-  const rows = rel.map(r => `<tr><td>${esc(r.version)}${r.version === u.installed_version ? ' ' + pill('ok', L('installed', 'nainstalováno')) : ''}</td><td>${esc(r.date || '')}</td>
-    <td>${esc(r.c6 || '–')}${r.c6 && r.c6 === c6.installed_id ? ' ' + pill('ok', L('installed', 'nainstalováno')) : ''}</td>
-    <td class="muted" style="max-width:420px">${esc((r.notes || '').split('\n')[0])}${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener">${L('more', 'více')}</a>` : ''}</td>
-    <td style="white-space:nowrap"><button class="btn" data-rel-gw="${esc(r.version)}" ${busy || r.version === u.installed_version ? 'disabled' : ''}>${ic('download')}${L('Gateway', 'Brána')}</button>
-      <button class="btn" data-rel-c6="${esc(r.version)}" ${busy || !r.c6 || r.c6 === c6.installed_id ? 'disabled' : ''}>${ic('chip')}C6</button></td></tr>`).join('');
-  return `<h4 style="margin:14px 0 6px">${L('Releases for this gateway', 'Vydání pro tuto bránu')}${tip('Releases')}</h4>
-    <div class="table-wrap"><table><thead><tr><th>${L('Version', 'Verze')}</th><th>${L('Date', 'Datum')}</th><th>${L('C6 package', 'Balík C6')}</th><th>${L('Notes', 'Poznámky')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const items = rel.map(r => {
+    const installed = r.version === u.installed_version, offered = r.version === u.latest_version;
+    const c6here = r.c6 && r.c6 === c6.installed_id;
+    const notes = offered && u.release_summary ? u.release_summary : r.notes;
+    return `<details class="rel" ${offered && u.available ? 'open' : ''}><summary>
+      <b>${esc(r.version)}</b>${installed ? pill('ok', L('installed', 'nainstalováno')) : offered && u.available ? pill('warn', L('newest', 'nejnovější')) : ''}
+      <span class="muted">${esc(r.date || '')}</span>
+      ${r.c6 ? `<span class="muted">C6 <code>${esc(r.c6)}</code></span>${c6here ? pill('ok', L('installed', 'nainstalováno')) : ''}` : ''}
+      <span class="spacer"></span>
+      <button class="btn" data-rel-gw="${esc(r.version)}" ${busy || installed ? 'disabled' : ''}>${ic('download')}${L('Gateway', 'Brána')}</button>
+      <button class="btn" data-rel-c6="${esc(r.version)}" ${busy || !r.c6 || c6here ? 'disabled' : ''}>${ic('chip')}C6</button></summary>
+      <div class="rel-body" data-notr>${notes ? mdLite(notes) : `<p class="muted">${L('No release notes.', 'Bez poznámek k vydání.')}</p>`}
+        ${r.url ? `<p><a href="${esc(r.url)}" target="_blank" rel="noopener">${L('Release on GitHub', 'Vydání na GitHubu')}</a></p>` : ''}</div></details>`;
+  }).join('');
+  return `<h4 style="margin:14px 0 6px">${L('Releases for this gateway', 'Vydání pro tuto bránu')}${tip('Releases')}</h4><div>${items}</div>`;
 }
 
 async function installC6(version) {
@@ -3852,8 +3888,10 @@ document.addEventListener('click', async e => {
     } else if (t.id === 'upd-install-c6') {
       await installC6();
     } else if (t.dataset.relGw) {
+      e.preventDefault(); // the button sits in the summary of an expandable row
       await installUpdate(t.dataset.relGw);
     } else if (t.dataset.relC6) {
+      e.preventDefault();
       await installC6(t.dataset.relC6);
     } else if (t.id === 'upd-github') {
       $('#upd-url').value = GITHUB_MANIFEST;

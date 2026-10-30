@@ -76,7 +76,7 @@ def main() -> None:
     notes = Path(a.notes_file).read_text().strip() if a.notes_file else a.notes
     m = {"version": app_version(gateway), "p4gw": url("p4gw.bin"), "layouts": LAYOUTS}
     if notes:
-        m["notes"] = notes[:1000]
+        m["notes"] = notes if len(notes) <= 1000 else notes[:998].rsplit(" ", 1)[0] + " …"
     if a.release_url:
         m["release_url"] = a.release_url
     idf = re.search(r"v\d+\.\d+\.\d+", (ROOT / "scripts/env.sh").read_text())

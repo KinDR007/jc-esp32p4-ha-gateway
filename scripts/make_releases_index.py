@@ -36,6 +36,8 @@ def entry(tag: str, date: str, manifest_url: str, m: dict):
     if not m.get("layouts"):
         return None  # releases before v1.6 name no layout: never offered
     notes = m.get("notes", "")
+    if len(notes) >= 1000 and not notes.endswith("…"):  # cut by an older make_update_manifest.py
+        notes = notes.rsplit(" ", 1)[0] + " …"
     return {
         "version": m["version"],
         "tag": tag,
@@ -44,7 +46,7 @@ def entry(tag: str, date: str, manifest_url: str, m: dict):
         "url": m.get("release_url", ""),
         "layouts": m["layouts"],
         "c6": m.get("c6fw", {}).get("sha256", "")[:8],
-        "notes": notes if len(notes) <= 300 else notes[:297] + "...",
+        "notes": notes,  # the manifest keeps at most 1000 characters
     }
 
 

@@ -23,7 +23,7 @@ static const char *TAG = "gw_update";
 /* in ticks: pdMS_TO_TICKS(6 h) overflows (ms * tick rate in 32 bits) and gave 125 s */
 #define CHECK_INTERVAL_TICKS ((TickType_t)6 * 3600 * configTICK_RATE_HZ)
 #define MANIFEST_MAX 8192
-#define RELEASES_MAX 16384 /* releases.json */
+#define RELEASES_MAX 32768 /* releases.json: 10 releases with notes of up to 1000 characters */
 #define RELEASES_KEEP 10
 #define URL_MAX 256
 #define C6FW_SUBTYPE 0x40
