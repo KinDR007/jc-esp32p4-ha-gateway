@@ -689,9 +689,14 @@ static void bot_events(const char *args, bool cz, char *out, size_t len)
         if (!l->at_us) {
             break;
         }
+        /* entries of single classes (no event) have no id */
         int ago = (int)((now - l->at_us) / 1000000);
-        n += snprintf(out + n, len - n, "%s, %s %.0f %% · %s %d %s\n", l->id, cls_name(l->cls), (double)l->score * 100,
-                      cz ? "před" : "", ago >= 3600 ? ago / 3600 : ago / 60, ago >= 3600 ? "h" : "min");
+        char when[24];
+        snprintf(when, sizeof(when), ago < 60 ? "%d s" : ago < 3600 ? "%d min" : "%d h",
+                 ago < 60 ? ago : ago < 3600 ? ago / 60 : ago / 3600);
+        n += snprintf(out + n, len - n, "%s%s%s%s %.0f %% · %s%s%s\n", l->id[0] ? "<b>" : "", l->id,
+                      l->id[0] ? "</b>, " : "", cls_name(l->cls), (double)l->score * 100, cz ? "před " : "", when,
+                      cz ? "" : " ago");
         shown++;
     }
     xSemaphoreGive(s_lock);
