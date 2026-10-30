@@ -6,12 +6,15 @@ from ipaddress import ip_address
 from unittest.mock import patch
 
 from homeassistant.config_entries import SOURCE_USER, SOURCE_ZEROCONF, ConfigEntryState
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
+from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PASSWORD, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+from homeassistant.components import persistent_notification
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import pytest
 
 from custom_components.p4gw.const import DOMAIN
 
@@ -56,16 +59,23 @@ async def test_user_flow_unreachable(hass: HomeAssistant, gateway) -> None:
     assert result["errors"] == {"base": "cannot_connect"}
 
 
-async def test_user_flow_password(hass: HomeAssistant, gateway) -> None:
-    gateway.password = "secret"
+async def test_user_flow_token(hass: HomeAssistant, gateway) -> None:
+    gateway.token = "p4gw_secret"
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_HOST: gateway.host})
     assert result["step_id"] == "auth"
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_PASSWORD: "wrong"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_TOKEN: "p4gw_wrong"})
     assert result["errors"] == {"base": "invalid_auth"}
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_PASSWORD: "secret"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_API_TOKEN: " p4gw_secret "})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {CONF_HOST: gateway.host, CONF_PASSWORD: "secret"}
+    assert result["data"] == {CONF_HOST: gateway.host, CONF_API_TOKEN: "p4gw_secret"}
+
+
+async def test_legacy_password_entry(hass: HomeAssistant, gateway) -> None:
+    """Entries from before user accounts keep working with the admin password (Basic)."""
+    gateway.password = "secret"
+    entry = await setup_entry(hass, gateway, **{CONF_PASSWORD: "secret"})
+    assert entry.state is ConfigEntryState.LOADED
 
 
 def zeroconf_info(host: str, mac: str | None = MAC) -> ZeroconfServiceInfo:
@@ -210,16 +220,81 @@ async def test_push_reconnects(hass: HomeAssistant, gateway) -> None:
     assert entry.runtime_data.push_connected
 
 
-async def test_password_set_later_starts_reauth(hass: HomeAssistant, gateway) -> None:
-    entry = await setup_entry(hass, gateway)
-    gateway.password = "new"
+async def test_accounts_created_later_start_reauth(hass: HomeAssistant, gateway) -> None:
+    """The gateway gets user accounts: reauth asks for a token, which replaces the old password."""
+    gateway.password = "old"
+    entry = await setup_entry(hass, gateway, **{CONF_PASSWORD: "old"})
+    gateway.token = "p4gw_new"
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
     flows = hass.config_entries.flow.async_progress()
-    assert any(f["context"]["source"] == "reauth" for f in flows)
     flow = next(f for f in flows if f["context"]["source"] == "reauth")
-    result = await hass.config_entries.flow.async_configure(flow["flow_id"], {CONF_PASSWORD: "new"})
+    result = await hass.config_entries.flow.async_configure(flow["flow_id"], {CONF_API_TOKEN: "p4gw_new"})
     assert result["reason"] == "reauth_successful"
-    assert entry.data[CONF_PASSWORD] == "new"
+    assert entry.data == {CONF_HOST: gateway.host, CONF_API_TOKEN: "p4gw_new"}
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_token_without_right(hass: HomeAssistant, gateway) -> None:
+    """A viewer token: commands fail with a clear error instead of a broken entity."""
+    gateway.token = "p4gw_viewer"
+    gateway.forbidden = {"/api/reboot"}
+    await setup_entry(hass, gateway, **{CONF_API_TOKEN: "p4gw_viewer"})
+    with pytest.raises(HomeAssistantError, match="no right"):
+        await hass.services.async_call("button", "press", {"entity_id": entity_id(hass, "button", "restart")}, blocking=True)
+
+
+async def test_notifications(hass: HomeAssistant, gateway) -> None:
+    entry = await setup_entry(hass, gateway)
+    await push(hass, gateway, "notify", "null")  # ignored
+    note_id = entity_id(hass, "event", "notification")
+    await gateway.notify("security", "warning", "Password reset requested for jan")
+    for _ in range(20):
+        await asyncio.sleep(0.01)
+        await hass.async_block_till_done()
+    state = hass.states.get(note_id)
+    assert state.attributes["event_type"] == "warning"
+    assert state.attributes["topic"] == "security"
+    assert state.attributes["text"] == "Password reset requested for jan"
+    shown = [n["message"] for n in persistent_notification._async_get_or_create_notifications(hass).values()]
+    assert "Password reset requested for jan" in shown
+    # info below the default level (warning), sound off by default: event only
+    await gateway.notify("system", "info", "Gateway restarted")
+    await gateway.notify("sound", "critical", "Smoke alarm")
+    for _ in range(20):
+        await asyncio.sleep(0.01)
+        await hass.async_block_till_done()
+    shown = [n["message"] for n in persistent_notification._async_get_or_create_notifications(hass).values()]
+    assert "Gateway restarted" not in shown and "Smoke alarm" not in shown
+    assert hass.states.get(note_id).attributes["text"] == "Smoke alarm"
+    # options: all sound notifications
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"security": "warning", "system": "all", "network": "off", "sound": "all"})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await gateway.notify("sound", "info", "Dog barking")
+    for _ in range(20):
+        await asyncio.sleep(0.01)
+        await hass.async_block_till_done()
+    shown = [n["message"] for n in persistent_notification._async_get_or_create_notifications(hass).values()]
+    assert "Dog barking" in shown
+
+
+async def test_missed_notifications_after_gateway_restart(hass: HomeAssistant, gateway) -> None:
+    """Notifications sent while the push connection was down come from /api/notify on reconnect."""
+    entry = await setup_entry(hass, gateway)
+    for _ in range(20):
+        await asyncio.sleep(0.01)
+        await hass.async_block_till_done()
+    await gateway.notify("security", "warning", "before")
+    await gateway.drop_push()
+    gateway.notes, gateway.boot = [], 2  # the gateway restarted
+    await gateway.notify("system", "critical", "Gateway restarted after a crash", live=False)
+    with patch("custom_components.p4gw.coordinator.RECONNECT_DELAY", 0):
+        await asyncio.wait_for(gateway.connected.wait(), 5)
+    for _ in range(50):
+        await asyncio.sleep(0.01)
+        await hass.async_block_till_done()
+    assert hass.states.get(entity_id(hass, "event", "notification")).attributes["text"] == "Gateway restarted after a crash"
+    assert entry.runtime_data.notify_boot == 2

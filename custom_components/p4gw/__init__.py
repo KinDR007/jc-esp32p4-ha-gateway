@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, Platform
+from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -21,13 +21,20 @@ PLATFORMS = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: P4ConfigEntry) -> bool:
-    client = P4Client(entry.data[CONF_HOST], async_get_clientsession(hass), entry.data.get(CONF_PASSWORD))
+    client = P4Client(
+        entry.data[CONF_HOST], async_get_clientsession(hass), entry.data.get(CONF_PASSWORD), entry.data.get(CONF_API_TOKEN)
+    )
     coordinator = P4Coordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     entry.async_create_background_task(hass, coordinator.async_listen(), "p4gw-push")
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(_options_updated))
     return True
+
+
+async def _options_updated(hass: HomeAssistant, entry: P4ConfigEntry) -> None:
+    """Notification levels apply to the next notification; nothing to reload."""
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: P4ConfigEntry) -> bool:

@@ -283,12 +283,14 @@ void app_main(void)
     ESP_LOGI(TAG, "%s, desired role %s", st->hostname, gw_role_name(st->desired));
 
     bool boot_loop = gw_boot_loop_detected();
+    gw_notify_boot(gw_boot_after_failure());
     ESP_ERROR_CHECK(gw_eth_init(st->hostname));
     init_mdns(st->hostname);
     gw_auth_init();
     ESP_ERROR_CHECK(gw_http_start());
     ESP_ERROR_CHECK(gw_api_register());
     gw_auth_register();
+    gw_notify_register();
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
     netscan_init();

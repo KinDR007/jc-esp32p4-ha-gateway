@@ -15,15 +15,18 @@
         "description": "Add the P4 gateway {name} ({host})?"
       },
       "auth": {
-        "description": "The gateway at {host} has a web UI password (user admin).",
+        "description": "The gateway at {host} has user accounts. Create an API token in its web UI (System › User management › API tokens, role admin or user) and paste it here.",
         "data": {
-          "password": "Password"
+          "api_token": "API token"
+        },
+        "data_description": {
+          "api_token": "Starts with p4gw_"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect",
-      "invalid_auth": "Wrong password"
+      "invalid_auth": "Invalid API token"
     },
     "abort": {
       "already_configured": "Device is already configured",
@@ -107,6 +110,18 @@
             }
           }
         }
+      },
+      "notification": {
+        "name": "Notification",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "info": "Information",
+              "warning": "Warning",
+              "critical": "Critical"
+            }
+          }
+        }
       }
     },
     "select": {
@@ -132,6 +147,30 @@
     "switch": {
       "sound": {
         "name": "Sound recognition"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Gateway notifications",
+        "description": "Which notifications of the gateway appear as persistent notifications in Home Assistant. Every notification also fires the Notification event entity for automations.",
+        "data": {
+          "security": "Security",
+          "system": "System",
+          "network": "Network",
+          "sound": "Sounds"
+        }
+      }
+    }
+  },
+  "selector": {
+    "notify_level": {
+      "options": {
+        "off": "Off",
+        "critical": "Critical only",
+        "warning": "Warnings and critical",
+        "all": "All"
       }
     }
   }

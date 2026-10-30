@@ -288,4 +288,5 @@ void gw_set_maintenance(const char *fmt, ...)
     va_end(args);
     s_state.active = GW_ROLE_NONE;
     ESP_LOGE(TAG, "maintenance mode: %s", s_state.maintenance);
+    gw_notify("system", GW_NOTIFY_CRITICAL, "Maintenance mode, no role runs: %s", s_state.maintenance);
 }

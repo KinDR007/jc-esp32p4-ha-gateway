@@ -58,6 +58,10 @@ static void inet_task(void *arg)
             int state = reachable();
             if (state != s_state) {
                 ESP_LOGI(TAG, "internet %s", state ? "reachable" : "unreachable");
+                if (s_state >= 0) {
+                    gw_notify("network", state ? GW_NOTIFY_INFO : GW_NOTIFY_WARNING,
+                              state ? "Internet reachable again" : "Internet not reachable (DNS or route to github.com)");
+                }
             }
             s_state = state;
             s_checked_us = esp_timer_get_time();

@@ -15,15 +15,18 @@
         "description": "Přidat P4 bránu {name} ({host})?"
       },
       "auth": {
-        "description": "Brána {host} má heslo webového rozhraní (uživatel admin).",
+        "description": "Brána {host} má uživatelské účty. Ve webovém rozhraní brány vytvořte API token (Systém › Správa uživatelů › API tokeny, role správce nebo uživatel) a vložte ho sem.",
         "data": {
-          "password": "Heslo"
+          "api_token": "API token"
+        },
+        "data_description": {
+          "api_token": "Začíná p4gw_"
         }
       }
     },
     "error": {
       "cannot_connect": "Nepodařilo se připojit",
-      "invalid_auth": "Špatné heslo"
+      "invalid_auth": "Neplatný API token"
     },
     "abort": {
       "already_configured": "Zařízení už je nastavené",
@@ -107,6 +110,18 @@
             }
           }
         }
+      },
+      "notification": {
+        "name": "Notifikace",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "info": "Informace",
+              "warning": "Varování",
+              "critical": "Kritické"
+            }
+          }
+        }
       }
     },
     "select": {
@@ -132,6 +147,30 @@
     "switch": {
       "sound": {
         "name": "Rozpoznávání zvuku"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Notifikace brány",
+        "description": "Které notifikace brány se v Home Assistant zobrazí jako trvalé oznámení. Každá notifikace navíc vyvolá entitu události Notifikace pro automatizace.",
+        "data": {
+          "security": "Zabezpečení",
+          "system": "Systém",
+          "network": "Síť",
+          "sound": "Zvuky"
+        }
+      }
+    }
+  },
+  "selector": {
+    "notify_level": {
+      "options": {
+        "off": "Vypnuto",
+        "critical": "Jen kritické",
+        "warning": "Varování a kritické",
+        "all": "Vše"
       }
     }
   }

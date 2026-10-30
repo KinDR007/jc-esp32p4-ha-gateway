@@ -11,11 +11,19 @@ static const char *TAG = "gw_boot";
 /* Boots that end before gw_boot_mark_stable() in a row before the gateway stops starting roles. */
 #define BOOT_LOOP_LIMIT 4
 
+static bool s_after_failure;
+
+bool gw_boot_after_failure(void)
+{
+    return s_after_failure;
+}
+
 bool gw_boot_loop_detected(void)
 {
     uint8_t count = gw_config_get_u8(GW_KEY_BOOT_COUNT, 0);
     esp_reset_reason_t reason = esp_reset_reason();
     bool failure = gw_config_get_u8(GW_KEY_FAIL_RST, 0);
+    s_after_failure = failure;
 
     if (failure) {
         gw_config_set_u8(GW_KEY_FAIL_RST, 0);

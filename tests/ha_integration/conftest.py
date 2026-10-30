@@ -35,7 +35,11 @@ class FakeGateway:
         self.status = copy.deepcopy(STATUS)
         self.sound = dict(SOUND)
         self.events = copy.deepcopy(EVENTS)
-        self.password = ""
+        self.password = ""  # admin password of firmware before user accounts (Basic)
+        self.token = ""  # API token of firmware with user accounts (Bearer)
+        self.forbidden: set[str] = set()  # POST paths the token's role may not use (403)
+        self.notes: list[dict] = []  # notifications kept by the gateway
+        self.boot = 1
         self.posts: list[tuple[str, dict]] = []
         self.sockets: list[web.WebSocketResponse] = []
         self.connected = asyncio.Event()
@@ -43,6 +47,7 @@ class FakeGateway:
         app.router.add_get("/api/status", self._get(lambda: self.status))
         app.router.add_get("/api/sound/status", self._get(lambda: self.sound))
         app.router.add_get("/api/sound/events", self._get(lambda: {"events": self.events}))
+        app.router.add_get("/api/notify", self._get(lambda: {"notifications": self.notes, "seq": len(self.notes), "boot": self.boot}))
         app.router.add_post("/api/{path:.*}", self._post)
         app.router.add_get("/api/ws", self._ws)
         self.server = TestServer(app, host="127.0.0.1")
@@ -52,9 +57,11 @@ class FakeGateway:
         return f"127.0.0.1:{self.server.port}"
 
     def _authorized(self, request: web.Request) -> bool:
+        auth = request.headers.get("Authorization", "")
+        if self.token:
+            return auth == f"Bearer {self.token}"
         if not self.password:
             return True
-        auth = request.headers.get("Authorization", "")
         import base64
 
         return auth == "Basic " + base64.b64encode(f"admin:{self.password}".encode()).decode()
@@ -72,6 +79,8 @@ class FakeGateway:
             return web.json_response({"error": "unauthorized"}, status=401)
         path = "/api/" + request.match_info["path"]
         body = await request.json() if request.can_read_body else {}
+        if path in self.forbidden:
+            return web.json_response({"error": "forbidden"}, status=403)
         self.posts.append((path, body))
         if path == "/api/c6/zigbee-snapshot" and self.status["role"]["active"] not in ("zigbee_coordinator", "zigbee_router"):
             return web.json_response({"error": "only in a Zigbee role"}, status=409)
@@ -97,6 +106,14 @@ class FakeGateway:
         for ws in self.sockets:
             if not ws.closed:
                 await ws.send_str(json.dumps({"topic": topic, "payload": payload}))
+
+    async def notify(self, topic: str, level: str, text: str, live: bool = True) -> dict:
+        """Keeps a notification and, when live, pushes it."""
+        note = {"seq": len(self.notes) + 1, "boot": self.boot, "topic": topic, "level": level, "text": text, "time": 0}
+        self.notes.append(note)
+        if live:
+            await self.push("notify", json.dumps(note))
+        return note
 
     async def drop_push(self) -> None:
         for ws in self.sockets:

@@ -84,8 +84,12 @@ The web UI shows the same buttons under Home Assistant › Guide.
 
 The gateway announces itself over mDNS (`_p4gw._tcp`, TXT `mac`, `version`),
 so it appears under Settings › Devices › **Discovered**; or add it by hand (Add integration ›
-P4 Gateway, address). With a web UI password set, the flow asks for it (user `admin`); a password
-changed later starts re-authentication.
+P4 Gateway, address). Once the gateway has user accounts, the flow asks for an **API token**: create
+one in the gateway web UI under System › User management › API tokens (role admin, or user when the
+integration should not restart the gateway or install updates) and paste it. The token does not
+depend on any user, so two-factor sign-in of the admins does not matter. Entries set up with the
+admin password of older firmware keep it while the account has no 2FA; otherwise re-authentication
+asks for a token, which then replaces the password.
 
 How it works: state is read from the REST API every 30 s (`/api/status`, `/api/sound/status`,
 `/api/sound/events`); sound detections, sound event states and update progress are pushed at once
@@ -101,15 +105,22 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 | `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
 | Firmware (update) | install with progress, from the online update manifest |
 | Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
+| Notification (event) | every notification of the gateway: event type `info`, `warning` or `critical`, attributes `topic` (security, system, network, sound), `text`, `time`; for automations, e.g. forwarding to the phone |
 | Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |
 | Chip and C6 temperature, Started, IP, C6 firmware, Maintenance reason, Sound level (dBFS), heap, CPU load | diagnostic (heap and CPU disabled by default) |
+
+Notifications: the gateway sends them on the push connection and keeps the last 32 (`/api/notify`), so
+those sent while Home Assistant was not connected (a restart of the gateway, a crash) arrive after the
+reconnect. Integration options (Configure) choose per topic from which level a persistent notification
+appears: off, critical only, warnings and critical, all. Defaults: security, system and network from
+warnings, sounds off (they have their own event entities).
 
 The integration and MQTT discovery can run side by side, but every entity would then exist twice.
 With the integration in use, switch off **Home Assistant discovery** in the gateway MQTT settings
 (MQTT then keeps only the plain topics, e.g. for Zigbee2MQTT network view).
 
 Tests: `tests/ha_integration` (pytest-homeassistant-custom-component against a fake gateway,
-also in CI), hardware test TC30 (mDNS, WebSocket push, password on the handshake).
+also in CI), hardware test TC30 (mDNS, WebSocket push, account and token on the handshake).
 
 ## MQTT (optional)
 

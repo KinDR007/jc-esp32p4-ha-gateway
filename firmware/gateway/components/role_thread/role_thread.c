@@ -159,6 +159,7 @@ static void on_rcp_failure(void)
     /* The C6 stopped answering Spinel: reflash it on the next boot, the boot loop guard limits retries. */
     s_rcp_failures++;
     ESP_LOGE(TAG, "RCP failure, reflashing the C6 after restart");
+    gw_notify("system", GW_NOTIFY_CRITICAL, "Thread radio (C6) stopped answering: reflash and restart");
     gw_config_set_u8(GW_KEY_C6_FORCE, 1);
     gw_restart_on_failure();
 }

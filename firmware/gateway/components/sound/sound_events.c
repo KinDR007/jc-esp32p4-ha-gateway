@@ -379,6 +379,10 @@ static void publish_event(const sevent_t *x, float level_db)
     snprintf(t, sizeof(t), "sound/%s", x->id);
     gw_mqtt_publish(t, payload, false);
     cJSON_free(payload);
+    /* alarms and breaking glass are critical, other sounds informative */
+    bool alarm = strstr(x->id, "alarm") || strstr(x->id, "siren") || strstr(x->id, "glass");
+    gw_notify("sound", alarm ? GW_NOTIFY_CRITICAL : GW_NOTIFY_INFO, "%s (%s, %.0f %%, %.0f dBFS)", x->name,
+              cls_name(x->peak_class), (double)x->peak * 100, (double)level_db);
 }
 
 /* ---------------------------------------------------------------- detection */

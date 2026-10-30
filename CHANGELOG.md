@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Home Assistant integration 1.1.0: API token instead of the admin password (config flow and
+  re-authentication; old entries keep the password while the admin has no 2FA), Notification event
+  entity and persistent notifications per topic and level (options), notifications missed during a
+  restart of the gateway fetched from `/api/notify`. Firmware: notifications for system (start and its
+  reason, crash, maintenance, C6 radio lost, update available), network (LAN link, internet, Zigbee2MQTT,
+  LAN settings) and sounds (critical for alarms and glass), kept in RAM (last 32) with a run id.
 - Users, roles and permissions (System › User management, docs/users.md): admin, user and viewer
   roles with a level per page (hidden, read, edit) and own levels per user, enforced by the server for
   every API URI; sign-in with a session cookie, lock after failed attempts, forced password change,

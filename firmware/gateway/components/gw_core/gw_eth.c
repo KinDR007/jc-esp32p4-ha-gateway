@@ -26,6 +26,7 @@ static esp_eth_handle_t s_eth;
 static EventGroupHandle_t s_events;
 static bool s_link_up;
 static uint32_t s_link_changes;
+static int64_t s_link_down_us;
 
 /* ---- traffic counters ----
  * The lwIP input and link output functions of the Ethernet netif are wrapped: every frame adds its
@@ -327,6 +328,7 @@ static void revert_task(void *arg)
 {
     if (s_lan_deadline_us) {
         ESP_LOGW(TAG, "LAN change not confirmed in %d s, previous settings restored", LAN_CONFIRM_S);
+        gw_notify("network", GW_NOTIFY_WARNING, "LAN change not confirmed in %d s, previous settings restored", LAN_CONFIRM_S);
         s_lan_deadline_us = 0;
         lan_apply(&s_lan_saved, true);
     }
@@ -382,7 +384,8 @@ esp_err_t gw_lan_confirm(void)
     cJSON_Delete(json);
     esp_err_t err = text ? gw_config_set_str(GW_KEY_LAN, text) : ESP_ERR_NO_MEM;
     cJSON_free(text);
-    ESP_LOGI(TAG, "LAN settings confirmed");
+    gw_notify("network", GW_NOTIFY_INFO, "LAN settings changed by %s: %s", gw_auth_who()[0] ? gw_auth_who() : "the web UI",
+              s_lan.fixed ? "static address" : "DHCP");
     return err;
 }
 
@@ -402,11 +405,17 @@ static void on_eth_event(void *arg, esp_event_base_t base, int32_t id, void *dat
         s_link_up = true;
         s_link_changes++;
         ESP_LOGI(TAG, "link up");
+        if (s_link_down_us) {
+            gw_notify("network", GW_NOTIFY_WARNING, "LAN link was down for %d s",
+                      (int)((esp_timer_get_time() - s_link_down_us) / 1000000));
+            s_link_down_us = 0;
+        }
         esp_netif_create_ip6_linklocal(s_netif);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         s_link_up = false;
         s_link_changes++;
+        s_link_down_us = esp_timer_get_time();
         xEventGroupClearBits(s_events, BIT_IP4 | BIT_IP6);
         ESP_LOGW(TAG, "link down");
         break;

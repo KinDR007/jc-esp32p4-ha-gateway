@@ -99,6 +99,10 @@ static void check(void)
     } else if (!version || !image || strlen(version) >= sizeof(s_up.latest)) {
         set_error("manifest: %s", "expected {\"version\", \"p4gw\"}");
     } else {
+        if (strcmp(s_up.latest, version) != 0 && strcmp(version, esp_app_get_description()->version) != 0) {
+            gw_notify("system", GW_NOTIFY_INFO, "Firmware update %s available (running %s)", version,
+                      esp_app_get_description()->version);
+        }
         strlcpy(s_up.latest, version, sizeof(s_up.latest));
         resolve_url(url, image, s_up.image_url, sizeof(s_up.image_url));
         strlcpy(s_up.notes, GW_JSON_STR(m, "notes") ? GW_JSON_STR(m, "notes") : "", sizeof(s_up.notes));

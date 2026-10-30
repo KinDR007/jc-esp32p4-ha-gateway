@@ -98,6 +98,7 @@ static void close_client_locked(void)
         shutdown(s_client, SHUT_RDWR);
         s_client = -1;
         ESP_LOGI(TAG, "client %s disconnected", s_client_addr);
+        gw_notify("network", GW_NOTIFY_WARNING, "Zigbee2MQTT %s disconnected", s_client_addr);
     }
 }
 
@@ -243,6 +244,7 @@ static void server_task(void *arg)
         }
         uart_flush_input(UART_PORT);
         s_client = sock;
+        gw_notify("network", GW_NOTIFY_INFO, "Zigbee2MQTT connected from %s", s_client_addr);
         s_stats.sessions++;
         s_stats.session_start_us = esp_timer_get_time();
         xSemaphoreGive(s_client_lock);

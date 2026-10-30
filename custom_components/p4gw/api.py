@@ -33,11 +33,19 @@ class P4RequestError(P4Error):
 class P4Client:
     """REST and push client of one gateway."""
 
-    def __init__(self, host: str, session: aiohttp.ClientSession, password: str | None = None) -> None:
+    def __init__(
+        self, host: str, session: aiohttp.ClientSession, password: str | None = None, token: str | None = None
+    ) -> None:
         self.host = host
         self._session = session
-        token = base64.b64encode(f"admin:{password}".encode()).decode() if password else None
-        self._headers = {"Authorization": f"Basic {token}"} if token else None
+        # an API token (firmware with user accounts); the admin password of older entries as Basic
+        if token:
+            self._headers = {"Authorization": f"Bearer {token}"}
+        elif password:
+            basic = base64.b64encode(f"admin:{password}".encode()).decode()
+            self._headers = {"Authorization": f"Basic {basic}"}
+        else:
+            self._headers = None
 
     async def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
         try:
@@ -47,6 +55,8 @@ class P4Client:
                 if resp.status == 401:
                     raise P4AuthError
                 data = await resp.json(content_type=None)
+                if resp.status == 403:
+                    raise P4RequestError("the API token has no right to do this (role of the token)")
                 if resp.status >= 400:
                     raise P4RequestError(data.get("error", resp.reason) if isinstance(data, dict) else resp.reason)
                 return data
@@ -61,6 +71,10 @@ class P4Client:
 
     async def sound_events(self) -> list[dict[str, Any]]:
         return (await self._request("GET", "/api/sound/events"))["events"]
+
+    async def notifications(self, since: int) -> dict[str, Any]:
+        """Notifications the gateway keeps, newer than seq since: {"notifications": [...], "seq"}."""
+        return await self._request("GET", f"/api/notify?since={since}")
 
     async def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
         return await self._request("POST", path, body if body is not None else {})

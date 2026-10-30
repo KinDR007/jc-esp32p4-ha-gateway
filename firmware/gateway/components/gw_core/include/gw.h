@@ -90,6 +90,8 @@ void gw_set_maintenance(const char *fmt, ...) __attribute__((format(printf, 1, 2
 /* ---- boot control ---- */
 /* Counts boots that crash before reaching stable uptime; true when the limit is hit. */
 bool gw_boot_loop_detected(void);
+/* this run follows a restart to recover from a failure (valid after gw_boot_loop_detected) */
+bool gw_boot_after_failure(void);
 /* Marks the image valid and resets the boot loop counter, called once the gateway is up. */
 void gw_boot_mark_stable(void);
 /* Boots the ESPHome slot on the next restart. */
@@ -145,6 +147,10 @@ int gw_auth_request_count(void);
 /* ---- notifications (gw_notify.c): security, system, network, sound ---- */
 typedef enum { GW_NOTIFY_INFO, GW_NOTIFY_WARNING, GW_NOTIFY_CRITICAL } gw_notify_level_t;
 void gw_notify(const char *topic, gw_notify_level_t level, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+void gw_notify_boot(bool after_failure);
+void gw_notify_register(void);
+/* one more consumer of every notification (the Telegram bot); called in the notifying task */
+void gw_notify_set_listener(void (*listener)(const char *topic, gw_notify_level_t level, const char *text));
 
 /* ---- HTTP ---- */
 esp_err_t gw_http_start(void);
