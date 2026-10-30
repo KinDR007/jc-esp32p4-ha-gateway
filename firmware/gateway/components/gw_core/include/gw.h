@@ -106,6 +106,13 @@ esp_netif_t *gw_eth_netif(void);
 bool gw_eth_wait_ip(TickType_t timeout);
 cJSON *gw_eth_status(void);
 
+/* ---- internet reachability (TCP to github.com:443 every minute) ---- */
+void gw_inet_start(void);
+/* -1 not checked yet, 0 unreachable, 1 reachable */
+int gw_inet_state(void);
+/* seconds since the last check, -1 before the first */
+double gw_inet_age_s(void);
+
 /* ---- log ring buffer ---- */
 esp_err_t gw_log_init(size_t size);
 /* Copies log text starting at *seq, advances *seq. Returns bytes copied. */
@@ -121,6 +128,8 @@ esp_err_t gw_http_register(const char *uri, httpd_method_t method, esp_err_t (*h
 esp_err_t gw_http_send_json(httpd_req_t *req, cJSON *json);
 /* Sends {"topic","payload"} to the clients of /api/ws (what goes to MQTT, without a broker). */
 void gw_http_push(const char *topic, const char *payload);
+/* Clients connected to /api/ws (the Home Assistant integration). Call from the server task. */
+int gw_http_ws_clients(void);
 esp_err_t gw_http_send_error(httpd_req_t *req, int status, const char *message);
 /* Reads a JSON body (max 4 KiB). NULL after an error response was sent. */
 cJSON *gw_http_read_json(httpd_req_t *req);
@@ -191,6 +200,8 @@ void gw_mqtt_entity(const char *component, const char *object_id, const char *na
  * cfg NULL removes the entity. component "device_automation" for device triggers. */
 void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg);
 bool gw_mqtt_connected(void);
+/* "off" (not configured or disabled), "connected" or "disconnected" */
+const char *gw_mqtt_link(void);
 /* Publishes to <base>/<suffix>, QoS 1. */
 void gw_mqtt_publish(const char *suffix, const char *payload, bool retain);
 const char *gw_mqtt_base_topic(void);

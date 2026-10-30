@@ -21,6 +21,11 @@
   a password; 16 and 32 px drawn simplified).
 - Home Assistant › Guide: card of the P4 Gateway integration with one-click My Home Assistant buttons
   (open the repository in HACS, start the setup); the same badges in README and docs.
+- Web UI header in the style of SMLIGHT: status tags (outlined when working, grey when off) for LAN,
+  the active role, its client (Zigbee2MQTT or OTBR REST), the P4 Gateway integration (`/api/ws`
+  clients), MQTT and internet; device uptime with the Zigbee2MQTT session or C6 uptime below it, and the
+  gateway clock once SNTP has set it. Firmware: `links` in `/api/status` (`mqtt`, `ha_clients`,
+  `internet`, `internet_age_s`); internet means a TCP connection to github.com:443, checked every minute.
 - Fix: `auth` in `/api/status` read the password into a 2-byte buffer, so a set password showed as
   none (the UI warned about a missing password) and a removed one as set. TC11 checks it.
 - C6 slots layout: the Thread RCP, Zigbee router, Zigbee coordinator and scanner firmwares sit in

@@ -226,6 +226,18 @@ static void ws_send_all(void *arg)
     }
 }
 
+int gw_http_ws_clients(void)
+{
+    int fds[CONFIG_LWIP_MAX_SOCKETS], n = 0;
+    size_t count = sizeof(fds) / sizeof(fds[0]);
+    if (s_server && httpd_get_client_list(s_server, &count, fds) == ESP_OK) {
+        for (size_t i = 0; i < count; i++) {
+            n += httpd_ws_get_fd_info(s_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET;
+        }
+    }
+    return n;
+}
+
 void gw_http_push(const char *topic, const char *payload)
 {
     if (!s_push_queue) {

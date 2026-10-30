@@ -294,6 +294,7 @@ void app_main(void)
     sound_init();
     gw_mqtt_start();
     gw_update_start();
+    gw_inet_start();
 
     if (boot_loop) {
         gw_set_maintenance("repeated crashes during start, role %s not started", gw_role_name(st->desired));

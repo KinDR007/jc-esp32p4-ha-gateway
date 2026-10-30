@@ -1,4 +1,4 @@
-idf_component_register(SRCS "gw_api.c" "gw_boot.c" "gw_config.c" "gw_eth.c" "gw_http.c" "gw_log.c" "gw_mqtt.c" "gw_update.c"
+idf_component_register(SRCS "gw_api.c" "gw_boot.c" "gw_config.c" "gw_eth.c" "gw_http.c" "gw_inet.c" "gw_log.c" "gw_mqtt.c" "gw_update.c"
                        INCLUDE_DIRS "include"
                        REQUIRES esp_http_server esp_netif esp_partition json
                        PRIV_REQUIRES app_update c6_flasher esp_driver_tsens esp_eth esp_psram

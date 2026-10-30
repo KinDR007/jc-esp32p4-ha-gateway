@@ -347,6 +347,15 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddItemToObject(json, "hw", hw_json());
     cJSON_AddItemToObject(json, "update", gw_update_status());
     cJSON_AddNumberToObject(json, "identify_s", gw_identify_left());
+    cJSON *links = cJSON_AddObjectToObject(json, "links");
+    cJSON_AddStringToObject(links, "mqtt", gw_mqtt_link());
+    cJSON_AddNumberToObject(links, "ha_clients", gw_http_ws_clients());
+    if (gw_inet_state() < 0) {
+        cJSON_AddNullToObject(links, "internet");
+    } else {
+        cJSON_AddBoolToObject(links, "internet", gw_inet_state());
+    }
+    cJSON_AddNumberToObject(links, "internet_age_s", (int)gw_inet_age_s());
     if (s_role_status) {
         cJSON_AddItemToObject(json, "role_status", s_role_status());
     }

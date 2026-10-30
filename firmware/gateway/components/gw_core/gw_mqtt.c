@@ -160,6 +160,11 @@ bool gw_mqtt_connected(void)
     return s_client && s_connected;
 }
 
+const char *gw_mqtt_link(void)
+{
+    return !s_client ? "off" : s_connected ? "connected" : "disconnected";
+}
+
 void gw_mqtt_publish(const char *suffix, const char *payload, bool retain)
 {
     char buf[128];
