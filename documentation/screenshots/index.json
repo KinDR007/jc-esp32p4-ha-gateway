@@ -1,0 +1,565 @@
+{
+ "overview": {
+  "page": "overview",
+  "cards": [
+   {
+    "title": "ROLE",
+    "file": "overview__1"
+   },
+   {
+    "title": "NETWORK",
+    "file": "overview__2"
+   },
+   {
+    "title": "ESP32-P4",
+    "file": "overview__3"
+   },
+   {
+    "title": "ESP32-C6 RADIO",
+    "file": "overview__4"
+   }
+  ]
+ },
+ "role": {
+  "page": "role",
+  "cards": [
+   {
+    "title": "SELECT ROLE",
+    "file": "role__1"
+   }
+  ]
+ },
+ "thread/info": {
+  "page": "thread_info",
+  "cards": [
+   {
+    "title": "THREAD",
+    "file": "thread_info__1"
+   },
+   {
+    "title": "BORDER ROUTING",
+    "file": "thread_info__2"
+   }
+  ]
+ },
+ "thread/topology": {
+  "page": "thread_topology",
+  "cards": [
+   {
+    "title": "NETWORK MAP",
+    "file": "thread_topology__1"
+   },
+   {
+    "title": "DEVICES IN THE NETWORK",
+    "file": "thread_topology__2"
+   },
+   {
+    "title": "NEIGHBORS (7)",
+    "file": "thread_topology__3"
+   },
+   {
+    "title": "ROUTERS (11)",
+    "file": "thread_topology__4"
+   }
+  ]
+ },
+ "thread/diag": {
+  "page": "thread_diag",
+  "cards": [
+   {
+    "title": "RADIO CO-PROCESSOR (RCP)",
+    "file": "thread_diag__1"
+   },
+   {
+    "title": "MAC COUNTERS",
+    "file": "thread_diag__2"
+   },
+   {
+    "title": "OPENTHREAD CLI",
+    "file": "thread_diag__3"
+   }
+  ]
+ },
+ "thread/settings": {
+  "page": "thread_settings",
+  "cards": [
+   {
+    "title": "NETWORK DATASET",
+    "file": "thread_settings__1"
+   },
+   {
+    "title": "TRANSMIT POWER",
+    "file": "thread_settings__2"
+   }
+  ]
+ },
+ "zigbee/network": {
+  "page": "zigbee_network",
+  "cards": [
+   {
+    "title": "ZIGBEE2MQTT",
+    "file": "zigbee_network__1"
+   },
+   {
+    "title": "PERMIT JOIN",
+    "file": "zigbee_network__2"
+   },
+   {
+    "title": "NETWORK MAP",
+    "file": "zigbee_network__3"
+   },
+   {
+    "title": "ZIGBEE DEVICES",
+    "file": "zigbee_network__4"
+   }
+  ]
+ },
+ "sound/live": {
+  "page": "sound_live",
+  "cards": [
+   {
+    "title": "MICROPHONE",
+    "file": "sound_live__1"
+   },
+   {
+    "title": "NOISE LEVEL",
+    "file": "sound_live__2"
+   },
+   {
+    "title": "SOUND RECOGNITION (YAMNET)",
+    "file": "sound_live__3"
+   },
+   {
+    "title": "HEARD NOW",
+    "file": "sound_live__4"
+   }
+  ]
+ },
+ "sound/events": {
+  "page": "sound_events",
+  "cards": [
+   {
+    "title": "EVENTS SENT TO HOME ASSISTANT",
+    "file": "sound_events__1"
+   }
+  ]
+ },
+ "sound/log": {
+  "page": "sound_log",
+  "cards": [
+   {
+    "title": "DETECTION LOG",
+    "file": "sound_log__1"
+   }
+  ]
+ },
+ "sound/classes": {
+  "page": "sound_classes",
+  "cards": [
+   {
+    "title": "ALL SOUNDS (521)",
+    "file": "sound_classes__1"
+   }
+  ]
+ },
+ "sound/learn": {
+  "page": "sound_learn",
+  "cards": [
+   {
+    "title": "RECORD",
+    "file": "sound_learn__1"
+   },
+   {
+    "title": "BACKGROUND",
+    "file": "sound_learn__2"
+   },
+   {
+    "title": "LEARNED SOUNDS",
+    "file": "sound_learn__3"
+   }
+  ]
+ },
+ "ha/guide": {
+  "page": "ha_guide",
+  "cards": [
+   {
+    "title": "P4 GATEWAY INTEGRATION",
+    "file": "ha_guide__1"
+   },
+   {
+    "title": "THREAD BORDER ROUTER → HOME ASSISTANT",
+    "file": "ha_guide__2"
+   }
+  ]
+ },
+ "ha/mqtt": {
+  "page": "ha_mqtt",
+  "cards": [
+   {
+    "title": "MQTT (OPTIONAL)",
+    "file": "ha_mqtt__1"
+   }
+  ]
+ },
+ "ha/esphome": {
+  "page": "ha_esphome",
+  "cards": [
+   {
+    "title": "ESPHOME BLE PROXY ROLE",
+    "file": "ha_esphome__1"
+   }
+  ]
+ },
+ "system/info": {
+  "page": "system_info",
+  "cards": [
+   {
+    "title": "FIRMWARE SLOTS",
+    "file": "system_info__1"
+   },
+   {
+    "title": "ESP32-P4",
+    "file": "system_info__2"
+   },
+   {
+    "title": "MEMORY",
+    "file": "system_info__3"
+   },
+   {
+    "title": "FIRMWARE",
+    "file": "system_info__4"
+   },
+   {
+    "title": "ESP32-C6 RADIO",
+    "file": "system_info__5"
+   }
+  ]
+ },
+ "system/lan": {
+  "page": "system_lan",
+  "cards": [
+   {
+    "title": "LAN SETTINGS",
+    "file": "system_lan__1"
+   },
+   {
+    "title": "CURRENT STATE",
+    "file": "system_lan__2"
+   },
+   {
+    "title": "TRAFFIC",
+    "file": "system_lan__3"
+   }
+  ]
+ },
+ "system/firmware": {
+  "page": "system_firmware",
+  "cards": [
+   {
+    "title": "GATEWAY FIRMWARE",
+    "file": "system_firmware__1"
+   },
+   {
+    "title": "ESPHOME IMAGE",
+    "file": "system_firmware__2"
+   },
+   {
+    "title": "C6 FIRMWARE BUNDLE",
+    "file": "system_firmware__3"
+   },
+   {
+    "title": "ONLINE UPDATE",
+    "file": "system_firmware__4"
+   }
+  ]
+ },
+ "system/diag": {
+  "page": "system_diag",
+  "cards": [
+   {
+    "title": "PING",
+    "file": "system_diag__1"
+   },
+   {
+    "title": "DIAGNOSTICS",
+    "file": "system_diag__2"
+   },
+   {
+    "title": "LOG",
+    "file": "system_diag__3"
+   }
+  ]
+ },
+ "system/netscan": {
+  "page": "system_netscan",
+  "cards": [
+   {
+    "title": "SCAN",
+    "file": "system_netscan__1"
+   },
+   {
+    "title": "RECOMMENDATION",
+    "file": "system_netscan__2"
+   },
+   {
+    "title": "2.4 GHZ SPECTRUM",
+    "file": "system_netscan__3"
+   },
+   {
+    "title": "IEEE 802.15.4 CHANNELS",
+    "file": "system_netscan__4"
+   },
+   {
+    "title": "THREAD AND ZIGBEE NETWORKS",
+    "file": "system_netscan__5"
+   },
+   {
+    "title": "WI-FI NETWORKS",
+    "file": "system_netscan__6"
+   }
+  ]
+ },
+ "system/settings": {
+  "page": "system_settings",
+  "cards": [
+   {
+    "title": "HOME ASSISTANT AND MATTER",
+    "file": "system_settings__1"
+   },
+   {
+    "title": "SETTINGS",
+    "file": "system_settings__2"
+   },
+   {
+    "title": "SETTINGS BACKUP",
+    "file": "system_settings__3"
+   }
+  ]
+ },
+ "system/maint": {
+  "page": "system_maint",
+  "cards": [
+   {
+    "title": "MAINTENANCE",
+    "file": "system_maint__1"
+   }
+  ]
+ },
+ "system/notify": {
+  "page": "system_notify",
+  "cards": [
+   {
+    "title": "TELEGRAM BOT",
+    "file": "system_notify__1"
+   },
+   {
+    "title": "HOME ASSISTANT",
+    "file": "system_notify__2"
+   }
+  ]
+ },
+ "system/users/list": {
+  "page": "system_users_list",
+  "cards": [
+   {
+    "title": "USERS",
+    "file": "system_users_list__1"
+   }
+  ]
+ },
+ "system/users/roles": {
+  "page": "system_users_roles",
+  "cards": [
+   {
+    "title": "ROLES AND PERMISSIONS",
+    "file": "system_users_roles__1"
+   }
+  ]
+ },
+ "system/users/tokens": {
+  "page": "system_users_tokens",
+  "cards": [
+   {
+    "title": "API TOKENS",
+    "file": "system_users_tokens__1"
+   }
+  ]
+ },
+ "system/users/requests": {
+  "page": "system_users_requests",
+  "cards": [
+   {
+    "title": "PASSWORD RESET REQUESTS",
+    "file": "system_users_requests__1"
+   }
+  ]
+ },
+ "system/users/policy": {
+  "page": "system_users_policy",
+  "cards": [
+   {
+    "title": "SIGN-IN SECURITY",
+    "file": "system_users_policy__1"
+   }
+  ]
+ },
+ "profile": {
+  "page": "profile",
+  "cards": [
+   {
+    "title": "ACCOUNT",
+    "file": "profile__1"
+   },
+   {
+    "title": "TWO-FACTOR SIGN-IN",
+    "file": "profile__2"
+   },
+   {
+    "title": "TELEGRAM AND NOTIFICATIONS",
+    "file": "profile__3"
+   }
+  ]
+ },
+ "overview__zigbee": {
+  "page": "overview__zigbee",
+  "cards": [
+   {
+    "title": "ROLE",
+    "file": "overview__zigbee__1"
+   },
+   {
+    "title": "NETWORK",
+    "file": "overview__zigbee__2"
+   },
+   {
+    "title": "ESP32-P4",
+    "file": "overview__zigbee__3"
+   },
+   {
+    "title": "ESP32-C6 RADIO",
+    "file": "overview__zigbee__4"
+   }
+  ]
+ },
+ "role__zigbee": {
+  "page": "role__zigbee",
+  "cards": [
+   {
+    "title": "SELECT ROLE",
+    "file": "role__zigbee__1"
+   }
+  ]
+ },
+ "zigbee/info__zigbee": {
+  "page": "zigbee_info__zigbee",
+  "cards": [
+   {
+    "title": "COORDINATOR BRIDGE",
+    "file": "zigbee_info__zigbee__1"
+   }
+  ]
+ },
+ "zigbee/diag__zigbee": {
+  "page": "zigbee_diag__zigbee",
+  "cards": [
+   {
+    "title": "TRAFFIC",
+    "file": "zigbee_diag__zigbee__1"
+   },
+   {
+    "title": "C6 LINK",
+    "file": "zigbee_diag__zigbee__2"
+   }
+  ]
+ },
+ "zigbee/backups__zigbee": {
+  "page": "zigbee_backups__zigbee",
+  "cards": [
+   {
+    "title": "ZIGBEE NETWORK BACKUPS",
+    "file": "zigbee_backups__zigbee__1"
+   }
+  ]
+ },
+ "zigbee/network__zigbee": {
+  "page": "zigbee_network__zigbee",
+  "cards": [
+   {
+    "title": "ZIGBEE2MQTT",
+    "file": "zigbee_network__zigbee__1"
+   },
+   {
+    "title": "PERMIT JOIN",
+    "file": "zigbee_network__zigbee__2"
+   },
+   {
+    "title": "NETWORK MAP",
+    "file": "zigbee_network__zigbee__3"
+   },
+   {
+    "title": "ZIGBEE DEVICES",
+    "file": "zigbee_network__zigbee__4"
+   }
+  ]
+ },
+ "ha/guide__zigbee": {
+  "page": "ha_guide__zigbee",
+  "cards": [
+   {
+    "title": "P4 GATEWAY INTEGRATION",
+    "file": "ha_guide__zigbee__1"
+   },
+   {
+    "title": "ZIGBEE COORDINATOR → ZIGBEE2MQTT (RECOMMENDED)",
+    "file": "ha_guide__zigbee__2"
+   }
+  ]
+ },
+ "overview__router": {
+  "page": "overview__router",
+  "cards": [
+   {
+    "title": "ROLE",
+    "file": "overview__router__1"
+   },
+   {
+    "title": "NETWORK",
+    "file": "overview__router__2"
+   },
+   {
+    "title": "ESP32-P4",
+    "file": "overview__router__3"
+   },
+   {
+    "title": "ESP32-C6 RADIO",
+    "file": "overview__router__4"
+   }
+  ]
+ },
+ "zigbee/info__router": {
+  "page": "zigbee_info__router",
+  "cards": [
+   {
+    "title": "ZIGBEE ROUTER",
+    "file": "zigbee_info__router__1"
+   },
+   {
+    "title": "NETWORK MEMBERSHIP",
+    "file": "zigbee_info__router__2"
+   },
+   {
+    "title": "TRANSMIT POWER",
+    "file": "zigbee_info__router__3"
+   }
+  ]
+ },
+ "zigbee/diag__router": {
+  "page": "zigbee_diag__router",
+  "cards": [
+   {
+    "title": "ZIGBEE ROUTER",
+    "file": "zigbee_diag__router__1"
+   }
+  ]
+ }
+}
