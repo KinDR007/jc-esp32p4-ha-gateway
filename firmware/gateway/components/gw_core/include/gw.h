@@ -213,15 +213,18 @@ void gw_upload_end(void);
 const esp_partition_t *gw_other_gateway_slot(void);
 
 /* Online update from a manifest URL (GW_KEY_UPDATE_URL):
- *   {"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "..."}
+ *   {"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "...", "layouts": [2, 3]}
  * "p4gw" may be relative to the manifest. Checked every 6 h; offered to Home Assistant as an MQTT
- * update entity. */
+ * update entity. releases.json next to the manifest lists older releases; those that run on the flash
+ * layout of this board can be installed too (rollback). */
 void gw_update_start(void);
 void gw_update_check_soon(void);
-/* Starts the download and installation of the offered version; restarts when done. */
-esp_err_t gw_update_install(void);
-/* Downloads the offered C6 package into PSRAM, checks it, stores it and restarts (the C6 is updated at start). */
-esp_err_t gw_update_install_c6(void);
+/* Starts the download and installation of a listed release (NULL or "": the offered one); restarts
+ * when done. ESP_ERR_NOT_FOUND: nothing offered or not listed. */
+esp_err_t gw_update_install(const char *version);
+/* Downloads the C6 package of a listed release (NULL or "": the offered one) into PSRAM, checks it,
+ * stores it and restarts (the C6 is updated at start). */
+esp_err_t gw_update_install_c6(const char *version);
 /* The c6fw partition changed (upload in the web UI): compare it with the offered package again. */
 void gw_update_c6_changed(void);
 /* Start-up: the C6 needs firmwares the gateway does not hold; downloads the package of the manifest

@@ -23,6 +23,8 @@
 - [x] Uživatelé etapa 3: Telegram bot
 - [x] Online aktualizace C6 (krok A): manifest s balíkem C6, stažení do PSRAM, HA, Telegram, CI vydání, TC36
 - [x] Repozitář veřejný, vydání v1.5 a v1.6 na GitHubu, výchozí URL manifestu GitHub Releases
+- [x] Návrat na starší vydání (jen kompatibilní s layoutem desky): releases.json, UI, HA, Telegram, TC37; ověřen rollback v1.6-dirty → v1.6 → zpět a balík C6 z v1.6
+- [ ] Ověřit /releases a /install v… se skutečným Telegram botem a update.install s verzí v UI HA
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
 - [x] Krok B na desce: migrace na layout v3 (2026-10-30), stažení balíku při startu, reinstalace layoutu z PSRAM, přepnutí rolí bez stahování, TC04/05/12/35/36; vydání v1.6
 - [x] Integrace 1.2.0 v HA (entita Firmware rádia C6, přihlášení tokenem) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)

@@ -85,6 +85,7 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 | Gateway, online | UI System → Firmware → Online update, or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
 | C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
 | C6 firmware, online | UI System → Firmware → Online update → **Install C6 package**, the *C6 radio firmware* update entity in Home Assistant, or Telegram `/install c6` | downloaded into PSRAM, sha256 of the file compared with the manifest and the header checked before the c6fw partition is erased; then a restart updates the C6 |
+| Older release (rollback) | UI System → Firmware → Online update → *Releases for this gateway*, `update.install` with `version` in Home Assistant, or Telegram `/releases`, `/install v1.6`, `/install c6 v1.6` | only releases whose manifest names the flash layout of the board; the manifest of the picked release is checked again before the download |
 
 Uploads are refused for the first 60 s after a gateway update, until the new image is confirmed.
 
@@ -94,7 +95,7 @@ server the gateway reaches, e.g. `/config/www/p4gw/` of Home Assistant, and set
 `http://<ha>:8123/local/p4gw/manifest.json` as the manifest URL.
 
 ```json
-{"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "...",
+{"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "...", "layouts": [2, 3],
  "build": {"commit": "abc1234", "date": "2026-10-30", "idf": "v5.5.5", "ci": "..."},
  "c6fw": {"url": "c6fw.bin", "sha256": "...", "size": 2015232, "format": 3,
           "bundles": {"slots": "4 firmware slots", "ot_rcp": "esp_ot_rcp v5.5.5-p4gw.3", "...": "..."}}}
@@ -106,13 +107,35 @@ nothing is downloaded until someone installs. A package of another `format` is o
 gateway that reads it, so the gateway goes first. HTTPS works with the ESP-IDF certificate bundle.
 The ESPHome image is still uploaded in the UI (CI does not build it, it needs the API key).
 
+`layouts` names the flash layouts the gateway firmware runs on (`LAYOUTS` in
+`scripts/make_update_manifest.py`; raise it with a new layout). A manifest that names layouts
+without the board's one is not offered.
+
+Older releases (rollback): `releases.json` next to the manifest (`scripts/make_releases_index.py`,
+published with each release) lists the releases with a manifest, newest first:
+
+```json
+{"releases": [{"version": "v1.6", "tag": "v1.6", "date": "2026-10-30", "manifest": "https://.../v1.6/manifest.json",
+  "url": "https://.../releases/tag/v1.6", "layouts": [2, 3], "c6": "0cc0a7ad", "notes": "..."}]}
+```
+
+The gateway reads it with every check and offers the releases (at most 10) that name its layout:
+on layout v3 v1.6 and later. Older ones are never offered: v1.5 and before cannot read the C6
+package of layout v3, v1.4 and before have no user accounts (the gateway would be open), and
+manifests before v1.6 name no layout. A picked release is installed like an update (gateway or C6
+package separately, `POST /api/update/install {"version": "v1.6"}` or `{"target": "c6", "version": "v1.6"}`);
+settings stay, functions added later are missing until the next update. The status
+(`/api/status` → `update.releases`, `update.layout`) lists them. A self-hosted manifest without
+`releases.json` simply offers no older releases.
+
 Releases: pushing a tag `v*` runs `.github/workflows/release.yml`: it builds `p4gw.bin` and `c6fw.bin`,
 takes the notes from the CHANGELOG section of the tag (or *Unreleased*, `scripts/release_notes.py`)
 and publishes a GitHub release with `manifest.json` (absolute URLs of the tag). The gateway reads
 `https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json`: the
 default while no URL is saved (button *GitHub Releases* puts it back; a saved empty URL turns the
 online update off). The release text holds the CHANGELOG section and the commits since the previous
-tag (`scripts/release_notes.py`); the manifest only the section.
+tag (`scripts/release_notes.py`); the manifest only the section. Each release also carries
+`releases.json` (the list of older releases, see above).
 
 CI (GitHub Actions, `.github/workflows/ci.yml`): `scripts/ci_checks.sh` (unit test, Python and web
 UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 firmwares,

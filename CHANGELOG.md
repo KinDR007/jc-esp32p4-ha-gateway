@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Online update: older releases can be installed (rollback), the gateway firmware and the C6 package
+  separately. Each release carries `releases.json`; the gateway offers only the releases whose manifest
+  names its flash layout (`layouts`, from v1.6), so on layout v3 nothing older than v1.6. Web UI
+  (*Releases for this gateway*), Home Assistant (`update.install` with `version`, attribute
+  `available_versions`), Telegram (`/releases`, `/install v1.6`, `/install c6 v1.6`).
+- Fix: the online update checked every 125 s instead of every 6 h (tick overflow).
+
 ## v1.6 (2026-10-30)
 
 **Flash layout v3 needs one USB flash to free the space** (`scripts/migrate_layout_v3.sh <port>`, keeps

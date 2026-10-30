@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the manifest of an online update next to p4gw.bin (and c6fw.bin).
 
-    {"version", "p4gw", "notes", "release_url",
+    {"version", "p4gw", "notes", "release_url", "layouts",
      "build": {"commit", "date", "idf", "ci"},
      "c6fw": {"url", "sha256", "size", "format", "bundles": {name: version}}}
 
@@ -24,6 +24,9 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# flash layouts (docs/installation.md) the gateway firmware of this tree runs on; the gateway installs
+# a release only when its layout is listed (an older release on a newer layout loses the C6 firmware)
+LAYOUTS = [2, 3]
 
 
 def app_version(path: Path) -> str:
@@ -71,7 +74,7 @@ def main() -> None:
         raise SystemExit(f"{gateway} missing, run scripts/build_all.sh")
     url = lambda name: f"{a.base_url.rstrip('/')}/{name}" if a.base_url else name
     notes = Path(a.notes_file).read_text().strip() if a.notes_file else a.notes
-    m = {"version": app_version(gateway), "p4gw": url("p4gw.bin")}
+    m = {"version": app_version(gateway), "p4gw": url("p4gw.bin"), "layouts": LAYOUTS}
     if notes:
         m["notes"] = notes[:1000]
     if a.release_url:

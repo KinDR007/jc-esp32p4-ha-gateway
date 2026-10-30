@@ -51,7 +51,8 @@ Each user, My account › Telegram and notifications:
 | `/noise` | Sound › Live, read | – |
 | `/events` | Sound › Detection log, read | – |
 | `/update` (gateway and C6 versions, build, release notes) | System › Firmware, read | – |
-| `/install`, `/install c6` (gateway firmware, C6 package) | System › Firmware, edit | yes |
+| `/releases` (releases this gateway can install) | System › Firmware, read | – |
+| `/install`, `/install c6` (gateway firmware, C6 package), `/install v1.6`, `/install c6 v1.6` (a listed release, rollback) | System › Firmware, edit | yes |
 | `/restart` (C6 and P4) | System › Maintenance, edit | yes |
 | `/identify` | Overview, edit | yes |
 | `/role <name>` | Role, edit | yes |

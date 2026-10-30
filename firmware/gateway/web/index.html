@@ -1044,6 +1044,7 @@ const TIPS = {
   'Background score': ['Highest score the background recordings reach for this sound. It has to stay below the samples.', 'Nejvyšší skóre, kterého pro tento zvuk dosáhnou nahrávky pozadí. Musí zůstat pod vzorky.'],
   'Suggested threshold': ['Halfway between the background and the samples; used by Create event and editable there.', 'Uprostřed mezi pozadím a vzorky; použije ho Vytvořit událost a dá se tam upravit.'],
   'Learned score now': ['Score of the last recognition window, to test: play the sound and watch it rise above the threshold.', 'Skóre posledního okna rozpoznávání, pro test: pusťte zvuk a sledujte, jestli přesáhne práh.'],
+  'Releases': ['Releases from releases.json next to the manifest that run on the flash layout of this board (older ones would lose the C6 firmware or the user accounts). Installing an older one is a rollback: settings stay, functions added later are missing until the next update. The gateway firmware and the C6 package install separately.', 'Vydání ze souboru releases.json vedle manifestu, která běží na layoutu flash této desky (starší by přišla o firmware C6 nebo o uživatelské účty). Instalace staršího vydání je návrat zpět: nastavení zůstane, později přidané funkce chybí do další aktualizace. Firmware brány a balík C6 se instalují zvlášť.'],
   'Update URL': ['Manifest of the online update. By default the latest GitHub release of the project (button GitHub Releases); your own server works too (scripts/make_update_manifest.py, e.g. /config/www/p4gw/ of Home Assistant). Checked every 6 hours; the gateway firmware and the C6 package are installed only on request. Saved empty: off.', 'Manifest online aktualizace. Výchozí je poslední vydání projektu na GitHubu (tlačítko GitHub Releases); funguje i vlastní server (scripts/make_update_manifest.py, např. /config/www/p4gw/ Home Assistant). Kontroluje se každých 6 hodin; firmware brány i balík C6 se instalují jen na vyžádání. Uloženo prázdné: vypnuto.'],
   'Settings backup': ['Role, Thread networks, MQTT, Home Assistant, transmit power and sound settings as one file, for a new board or after an NVS erase. Board state (C6 firmware, counters) is not part of it. Zigbee network data is backed up separately (C6 snapshots).', 'Role, sítě Thread, MQTT, Home Assistant, vysílací výkon a nastavení zvuku v jednom souboru, pro novou desku nebo po smazání NVS. Stav desky (firmware C6, čítače) v něm není. Data sítě Zigbee se zálohují zvlášť (snapshoty C6).'],
   'Previous log': ['The last 16 KiB of log before the last restart (requested, watchdog or crash). Not kept over a power cut.', 'Posledních 16 KiB logu před posledním restartem (vyžádaným, watchdogem i pádem). Výpadek napájení ho nepřežije.'],
@@ -2262,14 +2263,28 @@ function updateCard() {
       <div class="row" style="margin-top:8px"><button class="btn primary" id="upd-install-c6" ${c6.available && !c6.in_progress && !u.in_progress ? '' : 'disabled'}>${ic('chip')}${L('Install C6 package', 'Instalovat balík C6')}</button></div>
       ${c6.in_progress ? bar(c6.percent) : ''}</div></div>
       ${u.release_summary ? `<h4 style="margin:14px 0 6px">${L('Release notes', 'Poznámky k vydání')}</h4><p style="white-space:pre-wrap" data-notr>${esc(u.release_summary)}</p>` : ''}
+      ${releasesTable(u)}
       <p class="muted">${L('Checked', 'Zkontrolováno')} ${new Date(u.checked * 1000).toLocaleString()}. ${L('Install the gateway first: a C6 package of a newer format is offered only to the gateway that reads it.', 'Nejdřív instalujte bránu: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.')}</p>` : ''}</div>`;
 }
 
-async function installC6() {
+/* Releases of releases.json that run on the flash layout of this board: installing an older one is a rollback. */
+function releasesTable(u) {
+  const rel = u.releases || [], c6 = u.c6 || {}, busy = u.in_progress || c6.in_progress;
+  if (!rel.length) return '';
+  const rows = rel.map(r => `<tr><td>${esc(r.version)}${r.version === u.installed_version ? ' ' + pill('ok', L('installed', 'nainstalováno')) : ''}</td><td>${esc(r.date || '')}</td>
+    <td>${esc(r.c6 || '–')}${r.c6 && r.c6 === c6.installed_id ? ' ' + pill('ok', L('installed', 'nainstalováno')) : ''}</td>
+    <td class="muted" style="max-width:420px">${esc((r.notes || '').split('\n')[0])}${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener">${L('more', 'více')}</a>` : ''}</td>
+    <td style="white-space:nowrap"><button class="btn" data-rel-gw="${esc(r.version)}" ${busy || r.version === u.installed_version ? 'disabled' : ''}>${ic('download')}${L('Gateway', 'Brána')}</button>
+      <button class="btn" data-rel-c6="${esc(r.version)}" ${busy || !r.c6 || r.c6 === c6.installed_id ? 'disabled' : ''}>${ic('chip')}C6</button></td></tr>`).join('');
+  return `<h4 style="margin:14px 0 6px">${L('Releases for this gateway', 'Vydání pro tuto bránu')}${tip('Releases')}</h4>
+    <div class="table-wrap"><table><thead><tr><th>${L('Version', 'Verze')}</th><th>${L('Date', 'Datum')}</th><th>${L('C6 package', 'Balík C6')}</th><th>${L('Notes', 'Poznámky')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+async function installC6(version) {
   const c6 = status.update.c6;
-  if (!await confirmDialog(L('Install the C6 package?', 'Instalovat balík C6?'), L(`The gateway downloads the package (${fmtBytes(c6.size)}) into RAM, checks it, stores it and restarts; then it writes the new firmware into the C6 radio (about 2 minutes). Thread or Zigbee is down meanwhile.`,
-    `Brána stáhne balík (${fmtBytes(c6.size)}) do RAM, ověří ho, uloží a restartuje se; pak zapíše nový firmware do rádia C6 (asi 2 minuty). Thread nebo Zigbee mezitím neběží.`))) return;
-  await api('/api/update/install', { json: { target: 'c6' } });
+  if (!await confirmDialog(L('Install the C6 package?', 'Instalovat balík C6?'), L(`The gateway downloads the package${version ? ' of ' + version : ` (${fmtBytes(c6.size)})`} into RAM, checks it, stores it and restarts; then it writes the new firmware into the C6 radio (about 2 minutes). Thread or Zigbee is down meanwhile.`,
+    `Brána stáhne balík${version ? ' z vydání ' + version : ` (${fmtBytes(c6.size)})`} do RAM, ověří ho, uloží a restartuje se; pak zapíše nový firmware do rádia C6 (asi 2 minuty). Thread nebo Zigbee mezitím neběží.`))) return;
+  await api('/api/update/install', { json: version ? { target: 'c6', version } : { target: 'c6' } });
   for (let i = 0; i < 300; i++) {
     await new Promise(r => setTimeout(r, 1000));
     let s;
@@ -2282,11 +2297,12 @@ async function installC6() {
   waitForRestart();
 }
 
-async function installUpdate() {
-  const u = status.update;
-  if (!await confirmDialog('Install the update?', L(`The gateway downloads ${u.latest_version} into the inactive slot and restarts. It rolls back automatically if the new version does not start.`,
-    `Brána stáhne ${u.latest_version} do neaktivního slotu a restartuje se. Pokud nová verze nenastartuje, vrátí se automaticky zpět.`))) return;
-  await api('/api/update/install', { method: 'POST' });
+async function installUpdate(version) {
+  const u = status.update, v = version || u.latest_version;
+  if (!await confirmDialog(L('Install the update?', 'Instalovat aktualizaci?'), L(`The gateway downloads ${v} into the inactive slot and restarts. It rolls back automatically if the new version does not start.`,
+    `Brána stáhne ${v} do neaktivního slotu a restartuje se. Pokud nová verze nenastartuje, vrátí se automaticky zpět.`)
+    + (version && version !== u.latest_version ? L(' Settings stay; functions added after this release are not available until you update again.', ' Nastavení zůstane; funkce přidané po tomto vydání nebudou k dispozici, dokud znovu neaktualizujete.') : ''))) return;
+  await api('/api/update/install', version ? { json: { version } } : { method: 'POST' });
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 1000));
     let s;
@@ -3835,6 +3851,10 @@ document.addEventListener('click', async e => {
       await installUpdate();
     } else if (t.id === 'upd-install-c6') {
       await installC6();
+    } else if (t.dataset.relGw) {
+      await installUpdate(t.dataset.relGw);
+    } else if (t.dataset.relC6) {
+      await installC6(t.dataset.relC6);
     } else if (t.id === 'upd-github') {
       $('#upd-url').value = GITHUB_MANIFEST;
       toast(L('Save to use it. The repository must be public for the gateway to download releases.', 'Uložte pro použití. Repozitář musí být veřejný, aby brána mohla vydání stahovat.'));

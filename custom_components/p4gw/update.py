@@ -1,5 +1,6 @@
 """Updates from the manifest URL set on the gateway (System › Firmware › Online update): the gateway
-firmware and the package of the C6 radio firmwares."""
+firmware and the package of the C6 radio firmwares. An older listed release (the releases that run on
+the flash layout of the board) is installed with update.install and its version (rollback)."""
 
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ async def async_setup_entry(
 class P4Update(P4Entity, UpdateEntity):
     _attr_device_class = UpdateDeviceClass.FIRMWARE
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_supported_features = UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
+    _attr_supported_features = UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS | UpdateEntityFeature.SPECIFIC_VERSION
 
     def __init__(self, coordinator: P4Coordinator) -> None:
         super().__init__(coordinator, "firmware")
@@ -37,6 +38,10 @@ class P4Update(P4Entity, UpdateEntity):
     @property
     def installed_version(self) -> str | None:
         return self.coordinator.data.status["version"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"available_versions": [r["version"] for r in self._update.get("releases") or []]}
 
     @property
     def latest_version(self) -> str | None:
@@ -60,8 +65,9 @@ class P4Update(P4Entity, UpdateEntity):
         return self._update.get("percent") if self.in_progress else None
 
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
+        body = {"version": version} if version and version != self._update.get("latest_version") else None
         try:
-            self.coordinator.data.status["update"] = await self.coordinator.client.post("/api/update/install")
+            self.coordinator.data.status["update"] = await self.coordinator.client.post("/api/update/install", body)
         except P4Error as err:
             raise HomeAssistantError(f"Update: {err}") from err
         self.async_write_ha_state()
@@ -72,7 +78,7 @@ class P4C6Update(P4Entity, UpdateEntity):
 
     _attr_device_class = UpdateDeviceClass.FIRMWARE
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_supported_features = UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
+    _attr_supported_features = UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS | UpdateEntityFeature.SPECIFIC_VERSION
     _attr_translation_key = "c6_firmware"
 
     def __init__(self, coordinator: P4Coordinator) -> None:
@@ -85,6 +91,15 @@ class P4C6Update(P4Entity, UpdateEntity):
     @property
     def installed_version(self) -> str | None:
         return self._c6.get("installed_id") or None
+
+    @property
+    def _releases(self) -> list[dict[str, Any]]:
+        return [r for r in (self.coordinator.data.status.get("update") or {}).get("releases") or [] if r.get("c6")]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Packages of the listed releases: install one with update.install, version = its id."""
+        return {"available_versions": {r["c6"]: r["version"] for r in self._releases}}
 
     @property
     def latest_version(self) -> str | None:
@@ -108,8 +123,14 @@ class P4C6Update(P4Entity, UpdateEntity):
         return self._c6.get("percent") if self.in_progress else None
 
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
+        body: dict[str, Any] = {"target": "c6"}
+        if version and version != self.latest_version:
+            release = next((r["version"] for r in self._releases if version in (r["c6"], r["version"])), None)
+            if not release:
+                raise HomeAssistantError(f"C6 update: no listed release has the package {version}")
+            body["version"] = release
         try:
-            self.coordinator.data.status["update"] = await self.coordinator.client.post("/api/update/install", {"target": "c6"})
+            self.coordinator.data.status["update"] = await self.coordinator.client.post("/api/update/install", body)
         except P4Error as err:
             raise HomeAssistantError(f"C6 update: {err}") from err
         self.async_write_ha_state()

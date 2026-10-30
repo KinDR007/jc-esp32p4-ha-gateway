@@ -400,7 +400,7 @@ static void handle_command(const char *t, int tlen, const char *data, int dlen)
     }
     topic(expect, sizeof(expect), "update/install");
     if (strcmp(name, expect) == 0) {
-        esp_err_t err = gw_update_install();
+        esp_err_t err = gw_update_install(NULL);
         ESP_LOGW(TAG, "update via MQTT: %s", esp_err_to_name(err));
     }
 }

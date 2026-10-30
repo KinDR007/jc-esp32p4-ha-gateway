@@ -20,8 +20,11 @@
 
 static const char *TAG = "gw_update";
 
-#define CHECK_INTERVAL_MS (6 * 3600 * 1000)
+/* in ticks: pdMS_TO_TICKS(6 h) overflows (ms * tick rate in 32 bits) and gave 125 s */
+#define CHECK_INTERVAL_TICKS ((TickType_t)6 * 3600 * configTICK_RATE_HZ)
 #define MANIFEST_MAX 8192
+#define RELEASES_MAX 16384 /* releases.json */
+#define RELEASES_KEEP 10
 #define URL_MAX 256
 #define C6FW_SUBTYPE 0x40
 /* releases of the project (.github/workflows/release.yml); used while no URL is stored, "" stored = off */
@@ -59,6 +62,8 @@ static struct {
         uint8_t notified[32]; /* sha256 of the package last announced */
         char installed_id[9]; /* first bytes of the sha256 of the stored package, "" when none */
     } c6;
+    char want[32];   /* release picked for the requested installation, "" = the offered one */
+    char *releases;  /* JSON array of the listed releases this board runs (PSRAM), NULL = no list */
     char error[96];
     int64_t checked;    /* unix time of the last successful check, 0 = never */
     bool installing;
@@ -102,6 +107,48 @@ static int http_get(esp_http_client_handle_t client, esp_err_t *err)
         esp_http_client_close(client);
     }
     return 310; /* too many redirects */
+}
+
+/* GET into a new PSRAM buffer of at most max bytes (NUL terminated, free it); returns the HTTP
+ * status, -1 when the connection failed (err set). */
+static int fetch(const char *url, int max, char **body, esp_err_t *err)
+{
+    esp_http_client_config_t cfg;
+    esp_http_client_handle_t client = http_open(url, &cfg);
+    *body = heap_caps_calloc(1, max + 1, MALLOC_CAP_SPIRAM);
+    int status = -1, len = 0;
+    *err = client && *body ? ESP_OK : ESP_ERR_NO_MEM;
+    if (*err == ESP_OK) {
+        status = http_get(client, err);
+    }
+    if (*err == ESP_OK) {
+        for (int n; len < max && (n = esp_http_client_read(client, *body + len, max - len)) > 0;) {
+            len += n;
+        }
+    }
+    esp_http_client_cleanup(client);
+    return status;
+}
+
+/* Flash layout of this board (docs/installation.md): v3 keeps only a part of the C6 package in a
+ * c6fw partition of 64 kB, v2 the whole package. */
+static int flash_layout(void)
+{
+    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
+    return part && part->size < 0x200000 ? 3 : 2;
+}
+
+/* "layouts" of a manifest or of a releases.json entry names the layout of this board */
+static bool runs_here(const cJSON *layouts)
+{
+    const cJSON *l;
+    cJSON_ArrayForEach(l, layouts)
+    {
+        if (cJSON_IsNumber(l) && l->valueint == flash_layout()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /* "p4gw.bin" relative to the manifest URL, or an absolute URL. */
@@ -177,7 +224,7 @@ static void c6_installed_id(void)
 }
 
 /* Called with the lock held: the C6 part of a manifest (absent: nothing offered). */
-static void c6_offer(const char *manifest_url, const cJSON *c6)
+static void c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
 {
     const cJSON *size = cJSON_GetObjectItem(c6, "size"), *fmt = cJSON_GetObjectItem(c6, "format");
     uint8_t sha[32];
@@ -201,50 +248,40 @@ static void c6_offer(const char *manifest_url, const cJSON *c6)
     s_up.c6.bundles = cJSON_Duplicate(cJSON_GetObjectItem(c6, "bundles"), true);
     uint8_t have[32];
     s_up.c6.current = (c6fw_package_sha(have) || c6_partition_sha(s_up.c6.size, have)) && memcmp(have, sha, 32) == 0;
-    if (!s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
+    if (notify && !s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
         memcpy(s_up.c6.notified, sha, 32);
         gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware update available (%lu kB)", (unsigned long)(s_up.c6.size / 1024));
     }
 }
 
-static void check(void)
+/* Makes the manifest at url the offer; latest: the configured manifest (announced, sets the time of
+ * the check), else a release picked from the list. */
+static esp_err_t check_manifest(const char *url, bool latest)
 {
-    char url[URL_MAX];
-    if (!manifest_url(url, sizeof(url))) {
-        xSemaphoreTake(s_up.lock, portMAX_DELAY);
-        s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
-        c6_offer(NULL, NULL);
-        xSemaphoreGive(s_up.lock);
-        return;
-    }
-    esp_http_client_config_t cfg;
-    esp_http_client_handle_t client = http_open(url, &cfg);
-    char *body = heap_caps_calloc(1, MANIFEST_MAX + 1, MALLOC_CAP_SPIRAM);
-    int status = 0, len = 0;
-    esp_err_t err = client && body ? ESP_OK : ESP_ERR_NO_MEM;
-    if (err == ESP_OK) {
-        status = http_get(client, &err);
-    }
-    if (err == ESP_OK) {
-        for (int n; len < MANIFEST_MAX && (n = esp_http_client_read(client, body + len, MANIFEST_MAX - len)) > 0;) {
-            len += n;
-        }
-    }
-    esp_http_client_cleanup(client);
+    char *body;
+    esp_err_t err;
+    int status = fetch(url, MANIFEST_MAX, &body, &err);
 
     xSemaphoreTake(s_up.lock, portMAX_DELAY);
     cJSON *m = status == 200 ? cJSON_Parse(body) : NULL;
     const char *version = GW_JSON_STR(m, "version"), *image = GW_JSON_STR(m, "p4gw");
+    const cJSON *layouts = cJSON_GetObjectItem(m, "layouts");
     if (err != ESP_OK) {
         set_error("manifest: %s", esp_err_to_name(err));
     } else if (status != 200) {
         char code[16];
         snprintf(code, sizeof(code), "%d", status);
         set_error("manifest: HTTP %s", code);
+        err = ESP_FAIL;
     } else if (!version || !image || strlen(version) >= sizeof(s_up.latest)) {
         set_error("manifest: %s", "expected {\"version\", \"p4gw\"}");
+        err = ESP_ERR_INVALID_RESPONSE;
+    } else if ((layouts || !latest) && !runs_here(layouts)) {
+        /* manifests before v1.6 name no layout: only the configured one is taken without */
+        set_error("%s does not run on the flash layout of this gateway", version);
+        err = ESP_ERR_NOT_SUPPORTED;
     } else {
-        if (strcmp(s_up.latest, version) != 0 && strcmp(version, esp_app_get_description()->version) != 0) {
+        if (latest && strcmp(s_up.latest, version) != 0 && strcmp(version, esp_app_get_description()->version) != 0) {
             gw_notify("system", GW_NOTIFY_INFO, "Firmware update %s available (running %s)", version,
                       esp_app_get_description()->version);
         }
@@ -257,14 +294,115 @@ static void check(void)
         snprintf(s_up.build, sizeof(s_up.build), "%s%s%s%s%s", GW_JSON_STR(b, "commit") ? GW_JSON_STR(b, "commit") : "",
                  GW_JSON_STR(b, "date") ? " · " : "", GW_JSON_STR(b, "date") ? GW_JSON_STR(b, "date") : "",
                  GW_JSON_STR(b, "idf") ? " · ESP-IDF " : "", GW_JSON_STR(b, "idf") ? GW_JSON_STR(b, "idf") : "");
-        c6_offer(url, cJSON_GetObjectItem(m, "c6fw"));
+        c6_offer(url, cJSON_GetObjectItem(m, "c6fw"), latest);
         s_up.error[0] = '\0';
-        s_up.checked = time(NULL);
+        if (latest) {
+            s_up.checked = time(NULL);
+        }
         ESP_LOGI(TAG, "offered %s, running %s", s_up.latest, esp_app_get_description()->version);
+    }
+    if (err != ESP_OK && !latest) {
+        /* nothing of a release that failed stays offered */
+        s_up.latest[0] = s_up.build[0] = '\0';
+        c6_offer(NULL, NULL, false);
     }
     cJSON_Delete(m);
     free(body);
     xSemaphoreGive(s_up.lock);
+    return err;
+}
+
+/* releases.json next to the manifest (scripts/make_releases_index.py): the releases this board runs,
+ * newest first. Kept when it cannot be read, dropped when the server has none. */
+static void fetch_releases(const char *manifest)
+{
+    char url[URL_MAX], *body;
+    esp_err_t err;
+    resolve_url(manifest, "releases.json", url, sizeof(url));
+    int status = fetch(url, RELEASES_MAX, &body, &err);
+    cJSON *index = status == 200 ? cJSON_Parse(body) : NULL;
+    free(body);
+    if (!index && status != 404) {
+        return;
+    }
+    cJSON *list = cJSON_CreateArray();
+    const cJSON *r;
+    cJSON_ArrayForEach(r, cJSON_GetObjectItem(index, "releases"))
+    {
+        if (cJSON_GetArraySize(list) < RELEASES_KEEP && GW_JSON_STR(r, "version") && GW_JSON_STR(r, "manifest") &&
+            runs_here(cJSON_GetObjectItem(r, "layouts"))) {
+            cJSON_AddItemToArray(list, cJSON_Duplicate(r, true));
+        }
+    }
+    char *text = cJSON_PrintUnformatted(list);
+    cJSON_Delete(list);
+    cJSON_Delete(index);
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    cJSON_free(s_up.releases);
+    s_up.releases = text;
+    xSemaphoreGive(s_up.lock);
+}
+
+static void check(void)
+{
+    char url[URL_MAX];
+    if (!manifest_url(url, sizeof(url))) {
+        xSemaphoreTake(s_up.lock, portMAX_DELAY);
+        s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
+        c6_offer(NULL, NULL, false);
+        cJSON_free(s_up.releases);
+        s_up.releases = NULL;
+        xSemaphoreGive(s_up.lock);
+        return;
+    }
+    if (check_manifest(url, true) == ESP_OK) {
+        fetch_releases(url);
+    }
+}
+
+/* Manifest URL of a listed release; false when the list has no such version. */
+static bool release_manifest(const char *version, char *url, size_t len)
+{
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    cJSON *list = s_up.releases ? cJSON_Parse(s_up.releases) : NULL;
+    xSemaphoreGive(s_up.lock);
+    const cJSON *r;
+    bool found = false;
+    cJSON_ArrayForEach(r, list)
+    {
+        const char *v = GW_JSON_STR(r, "version"), *m = GW_JSON_STR(r, "manifest");
+        if (!found && v && m && strcmp(v, version) == 0) {
+            strlcpy(url, m, len);
+            found = true;
+        }
+    }
+    cJSON_Delete(list);
+    return found;
+}
+
+/* Called by the task: the release picked for the installation becomes the offer. */
+static esp_err_t select_release(const char *version)
+{
+    char url[URL_MAX];
+    if (!release_manifest(version, url, sizeof(url))) {
+        set_error("%s is not offered for this gateway", version);
+        return ESP_ERR_NOT_FOUND;
+    }
+    esp_err_t err = check_manifest(url, false);
+    if (err == ESP_OK && strcmp(s_up.latest, version) != 0) {
+        set_error("the manifest of %s names another version", version);
+        err = ESP_ERR_INVALID_RESPONSE;
+    }
+    return err;
+}
+
+/* After a failed installation of a picked release: the latest release is offered again, the error kept. */
+static void restore_offer(void)
+{
+    char error[sizeof(s_up.error)];
+    strlcpy(error, s_up.error, sizeof(error));
+    check();
+    strlcpy(s_up.error, error, sizeof(s_up.error));
 }
 
 static esp_err_t install(void)
@@ -458,18 +596,30 @@ static void update_task(void *arg)
                 s_up.c6.percent = 0;
                 s_up.error[0] = '\0';
                 gw_update_mqtt_state();
-                err = install_c6();
+                err = s_up.want[0] ? select_release(s_up.want) : ESP_OK;
+                if (err == ESP_OK && !s_up.c6.offered) {
+                    set_error("%s", "no C6 package this gateway reads in the release");
+                    err = ESP_ERR_NOT_FOUND;
+                }
+                if (err == ESP_OK) {
+                    err = install_c6();
+                }
                 gw_upload_end();
             } else {
                 set_error("%s", "another upload or C6 flash is running");
             }
             s_up.c6.installing = false;
             s_up.c6.percent = err == ESP_OK ? 100 : 0;
-            gw_update_mqtt_state();
             if (err == ESP_OK) {
+                gw_update_mqtt_state();
                 gw_restart_later_full(2000, false);
                 vTaskDelete(NULL);
             }
+            if (s_up.want[0]) {
+                s_up.want[0] = '\0';
+                restore_offer();
+            }
+            gw_update_mqtt_state();
         } else if (s_up.install_requested) {
             s_up.install_requested = false;
             esp_err_t err = ESP_ERR_INVALID_STATE;
@@ -478,7 +628,10 @@ static void update_task(void *arg)
                 s_up.percent = 0;
                 s_up.error[0] = '\0';
                 gw_update_mqtt_state();
-                err = install();
+                err = s_up.want[0] ? select_release(s_up.want) : ESP_OK;
+                if (err == ESP_OK) {
+                    err = install();
+                }
                 gw_upload_end();
             } else {
                 set_error("%s", "another upload or C6 flash is running");
@@ -490,6 +643,10 @@ static void update_task(void *arg)
                 vTaskDelete(NULL);
             }
             s_up.installing = false;
+            if (s_up.want[0]) {
+                s_up.want[0] = '\0';
+                restore_offer();
+            }
             gw_update_mqtt_state();
         } else {
             s_up.checking = true;
@@ -498,7 +655,7 @@ static void update_task(void *arg)
             gw_update_mqtt_state();
         }
         /* woken early by gw_update_check_soon() and gw_update_install() */
-        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(CHECK_INTERVAL_MS));
+        ulTaskNotifyTake(pdTRUE, CHECK_INTERVAL_TICKS);
     }
 }
 
@@ -513,10 +670,12 @@ static esp_err_t check_post(httpd_req_t *req)
     return gw_http_send_json(req, gw_update_status());
 }
 
-/* {"target": "c6"} installs the C6 package, else the gateway firmware */
+/* {"target": "c6"} installs the C6 package, else the gateway firmware; {"version": "v1.6"} of the
+ * listed releases, else of the offered one */
 static esp_err_t install_post(httpd_req_t *req)
 {
     bool c6 = false;
+    char version[32] = "";
     if (req->content_len) {
         cJSON *body = gw_http_read_json(req);
         if (!body) {
@@ -524,11 +683,12 @@ static esp_err_t install_post(httpd_req_t *req)
         }
         const char *target = GW_JSON_STR(body, "target");
         c6 = target && strcmp(target, "c6") == 0;
+        strlcpy(version, GW_JSON_STR(body, "version") ? GW_JSON_STR(body, "version") : "", sizeof(version));
         cJSON_Delete(body);
     }
-    esp_err_t err = c6 ? gw_update_install_c6() : gw_update_install();
+    esp_err_t err = c6 ? gw_update_install_c6(version) : gw_update_install(version);
     if (err == ESP_ERR_NOT_FOUND) {
-        return gw_http_send_error(req, 409, "no update offered, check first");
+        return gw_http_send_error(req, 409, version[0] ? "release not offered for this gateway" : "no update offered, check first");
     }
     if (err != ESP_OK) {
         return gw_http_send_error(req, 409, "an installation is already running");
@@ -552,13 +712,31 @@ void gw_update_check_soon(void)
     }
 }
 
-esp_err_t gw_update_install_c6(void)
+static bool busy(void)
 {
-    if (!s_up.task || !s_up.c6.offered) {
+    return s_up.installing || s_up.c6.installing || s_up.install_requested || s_up.c6.install_requested;
+}
+
+/* version of the listed releases, NULL or "" = the offered one */
+static esp_err_t request(const char *version, bool offered)
+{
+    char url[URL_MAX];
+    bool pick = version && version[0];
+    if (!s_up.task || (pick ? !release_manifest(version, url, sizeof(url)) : !offered)) {
         return ESP_ERR_NOT_FOUND;
     }
-    if (s_up.installing || s_up.c6.installing || s_up.install_requested || s_up.c6.install_requested) {
+    if (busy()) {
         return ESP_ERR_INVALID_STATE;
+    }
+    strlcpy(s_up.want, pick ? version : "", sizeof(s_up.want));
+    return ESP_OK;
+}
+
+esp_err_t gw_update_install_c6(const char *version)
+{
+    esp_err_t err = request(version, s_up.c6.offered);
+    if (err != ESP_OK) {
+        return err;
     }
     s_up.c6.install_requested = true;
     xTaskNotifyGive(s_up.task);
@@ -578,13 +756,11 @@ void gw_update_c6_changed(void)
     xSemaphoreGive(s_up.lock);
 }
 
-esp_err_t gw_update_install(void)
+esp_err_t gw_update_install(const char *version)
 {
-    if (!s_up.task || !s_up.latest[0]) {
-        return ESP_ERR_NOT_FOUND;
-    }
-    if (s_up.installing || s_up.install_requested) {
-        return ESP_ERR_INVALID_STATE;
+    esp_err_t err = request(version, s_up.latest[0]);
+    if (err != ESP_OK) {
+        return err;
     }
     s_up.install_requested = true;
     xTaskNotifyGive(s_up.task);
@@ -638,6 +814,9 @@ cJSON *gw_update_status(void)
     cJSON_AddBoolToObject(j, "available", s_up.latest[0] && strcmp(s_up.latest, esp_app_get_description()->version) != 0);
     xSemaphoreTake(s_up.lock, portMAX_DELAY);
     cJSON_AddStringToObject(j, "build", s_up.build);
+    cJSON_AddNumberToObject(j, "layout", flash_layout());
+    cJSON *releases = s_up.releases ? cJSON_Parse(s_up.releases) : NULL;
+    cJSON_AddItemToObject(j, "releases", releases ? releases : cJSON_CreateArray());
     cJSON *c6 = cJSON_GetObjectItem(j, "c6");
     cJSON_AddNumberToObject(c6, "size", s_up.c6.size);
     if (s_up.c6.bundles) {

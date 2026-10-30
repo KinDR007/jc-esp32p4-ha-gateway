@@ -1442,6 +1442,60 @@ def tc36_c6_online_update():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def tc37_release_list():
+    """releases.json: only releases that name the board's flash layout are listed; a picked release whose
+    manifest does not run on the layout, or an unlisted one, is refused without a restart."""
+    import shutil, socketserver, tempfile, threading
+    from http.server import SimpleHTTPRequestHandler
+    s0 = status()
+    layout, current = s0['update']['layout'], s0['version']
+    root = tempfile.mkdtemp()
+    handler = lambda *a, **k: SimpleHTTPRequestHandler(*a, directory=root, **k)
+    server = socketserver.TCPServer(('', 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    me = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    me.connect((ARGS.host if ARGS.host[0].isdigit() else socket.gethostbyname(ARGS.host), 80))
+    base = f'http://{me.getsockname()[0]}:{server.server_address[1]}'
+
+    def write(name, obj):
+        open(os.path.join(root, name), 'w').write(json.dumps(obj))
+
+    def checked():
+        http('POST', '/api/update/check')
+        def done():
+            u = status()['update']
+            return u if not u['checking'] and u['checked'] else None
+        time.sleep(2)
+        return wait_until('manifest checked', done, 60, 2)
+
+    write('manifest.json', {'version': current, 'p4gw': 'none.bin', 'layouts': [layout]})
+    write('nolayout.json', {'version': 'v0.0-nolayout', 'p4gw': 'none.bin'})
+    write('releases.json', {'releases': [
+        {'version': current, 'manifest': f'{base}/manifest.json', 'layouts': [layout]},
+        {'version': 'v0.0-other', 'manifest': f'{base}/manifest.json', 'layouts': [99]},
+        {'version': 'v0.0-nolayout', 'manifest': f'{base}/nolayout.json', 'layouts': [layout]}]})
+    before_url = s0['update']['url']
+    try:
+        check(http('POST', '/api/settings', {'update_url': f'{base}/manifest.json'})[0] == 200, 'manifest URL set')
+        u = checked()
+        versions = [r['version'] for r in u['releases']]
+        check(versions == [current, 'v0.0-nolayout'], f'listed for layout {layout}: {versions}')
+        check(http('POST', '/api/update/install', {'version': 'v0.0-other'})[0] == 409, 'release of another layout refused (409)')
+        check(http('POST', '/api/update/install', {'version': 'v9.9'})[0] == 409, 'unlisted release refused (409)')
+        up = status()['uptime_s']
+        check(http('POST', '/api/update/install', {'version': 'v0.0-nolayout'})[0] == 200, 'listed release accepted')
+        u = wait_until('refused', lambda: (lambda u: u if not u['in_progress'] and u['error'] else None)(status()['update']), 60, 1)
+        check('flash layout' in u['error'], f'manifest without the layout refused: {u["error"]}')
+        check(u['latest_version'] == current and status()['uptime_s'] >= up, 'offer restored, no restart')
+        write('manifest.json', {'version': 'v0.0-new', 'p4gw': 'none.bin', 'layouts': [99]})
+        u = checked()
+        check('flash layout' in u['error'] and u['latest_version'] == current, f'latest of another layout not offered: {u["error"]}')
+    finally:
+        http('POST', '/api/settings', {'update_url': before_url})
+        server.shutdown()
+        shutil.rmtree(root, ignore_errors=True)
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1454,7 +1508,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list),
 ]
 
 

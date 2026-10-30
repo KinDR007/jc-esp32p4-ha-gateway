@@ -31,8 +31,10 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: ./scripts/ci_build.sh
         shell: bash
-      - name: Release notes and manifest
+      - name: Release notes, manifest and the list of releases
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/release_notes.py "$TAG" > notes.md
           # the gateway shows the notes without the commit list
@@ -41,6 +43,8 @@ jobs:
           python3 scripts/make_update_manifest.py --notes-file notes-short.md \
             --release-url "$url/releases/tag/$TAG" --base-url "$url/releases/download/$TAG" \
             --ci "$url/actions/runs/$GITHUB_RUN_ID"
+          # older releases the gateways can go back to (rollback), next to the manifest
+          python3 scripts/make_releases_index.py --repo "$GITHUB_REPOSITORY" --tag "$TAG"
           sha256sum dist/p4gw.bin dist/c6fw.bin > dist/SHA256SUMS
       # p4gw.bin and c6fw.bin hold no secrets (the ESPHome image with the API key is not built here)
       - uses: softprops/action-gh-release@v2
@@ -51,4 +55,5 @@ jobs:
             dist/p4gw.bin
             dist/c6fw.bin
             dist/manifest.json
+            dist/releases.json
             dist/SHA256SUMS

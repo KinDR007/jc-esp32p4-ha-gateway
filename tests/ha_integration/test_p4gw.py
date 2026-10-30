@@ -313,3 +313,18 @@ async def test_c6_update(hass: HomeAssistant, gateway) -> None:
     assert state.attributes["latest_version"] == "1b2c3d4e"
     await hass.services.async_call("update", "install", {"entity_id": c6_id}, blocking=True)
     assert ("/api/update/install", {"target": "c6"}) in gateway.posts
+
+
+async def test_rollback(hass: HomeAssistant, gateway) -> None:
+    """A listed release is installed with update.install and its version (the C6 package by its id)."""
+    gateway.status["update"]["releases"] = [{"version": "v1.7", "c6": "1b2c3d4e"}, {"version": "v1.6", "c6": "0cc0a7ad"}]
+    await setup_entry(hass, gateway)
+    fw, c6 = entity_id(hass, "update", "firmware"), entity_id(hass, "update", "c6_firmware")
+    assert hass.states.get(fw).attributes["available_versions"] == ["v1.7", "v1.6"]
+    assert hass.states.get(c6).attributes["available_versions"] == {"1b2c3d4e": "v1.7", "0cc0a7ad": "v1.6"}
+    await hass.services.async_call("update", "install", {"entity_id": fw, "version": "v1.6"}, blocking=True)
+    assert ("/api/update/install", {"version": "v1.6"}) in gateway.posts
+    await hass.services.async_call("update", "install", {"entity_id": c6, "version": "0cc0a7ad"}, blocking=True)
+    assert ("/api/update/install", {"target": "c6", "version": "v1.6"}) in gateway.posts
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call("update", "install", {"entity_id": c6, "version": "deadbeef"}, blocking=True)
