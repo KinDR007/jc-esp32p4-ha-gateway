@@ -298,3 +298,18 @@ async def test_missed_notifications_after_gateway_restart(hass: HomeAssistant, g
         await hass.async_block_till_done()
     assert hass.states.get(entity_id(hass, "event", "notification")).attributes["text"] == "Gateway restarted after a crash"
     assert entry.runtime_data.notify_boot == 2
+
+
+async def test_c6_update(hass: HomeAssistant, gateway) -> None:
+    """The C6 package: offered by a pushed update state, versions kept from the poll, install posts target c6."""
+    await setup_entry(hass, gateway)
+    c6_id = entity_id(hass, "update", "c6_firmware")
+    assert hass.states.get(c6_id).state == STATE_OFF
+    await push(hass, gateway, "update", dict(gateway.status["update"], c6={"offered": True, "available": True, "in_progress": False,
+                                                                         "percent": 0, "installed_id": "9ae0d4cd", "offered_id": "1b2c3d4e"}))
+    state = hass.states.get(c6_id)
+    assert state.state == STATE_ON
+    assert state.attributes["installed_version"] == "9ae0d4cd"
+    assert state.attributes["latest_version"] == "1b2c3d4e"
+    await hass.services.async_call("update", "install", {"entity_id": c6_id}, blocking=True)
+    assert ("/api/update/install", {"target": "c6"}) in gateway.posts

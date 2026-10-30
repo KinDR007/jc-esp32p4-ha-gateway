@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/param.h>
 #include <string.h>
 #include <time.h>
 
@@ -9,16 +10,20 @@
 #include "esp_https_ota.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_partition.h"
+#include "c6_flasher.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "mbedtls/sha256.h"
 
 static const char *TAG = "gw_update";
 
 #define CHECK_INTERVAL_MS (6 * 3600 * 1000)
-#define MANIFEST_MAX 4096
+#define MANIFEST_MAX 8192
 #define URL_MAX 256
+#define C6FW_SUBTYPE 0x40
 
 /* Offered update, from the last manifest check. */
 static struct {
@@ -26,8 +31,24 @@ static struct {
     TaskHandle_t task;
     char latest[32];
     char image_url[URL_MAX];
-    char notes[256];
+    char notes[1024];
     char release_url[160];
+    char build[128]; /* "commit abc1234 · 2026-10-30 · ESP-IDF v5.5.5" */
+    /* C6 firmware offered by the manifest: downloaded into PSRAM on request, checked, then written
+     * to the c6fw partition (the C6 gets it at the next start) */
+    struct {
+        bool offered;
+        bool current; /* the c6fw partition holds exactly this file */
+        char url[URL_MAX];
+        uint8_t sha256[32];
+        uint32_t size;
+        cJSON *bundles; /* {name: version} */
+        bool install_requested;
+        bool installing;
+        int percent;
+        uint8_t notified[32]; /* sha256 of the package last announced */
+        char installed_id[9]; /* first bytes of the sha256 of the stored package, "" when none */
+    } c6;
     char error[96];
     int64_t checked;    /* unix time of the last successful check, 0 = never */
     bool installing;
@@ -64,12 +85,102 @@ static void resolve_url(const char *base, const char *ref, char *out, size_t len
     snprintf(out, len, "%.*s/%s", (int)(slash ? slash - base : (int)strlen(base)), base, ref);
 }
 
+/* sha256 of the first len bytes of the c6fw partition */
+static bool c6_partition_sha(uint32_t len, uint8_t out[32])
+{
+    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
+    uint8_t *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
+    if (!part || !buf || len > part->size) {
+        free(buf);
+        return false;
+    }
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts(&ctx, 0);
+    bool ok = true;
+    for (uint32_t off = 0; off < len && ok; off += 4096) {
+        uint32_t n = len - off < 4096 ? len - off : 4096;
+        ok = esp_partition_read(part, off, buf, n) == ESP_OK;
+        mbedtls_sha256_update(&ctx, buf, n);
+    }
+    mbedtls_sha256_finish(&ctx, out);
+    mbedtls_sha256_free(&ctx);
+    free(buf);
+    return ok;
+}
+
+static bool unhex32(const char *in, uint8_t out[32])
+{
+    if (!in || strlen(in) != 64) {
+        return false;
+    }
+    for (int i = 0; i < 32; i++) {
+        unsigned v;
+        if (sscanf(in + 2 * i, "%2x", &v) != 1) {
+            return false;
+        }
+        out[i] = v;
+    }
+    return true;
+}
+
+/* Short id of the package in the c6fw partition: the sha256 of the file as it was written (packages
+ * end on a 4 KiB boundary after the last bundle). */
+static void c6_installed_id(void)
+{
+    c6fw_dir_t dir;
+    uint8_t sha[32];
+    s_up.c6.installed_id[0] = '\0';
+    if (c6fw_read_dir(&dir) != ESP_OK) {
+        return;
+    }
+    uint32_t end = 0;
+    for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
+        end = MAX(end, dir.entries[i].offset + dir.entries[i].size);
+    }
+    if (c6_partition_sha((end + 0xfff) & ~0xfff, sha)) {
+        snprintf(s_up.c6.installed_id, sizeof(s_up.c6.installed_id), "%02x%02x%02x%02x", sha[0], sha[1], sha[2], sha[3]);
+    }
+}
+
+/* Called with the lock held: the C6 part of a manifest (absent: nothing offered). */
+static void c6_offer(const char *manifest_url, const cJSON *c6)
+{
+    const cJSON *size = cJSON_GetObjectItem(c6, "size"), *fmt = cJSON_GetObjectItem(c6, "format");
+    uint8_t sha[32];
+    bool valid = c6 && GW_JSON_STR(c6, "url") && unhex32(GW_JSON_STR(c6, "sha256"), sha) && cJSON_IsNumber(size) &&
+                 size->valueint > 0 && cJSON_IsNumber(fmt);
+    cJSON_Delete(s_up.c6.bundles);
+    s_up.c6.bundles = NULL;
+    s_up.c6.offered = false;
+    if (!valid) {
+        return;
+    }
+    if (fmt->valueint != C6FW_FORMAT_VERSION) {
+        /* a C6 package of another format waits for the gateway firmware that reads it */
+        ESP_LOGI(TAG, "C6 package format %d, this gateway reads %d", fmt->valueint, C6FW_FORMAT_VERSION);
+        return;
+    }
+    s_up.c6.offered = true;
+    resolve_url(manifest_url, GW_JSON_STR(c6, "url"), s_up.c6.url, sizeof(s_up.c6.url));
+    memcpy(s_up.c6.sha256, sha, 32);
+    s_up.c6.size = size->valueint;
+    s_up.c6.bundles = cJSON_Duplicate(cJSON_GetObjectItem(c6, "bundles"), true);
+    uint8_t have[32];
+    s_up.c6.current = c6_partition_sha(s_up.c6.size, have) && memcmp(have, sha, 32) == 0;
+    if (!s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
+        memcpy(s_up.c6.notified, sha, 32);
+        gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware update available (%lu kB)", (unsigned long)(s_up.c6.size / 1024));
+    }
+}
+
 static void check(void)
 {
     char url[URL_MAX];
     if (!gw_config_get_str(GW_KEY_UPDATE_URL, url, sizeof(url)) || !url[0]) {
         xSemaphoreTake(s_up.lock, portMAX_DELAY);
-        s_up.latest[0] = s_up.error[0] = '\0';
+        s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
+        c6_offer(NULL, NULL);
         xSemaphoreGive(s_up.lock);
         return;
     }
@@ -108,6 +219,11 @@ static void check(void)
         strlcpy(s_up.notes, GW_JSON_STR(m, "notes") ? GW_JSON_STR(m, "notes") : "", sizeof(s_up.notes));
         strlcpy(s_up.release_url, GW_JSON_STR(m, "release_url") ? GW_JSON_STR(m, "release_url") : "",
                 sizeof(s_up.release_url));
+        const cJSON *b = cJSON_GetObjectItem(m, "build");
+        snprintf(s_up.build, sizeof(s_up.build), "%s%s%s%s%s", GW_JSON_STR(b, "commit") ? GW_JSON_STR(b, "commit") : "",
+                 GW_JSON_STR(b, "date") ? " · " : "", GW_JSON_STR(b, "date") ? GW_JSON_STR(b, "date") : "",
+                 GW_JSON_STR(b, "idf") ? " · ESP-IDF " : "", GW_JSON_STR(b, "idf") ? GW_JSON_STR(b, "idf") : "");
+        c6_offer(url, cJSON_GetObjectItem(m, "c6fw"));
         s_up.error[0] = '\0';
         s_up.checked = time(NULL);
         ESP_LOGI(TAG, "offered %s, running %s", s_up.latest, esp_app_get_description()->version);
@@ -183,11 +299,122 @@ static esp_err_t install(void)
     return ESP_OK;
 }
 
+/* c6fw.bin into PSRAM, checked against the manifest (sha256) and its own header before the c6fw
+ * partition is erased; the C6 itself is reflashed by the boot sequence after the restart. */
+static esp_err_t install_c6(void)
+{
+    char url[URL_MAX];
+    uint8_t want[32];
+    uint32_t size;
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    strlcpy(url, s_up.c6.url, sizeof(url));
+    memcpy(want, s_up.c6.sha256, 32);
+    size = s_up.c6.size;
+    xSemaphoreGive(s_up.lock);
+    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
+    if (!part || size > part->size) {
+        set_error("%s", "the C6 package does not fit the c6fw partition");
+        return ESP_ERR_INVALID_SIZE;
+    }
+    uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+    if (!data) {
+        set_error("%s", "no PSRAM for the C6 package");
+        return ESP_ERR_NO_MEM;
+    }
+    esp_http_client_config_t cfg;
+    esp_http_client_handle_t client = http_open(url, &cfg);
+    esp_err_t err = client ? esp_http_client_open(client, 0) : ESP_ERR_NO_MEM;
+    uint32_t got = 0;
+    if (err == ESP_OK) {
+        esp_http_client_fetch_headers(client);
+        int status = esp_http_client_get_status_code(client);
+        if (status != 200) {
+            char code[16];
+            snprintf(code, sizeof(code), "%d", status);
+            set_error("C6 package: HTTP %s", code);
+            err = ESP_FAIL;
+        }
+        for (int n; err == ESP_OK && got < size && (n = esp_http_client_read(client, (char *)data + got, size - got)) > 0;) {
+            got += n;
+            int percent = (int)(90LL * got / size);
+            if (percent / 10 != s_up.c6.percent / 10) {
+                s_up.c6.percent = percent;
+                gw_update_mqtt_state();
+            }
+            s_up.c6.percent = percent;
+            vTaskDelay(1);
+        }
+    } else {
+        set_error("cannot download the C6 package (%s)", esp_err_to_name(err));
+    }
+    esp_http_client_cleanup(client);
+    uint8_t sha[32];
+    if (err == ESP_OK && got != size) {
+        set_error("%s", "C6 package incomplete");
+        err = ESP_ERR_INVALID_SIZE;
+    }
+    if (err == ESP_OK) {
+        mbedtls_sha256(data, size, sha, 0);
+        if (memcmp(sha, want, 32) != 0) {
+            set_error("%s", "C6 package sha256 does not match the manifest");
+            err = ESP_ERR_INVALID_CRC;
+        } else if (memcmp(data, C6FW_DIR_MAGIC, 4) != 0 || ((uint32_t *)data)[1] != C6FW_FORMAT_VERSION) {
+            set_error("%s", "not a C6 package of this format");
+            err = ESP_ERR_INVALID_VERSION;
+        }
+    }
+    if (err == ESP_OK) {
+        s_up.c6.percent = 92;
+        err = esp_partition_erase_range(part, 0, (size + 0xfff) & ~0xfff);
+        for (uint32_t off = 0; err == ESP_OK && off < size; off += 4096) {
+            err = esp_partition_write(part, off, data + off, size - off < 4096 ? size - off : 4096);
+        }
+        if (err == ESP_OK) {
+            err = c6fw_verify_all();
+        }
+        if (err != ESP_OK) {
+            esp_partition_erase_range(part, 0, 0x1000); /* never leave a half-written package that parses */
+            set_error("C6 package not stored: %s", esp_err_to_name(err));
+        }
+    }
+    free(data);
+    if (err == ESP_OK) {
+        s_up.c6.current = true;
+        ESP_LOGW(TAG, "C6 package stored (%lu bytes), the C6 is updated after the restart", (unsigned long)size);
+        gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware downloaded; the gateway restarts and updates the C6");
+    }
+    return err;
+}
+
 static void update_task(void *arg)
 {
-    vTaskDelay(pdMS_TO_TICKS(30 * 1000)); /* after start-up: network, clock, MQTT */
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    c6_installed_id();
+    xSemaphoreGive(s_up.lock);
+    /* after start-up (network, clock, MQTT), or at once when someone asks for a check */
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(30 * 1000));
     while (true) {
-        if (s_up.install_requested) {
+        if (s_up.c6.install_requested) {
+            s_up.c6.install_requested = false;
+            esp_err_t err = ESP_ERR_INVALID_STATE;
+            if (gw_upload_begin()) {
+                s_up.c6.installing = true;
+                s_up.c6.percent = 0;
+                s_up.error[0] = '\0';
+                gw_update_mqtt_state();
+                err = install_c6();
+                gw_upload_end();
+            } else {
+                set_error("%s", "another upload or C6 flash is running");
+            }
+            s_up.c6.installing = false;
+            s_up.c6.percent = err == ESP_OK ? 100 : 0;
+            gw_update_mqtt_state();
+            if (err == ESP_OK) {
+                gw_restart_later_full(2000, false);
+                vTaskDelete(NULL);
+            }
+        } else if (s_up.install_requested) {
             s_up.install_requested = false;
             esp_err_t err = ESP_ERR_INVALID_STATE;
             if (gw_upload_begin()) {
@@ -230,9 +457,20 @@ static esp_err_t check_post(httpd_req_t *req)
     return gw_http_send_json(req, gw_update_status());
 }
 
+/* {"target": "c6"} installs the C6 package, else the gateway firmware */
 static esp_err_t install_post(httpd_req_t *req)
 {
-    esp_err_t err = gw_update_install();
+    bool c6 = false;
+    if (req->content_len) {
+        cJSON *body = gw_http_read_json(req);
+        if (!body) {
+            return ESP_OK;
+        }
+        const char *target = GW_JSON_STR(body, "target");
+        c6 = target && strcmp(target, "c6") == 0;
+        cJSON_Delete(body);
+    }
+    esp_err_t err = c6 ? gw_update_install_c6() : gw_update_install();
     if (err == ESP_ERR_NOT_FOUND) {
         return gw_http_send_error(req, 409, "no update offered, check first");
     }
@@ -256,6 +494,31 @@ void gw_update_check_soon(void)
         s_up.checking = true;
         xTaskNotifyGive(s_up.task);
     }
+}
+
+esp_err_t gw_update_install_c6(void)
+{
+    if (!s_up.task || !s_up.c6.offered) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (s_up.installing || s_up.c6.installing || s_up.install_requested || s_up.c6.install_requested) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    s_up.c6.install_requested = true;
+    xTaskNotifyGive(s_up.task);
+    return ESP_OK;
+}
+
+void gw_update_c6_changed(void)
+{
+    if (!s_up.lock) {
+        return;
+    }
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    uint8_t have[32];
+    s_up.c6.current = s_up.c6.offered && c6_partition_sha(s_up.c6.size, have) && memcmp(have, s_up.c6.sha256, 32) == 0;
+    c6_installed_id();
+    xSemaphoreGive(s_up.lock);
 }
 
 esp_err_t gw_update_install(void)
@@ -288,6 +551,18 @@ static cJSON *state_json(void)
     if (s_up.installing) {
         cJSON_AddNumberToObject(j, "update_percentage", s_up.percent);
     }
+    cJSON *c6 = cJSON_AddObjectToObject(j, "c6");
+    cJSON_AddBoolToObject(c6, "offered", s_up.c6.offered);
+    cJSON_AddBoolToObject(c6, "available", s_up.c6.offered && !s_up.c6.current);
+    cJSON_AddBoolToObject(c6, "in_progress", s_up.c6.installing);
+    cJSON_AddNumberToObject(c6, "percent", s_up.c6.percent);
+    cJSON_AddStringToObject(c6, "installed_id", s_up.c6.installed_id);
+    char offered[9] = "";
+    if (s_up.c6.offered) {
+        snprintf(offered, sizeof(offered), "%02x%02x%02x%02x", s_up.c6.sha256[0], s_up.c6.sha256[1], s_up.c6.sha256[2],
+                 s_up.c6.sha256[3]);
+    }
+    cJSON_AddStringToObject(c6, "offered_id", offered);
     xSemaphoreGive(s_up.lock);
     return j;
 }
@@ -303,6 +578,24 @@ cJSON *gw_update_status(void)
     cJSON_AddBoolToObject(j, "checking", s_up.checking);
     cJSON_AddStringToObject(j, "error", s_up.error);
     cJSON_AddBoolToObject(j, "available", s_up.latest[0] && strcmp(s_up.latest, esp_app_get_description()->version) != 0);
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    cJSON_AddStringToObject(j, "build", s_up.build);
+    cJSON *c6 = cJSON_GetObjectItem(j, "c6");
+    cJSON_AddNumberToObject(c6, "size", s_up.c6.size);
+    if (s_up.c6.bundles) {
+        cJSON_AddItemToObject(c6, "offered_versions", cJSON_Duplicate(s_up.c6.bundles, true));
+    }
+    cJSON *inst = cJSON_AddObjectToObject(c6, "installed_versions");
+    c6fw_dir_t dir;
+    if (c6fw_read_dir(&dir) == ESP_OK) {
+        for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
+            char name[17], version[33];
+            strlcpy(name, dir.entries[i].name, sizeof(name));
+            strlcpy(version, dir.entries[i].version, sizeof(version));
+            cJSON_AddStringToObject(inst, name, version);
+        }
+    }
+    xSemaphoreGive(s_up.lock);
     return j;
 }
 

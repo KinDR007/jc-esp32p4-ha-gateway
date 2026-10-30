@@ -90,7 +90,9 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
         if not self.data:
             return
         if topic == "update":
-            self.data.status["update"] = json.loads(payload)
+            # the push carries the state, the poll also the versions of the C6 package: keep those
+            old, new = self.data.status.get("update") or {}, json.loads(payload)
+            self.data.status["update"] = {**old, **new, "c6": {**(old.get("c6") or {}), **(new.get("c6") or {})}}
             self.async_set_updated_data(self.data)
         elif topic.startswith("sound/") and topic.endswith("/state"):
             event = self.data.events.get(topic[6:-6])

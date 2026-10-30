@@ -1368,6 +1368,80 @@ def tc35_telegram():
     check(http('POST', '/api/auth/telegram/pair')[0] == 409, 'pairing refused while the bot does not run or without a user')
 
 
+def tc36_c6_online_update():
+    """Online update of the C6 package: offered by a manifest, downloaded into PSRAM, checked (sha256), stored, the old one back."""
+    import hashlib, shutil, socketserver, struct, tempfile, threading, zlib
+    from http.server import SimpleHTTPRequestHandler
+    src = os.path.join(ROOT, 'dist', 'c6fw.bin')
+    original = open(src, 'rb').read()
+    s0 = status()
+    if not s0['update']['c6']['installed_id'] or hashlib.sha256(original).hexdigest()[:8] != s0['update']['c6']['installed_id']:
+        log(f'skipped: the gateway does not hold dist/c6fw.bin ({s0["update"]["c6"]["installed_id"]})')
+        return
+    # the same firmwares with another label: the gateway stores it, the C6 is not rewritten (bundle hashes unchanged)
+    test = bytearray(original)
+    test[28:60] = b'tc36 label'.ljust(32, b'\0')
+    crc_off = 12 + 8 * 88
+    struct.pack_into('<I', test, crc_off, zlib.crc32(bytes(test[:crc_off])) & 0xffffffff)
+    root = tempfile.mkdtemp()
+    for name, data in (('test.bin', bytes(test)), ('orig.bin', original)):
+        open(os.path.join(root, name), 'wb').write(data)
+
+    def manifest(name, data, sha=None):
+        m = {'version': s0['version'], 'p4gw': 'none.bin', 'notes': 'tc36',
+             'c6fw': {'url': name, 'sha256': sha or hashlib.sha256(data).hexdigest(), 'size': len(data), 'format': 3, 'bundles': {}}}
+        open(os.path.join(root, 'manifest.json'), 'w').write(json.dumps(m))
+
+    handler = lambda *a, **k: SimpleHTTPRequestHandler(*a, directory=root, **k)
+    server = socketserver.TCPServer(('', 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    me = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    me.connect((ARGS.host if ARGS.host[0].isdigit() else socket.gethostbyname(ARGS.host), 80))
+    url = f'http://{me.getsockname()[0]}:{server.server_address[1]}/manifest.json'
+    before_url = s0['update']['url']
+
+    def offered():
+        def checked():
+            u = status()['update']
+            if u['checking'] or not u['checked']:
+                http('POST', '/api/update/check')  # again: a request sent while the gateway restarted is lost
+                return None
+            return u
+        http('POST', '/api/update/check')
+        return wait_until('manifest checked', checked, 60, 2)
+
+    def install_and_wait():
+        up = status()['uptime_s']
+        check(http('POST', '/api/update/install', {'target': 'c6'})[0] == 200, 'C6 install started')
+        # restarted: the uptime starts again
+        return wait_until('gateway restarted', lambda: (lambda x: x if x['uptime_s'] < up and x['update']['c6']['installed_id'] else None)(status()), 180, 3)
+
+    try:
+        manifest('test.bin', test)
+        check(http('POST', '/api/settings', {'update_url': url})[0] == 200, f'manifest URL {url}')
+        u = offered()
+        check(u['c6']['offered'] and u['c6']['available'], f'C6 package offered: {u["c6"]["installed_id"]} -> {u["c6"]["offered_id"]}')
+        manifest('test.bin', test, sha='00' * 32)
+        offered()
+        up = status()['uptime_s']
+        check(http('POST', '/api/update/install', {'target': 'c6'})[0] == 200, 'install with a wrong sha256 started')
+        u = wait_until('refused', lambda: (lambda u: u if not u['c6']['in_progress'] and u['error'] else None)(status()['update']), 30, 1)
+        check('sha256' in u['error'] and status()['uptime_s'] >= up, f'refused, no restart: {u["error"]}')
+        manifest('test.bin', test)
+        offered()
+        s = install_and_wait()
+        check(s['update']['c6']['installed_versions'].get('slots') == 'tc36 label', 'new package stored after the restart')
+        check(not s['c6']['flash']['busy'] and s['role']['active'] == s0['role']['active'], 'role back, the C6 was not rewritten')
+        manifest('orig.bin', original)
+        offered()
+        s = install_and_wait()
+        check(s['update']['c6']['installed_id'] == s0['update']['c6']['installed_id'], 'original package back')
+    finally:
+        http('POST', '/api/settings', {'update_url': before_url})
+        server.shutdown()
+        shutil.rmtree(root, ignore_errors=True)
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1380,7 +1454,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update),
 ]
 
 

@@ -312,9 +312,17 @@ PAGES = [
      {"GATEWAY FIRMWARE": T("Upload <code>p4gw.bin</code>: written to the other slot, confirmed after 60 s, otherwise rolled back.", "Nahrání <code>p4gw.bin</code>: zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí."),
       "ESPHOME IMAGE": T("Upload <code>esphome.bin</code> for the ESPHome role.", "Nahrání <code>esphome.bin</code> pro roli ESPHome."),
       "C6 FIRMWARE BUNDLE": T("Upload <code>c6fw.bin</code>; the C6 gets the new firmware on the next start.", "Nahrání <code>c6fw.bin</code>; C6 dostane nový firmware při dalším startu."),
-      "ONLINE UPDATE": T("Manifest URL, check and install; also the Firmware update entity in Home Assistant and Telegram <code>/update</code>, <code>/install</code>.",
-                         "URL manifestu, kontrola a instalace; také entita aktualizace Firmware v Home Assistant a Telegram <code>/update</code>, <code>/install</code>.")},
-     None, ["system_firmware"]),
+      "ONLINE UPDATE": T("Manifest URL (<b>GitHub Releases</b> fills in the address of the latest release), check, then the gateway firmware and the <b>C6 package</b> separately: versions installed and offered of every C6 firmware, build (commit, date, ESP-IDF) and release notes.",
+                         "URL manifestu (<b>GitHub Releases</b> doplní adresu posledního vydání), kontrola, pak zvlášť firmware brány a <b>balík C6</b>: nainstalované a nabízené verze všech firmwarů C6, sestavení (commit, datum, ESP-IDF) a poznámky k vydání.")},
+     T("""<ol><li>Set the manifest URL (your web server, or <b>GitHub Releases</b> once the repository is public) and press <b>Check</b>.</li>
+       <li><b>Install gateway firmware</b> first when both are newer: a C6 package of a newer format is offered only to a gateway that reads it.</li>
+       <li><b>Install C6 package</b>: the gateway downloads it into RAM, checks its sha256 against the manifest, stores it and restarts; the C6 then gets the new firmware (about 2 minutes without Thread or Zigbee).</li></ol>
+       <p>Without internet the same works by uploading <code>c6fw.bin</code> in the C6 firmware bundle card. Also from Home Assistant (<i>C6 radio firmware</i> update entity) and Telegram (<code>/update</code>, <code>/install c6</code>).</p>""",
+       """<ol><li>Nastavte URL manifestu (vlastní webový server, nebo <b>GitHub Releases</b>, až bude repozitář veřejný) a stiskněte <b>Zkontrolovat</b>.</li>
+       <li>Když jsou novější obě části, instalujte nejdřív <b>firmware brány</b>: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.</li>
+       <li><b>Instalovat balík C6</b>: brána ho stáhne do RAM, ověří sha256 proti manifestu, uloží a restartuje se; C6 pak dostane nový firmware (asi 2 minuty bez Thread nebo Zigbee).</li></ol>
+       <p>Bez internetu to samé jde nahráním <code>c6fw.bin</code> v kartě Balík firmwaru C6. Také z Home Assistant (entita aktualizace <i>Firmware rádia C6</i>) a z Telegramu (<code>/update</code>, <code>/install c6</code>).</p>"""),
+     ["system_firmware"]),
     ("system/diag", "stethoscope", T("System › Diagnostics", "Systém › Diagnostika"),
      T("Tools when something does not work.", "Nástroje, když něco nefunguje."),
      {"PING": T("Ping a host from the gateway.", "Ping na hostitele z brány."),
@@ -394,7 +402,7 @@ HA = T(
     <li>With user accounts on the gateway it asks for an <b>API token</b>: create one under System › User management › API tokens (role admin, or user when the integration should not restart or update) and paste it. The token does not depend on any user or their 2FA.</li>
     <li><b>Configure</b> (integration options): per topic from which level a persistent notification appears (off, critical only, warnings and critical, all).</li></ol>
     <p>Entities: active role, Thread state, noise and noise max in dB(A), role select, sound recognition switch, one event and binary sensor per sound event,
-    <b>Notification</b> event (for automations), firmware update, restart, identify, Zigbee backup and update check buttons, diagnostic sensors.</p>
+    <b>Notification</b> event (for automations), firmware update and <b>C6 radio firmware</b> update, restart, identify, Zigbee backup and update check buttons, diagnostic sensors.</p>
     <h3>Thread and Matter</h3>
     <ol><li>Settings › Devices & services › Add integration › <b>OpenThread Border Router</b>, URL <code>http://&lt;gateway&gt;:8081</code>.</li>
     <li>Thread › Configure: mark the network as preferred, or join the gateway to the existing network (Thread › Settings › Apply dataset).</li>
@@ -415,7 +423,7 @@ advanced:
     <li>Když má brána uživatelské účty, integrace chce <b>API token</b>: vytvořte ho v Systém › Správa uživatelů › API tokeny (role správce, nebo uživatel, když integrace nemá restartovat ani aktualizovat) a vložte ho. Token nezávisí na žádném uživateli ani jeho 2FA.</li>
     <li><b>Konfigurovat</b> (volby integrace): pro každé téma, od jaké úrovně se zobrazí trvalé oznámení (vypnuto, jen kritické, varování a kritické, vše).</li></ol>
     <p>Entity: aktivní role, stav Thread, hluk a hluk max v dB(A), výběr role, přepínač rozpoznávání zvuků, událost a binární senzor pro každou zvukovou událost,
-    událost <b>Notifikace</b> (pro automatizace), aktualizace firmwaru, tlačítka restart, identifikace, záloha Zigbee a kontrola aktualizace, diagnostické senzory.</p>
+    událost <b>Notifikace</b> (pro automatizace), aktualizace firmwaru a <b>firmwaru rádia C6</b>, tlačítka restart, identifikace, záloha Zigbee a kontrola aktualizace, diagnostické senzory.</p>
     <h3>Thread a Matter</h3>
     <ol><li>Nastavení › Zařízení a služby › Přidat integraci › <b>OpenThread Border Router</b>, URL <code>http://&lt;brána&gt;:8081</code>.</li>
     <li>Thread › Konfigurovat: označte síť jako preferovanou, nebo bránu připojte do existující sítě (Thread › Nastavení › Použít dataset).</li>
@@ -439,8 +447,8 @@ TELEGRAM = T(
     <tr><td><code>/thread</code>, <code>/zigbee</code></td><td>state of the role</td><td>Information, read</td><td>–</td></tr>
     <tr><td><code>/noise</code></td><td>noise in dB(A)</td><td>Sound › Live, read</td><td>–</td></tr>
     <tr><td><code>/events</code></td><td>last detections</td><td>Sound › Detection log, read</td><td>–</td></tr>
-    <tr><td><code>/update</code></td><td>check for a firmware update</td><td>System › Firmware, read</td><td>–</td></tr>
-    <tr><td><code>/install</code></td><td>install the offered update</td><td>System › Firmware, edit</td><td>yes</td></tr>
+    <tr><td><code>/update</code></td><td>gateway and C6 versions, build, release notes</td><td>System › Firmware, read</td><td>–</td></tr>
+    <tr><td><code>/install</code>, <code>/install c6</code></td><td>install the gateway firmware or the C6 package</td><td>System › Firmware, edit</td><td>yes</td></tr>
     <tr><td><code>/restart</code></td><td>restart C6 and P4</td><td>System › Maintenance, edit</td><td>yes</td></tr>
     <tr><td><code>/identify</code></td><td>blink the identify icon</td><td>Overview, edit</td><td>yes</td></tr>
     <tr><td><code>/role &lt;name&gt;</code></td><td>switch the role</td><td>Role, edit</td><td>yes</td></tr>
@@ -455,8 +463,8 @@ TELEGRAM = T(
     <tr><td><code>/thread</code>, <code>/zigbee</code></td><td>stav role</td><td>Informace, číst</td><td>–</td></tr>
     <tr><td><code>/noise</code></td><td>hluk v dB(A)</td><td>Zvuk › Živě, číst</td><td>–</td></tr>
     <tr><td><code>/events</code></td><td>poslední detekce</td><td>Zvuk › Log detekcí, číst</td><td>–</td></tr>
-    <tr><td><code>/update</code></td><td>kontrola aktualizace firmwaru</td><td>Systém › Firmware, číst</td><td>–</td></tr>
-    <tr><td><code>/install</code></td><td>instalace nabízené aktualizace</td><td>Systém › Firmware, upravovat</td><td>ano</td></tr>
+    <tr><td><code>/update</code></td><td>verze brány a C6, sestavení, poznámky k vydání</td><td>Systém › Firmware, číst</td><td>–</td></tr>
+    <tr><td><code>/install</code>, <code>/install c6</code></td><td>instalace firmwaru brány nebo balíku C6</td><td>Systém › Firmware, upravovat</td><td>ano</td></tr>
     <tr><td><code>/restart</code></td><td>restart C6 a P4</td><td>Systém › Údržba, upravovat</td><td>ano</td></tr>
     <tr><td><code>/identify</code></td><td>rozblikání ikony identifikace</td><td>Přehled, upravovat</td><td>ano</td></tr>
     <tr><td><code>/role &lt;název&gt;</code></td><td>přepnutí role</td><td>Role, upravovat</td><td>ano</td></tr>

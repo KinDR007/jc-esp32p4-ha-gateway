@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Online update of the C6 radio firmwares: the manifest offers the C6 package (`c6fw`: URL, sha256,
+  size, format, firmware versions) and the build (commit, date, ESP-IDF, CI run); the gateway compares
+  it with its c6fw partition and on request downloads it into PSRAM, checks sha256 and header, stores
+  it and restarts to update the C6. Web UI (System › Firmware: both parts, firmware versions installed
+  and offered, build, release notes, GitHub Releases preset), Home Assistant (*C6 radio firmware* update
+  entity, integration 1.2.0), Telegram (`/update` with notes and build, `/install c6`), notification
+  when a new package appears. Release workflow on tags `v*` (`release.yml`, `scripts/release_notes.py`,
+  `scripts/make_update_manifest.py`). The c6fw partition stays as the cache (offline recovery);
+  dropping it is step B. Test TC36. Fix: the first update check after a start waited 30 s even when
+  asked earlier.
+
 - Telegram bot (System › Notifications, My account › Telegram, docs/notifications.md): notifications
   to chats paired with user accounts (level per topic, quiet hours, /mute for sounds, Czech or English)
   and commands with the user's rights (/status /lan /thread /zigbee /noise /events /update /install

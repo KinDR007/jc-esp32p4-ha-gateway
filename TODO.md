@@ -20,7 +20,11 @@
 - [x] Uživatelé etapa 2: integrace HA přes API token (config flow, reauth) a notifikace v HA (persistentní notifikace, událost) z tématu `notify`
 - [ ] Integrace HA: ověřit v UI HA nové ověření tokenem a trvalá oznámení
 - [ ] Telegram: ověřit se skutečným botem (párování, notifikace, příkazy s potvrzením a TOTP)
-- [x] Uživatelé etapa 3: Telegram bot (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
+- [x] Uživatelé etapa 3: Telegram bot
+- [x] Online aktualizace C6 (krok A): manifest s balíkem C6, stažení do PSRAM, HA, Telegram, CI vydání, TC36
+- [ ] Zveřejnit repozitář (rozhodnutí uživatele), pak první GitHub Release (tag `v1.5`) a výchozí URL manifestu GitHub Releases
+- [ ] Krok B: zrušit oddíl `c6fw` (2 MB) a flashovat C6 přímo z PSRAM; jen přes USB, až bude místo potřeba (např. větší zvukový model)
+- [ ] Nasadit integraci 1.2.0 do HA (entita Firmware rádia C6) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
 - [ ] Ověřit automatickou noční zálohu Zigbee (02:00–03:00 UTC) v roli router; v testu TC26 ověřena jen záloha na požádání
 - [x] Brána vrácena do Thread sítě `MyHome284238473` (uživatel)
 - [x] Zvuk fáze 3: události (předvolby, editor, výjimky, log), MQTT event/binary_sensor/device trigger, TC17/TC18

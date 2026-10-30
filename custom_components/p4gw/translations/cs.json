@@ -148,6 +148,11 @@
       "sound": {
         "name": "Rozpoznávání zvuku"
       }
+    },
+    "update": {
+      "c6_firmware": {
+        "name": "Firmware rádia C6"
+      }
     }
   },
   "options": {

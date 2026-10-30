@@ -104,6 +104,7 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 | Sound recognition (switch) | microphone and model on/off |
 | `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
 | Firmware (update) | install with progress, from the online update manifest |
+| C6 radio firmware (update) | the package of all C6 firmwares from the same manifest; versions are the first 8 hex digits of its sha256, the release summary lists the firmwares that change; install downloads it into the gateway's RAM, stores it and restarts the gateway, which then updates the C6 |
 | Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
 | Notification (event) | every notification of the gateway: event type `info`, `warning` or `critical`, attributes `topic` (security, system, network, sound), `text`, `time`; for automations, e.g. forwarding to the phone |
 | Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |

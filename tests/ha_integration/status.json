@@ -178,7 +178,24 @@
     "checked": 0,
     "checking": false,
     "error": "",
-    "available": false
+    "available": false,
+    "c6": {
+      "offered": true,
+      "available": false,
+      "in_progress": false,
+      "percent": 0,
+      "installed_id": "9ae0d4cd",
+      "offered_id": "9ae0d4cd",
+      "size": 2015232,
+      "installed_versions": {
+        "slots": "4 firmware slots",
+        "ot_rcp": "esp_ot_rcp v5.5.5-p4gw.3"
+      },
+      "offered_versions": {
+        "slots": "4 firmware slots",
+        "ot_rcp": "esp_ot_rcp v5.5.5-p4gw.3"
+      }
+    }
   },
   "identify_s": 0,
   "role_status": {

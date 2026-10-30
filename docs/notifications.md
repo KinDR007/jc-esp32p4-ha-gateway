@@ -50,8 +50,8 @@ Each user, My account › Telegram and notifications:
 | `/thread`, `/zigbee` | Thread / Zigbee › Information, read | – |
 | `/noise` | Sound › Live, read | – |
 | `/events` | Sound › Detection log, read | – |
-| `/update` | System › Firmware, read | – |
-| `/install` | System › Firmware, edit | yes |
+| `/update` (gateway and C6 versions, build, release notes) | System › Firmware, read | – |
+| `/install`, `/install c6` (gateway firmware, C6 package) | System › Firmware, edit | yes |
 | `/restart` (C6 and P4) | System › Maintenance, edit | yes |
 | `/identify` | Overview, edit | yes |
 | `/role <name>` | Role, edit | yes |

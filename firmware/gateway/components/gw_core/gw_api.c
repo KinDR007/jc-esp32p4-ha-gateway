@@ -736,6 +736,7 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
         }
         return gw_http_send_error(req, 400, esp_err_to_name(err));
     }
+    gw_update_c6_changed();
     /* The boot sequence compares bundle hashes and reflashes the C6 if its bundle changed. */
     cJSON *json = cJSON_CreateObject();
     cJSON_AddBoolToObject(json, "ok", true);

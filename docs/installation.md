@@ -68,15 +68,34 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 | ESPHome image | UI System → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
 | Gateway, online | UI System → Firmware → Online update, or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
 | C6 firmware | UI System → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
+| C6 firmware, online | UI System → Firmware → Online update → **Install C6 package**, the *C6 radio firmware* update entity in Home Assistant, or Telegram `/install c6` | downloaded into PSRAM, sha256 of the file compared with the manifest and the header checked before the c6fw partition is erased; then a restart updates the C6 |
 
 Uploads are refused for the first 60 s after a gateway update, until the new image is confirmed.
 
-Online update: `scripts/make_update_manifest.sh ["notes"] [release_url]` writes `dist/manifest.json`
-next to `dist/p4gw.bin`; copy both to a web server the gateway reaches, e.g. `/config/www/p4gw/` of
-Home Assistant, and set `http://<ha>:8123/local/p4gw/manifest.json` as the manifest URL.
-`{"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "..."}`; `p4gw` may be an
-absolute URL. HTTPS works with the ESP-IDF certificate bundle. Only the gateway image is updated
-this way; c6fw.bin and the ESPHome image are uploaded in the UI.
+Online update: `scripts/make_update_manifest.py [--notes TEXT] [--release-url URL] [--base-url URL]`
+writes `dist/manifest.json` next to `dist/p4gw.bin` and `dist/c6fw.bin`; copy the three to a web
+server the gateway reaches, e.g. `/config/www/p4gw/` of Home Assistant, and set
+`http://<ha>:8123/local/p4gw/manifest.json` as the manifest URL.
+
+```json
+{"version": "v1.5", "p4gw": "p4gw.bin", "notes": "...", "release_url": "...",
+ "build": {"commit": "abc1234", "date": "2026-10-30", "idf": "v5.5.5", "ci": "..."},
+ "c6fw": {"url": "c6fw.bin", "sha256": "...", "size": 2015232, "format": 3,
+          "bundles": {"slots": "4 firmware slots", "ot_rcp": "esp_ot_rcp v5.5.5-p4gw.3", "...": "..."}}}
+```
+
+URLs may be absolute. The gateway compares `version` with its own and the sha256 of the C6 package
+with the file in its c6fw partition (versions shown as the first 8 hex digits of that sha256);
+nothing is downloaded until someone installs. A package of another `format` is offered only to a
+gateway that reads it, so the gateway goes first. HTTPS works with the ESP-IDF certificate bundle.
+The ESPHome image is still uploaded in the UI (CI does not build it, it needs the API key).
+
+Releases: pushing a tag `v*` runs `.github/workflows/release.yml`: it builds `p4gw.bin` and `c6fw.bin`,
+takes the notes from the CHANGELOG section of the tag (or *Unreleased*, `scripts/release_notes.py`)
+and publishes a GitHub release with `manifest.json` (absolute URLs of the tag). The gateway reads
+`https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json` (button
+*GitHub Releases*) once the repository is public; a private repository needs a token the gateway does
+not have.
 
 CI (GitHub Actions, `.github/workflows/ci.yml`): `scripts/ci_checks.sh` (unit test, Python and web
 UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 firmwares,

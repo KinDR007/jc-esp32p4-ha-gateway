@@ -701,21 +701,46 @@ static void cmd_identify(const char *args, bool cz, char *out, size_t len)
     strlcpy(out, cz ? "Ikona identifikace bliká 10 s ve webovém rozhraní." : "The identify icon blinks for 10 s in the web UI.", len);
 }
 
+/* gateway and C6 versions, release notes and build of the offered release */
 static void cmd_update(const char *args, bool cz, char *out, size_t len)
 {
     gw_update_check_soon();
     cJSON *u = gw_update_status();
+    const cJSON *c6 = cJSON_GetObjectItem(u, "c6");
     bool available = cJSON_IsTrue(cJSON_GetObjectItem(u, "available"));
-    snprintf(out, len, cz ? "Nainstalováno: %s\nNabízeno: %s\n%s" : "Installed: %s\nOffered: %s\n%s",
-             GW_JSON_STR(u, "installed_version") ? GW_JSON_STR(u, "installed_version") : "?",
-             GW_JSON_STR(u, "latest_version") ? GW_JSON_STR(u, "latest_version") : "?",
-             available ? (cz ? "Instalace: /install" : "Install: /install")
-                       : (cz ? "Žádná novější verze (kontrola proběhne za chvíli znovu)." : "Nothing newer (checking again shortly)."));
+    bool c6_available = cJSON_IsTrue(cJSON_GetObjectItem(c6, "available"));
+    char notes[700] = "", build[160] = "";
+    html(GW_JSON_STR(u, "release_summary") ? GW_JSON_STR(u, "release_summary") : "", notes, sizeof(notes));
+    html(GW_JSON_STR(u, "build") ? GW_JSON_STR(u, "build") : "", build, sizeof(build));
+    size_t n = snprintf(out, len, cz ? "<b>Brána</b>: %s → %s%s\n<b>Rádio C6</b>: %s"
+                                     : "<b>Gateway</b>: %s → %s%s\n<b>C6 radio</b>: %s",
+                        GW_JSON_STR(u, "installed_version") ? GW_JSON_STR(u, "installed_version") : "?",
+                        GW_JSON_STR(u, "latest_version") ? GW_JSON_STR(u, "latest_version") : "?",
+                        available ? (cz ? " (/install)" : " (/install)") : (cz ? " (aktuální)" : " (up to date)"),
+                        c6_available ? (cz ? "nový balík (/install c6)" : "new package (/install c6)")
+                                     : cJSON_IsTrue(cJSON_GetObjectItem(c6, "offered")) ? (cz ? "aktuální" : "up to date")
+                                                                                        : (cz ? "nenabízeno" : "not offered"));
+    if (build[0] && n < len) {
+        n += snprintf(out + n, len - n, cz ? "\n<b>Sestavení</b>: %s" : "\n<b>Build</b>: %s", build);
+    }
+    if (notes[0] && n < len) {
+        n += snprintf(out + n, len - n, cz ? "\n\n<b>Poznámky k vydání</b>\n%s" : "\n\n<b>Release notes</b>\n%s", notes);
+    }
+    if (!GW_JSON_STR(u, "url") || !GW_JSON_STR(u, "url")[0]) {
+        snprintf(out + n, len - n, "%s", cz ? "\n\nAdresa manifestu není nastavená (Systém › Firmware)." : "\n\nNo manifest URL set (System › Firmware).");
+    }
     cJSON_Delete(u);
 }
 
 static void cmd_install(const char *args, bool cz, char *out, size_t len)
 {
+    if (strcmp(args, "c6") == 0) {
+        esp_err_t err = gw_update_install_c6();
+        snprintf(out, len, err == ESP_OK ? (cz ? "Stahuji balík C6, brána se pak restartuje a aktualizuje rádio (asi 2 min)." : "Downloading the C6 package; the gateway then restarts and updates the radio (about 2 min).")
+                                         : (cz ? "Balík C6 nejde nainstalovat: %s" : "Cannot install the C6 package: %s"),
+                 err == ESP_ERR_NOT_FOUND ? (cz ? "není nabízen" : "none offered") : esp_err_to_name(err));
+        return;
+    }
     esp_err_t err = gw_update_install();
     snprintf(out, len, err == ESP_OK ? (cz ? "Instaluji aktualizaci, brána se pak restartuje." : "Installing the update, the gateway restarts after it.")
                                      : (cz ? "Aktualizaci nejde spustit: %s" : "Cannot start the update: %s"),
@@ -952,7 +977,8 @@ void gw_telegram_start(void)
     gw_bot_command("restart", "restart the whole gateway (C6 and P4)", "restart celé brány (C6 a P4)", "system/maint", 2, true, cmd_restart);
     gw_bot_command("identify", "blink the identify icon", "rozblikat ikonu identifikace", "overview", 2, true, cmd_identify);
     gw_bot_command("update", "check for a firmware update", "kontrola aktualizace firmwaru", "system/firmware", 1, false, cmd_update);
-    gw_bot_command("install", "install the offered update", "instalace nabízené aktualizace", "system/firmware", 2, true, cmd_install);
+    gw_bot_command("install", "install the offered gateway firmware (/install c6: the C6 radio package)",
+                   "instalace nabízeného firmwaru brány (/install c6: balík rádia C6)", "system/firmware", 2, true, cmd_install);
     gw_bot_command("role", "switch the role, e.g. /role zigbee_coordinator", "přepnutí role, např. /role zigbee_coordinator", "role", 2, true, cmd_role);
     gw_notify_set_listener(on_note);
     gw_http_register("/api/telegram", HTTP_GET, telegram_get);

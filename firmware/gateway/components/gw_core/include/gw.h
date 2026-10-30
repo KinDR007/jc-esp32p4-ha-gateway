@@ -220,6 +220,10 @@ void gw_update_start(void);
 void gw_update_check_soon(void);
 /* Starts the download and installation of the offered version; restarts when done. */
 esp_err_t gw_update_install(void);
+/* Downloads the offered C6 package into PSRAM, checks it, stores it and restarts (the C6 is updated at start). */
+esp_err_t gw_update_install_c6(void);
+/* The c6fw partition changed (upload in the web UI): compare it with the offered package again. */
+void gw_update_c6_changed(void);
 cJSON *gw_update_status(void);
 /* MQTT: discovery of the update entity and its state (called by gw_mqtt on connect and on change). */
 void gw_update_mqtt_discovery(void);

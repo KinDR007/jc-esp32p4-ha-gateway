@@ -1,0 +1,52 @@
+name: Release
+
+# A tag v* builds the gateway and the C6 package and publishes them as a GitHub release with the
+# manifest of the online update. The gateway reads it from
+# https://github.com/<owner>/<repo>/releases/latest/download/manifest.json (public repository only:
+# a private one needs a token the gateway does not have).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: existing tag to (re)publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.5.5
+    timeout-minutes: 90
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # git describe gives the firmware version
+          ref: ${{ inputs.tag || github.ref }}
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: ./scripts/ci_build.sh
+        shell: bash
+      - name: Release notes and manifest
+        shell: bash
+        run: |
+          python3 scripts/release_notes.py "$TAG" > notes.md
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          python3 scripts/make_update_manifest.py --notes-file notes.md \
+            --release-url "$url/releases/tag/$TAG" --base-url "$url/releases/download/$TAG" \
+            --ci "$url/actions/runs/$GITHUB_RUN_ID"
+          sha256sum dist/p4gw.bin dist/c6fw.bin > dist/SHA256SUMS
+      # p4gw.bin and c6fw.bin hold no secrets (the ESPHome image with the API key is not built here)
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          body_path: notes.md
+          files: |
+            dist/p4gw.bin
+            dist/c6fw.bin
+            dist/manifest.json
+            dist/SHA256SUMS

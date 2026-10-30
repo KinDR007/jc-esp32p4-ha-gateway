@@ -148,6 +148,11 @@
       "sound": {
         "name": "Sound recognition"
       }
+    },
+    "update": {
+      "c6_firmware": {
+        "name": "C6 radio firmware"
+      }
     }
   },
   "options": {
