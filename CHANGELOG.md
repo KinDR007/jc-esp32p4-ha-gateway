@@ -2,10 +2,13 @@
 
 ## Unreleased
 
-## v1.8 (2026-10-31)
+## v1.8.1 (2026-10-31)
 
+First release of v1.8 (the v1.8 tag was not released: the ESPHome build failed in CI).
 Home Assistant integration 1.4.0 (role select of radio B).
 
+- Fix (build): the ESPHome Bluetooth proxy is built with ESPHome's own ESP-IDF, not the one of the
+  CI container.
 **Two radios** ([docs/dual-radio.md](docs/dual-radio.md)): a XIAO ESP32-C5 on JP1 (powered over its own
 USB-C) is radio B next to the C6 of the board, so Thread and Zigbee run at the same time. **The
 ESPHome image on the P4 is gone**: ESPHome is now a role of a radio; a gateway with the old ESPHome
