@@ -189,7 +189,7 @@ static cJSON *c6_telemetry_json(void)
 
 static cJSON *c6_chip_json(void)
 {
-    const c6_chip_t *c = c6_chip_info();
+    const c6_chip_t *c = c6_chip_info(C6_RADIO_A);
     cJSON *j = cJSON_CreateObject();
     if (c->known) {
         char buf[18];
@@ -313,7 +313,7 @@ static esp_err_t status_get(httpd_req_t *req)
         }
     }
     free(dir);
-    const c6_progress_t *p = c6_progress();
+    const c6_progress_t *p = c6_progress(C6_RADIO_A);
     cJSON_AddItemToObject(c6, "chip", c6_chip_json());
     cJSON *tel = c6_telemetry_json();
     if (tel) {
@@ -332,7 +332,7 @@ static esp_err_t status_get(httpd_req_t *req)
     static const char *const snap_bundles[] = {"zigbee_ncp", "zigbee_router"};
     for (size_t i = 0; i < sizeof(snap_bundles) / sizeof(snap_bundles[0]); i++) {
         uint32_t snap_size, snap_gen, snap_time;
-        if (c6_snapshot_info(snap_bundles[i], &snap_size, &snap_gen, &snap_time) == ESP_OK) {
+        if (c6_snapshot_info(C6_RADIO_A, snap_bundles[i], &snap_size, &snap_gen, &snap_time) == ESP_OK) {
             cJSON *snap = cJSON_CreateObject();
             cJSON_AddStringToObject(snap, "bundle", snap_bundles[i]);
             cJSON_AddNumberToObject(snap, "size", snap_size);
@@ -413,7 +413,7 @@ esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size
         }
         gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     }
-    if (c6_progress()->busy) {
+    if (c6_progress(C6_RADIO_A)->busy) {
         snprintf(err, err_len, "C6 flashing in progress");
         return ESP_ERR_INVALID_STATE;
     }
@@ -464,7 +464,7 @@ static esp_err_t reboot_post(httpd_req_t *req)
     }
     bool full = cJSON_IsTrue(cJSON_GetObjectItem(body, "full"));
     cJSON_Delete(body);
-    if (full && c6_progress()->busy) {
+    if (full && c6_progress(C6_RADIO_A)->busy) {
         return gw_http_send_error(req, 409, "C6 flashing in progress");
     }
     gw_restart_later_full(500, full);
@@ -655,7 +655,7 @@ bool gw_upload_begin(void)
     if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE) {
         return false;
     }
-    if (c6_progress()->busy) {
+    if (c6_progress(C6_RADIO_A)->busy) {
         xSemaphoreGive(s_upload_lock);
         return false;
     }
@@ -754,7 +754,7 @@ static esp_err_t c6_reflash_post(httpd_req_t *req)
 static esp_err_t radio_b_probe_post(httpd_req_t *req)
 {
     c6_probe_t r;
-    c6_radio_probe(c6_radio_b_pins(), &r);
+    c6_radio_probe(c6_radio_pins(C6_RADIO_B), &r);
     cJSON *j = cJSON_CreateObject();
     cJSON_AddBoolToObject(j, "wired", r.wired);
     cJSON_AddBoolToObject(j, "banner", r.banner);
@@ -778,7 +778,7 @@ static esp_err_t snapshot_get(httpd_req_t *req)
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         httpd_query_key_value(query, "bundle", bundle, sizeof(bundle));
     }
-    if (c6_snapshot_info(bundle, &size, &gen, NULL) != ESP_OK) {
+    if (c6_snapshot_info(C6_RADIO_A, bundle, &size, &gen, NULL) != ESP_OK) {
         return gw_http_send_error(req, 404, "no Zigbee snapshot");
     }
     char *buf = malloc(UPLOAD_CHUNK);
@@ -792,7 +792,7 @@ static esp_err_t snapshot_get(httpd_req_t *req)
     esp_err_t err = ESP_OK;
     for (uint32_t off = 0; off < size && err == ESP_OK; off += UPLOAD_CHUNK) {
         size_t n = MIN(UPLOAD_CHUNK, size - off);
-        err = c6_snapshot_read(bundle, off, buf, n);
+        err = c6_snapshot_read(C6_RADIO_A, bundle, off, buf, n);
         if (err == ESP_OK) {
             err = httpd_resp_send_chunk(req, buf, n);
         }
@@ -824,18 +824,18 @@ static esp_err_t c6_backup_get(httpd_req_t *req)
     if (gw_state()->active != GW_ROLE_NONE) {
         return gw_http_send_error(req, 409, "only in maintenance mode (no active role)");
     }
-    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress()->busy) {
+    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress(C6_RADIO_A)->busy) {
         return gw_http_send_error(req, 409, "C6 busy");
     }
     backup_ctx_t ctx = {.req = req};
-    esp_err_t err = c6_read_flash(http_sink, &ctx);
+    esp_err_t err = c6_read_flash(C6_RADIO_A, http_sink, &ctx);
     xSemaphoreGive(s_upload_lock);
     if (err == ESP_OK) {
         gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
     } else {
         ESP_LOGE(TAG, "C6 backup failed: %s", esp_err_to_name(err));
         if (ctx.sent == 0) {
-            return gw_http_send_error(req, 503, c6_progress()->last_error);
+            return gw_http_send_error(req, 503, c6_progress(C6_RADIO_A)->last_error);
         }
         /* Mid-transfer: an aborted download is the error signal. */
         return ESP_FAIL;
@@ -930,7 +930,7 @@ static esp_err_t settings_export_get(httpd_req_t *req)
 
 static esp_err_t settings_import_post(httpd_req_t *req)
 {
-    if (c6_progress()->busy) {
+    if (c6_progress(C6_RADIO_A)->busy) {
         return gw_http_send_error(req, 409, "C6 flashing in progress");
     }
     cJSON *body = gw_http_read_json_max(req, SETTINGS_MAX_BODY);

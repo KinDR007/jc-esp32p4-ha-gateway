@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "c6_flasher.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus
@@ -14,7 +15,7 @@ extern "C" {
  * Router mode talks to the standalone router firmware on the C6 over a line protocol
  * ("@ZR {json}" status lines, plain text commands).
  */
-esp_err_t role_zigbee_start(bool coordinator);
+esp_err_t role_zigbee_start(bool coordinator, c6_radio_t radio);
 /* Coordinator: a host (Zigbee2MQTT, ZHA) is connected to the TCP bridge. */
 bool role_zigbee_host_connected(void);
 

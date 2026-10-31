@@ -29,9 +29,10 @@ static const char *TAG = "main";
 #define STABLE_AFTER_MS (60 * 1000)
 #define C6_FLASH_MAX_TRIES 3
 
-/* Makes sure the C6 runs the bundle the role needs; flashes it when not. */
-static bool ensure_c6(const char *bundle)
+/* Makes sure the radio runs the bundle the role needs; flashes it when not. */
+static bool ensure_c6(c6_radio_t radio, const char *bundle)
 {
+    const gw_radio_keys_t *keys = gw_radio_keys(radio);
     c6fw_entry_t entry;
     char current[16];
     uint8_t current_sha[32] = {0};
@@ -48,21 +49,21 @@ static bool ensure_c6(const char *bundle)
                            esp_err_to_name(err));
         return false;
     }
-    gw_config_get_str(GW_KEY_C6_BUNDLE, current, sizeof(current));
-    gw_config_get_blob(GW_KEY_C6_SHA, current_sha, sizeof(current_sha));
-    bool force = gw_config_get_u8(GW_KEY_C6_FORCE, 0);
+    gw_config_get_str(keys->bundle, current, sizeof(current));
+    gw_config_get_blob(keys->sha, current_sha, sizeof(current_sha));
+    bool force = gw_config_get_u8(keys->force, 0);
     if (!force && strcmp(current, bundle) == 0 && memcmp(current_sha, entry.sha256, sizeof(current_sha)) == 0) {
         return true;
     }
 
-    uint8_t tries = gw_config_get_u8(GW_KEY_C6_TRIES, 0);
+    uint8_t tries = gw_config_get_u8(keys->tries, 0);
     if (tries >= C6_FLASH_MAX_TRIES) {
         gw_set_maintenance("flashing the C6 failed %u times, check the JP1 jumpers and retry from the UI", tries);
         return false;
     }
-    gw_config_set_u8(GW_KEY_C6_TRIES, tries + 1);
+    gw_config_set_u8(keys->tries, tries + 1);
     if (force) {
-        c6_slots_invalidate(); /* "Reflash C6" rewrites the whole slots layout, not only the slot choice */
+        c6_slots_invalidate(radio); /* "Reflash C6" rewrites the whole slots layout, not only the slot choice */
     }
     ESP_LOGW(TAG, "C6: %s -> %s %s%s", current[0] ? current : "unknown", entry.name, entry.version,
              force ? " (forced)" : "");
@@ -73,30 +74,30 @@ static bool ensure_c6(const char *bundle)
     }
     /* The large firmwares (slots layout, esp-hosted) live only in the package in PSRAM when the c6fw
      * partition is small: after a power cut it is gone and the release has to provide it again. */
-    if (!c6_flash_ready(&entry)) {
+    if (!c6_flash_ready(radio, &entry)) {
         ESP_LOGW(TAG, "C6 firmwares for %s not on the gateway, fetching the package", entry.name);
         err = gw_eth_wait_ip(pdMS_TO_TICKS(30000)) ? gw_update_fetch_c6() : ESP_ERR_TIMEOUT;
         if (err == ESP_OK && c6fw_find(bundle, &entry) != ESP_OK) {
             err = ESP_ERR_NOT_FOUND;
         }
-        if (err != ESP_OK || !c6_flash_ready(&entry)) {
-            gw_config_set_u8(GW_KEY_C6_TRIES, tries); /* not a failed flash */
+        if (err != ESP_OK || !c6_flash_ready(radio, &entry)) {
+            gw_config_set_u8(keys->tries, tries); /* not a failed flash */
             gw_set_maintenance("the C6 firmware package is not on the gateway (%s): connect it to the internet "
                                "(online update) or upload c6fw.bin under System > Firmware", esp_err_to_name(err));
             return false;
         }
     }
     gw_flash_lock();
-    err = c6_flash_bundle(&entry, current);
+    err = c6_flash_bundle(radio, &entry, current);
     gw_flash_unlock();
     if (err != ESP_OK) {
-        gw_set_maintenance("%s", c6_progress()->last_error);
+        gw_set_maintenance("%s", c6_progress(radio)->last_error);
         return false;
     }
-    gw_config_set_str(GW_KEY_C6_BUNDLE, entry.name);
-    gw_config_set_blob(GW_KEY_C6_SHA, entry.sha256, sizeof(entry.sha256));
-    gw_config_erase(GW_KEY_C6_FORCE);
-    gw_config_set_u8(GW_KEY_C6_TRIES, 0);
+    gw_config_set_str(keys->bundle, entry.name);
+    gw_config_set_blob(keys->sha, entry.sha256, sizeof(entry.sha256));
+    gw_config_erase(keys->force);
+    gw_config_set_u8(keys->tries, 0);
     return true;
 }
 
@@ -124,7 +125,7 @@ static void apply_role(gw_role_t role)
         /* The factory firmware cannot be downloaded again: never overwrite it before a backup. */
         gw_set_maintenance("back up the C6 factory firmware first (System tab) or confirm skipping the backup");
         return;
-    } else if (!ensure_c6(gw_role_c6_bundle(role))) {
+    } else if (!ensure_c6(C6_RADIO_A, gw_role_c6_bundle(role))) {
         return;
     }
     if ((role == GW_ROLE_ZIGBEE_COORD || role == GW_ROLE_ZIGBEE_ROUTER) && gw_config_get_u8(GW_KEY_ZB_SNAP_REQ, 0)) {
@@ -133,7 +134,7 @@ static void apply_role(gw_role_t role)
             vTaskDelay(pdMS_TO_TICKS(2000));
         }
         gw_flash_lock();
-        esp_err_t err = c6_snapshot_take(gw_role_c6_bundle(role));
+        esp_err_t err = c6_snapshot_take(C6_RADIO_A, gw_role_c6_bundle(role));
         gw_flash_unlock();
         ESP_LOGI(TAG, "Zigbee network backup: %s", esp_err_to_name(err));
     }
@@ -142,11 +143,11 @@ static void apply_role(gw_role_t role)
     switch (role) {
     case GW_ROLE_THREAD_BR:
     case GW_ROLE_THREAD_ROUTER:
-        err = role_thread_start(role == GW_ROLE_THREAD_BR);
+        err = role_thread_start(role == GW_ROLE_THREAD_BR, C6_RADIO_A);
         break;
     case GW_ROLE_ZIGBEE_COORD:
     case GW_ROLE_ZIGBEE_ROUTER:
-        err = role_zigbee_start(role == GW_ROLE_ZIGBEE_COORD);
+        err = role_zigbee_start(role == GW_ROLE_ZIGBEE_COORD, C6_RADIO_A);
         break;
     case GW_ROLE_ESPHOME:
         err = gw_boot_select_esphome();
@@ -190,7 +191,7 @@ static esp_err_t zigbee_snapshot_post(httpd_req_t *req)
     if (role != GW_ROLE_ZIGBEE_COORD && role != GW_ROLE_ZIGBEE_ROUTER) {
         return gw_http_send_error(req, 409, "only in a Zigbee role");
     }
-    if (c6_progress()->busy) {
+    if (c6_progress(C6_RADIO_A)->busy) {
         return gw_http_send_error(req, 409, "C6 flashing in progress");
     }
     cJSON *json = cJSON_CreateObject();
@@ -216,7 +217,7 @@ static bool zigbee_backup_due(void)
     if (utc.tm_hour != SNAP_HOUR_UTC || (role == GW_ROLE_ZIGBEE_COORD && role_zigbee_host_connected())) {
         return false;
     }
-    c6_snapshot_info(gw_role_c6_bundle(role), &size, &gen, &saved);
+    c6_snapshot_info(C6_RADIO_A, gw_role_c6_bundle(role), &size, &gen, &saved);
     /* an hour of slack: the check runs every 10 minutes, so yesterday's backup may be 23.9 h old */
     return !saved || now - (time_t)saved >= (time_t)days * 86400 - 3600;
 }
@@ -287,8 +288,8 @@ void app_main(void)
     gw_log_init(LOG_RING_SIZE);
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    c6_init_pins();
-    c6_radio_init_pins(c6_radio_b_pins()); /* external radio running, if connected */
+    c6_radio_init_pins(c6_radio_pins(C6_RADIO_A));
+    c6_radio_init_pins(c6_radio_pins(C6_RADIO_B)); /* external radio running, if connected */
     c6fw_stage_load(); /* a C6 package downloaded or uploaded before a software restart */
 
     gw_role_t def_role = GW_ROLE_THREAD_BR;

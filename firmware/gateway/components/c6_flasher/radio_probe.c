@@ -18,7 +18,6 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "sdkconfig.h"
 
 static const char *TAG = "radio_probe";
 
@@ -42,18 +41,6 @@ static const char *chip_name(target_chip_t chip)
     default:
         return "other";
     }
-}
-
-const c6_radio_pins_t *c6_radio_b_pins(void)
-{
-    static const c6_radio_pins_t pins = {
-        .uart_port = CONFIG_GW_RADIO_B_UART_PORT,
-        .tx = CONFIG_GW_RADIO_B_UART_TX,
-        .rx = CONFIG_GW_RADIO_B_UART_RX,
-        .reset = CONFIG_GW_RADIO_B_RESET_GPIO,
-        .boot = CONFIG_GW_RADIO_B_BOOT_GPIO,
-    };
-    return &pins;
 }
 
 void c6_radio_init_pins(const c6_radio_pins_t *p)

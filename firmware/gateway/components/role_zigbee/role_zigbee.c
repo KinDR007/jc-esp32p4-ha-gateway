@@ -18,7 +18,7 @@
 
 static const char *TAG = "role_zigbee";
 
-#define UART_PORT CONFIG_GW_C6_UART_PORT
+#define UART_PORT s_port
 #define UART_RX_BUF 16384
 #define UART_TX_BUF 8192
 #define CHUNK 1024
@@ -26,6 +26,8 @@ static const char *TAG = "role_zigbee";
 #define ROUTER_LINE_MAX 512
 
 static bool s_coordinator;
+static c6_radio_t s_radio; /* the radio running Zigbee */
+static uart_port_t s_port;
 
 /* ---- statistics ---- */
 static struct {
@@ -72,7 +74,7 @@ static void uart_setup(void)
     };
     ESP_ERROR_CHECK(uart_driver_install(UART_PORT, UART_RX_BUF, UART_TX_BUF, 32, &s_uart_queue, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_PORT, &cfg));
-    ESP_ERROR_CHECK(uart_set_pin(UART_PORT, CONFIG_GW_C6_UART_TX, CONFIG_GW_C6_UART_RX, UART_PIN_NO_CHANGE,
+    ESP_ERROR_CHECK(uart_set_pin(UART_PORT, c6_radio_pins(s_radio)->tx, c6_radio_pins(s_radio)->rx, UART_PIN_NO_CHANGE,
                                  UART_PIN_NO_CHANGE));
     /* Wake the reader early: deliver bytes as soon as the line goes idle for ~2 characters. */
     uart_set_rx_timeout(UART_PORT, 2);
@@ -81,7 +83,7 @@ static void uart_setup(void)
 
 static void reset_c6_and_flush(void)
 {
-    c6_reset();
+    c6_reset(s_radio);
     s_stats.c6_resets++;
     /* Drop the ROM boot banner (115200 Bd garbage at our baud rate). */
     vTaskDelay(pdMS_TO_TICKS(300));
@@ -443,8 +445,10 @@ static esp_err_t reset_post(httpd_req_t *req)
     return gw_http_send_json(req, cJSON_CreateObject());
 }
 
-esp_err_t role_zigbee_start(bool coordinator)
+esp_err_t role_zigbee_start(bool coordinator, c6_radio_t radio)
 {
+    s_radio = radio;
+    s_port = c6_radio_pins(radio)->uart_port;
     s_coordinator = coordinator;
     s_client_lock = xSemaphoreCreateMutex();
     s_router_lock = xSemaphoreCreateMutex();

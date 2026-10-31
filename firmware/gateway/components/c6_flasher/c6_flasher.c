@@ -57,43 +57,59 @@ typedef struct __attribute__((packed)) {
     uint32_t saved_unix; /* not in the crc: headers written before it have 0xffffffff, 0 = clock unset */
 } snap_header_t;
 
-static c6_progress_t s_progress;
+/* One radio: the C6 of the board (A) or the external radio on JP1 (B, docs/dual-radio.md). */
+typedef struct {
+    c6_radio_pins_t pins;
+    const char *name;     /* "C6" / "radio B" in messages */
+    const char *nvs_ns;   /* chip data and the installed slots layout */
+    const char *snap_tag; /* prefix of its Zigbee snapshots in c6data ("" keeps the names of radio A) */
+    c6_progress_t progress;
+    c6_chip_t chip;
+    bool chip_loaded;
+    uint32_t flash_size;
+} radio_t;
 
-static void progress(int percent, const char *stage)
+static radio_t s_radios[C6_RADIOS] = {
+    [C6_RADIO_A] = {.pins = {.uart_port = CONFIG_GW_C6_UART_PORT, .tx = CONFIG_GW_C6_UART_TX, .rx = CONFIG_GW_C6_UART_RX,
+                             .reset = CONFIG_GW_C6_RESET_GPIO, .boot = CONFIG_GW_C6_BOOT_GPIO},
+                    .name = "C6", .nvs_ns = "c6chip", .snap_tag = ""},
+    [C6_RADIO_B] = {.pins = {.uart_port = CONFIG_GW_RADIO_B_UART_PORT, .tx = CONFIG_GW_RADIO_B_UART_TX,
+                             .rx = CONFIG_GW_RADIO_B_UART_RX, .reset = CONFIG_GW_RADIO_B_RESET_GPIO,
+                             .boot = CONFIG_GW_RADIO_B_BOOT_GPIO},
+                    .name = "radio B", .nvs_ns = "c6chipb", .snap_tag = "b/"},
+};
+
+static radio_t *radio(c6_radio_t r)
 {
-    s_progress.percent = percent;
-    strlcpy(s_progress.stage, stage, sizeof(s_progress.stage));
+    return &s_radios[r == C6_RADIO_B ? C6_RADIO_B : C6_RADIO_A];
 }
 
-const c6_progress_t *c6_progress(void)
+static void progress(radio_t *rd, int percent, const char *stage)
 {
-    return &s_progress;
+    rd->progress.percent = percent;
+    strlcpy(rd->progress.stage, stage, sizeof(rd->progress.stage));
 }
 
-void c6_init_pins(void)
+const c6_progress_t *c6_progress(c6_radio_t r)
 {
-    gpio_config_t reset = {
-        .pin_bit_mask = 1ULL << CONFIG_GW_C6_RESET_GPIO,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    gpio_set_level(CONFIG_GW_C6_RESET_GPIO, 1);
-    gpio_config(&reset);
-    gpio_set_level(CONFIG_GW_C6_RESET_GPIO, 1);
-    /* BOOT has a 5k1 pull-up on the C6 side; leave it released. */
-    gpio_reset_pin(CONFIG_GW_C6_BOOT_GPIO);
-    gpio_set_direction(CONFIG_GW_C6_BOOT_GPIO, GPIO_MODE_INPUT);
+    return &radio(r)->progress;
 }
 
-void c6_hold_reset(bool hold)
+const c6_radio_pins_t *c6_radio_pins(c6_radio_t r)
 {
-    gpio_set_level(CONFIG_GW_C6_RESET_GPIO, hold ? 0 : 1);
+    return &radio(r)->pins;
 }
 
-void c6_reset(void)
+void c6_hold_reset(c6_radio_t r, bool hold)
 {
-    c6_hold_reset(true);
+    gpio_set_level(radio(r)->pins.reset, hold ? 0 : 1);
+}
+
+void c6_reset(c6_radio_t r)
+{
+    c6_hold_reset(r, true);
     vTaskDelay(pdMS_TO_TICKS(20));
-    c6_hold_reset(false);
+    c6_hold_reset(r, false);
 }
 
 static const esp_partition_t *partition(uint8_t subtype)
@@ -421,69 +437,70 @@ static bool bundle_has_preserve(const bundle_t *b)
 typedef struct {
     esp_loader_t loader;
     esp32_port_t port;
+    radio_t *radio;
 } session_t;
 
 /* ---------------------------------------------------------------- chip info */
 
-static c6_chip_t s_chip;
-static bool s_chip_loaded;
-
-static void chip_info_save(void)
+static void chip_info_save(radio_t *rd)
 {
     nvs_handle_t h;
-    if (nvs_open(CHIP_NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
-        nvs_set_blob(h, "info", &s_chip, sizeof(s_chip));
+    if (nvs_open(rd->nvs_ns, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_blob(h, "info", &rd->chip, sizeof(rd->chip));
         nvs_commit(h);
         nvs_close(h);
     }
 }
 
-const c6_chip_t *c6_chip_info(void)
+const c6_chip_t *c6_chip_info(c6_radio_t r)
 {
-    if (!s_chip_loaded) {
+    radio_t *rd = radio(r);
+    if (!rd->chip_loaded) {
         nvs_handle_t h;
-        size_t len = sizeof(s_chip);
-        if (nvs_open(CHIP_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
-            if (nvs_get_blob(h, "info", &s_chip, &len) != ESP_OK || len != sizeof(s_chip)) {
-                memset(&s_chip, 0, sizeof(s_chip));
+        size_t len = sizeof(rd->chip);
+        if (nvs_open(rd->nvs_ns, NVS_READONLY, &h) == ESP_OK) {
+            if (nvs_get_blob(h, "info", &rd->chip, &len) != ESP_OK || len != sizeof(rd->chip)) {
+                memset(&rd->chip, 0, sizeof(rd->chip));
             }
             nvs_close(h);
         }
-        s_chip_loaded = true;
+        rd->chip_loaded = true;
     }
-    return &s_chip;
+    return &rd->chip;
 }
 
 /* MAC, revision and flash size while the ROM bootloader is connected; failures only leave old data. */
 static void chip_info_read(session_t *s)
 {
-    c6_chip_info();
+    radio_t *rd = s->radio;
+    c6_chip_info(rd - s_radios);
     uint8_t mac[6];
     uint16_t rev;
     uint32_t size;
     if (esp_loader_read_mac(&s->loader, mac) == ESP_LOADER_SUCCESS) {
-        memcpy(s_chip.mac, mac, sizeof(mac));
-        s_chip.known = true;
+        memcpy(rd->chip.mac, mac, sizeof(mac));
+        rd->chip.known = true;
     }
     if (esp_loader_get_chip_revision(&s->loader, &rev) == ESP_LOADER_SUCCESS) {
-        s_chip.revision = rev;
+        rd->chip.revision = rev;
     }
     if (esp_loader_flash_detect_size(&s->loader, &size) == ESP_LOADER_SUCCESS) {
-        s_chip.flash_size = size;
+        rd->chip.flash_size = size;
     }
-    chip_info_save();
+    chip_info_save(rd);
 }
 
-static esp_err_t session_open(session_t *s)
+static esp_err_t session_open(session_t *s, radio_t *rd)
 {
     memset(s, 0, sizeof(*s));
+    s->radio = rd;
     s->port.port.ops = &esp32_uart_ops;
     s->port.baud_rate = 115200;
-    s->port.uart_port = CONFIG_GW_C6_UART_PORT;
-    s->port.uart_rx_pin = CONFIG_GW_C6_UART_RX;
-    s->port.uart_tx_pin = CONFIG_GW_C6_UART_TX;
-    s->port.reset_pin = CONFIG_GW_C6_RESET_GPIO;
-    s->port.boot_pin = CONFIG_GW_C6_BOOT_GPIO;
+    s->port.uart_port = rd->pins.uart_port;
+    s->port.uart_rx_pin = rd->pins.rx;
+    s->port.uart_tx_pin = rd->pins.tx;
+    s->port.reset_pin = rd->pins.reset;
+    s->port.boot_pin = rd->pins.boot;
     s->port.rx_buffer_size = 2048;
     s->port.tx_buffer_size = 2048;
 
@@ -494,10 +511,12 @@ static esp_err_t session_open(session_t *s)
     esp_loader_error_t err = esp_loader_connect(&s->loader, &args);
     if (err != ESP_LOADER_SUCCESS) {
         esp_loader_deinit(&s->loader);
-        ESP_LOGE(TAG, "C6 bootloader not responding (%d): check JP1 jumpers 13-20, 15-22, 17-24", err);
+        ESP_LOGE(TAG, "%s bootloader not responding (%d): check the JP1 wiring", rd->name, err);
         return ESP_ERR_TIMEOUT;
     }
-    if (esp_loader_get_target(&s->loader) != ESP32C6_CHIP) {
+    /* radio A is the C6 of the board; radio B a C6 or C5 */
+    target_chip_t chip = esp_loader_get_target(&s->loader);
+    if (chip != ESP32C6_CHIP && (rd == &s_radios[C6_RADIO_A] || chip != ESP32C5_CHIP)) {
         esp_loader_deinit(&s->loader);
         return ESP_ERR_NOT_SUPPORTED;
     }
@@ -512,7 +531,7 @@ static void session_close(session_t *s)
 {
     esp_loader_reset_target(&s->loader);
     esp_loader_deinit(&s->loader);
-    c6_init_pins();
+    c6_radio_init_pins(&s->radio->pins);
 }
 
 static esp_err_t write_region(session_t *s, uint32_t addr, uint32_t size, uint32_t (*fill)(void *, uint32_t, uint8_t *, uint32_t),
@@ -533,7 +552,7 @@ static esp_err_t write_region(session_t *s, uint32_t addr, uint32_t size, uint32
             ret = ESP_FAIL;
             goto out;
         }
-        s_progress.percent = pct_from + (int)((int64_t)(pct_to - pct_from) * (pos + n) / size);
+        s->radio->progress.percent = pct_from + (int)((int64_t)(pct_to - pct_from) * (pos + n) / size);
     }
     if (esp_loader_flash_finish(&s->loader, &cfg) != ESP_LOADER_SUCCESS) {
         ret = ESP_ERR_INVALID_CRC;
@@ -643,6 +662,12 @@ static bool snapshot_header(int slot, snap_header_t *hdr)
     return esp_rom_crc32_le(0, (const uint8_t *)hdr, offsetof(snap_header_t, crc32)) == hdr->crc32;
 }
 
+/* Name of a snapshot in c6data: the bundle, prefixed for radio B. */
+static void snap_name(const radio_t *rd, const char *bundle, char out[16])
+{
+    snprintf(out, 16, "%s%s", rd->snap_tag, bundle);
+}
+
 static int snapshot_find(const char *bundle, snap_header_t *hdr)
 {
     for (int slot = 0; slot < SNAP_SLOTS; slot++) {
@@ -705,7 +730,7 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
     ESP_RETURN_ON_FALSE(part, ESP_ERR_NOT_FOUND, TAG, "no c6data partition");
     snap_header_t hdr = {0};
     memcpy(hdr.magic, SNAP_MAGIC, 4);
-    strlcpy(hdr.bundle, from->entry.name, sizeof(hdr.bundle));
+    snap_name(s->radio, from->entry.name, hdr.bundle);
     uint32_t generation;
     int slot = snapshot_pick_slot(hdr.bundle, &generation);
     hdr.generation = generation;
@@ -726,7 +751,7 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
     ESP_RETURN_ON_FALSE(buf, ESP_ERR_NO_MEM, TAG, "no mem");
     esp_err_t err = ESP_OK;
     uint8_t *p = buf;
-    progress(5, "saving Zigbee network data");
+    progress(s->radio, 5, "saving Zigbee network data");
     for (uint32_t i = 0; i < hdr.count && err == ESP_OK; i++) {
         if (esp_loader_flash_read(&s->loader, p, hdr.entries[i].addr, hdr.entries[i].size) != ESP_LOADER_SUCCESS) {
             err = ESP_FAIL;
@@ -758,7 +783,9 @@ static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
 static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
 {
     snap_header_t hdr;
-    int slot = snapshot_find(to->entry.name, &hdr);
+    char name[16];
+    snap_name(s->radio, to->entry.name, name);
+    int slot = snapshot_find(name, &hdr);
     const esp_partition_t *part = partition(C6DATA_SUBTYPE);
 
     for (uint32_t i = 0; i < to->count; i++) {
@@ -774,7 +801,7 @@ static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
             }
         }
         if (match) {
-            progress(90, "restoring Zigbee network data");
+            progress(s->radio, 90, "restoring Zigbee network data");
             part_reader_t r = {.part = part, .base = slot * slot_size(part) + match->data_off};
             ESP_RETURN_ON_ERROR(write_region(s, seg->addr, seg->size, fill_from_partition, &r, 90, 95), TAG,
                                 "restore 0x%lx", (unsigned long)seg->addr);
@@ -791,8 +818,9 @@ static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
     return ESP_OK;
 }
 
-esp_err_t c6_snapshot_take(const char *bundle)
+esp_err_t c6_snapshot_take(c6_radio_t r, const char *bundle)
 {
+    radio_t *rd = radio(r);
     c6fw_entry_t entry;
     bundle_t b = {0};
     session_t *s = calloc(1, sizeof(session_t));
@@ -805,30 +833,32 @@ esp_err_t c6_snapshot_take(const char *bundle)
         err = ESP_ERR_NOT_SUPPORTED;
     }
     if (err == ESP_OK) {
-        s_progress.busy = true;
-        s_progress.started_us = esp_timer_get_time();
-        s_progress.last_error[0] = '\0';
-        progress(2, "connecting to C6 bootloader");
-        err = session_open(s);
+        rd->progress.busy = true;
+        rd->progress.started_us = esp_timer_get_time();
+        rd->progress.last_error[0] = '\0';
+        progress(rd, 2, "connecting to C6 bootloader");
+        err = session_open(s, rd);
         if (err == ESP_OK) {
             err = snapshot_save(s, &b);
             session_close(s);
         }
         if (err != ESP_OK) {
-            snprintf(s_progress.last_error, sizeof(s_progress.last_error), "Zigbee backup failed: %s", esp_err_to_name(err));
+            snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "Zigbee backup failed: %s", esp_err_to_name(err));
         }
-        progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
-        s_progress.busy = false;
+        progress(rd, err == ESP_OK ? 100 : rd->progress.percent, err == ESP_OK ? "done" : "failed");
+        rd->progress.busy = false;
     }
     bundle_free(&b);
     free(s);
     return err;
 }
 
-esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix)
+esp_err_t c6_snapshot_info(c6_radio_t r, const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix)
 {
     snap_header_t hdr;
-    if (snapshot_find(bundle, &hdr) < 0) {
+    char name[16];
+    snap_name(radio(r), bundle, name);
+    if (snapshot_find(name, &hdr) < 0) {
         return ESP_ERR_NOT_FOUND;
     }
     *total_size = 0;
@@ -842,10 +872,12 @@ esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *g
     return ESP_OK;
 }
 
-esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_t len)
+esp_err_t c6_snapshot_read(c6_radio_t r, const char *bundle, uint32_t offset, void *buf, size_t len)
 {
     snap_header_t hdr;
-    int slot = snapshot_find(bundle, &hdr);
+    char name[16];
+    snap_name(radio(r), bundle, name);
+    int slot = snapshot_find(name, &hdr);
     ESP_RETURN_ON_FALSE(slot >= 0, ESP_ERR_NOT_FOUND, TAG, "no snapshot");
     const esp_partition_t *part = partition(C6DATA_SUBTYPE);
     uint32_t base = slot * slot_size(part);
@@ -874,7 +906,7 @@ static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, u
     for (uint32_t i = 0; i < b->count && err == ESP_OK; i++) {
         const c6fw_segment_t *seg = &b->segs[i];
         if (seg->flags & C6FW_SEG_ERASE) {
-            progress(8, "erasing settings area");
+            progress(s->radio, 8, "erasing settings area");
             if (esp_loader_flash_erase_region(&s->loader, seg->addr, seg->size) != ESP_LOADER_SUCCESS) {
                 err = ESP_FAIL;
             }
@@ -882,7 +914,7 @@ static esp_err_t write_bundle(session_t *s, const bundle_t *b, uint32_t *done, u
             char stage[48];
             snprintf(stage, sizeof(stage), "writing 0x%05lx (%lu kB)", (unsigned long)seg->addr,
                      (unsigned long)seg->size / 1024);
-            progress(s_progress.percent, stage);
+            progress(s->radio, s->radio->progress.percent, stage);
             fw_reader_t r = {.entry = &b->entry, .base = seg->data_off};
             int from_pct = 10 + (int)(80LL * *done / total);
             int to_pct = 10 + (int)(80LL * (*done + seg->size) / total);
@@ -920,23 +952,23 @@ static uint32_t bundle_bytes(const bundle_t *b)
 }
 
 /* sha256 of the slots bundle installed on the C6, kept with the chip data */
-static bool slots_installed(const c6fw_entry_t *slots)
+static bool slots_installed(const radio_t *rd, const c6fw_entry_t *slots)
 {
     nvs_handle_t h;
     uint8_t sha[32];
     size_t len = sizeof(sha);
     bool same = false;
-    if (nvs_open(CHIP_NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+    if (nvs_open(rd->nvs_ns, NVS_READONLY, &h) == ESP_OK) {
         same = nvs_get_blob(h, "slots", sha, &len) == ESP_OK && len == sizeof(sha) && memcmp(sha, slots->sha256, len) == 0;
         nvs_close(h);
     }
     return same;
 }
 
-static void slots_record(const c6fw_entry_t *slots)
+static void slots_record(const radio_t *rd, const c6fw_entry_t *slots)
 {
     nvs_handle_t h;
-    if (nvs_open(CHIP_NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+    if (nvs_open(rd->nvs_ns, NVS_READWRITE, &h) == ESP_OK) {
         if (slots) {
             nvs_set_blob(h, "slots", slots->sha256, sizeof(slots->sha256));
         } else {
@@ -947,13 +979,13 @@ static void slots_record(const c6fw_entry_t *slots)
     }
 }
 
-void c6_slots_invalidate(void)
+void c6_slots_invalidate(c6_radio_t r)
 {
-    slots_record(NULL);
+    slots_record(radio(r), NULL);
 }
 
 
-bool c6_flash_ready(const c6fw_entry_t *entry)
+bool c6_flash_ready(c6_radio_t r, const c6fw_entry_t *entry)
 {
     bundle_t b = {0};
     if (!c6fw_available(entry) || bundle_load(entry, &b) != ESP_OK) {
@@ -962,26 +994,27 @@ bool c6_flash_ready(const c6fw_entry_t *entry)
     }
     const c6fw_segment_t *marker = bundle_find_flag(&b, C6FW_SEG_SLOTS);
     c6fw_entry_t slots;
-    bool ready = !marker || (c6fw_find(C6FW_SLOTS_BUNDLE, &slots) == ESP_OK && (slots_installed(&slots) || c6fw_available(&slots)));
+    bool ready = !marker || (c6fw_find(C6FW_SLOTS_BUNDLE, &slots) == ESP_OK && (slots_installed(radio(r), &slots) || c6fw_available(&slots)));
     bundle_free(&b);
     return ready;
 }
 
-esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
+esp_err_t c6_flash_bundle(c6_radio_t r, const c6fw_entry_t *entry, const char *current_name)
 {
+    radio_t *rd = radio(r);
     bundle_t to = {0}, from = {0}, base = {0};
     session_t *s = calloc(1, sizeof(session_t));
     esp_err_t err;
 
     ESP_RETURN_ON_FALSE(s, ESP_ERR_NO_MEM, TAG, "no mem");
-    s_progress.busy = true;
-    s_progress.started_us = esp_timer_get_time();
-    s_progress.last_error[0] = '\0';
-    progress(0, "verifying image");
+    rd->progress.busy = true;
+    rd->progress.started_us = esp_timer_get_time();
+    rd->progress.last_error[0] = '\0';
+    progress(rd, 0, "verifying image");
 
     err = c6fw_verify(entry);
     if (err != ESP_OK) {
-        snprintf(s_progress.last_error, sizeof(s_progress.last_error), "bundle %s fails sha256 check", entry->name);
+        snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "bundle %s fails sha256 check", entry->name);
         goto done;
     }
     if ((err = bundle_load(entry, &to)) != ESP_OK) {
@@ -992,17 +1025,17 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
         bundle_load(&current, &from);
     }
 
-    progress(2, "connecting to C6 bootloader");
-    if ((err = session_open(s)) != ESP_OK) {
-        snprintf(s_progress.last_error, sizeof(s_progress.last_error),
-                 "C6 bootloader not responding, check JP1 jumpers");
+    progress(rd, 2, "connecting to the bootloader");
+    if ((err = session_open(s, rd)) != ESP_OK) {
+        snprintf(rd->progress.last_error, sizeof(rd->progress.last_error),
+                 "%s bootloader not responding, check the JP1 wiring", rd->name);
         goto done;
     }
 
     if (from.segs && bundle_has_preserve(&from)) {
         err = snapshot_save(s, &from);
         if (err != ESP_OK) {
-            snprintf(s_progress.last_error, sizeof(s_progress.last_error), "saving Zigbee data failed");
+            snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "saving Zigbee data failed");
             goto close;
         }
     }
@@ -1012,36 +1045,36 @@ esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name)
     c6fw_entry_t slots_entry;
     if (marker && (c6fw_find(C6FW_SLOTS_BUNDLE, &slots_entry) != ESP_OK ||
                    memcmp(slots_entry.sha256, marker->md5, sizeof(marker->md5)) != 0)) {
-        snprintf(s_progress.last_error, sizeof(s_progress.last_error), "bundle %s does not match the slots bundle", entry->name);
+        snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "bundle %s does not match the slots bundle", entry->name);
         err = ESP_ERR_INVALID_STATE;
         goto close;
     }
-    if (marker && !slots_installed(&slots_entry)) {
+    if (marker && !slots_installed(rd, &slots_entry)) {
         if ((err = c6fw_verify(&slots_entry)) != ESP_OK || (err = bundle_load(&slots_entry, &base)) != ESP_OK) {
-            snprintf(s_progress.last_error, sizeof(s_progress.last_error), "slots bundle unusable");
+            snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "slots bundle unusable");
             goto close;
         }
         ESP_LOGW(TAG, "installing the slots layout %s", slots_entry.version);
     }
     uint32_t done_bytes = 0, total = bundle_bytes(&base) + bundle_bytes(&to);
     if (base.segs) {
-        slots_record(NULL); /* a partly written layout is not the installed one */
+        slots_record(rd, NULL); /* a partly written layout is not the installed one */
         err = write_bundle(s, &base, &done_bytes, total);
         if (err == ESP_OK) {
-            slots_record(&slots_entry);
+            slots_record(rd, &slots_entry);
         }
     }
     if (err == ESP_OK) {
         err = write_bundle(s, &to, &done_bytes, total);
     }
     if (err == ESP_OK && !marker) {
-        slots_record(NULL); /* a whole-flash bundle replaced the layout */
+        slots_record(rd, NULL); /* a whole-flash bundle replaced the layout */
     }
     if (err == ESP_OK && bundle_has_preserve(&to)) {
         err = snapshot_restore(s, &to);
     }
-    if (err != ESP_OK && !s_progress.last_error[0]) {
-        snprintf(s_progress.last_error, sizeof(s_progress.last_error), "flashing %s failed: %s", entry->name,
+    if (err != ESP_OK && !rd->progress.last_error[0]) {
+        snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "flashing %s failed: %s", entry->name,
                  esp_err_to_name(err));
     }
 close:
@@ -1053,29 +1086,28 @@ done:
     free(s);
     if (err == ESP_OK) {
         /* before busy clears: callers (and tests) treat busy == false as "flashing finished" */
-        c6_chip_info();
-        s_chip.flashes++;
-        chip_info_save();
+        c6_chip_info(r);
+        rd->chip.flashes++;
+        chip_info_save(rd);
     }
-    progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "done" : "failed");
-    s_progress.busy = false;
+    progress(rd, err == ESP_OK ? 100 : rd->progress.percent, err == ESP_OK ? "done" : "failed");
+    rd->progress.busy = false;
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "C6 now runs %s (%s)", entry->name, entry->version);
+        ESP_LOGI(TAG, "%s now runs %s (%s)", rd->name, entry->name, entry->version);
     } else {
-        ESP_LOGE(TAG, "%s", s_progress.last_error);
+        ESP_LOGE(TAG, "%s", rd->progress.last_error);
     }
     return err;
 }
 
-static uint32_t s_flash_size;
-
-uint32_t c6_flash_size(void)
+uint32_t c6_flash_size(c6_radio_t r)
 {
-    return s_flash_size;
+    return radio(r)->flash_size;
 }
 
-esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
+esp_err_t c6_read_flash(c6_radio_t r, c6_sink_t sink, void *ctx)
 {
+    radio_t *rd = radio(r);
     session_t *s = calloc(1, sizeof(session_t));
     uint8_t *buf = malloc(FLASH_BLOCK);
     esp_err_t err;
@@ -1085,35 +1117,35 @@ esp_err_t c6_read_flash(c6_sink_t sink, void *ctx)
         free(buf);
         return ESP_ERR_NO_MEM;
     }
-    s_progress.busy = true;
-    s_progress.started_us = esp_timer_get_time();
-    s_progress.last_error[0] = '\0';
-    progress(0, "reading C6 flash");
-    err = session_open(s);
+    rd->progress.busy = true;
+    rd->progress.started_us = esp_timer_get_time();
+    rd->progress.last_error[0] = '\0';
+    progress(rd, 0, "reading the flash");
+    err = session_open(s, rd);
     if (err != ESP_OK) {
-        snprintf(s_progress.last_error, sizeof(s_progress.last_error),
-                 "C6 bootloader not responding, check JP1 jumpers");
+        snprintf(rd->progress.last_error, sizeof(rd->progress.last_error),
+                 "%s bootloader not responding, check the JP1 wiring", rd->name);
     }
     if (err == ESP_OK) {
-        if (esp_loader_flash_detect_size(&s->loader, &s_flash_size) != ESP_LOADER_SUCCESS) {
-            s_flash_size = 4 * 1024 * 1024;
+        if (esp_loader_flash_detect_size(&s->loader, &rd->flash_size) != ESP_LOADER_SUCCESS) {
+            rd->flash_size = 4 * 1024 * 1024;
         }
-        ESP_LOGI(TAG, "C6 flash %lu kB", (unsigned long)s_flash_size / 1024);
-        for (uint32_t addr = 0; addr < s_flash_size && err == ESP_OK; addr += FLASH_BLOCK) {
+        ESP_LOGI(TAG, "%s flash %lu kB", rd->name, (unsigned long)rd->flash_size / 1024);
+        for (uint32_t addr = 0; addr < rd->flash_size && err == ESP_OK; addr += FLASH_BLOCK) {
             if (esp_loader_flash_read(&s->loader, buf, addr, FLASH_BLOCK) != ESP_LOADER_SUCCESS) {
-                snprintf(s_progress.last_error, sizeof(s_progress.last_error), "C6 flash read failed at 0x%lx",
+                snprintf(rd->progress.last_error, sizeof(rd->progress.last_error), "flash read failed at 0x%lx",
                          (unsigned long)addr);
                 err = ESP_FAIL;
                 break;
             }
             err = sink(ctx, buf, FLASH_BLOCK);
-            s_progress.percent = (int)((uint64_t)(addr + FLASH_BLOCK) * 100 / s_flash_size);
+            rd->progress.percent = (int)((uint64_t)(addr + FLASH_BLOCK) * 100 / rd->flash_size);
         }
         session_close(s);
     }
     free(buf);
     free(s);
-    progress(err == ESP_OK ? 100 : s_progress.percent, err == ESP_OK ? "backup done" : "backup failed");
-    s_progress.busy = false;
+    progress(rd, err == ESP_OK ? 100 : rd->progress.percent, err == ESP_OK ? "backup done" : "backup failed");
+    rd->progress.busy = false;
     return err;
 }

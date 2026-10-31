@@ -43,6 +43,11 @@ const char *gw_role_c6_bundle(gw_role_t role);
 #define GW_KEY_C6_FORCE "c6_force"  /* u8, reflash on next boot (RCP failure) */
 #define GW_KEY_C6_TRIES "c6_tries"  /* u8, consecutive flash attempts */
 #define GW_KEY_C6_ADOPTED "c6_ok"   /* u8, the user allowed overwriting the C6 factory firmware */
+/* The keys above per radio (c6_radio_t): radio A keeps them, radio B uses "c6b_*". */
+typedef struct {
+    const char *bundle, *sha, *force, *tries, *adopted;
+} gw_radio_keys_t;
+const gw_radio_keys_t *gw_radio_keys(int radio);
 #define GW_KEY_RCP_TEL_OFF "rcp_tel_off" /* str, RCP version that hung on the telemetry request */
 #define GW_KEY_HA_SEEN "ha_seen"       /* blob gw_ha_seen_t, last client of the OTBR REST API */
 #define GW_KEY_MATTER_URL "matter_url" /* str, Matter Server WebSocket for device names in the Thread map */

@@ -60,12 +60,24 @@ typedef struct {
     char last_error[96];
 } c6_progress_t;
 
-/* Pins and UART from Kconfig (GW_C6_*). Drives reset high and leaves BOOT released. */
-void c6_init_pins(void);
-/* Pulses CHIP_PU; the C6 boots its application. */
-void c6_reset(void);
-/* Holds the C6 in reset (true) or releases it. */
-void c6_hold_reset(bool hold);
+/* The radios: A is the C6 of the board (Kconfig GW_C6_*), B the external radio on JP1 (GW_RADIO_B_*,
+ * a C6 or C5, docs/dual-radio.md). Each has its own progress, chip data and Zigbee snapshots. */
+typedef enum { C6_RADIO_A, C6_RADIO_B, C6_RADIOS } c6_radio_t;
+
+/* A radio's UART, reset and boot lines. */
+typedef struct {
+    int uart_port;
+    int tx, rx; /* P4 GPIOs to the radio's RX and from its TX */
+    int reset, boot;
+} c6_radio_pins_t;
+
+const c6_radio_pins_t *c6_radio_pins(c6_radio_t radio);
+/* Drives reset high and leaves BOOT released (the radio runs its application). */
+void c6_radio_init_pins(const c6_radio_pins_t *pins);
+/* Pulses the reset line; the radio boots its application. */
+void c6_reset(c6_radio_t radio);
+/* Holds the radio in reset (true) or releases it. */
+void c6_hold_reset(c6_radio_t radio, bool hold);
 
 /* Reads and validates the directory of the c6fw partition. */
 esp_err_t c6fw_read_dir(c6fw_dir_t *dir);
@@ -97,26 +109,26 @@ bool c6fw_package_sha(uint8_t sha[32]);
  * region erased if that bundle has no snapshot yet). A bundle with a SLOTS marker first
  * installs the "slots" bundle when the C6 does not hold that exact layout yet.
  */
-esp_err_t c6_flash_bundle(const c6fw_entry_t *entry, const char *current_name);
+esp_err_t c6_flash_bundle(c6_radio_t radio, const c6fw_entry_t *entry, const char *current_name);
 /* Everything c6_flash_bundle() would write for entry is readable now (else a package is needed). */
-bool c6_flash_ready(const c6fw_entry_t *entry);
-/* Forgets that the slots layout is on the C6: the next slot bundle installs it again. */
-void c6_slots_invalidate(void);
+bool c6_flash_ready(c6_radio_t radio, const c6fw_entry_t *entry);
+/* Forgets that the slots layout is on the radio: the next slot bundle installs it again. */
+void c6_slots_invalidate(c6_radio_t radio);
 
-/* Snapshot of a bundle's preserved C6 regions (Zigbee network data), one slot per bundle. */
+/* Snapshot of a bundle's preserved regions on a radio (Zigbee network data), one slot per radio and bundle. */
 /* saved_unix (may be NULL): when it was taken, 0 when unknown. */
-esp_err_t c6_snapshot_info(const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix);
-/* Saves the preserved regions of the running bundle without flashing (the C6 restarts). */
-esp_err_t c6_snapshot_take(const char *bundle);
-esp_err_t c6_snapshot_read(const char *bundle, uint32_t offset, void *buf, size_t len);
+esp_err_t c6_snapshot_info(c6_radio_t radio, const char *bundle, uint32_t *total_size, uint32_t *generation, uint32_t *saved_unix);
+/* Saves the preserved regions of the running bundle without flashing (the radio restarts). */
+esp_err_t c6_snapshot_take(c6_radio_t radio, const char *bundle);
+esp_err_t c6_snapshot_read(c6_radio_t radio, const char *bundle, uint32_t offset, void *buf, size_t len);
 
 /* Streams the whole C6 flash (backup of the factory firmware). The C6 restarts afterwards. */
 typedef esp_err_t (*c6_sink_t)(void *ctx, const void *data, size_t len);
-esp_err_t c6_read_flash(c6_sink_t sink, void *ctx);
-/* Detected C6 flash size, valid after c6_read_flash() started. */
-uint32_t c6_flash_size(void);
+esp_err_t c6_read_flash(c6_radio_t radio, c6_sink_t sink, void *ctx);
+/* Detected flash size, valid after c6_read_flash() started. */
+uint32_t c6_flash_size(c6_radio_t radio);
 
-const c6_progress_t *c6_progress(void);
+const c6_progress_t *c6_progress(c6_radio_t radio);
 
 /* C6 chip data read from its ROM bootloader at the last flashing or backup, kept in NVS. */
 typedef struct {
@@ -126,14 +138,8 @@ typedef struct {
     uint32_t flash_size;
     uint32_t flashes; /* successful bundle flashes since the data was first read */
 } c6_chip_t;
-const c6_chip_t *c6_chip_info(void);
+const c6_chip_t *c6_chip_info(c6_radio_t radio);
 
-/* A radio on its own UART, reset and boot lines (internal C6, external radio on JP1). */
-typedef struct {
-    int uart_port;
-    int tx, rx;     /* P4 GPIOs to the radio's RX and from its TX */
-    int reset, boot;
-} c6_radio_pins_t;
 
 /* Wiring test result (radio_probe.c). */
 typedef struct {
@@ -147,10 +153,6 @@ typedef struct {
     char verdict[160];
 } c6_probe_t;
 
-/* External radio B on JP1 (docs/dual-radio.md). */
-const c6_radio_pins_t *c6_radio_b_pins(void);
-/* Releases the radio's reset and boot lines (radio running). */
-void c6_radio_init_pins(const c6_radio_pins_t *pins);
 /* Resets the radio a few times and tells which lines work; ESP_OK when all do. Takes a few seconds. */
 esp_err_t c6_radio_probe(const c6_radio_pins_t *pins, c6_probe_t *result);
 

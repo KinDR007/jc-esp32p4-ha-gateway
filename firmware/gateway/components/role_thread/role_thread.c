@@ -999,8 +999,13 @@ static esp_err_t cli_post(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
-esp_err_t role_thread_start(bool border_router)
+esp_err_t role_thread_start(bool border_router, c6_radio_t radio)
 {
+    /* the RCP on the chosen radio's UART */
+    const c6_radio_pins_t *pins = c6_radio_pins(radio);
+    s_config.platform_config.radio_config.radio_uart_config.port = pins->uart_port;
+    s_config.platform_config.radio_config.radio_uart_config.rx_pin = pins->rx;
+    s_config.platform_config.radio_config.radio_uart_config.tx_pin = pins->tx;
     s_border_router = border_router;
     s_cli_lock = xSemaphoreCreateMutex();
     s_cli_buf_lock = xSemaphoreCreateMutex();

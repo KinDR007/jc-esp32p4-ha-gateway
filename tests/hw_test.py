@@ -133,6 +133,8 @@ def wait_thread_running(timeout=60):
 
 def logs_since(seq=0):
     req = urllib.request.Request(f'http://{ARGS.host}/api/logs?since={seq}')
+    if ARGS.token:
+        req.add_header('Authorization', 'Bearer ' + ARGS.token)
     with urllib.request.urlopen(req, timeout=10) as res:
         return res.read().decode(errors='replace')
 

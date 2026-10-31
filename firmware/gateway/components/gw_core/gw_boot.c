@@ -85,7 +85,8 @@ static void restart_task(void *arg)
     if (s_restart_c6) {
         /* held in reset until the P4 restart releases the pin (CHIP_PU has its own pull-up) */
         ESP_LOGW(TAG, "C6 reset");
-        c6_hold_reset(true);
+        c6_hold_reset(C6_RADIO_A, true);
+        c6_hold_reset(C6_RADIO_B, true);
         vTaskDelay(pdMS_TO_TICKS(50));
     }
     esp_restart();

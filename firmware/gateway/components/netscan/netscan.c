@@ -116,12 +116,12 @@ static esp_err_t flash_scanner(cJSON *res)
     }
     /* Zigbee network data of the current bundle is saved by the flasher and restored with the role. */
     gw_flash_lock();
-    esp_err_t err = c6_flash_bundle(&entry, current);
+    esp_err_t err = c6_flash_bundle(C6_RADIO_A, &entry, current);
     gw_flash_unlock();
     if (err != ESP_OK) {
         /* unknown C6 content: make the role flash its image again */
         gw_config_set_str(GW_KEY_C6_BUNDLE, "");
-        add_error(res, c6_progress()->last_error[0] ? c6_progress()->last_error : "flashing the scanner failed");
+        add_error(res, c6_progress(C6_RADIO_A)->last_error[0] ? c6_progress(C6_RADIO_A)->last_error : "flashing the scanner failed");
         return err;
     }
     gw_config_set_str(GW_KEY_C6_BUNDLE, entry.name);
@@ -185,7 +185,8 @@ void netscan_run_full(void)
     set_state("full");
     ESP_LOGI(TAG, "full scan: flashing the scanner image");
     if (flash_scanner(res) == ESP_OK) {
-        const uart_port_t port = CONFIG_GW_C6_UART_PORT;
+        const c6_radio_pins_t *pins = c6_radio_pins(C6_RADIO_A);
+        const uart_port_t port = pins->uart_port;
         uart_config_t cfg = {
             .baud_rate = CONFIG_GW_C6_UART_BAUD,
             .data_bits = UART_DATA_8_BITS,
@@ -197,8 +198,8 @@ void netscan_run_full(void)
         char *line = malloc(LINE_MAX);
         if (line && uart_driver_install(port, 8192, 0, 0, NULL, 0) == ESP_OK) {
             uart_param_config(port, &cfg);
-            uart_set_pin(port, CONFIG_GW_C6_UART_TX, CONFIG_GW_C6_UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-            c6_reset(); /* from the start: the flasher already let it run */
+            uart_set_pin(port, pins->tx, pins->rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+            c6_reset(C6_RADIO_A); /* from the start: the flasher already let it run */
             vTaskDelay(pdMS_TO_TICKS(200));
             uart_flush_input(port);
             size_t len = 0;
