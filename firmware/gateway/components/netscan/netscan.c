@@ -106,7 +106,7 @@ static esp_err_t flash_scanner(cJSON *res)
 {
     c6fw_entry_t entry;
     char current[16] = "";
-    if (c6fw_find(SCANNER_BUNDLE, &entry) != ESP_OK) {
+    if (c6fw_find(C6_RADIO_A, SCANNER_BUNDLE, &entry) != ESP_OK) {
         add_error(res, "the C6 firmware bundle has no scanner image, upload a current c6fw.bin");
         return ESP_ERR_NOT_FOUND;
     }

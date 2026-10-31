@@ -74,7 +74,9 @@ static bool rom_sync(const c6_radio_pins_t *p, c6_probe_t *r)
     args.trials = 3;
     bool ok = esp_loader_connect(&loader, &args) == ESP_LOADER_SUCCESS;
     if (ok) {
-        strlcpy(r->chip, chip_name(esp_loader_get_target(&loader)), sizeof(r->chip));
+        target_chip_t target = esp_loader_get_target(&loader);
+        strlcpy(r->chip, chip_name(target), sizeof(r->chip));
+        r->chip_id = target == ESP32C6_CHIP ? C6FW_CHIP_C6 : target == ESP32C5_CHIP ? C6FW_CHIP_C5 : 0;
         esp_loader_read_mac(&loader, r->mac);
         esp_loader_get_chip_revision(&loader, &r->revision);
         esp_loader_flash_detect_size(&loader, &r->flash_size);
@@ -121,12 +123,16 @@ static int banner(const c6_radio_pins_t *p, bool boot_low, char *buf, size_t len
     return n;
 }
 
-esp_err_t c6_radio_probe(const c6_radio_pins_t *p, c6_probe_t *r)
+esp_err_t c6_radio_probe(c6_radio_t radio, c6_probe_t *r)
 {
+    const c6_radio_pins_t *p = c6_radio_pins(radio);
     memset(r, 0, sizeof(*r));
     c6_radio_init_pins(p);
     if (rom_sync(p, r)) {
         r->wired = true;
+        if (r->chip_id) {
+            c6_radio_set_chip(radio, r->chip_id);
+        }
         snprintf(r->verdict, sizeof(r->verdict), "%s found, all four lines work", r->chip);
         c6_radio_init_pins(p);
         ESP_LOGI(TAG, "%s", r->verdict);

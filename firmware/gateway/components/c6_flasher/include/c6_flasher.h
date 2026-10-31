@@ -24,8 +24,11 @@ extern "C" {
  * md5 holds the first 16 bytes of that bundle's sha256. */
 #define C6FW_SEG_SLOTS 16
 #define C6FW_SLOTS_BUNDLE "slots"
-/* entry offset of a bundle the c6fw partition does not hold: it is read from the package in PSRAM */
+/* entry offset of a bundle a radio's local image does not hold: it is read from the package in PSRAM */
 #define C6FW_REMOTE 0xFFFFFFFFu
+/* chip of a package and of a radio (esp_image_header_t.chip_id) */
+#define C6FW_CHIP_C6 13
+#define C6FW_CHIP_C5 23
 
 typedef struct __attribute__((packed)) {
     char name[16];
@@ -79,28 +82,32 @@ void c6_reset(c6_radio_t radio);
 /* Holds the radio in reset (true) or releases it. */
 void c6_hold_reset(c6_radio_t radio, bool hold);
 
-/* Reads and validates the directory of the c6fw partition. */
-esp_err_t c6fw_read_dir(c6fw_dir_t *dir);
-esp_err_t c6fw_find(const char *name, c6fw_entry_t *entry);
+/* Directory of the bundles for a radio: the package in PSRAM when it is for the radio's chip, else
+ * the radio's local image (NVS: what it was last flashed from, the large bundles C6FW_REMOTE). */
+esp_err_t c6fw_read_dir(c6_radio_t radio, c6fw_dir_t *dir);
+esp_err_t c6fw_find(c6_radio_t radio, const char *name, c6fw_entry_t *entry);
 /* Recomputes the bundle sha256 and compares it to the directory. */
 esp_err_t c6fw_verify(const c6fw_entry_t *entry);
-/* Validates the bundles the partition (or the PSRAM package) holds. */
-esp_err_t c6fw_verify_all(void);
-/* The data of the bundle can be read now (in the partition, or remote and in the PSRAM package). */
+/* The data of the bundle can be read now (PSRAM package or a local image). */
 bool c6fw_available(const c6fw_entry_t *entry);
 
 /*
- * A whole package (c6fw.bin) goes into a PSRAM buffer that a software restart keeps:
- * fill c6fw_stage_buffer(), then c6fw_stage_commit() checks it (directory, sha256 of every bundle)
- * and stores it in the c6fw partition: whole when it fits, else the directory and the small bundles,
- * the large ones read from PSRAM when the C6 is flashed. c6fw_stage_load() at start takes over a
- * package staged before a software restart.
+ * A whole package (c6fw.bin for the C6, c5fw.bin for the C5) goes into a PSRAM buffer that a software
+ * restart keeps: fill c6fw_stage_buffer(), then c6fw_stage_commit() checks it (directory, sha256 of
+ * every bundle) and tells its chip (C6FW_CHIP_*). The radio of that chip is flashed from it at the
+ * next start; then it is dropped. c6fw_stage_load() at start takes over a package staged before a
+ * software restart. Nothing of it is written to the gateway's flash.
  */
 uint8_t *c6fw_stage_buffer(uint32_t *capacity);
-esp_err_t c6fw_stage_commit(uint32_t len);
+esp_err_t c6fw_stage_commit(uint32_t len, uint32_t *chip);
 bool c6fw_stage_load(void);
-/* sha256 of the whole package last stored (c6fw_stage_commit), false when unknown */
-bool c6fw_package_sha(uint8_t sha[32]);
+/* C6FW_CHIP_* of the package in PSRAM, 0 when none */
+uint32_t c6fw_stage_chip(void);
+void c6fw_stage_drop(void);
+/* sha256 of the whole package the radio was last flashed from, false when unknown */
+bool c6fw_package_sha(c6_radio_t radio, uint8_t sha[32]);
+/* C6FW_CHIP_* of a radio (radio B: what its bootloader reported, 0 before it was ever reached) */
+uint32_t c6fw_radio_chip(c6_radio_t radio);
 
 /*
  * Flashes a bundle to the C6 through its ROM bootloader. When the bundle being replaced
@@ -147,6 +154,7 @@ typedef struct {
     bool banner;        /* without sync: the ROM banner came after a reset (power, RESET, radio TX work) */
     bool download_mode; /* with BOOT held low the radio entered download mode (BOOT works) */
     char chip[16];
+    uint32_t chip_id; /* C6FW_CHIP_* when a C6 or C5, else 0 */
     uint8_t mac[6];
     uint16_t revision; /* major * 100 + minor */
     uint32_t flash_size;
@@ -154,7 +162,9 @@ typedef struct {
 } c6_probe_t;
 
 /* Resets the radio a few times and tells which lines work; ESP_OK when all do. Takes a few seconds. */
-esp_err_t c6_radio_probe(const c6_radio_pins_t *pins, c6_probe_t *result);
+esp_err_t c6_radio_probe(c6_radio_t radio, c6_probe_t *result);
+/* Records the chip (C6FW_CHIP_*) a radio's bootloader reported. */
+void c6_radio_set_chip(c6_radio_t radio, uint32_t chip);
 
 #ifdef __cplusplus
 }

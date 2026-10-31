@@ -303,7 +303,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddBoolToObject(c6, "adopted", gw_config_get_u8(GW_KEY_C6_ADOPTED, 0));
     c6fw_dir_t *dir = malloc(sizeof(*dir));
     cJSON *images = cJSON_AddArrayToObject(c6, "images");
-    if (dir && c6fw_read_dir(dir) == ESP_OK) {
+    if (dir && c6fw_read_dir(C6_RADIO_A, dir) == ESP_OK) {
         for (uint32_t i = 0; i < dir->count; i++) {
             cJSON *img = cJSON_CreateObject();
             cJSON_AddStringToObject(img, "name", dir->entries[i].name);
@@ -725,14 +725,14 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
     }
     esp_err_t err = gw_http_receive(req, c6fw_sink, &ctx);
     if (err == ESP_OK) {
-        err = c6fw_stage_commit(req->content_len); /* checks every bundle, then stores it */
+        err = c6fw_stage_commit(req->content_len, NULL); /* checks every bundle and tells the chip */
     }
     if (err != ESP_OK) {
         return gw_http_send_error(req, 400, esp_err_to_name(err));
     }
     gw_update_c6_changed();
-    /* The boot sequence compares bundle hashes and reflashes the C6 if its bundle changed; the large
-     * firmwares come from the PSRAM copy, which a restart (not a power cut) keeps. */
+    /* The boot sequence compares bundle hashes and reflashes the radio of the package's chip if its
+     * bundle changed, from the PSRAM copy, which a restart (not a power cut) keeps. */
     cJSON *json = cJSON_CreateObject();
     cJSON_AddBoolToObject(json, "ok", true);
     return gw_http_send_json(req, json);
@@ -754,7 +754,7 @@ static esp_err_t c6_reflash_post(httpd_req_t *req)
 static esp_err_t radio_b_probe_post(httpd_req_t *req)
 {
     c6_probe_t r;
-    c6_radio_probe(c6_radio_pins(C6_RADIO_B), &r);
+    c6_radio_probe(C6_RADIO_B, &r);
     cJSON *j = cJSON_CreateObject();
     cJSON_AddBoolToObject(j, "wired", r.wired);
     cJSON_AddBoolToObject(j, "banner", r.banner);

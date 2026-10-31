@@ -47,11 +47,11 @@ static struct {
     char notes[1024];
     char release_url[160];
     char build[128]; /* "commit abc1234 · 2026-10-30 · ESP-IDF v5.5.5" */
-    /* C6 firmware offered by the manifest: downloaded into PSRAM on request, checked, then written
-     * to the c6fw partition (the C6 gets it at the next start) */
+    /* C6 firmware offered by the manifest: downloaded into PSRAM on request, checked, flashed into the
+     * C6 at the next start */
     struct {
         bool offered;
-        bool current; /* the c6fw partition holds exactly this file */
+        bool current; /* the C6 was last flashed from exactly this file */
         char url[URL_MAX];
         uint8_t sha256[32];
         uint32_t size;
@@ -60,8 +60,16 @@ static struct {
         bool installing;
         int percent;
         uint8_t notified[32]; /* sha256 of the package last announced */
-        char installed_id[9]; /* first bytes of the sha256 of the stored package, "" when none */
+        char installed_id[9]; /* first bytes of the sha256 of the package last flashed, "" when none */
     } c6;
+    /* C5 package (external radio B, docs/dual-radio.md): downloaded when radio B needs it */
+    struct {
+        bool offered;
+        char url[URL_MAX];
+        uint8_t sha256[32];
+        uint32_t size;
+        int percent;
+    } c5;
     char want[32];   /* release picked for the requested installation, "" = the offered one */
     char *releases;  /* JSON array of the listed releases this board runs (PSRAM), NULL = no list */
     char error[96];
@@ -162,30 +170,6 @@ static void resolve_url(const char *base, const char *ref, char *out, size_t len
     snprintf(out, len, "%.*s/%s", (int)(slash ? slash - base : (int)strlen(base)), base, ref);
 }
 
-/* sha256 of the first len bytes of the c6fw partition */
-static bool c6_partition_sha(uint32_t len, uint8_t out[32])
-{
-    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
-    uint8_t *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
-    if (!part || !buf || len > part->size) {
-        free(buf);
-        return false;
-    }
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-    mbedtls_sha256_starts(&ctx, 0);
-    bool ok = true;
-    for (uint32_t off = 0; off < len && ok; off += 4096) {
-        uint32_t n = len - off < 4096 ? len - off : 4096;
-        ok = esp_partition_read(part, off, buf, n) == ESP_OK;
-        mbedtls_sha256_update(&ctx, buf, n);
-    }
-    mbedtls_sha256_finish(&ctx, out);
-    mbedtls_sha256_free(&ctx);
-    free(buf);
-    return ok;
-}
-
 static bool unhex32(const char *in, uint8_t out[32])
 {
     if (!in || strlen(in) != 64) {
@@ -201,25 +185,27 @@ static bool unhex32(const char *in, uint8_t out[32])
     return true;
 }
 
-/* Short id of the package in the c6fw partition: the sha256 of the file as it was written (packages
- * end on a 4 KiB boundary after the last bundle). */
+/* Short id of the package radio A was last flashed from: the first bytes of its sha256. */
 static void c6_installed_id(void)
 {
-    c6fw_dir_t dir;
     uint8_t sha[32];
     s_up.c6.installed_id[0] = '\0';
-    if (c6fw_read_dir(&dir) != ESP_OK) {
-        return;
-    }
-    uint32_t end = 0;
-    bool whole = true;
-    for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
-        whole &= dir.entries[i].offset != C6FW_REMOTE;
-        end = MAX(end, whole ? dir.entries[i].offset + dir.entries[i].size : 0);
-    }
-    /* layout v3 holds a part only: the sha256 recorded when the package was stored */
-    if (c6fw_package_sha(sha) || (whole && c6_partition_sha((end + 0xfff) & ~0xfff, sha))) {
+    if (c6fw_package_sha(C6_RADIO_A, sha)) {
         snprintf(s_up.c6.installed_id, sizeof(s_up.c6.installed_id), "%02x%02x%02x%02x", sha[0], sha[1], sha[2], sha[3]);
+    }
+}
+
+/* Called with the lock held: the C5 part of a manifest (absent: nothing offered). */
+static void c5_offer(const char *manifest_url, const cJSON *c5)
+{
+    const cJSON *size = cJSON_GetObjectItem(c5, "size"), *fmt = cJSON_GetObjectItem(c5, "format");
+    uint8_t sha[32];
+    s_up.c5.offered = c5 && GW_JSON_STR(c5, "url") && unhex32(GW_JSON_STR(c5, "sha256"), sha) && cJSON_IsNumber(size) &&
+                      size->valueint > 0 && cJSON_IsNumber(fmt) && fmt->valueint == C6FW_FORMAT_VERSION;
+    if (s_up.c5.offered) {
+        resolve_url(manifest_url, GW_JSON_STR(c5, "url"), s_up.c5.url, sizeof(s_up.c5.url));
+        memcpy(s_up.c5.sha256, sha, 32);
+        s_up.c5.size = size->valueint;
     }
 }
 
@@ -247,7 +233,7 @@ static void c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
     s_up.c6.size = size->valueint;
     s_up.c6.bundles = cJSON_Duplicate(cJSON_GetObjectItem(c6, "bundles"), true);
     uint8_t have[32];
-    s_up.c6.current = (c6fw_package_sha(have) || c6_partition_sha(s_up.c6.size, have)) && memcmp(have, sha, 32) == 0;
+    s_up.c6.current = c6fw_package_sha(C6_RADIO_A, have) && memcmp(have, sha, 32) == 0;
     if (notify && !s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
         memcpy(s_up.c6.notified, sha, 32);
         gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware update available (%lu kB)", (unsigned long)(s_up.c6.size / 1024));
@@ -295,6 +281,7 @@ static esp_err_t check_manifest(const char *url, bool latest)
                  GW_JSON_STR(b, "date") ? " · " : "", GW_JSON_STR(b, "date") ? GW_JSON_STR(b, "date") : "",
                  GW_JSON_STR(b, "idf") ? " · ESP-IDF " : "", GW_JSON_STR(b, "idf") ? GW_JSON_STR(b, "idf") : "");
         c6_offer(url, cJSON_GetObjectItem(m, "c6fw"), latest);
+        c5_offer(url, cJSON_GetObjectItem(m, "c5fw"));
         s_up.error[0] = '\0';
         if (latest) {
             s_up.checked = time(NULL);
@@ -350,6 +337,7 @@ static void check(void)
         xSemaphoreTake(s_up.lock, portMAX_DELAY);
         s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
         c6_offer(NULL, NULL, false);
+        c5_offer(NULL, NULL);
         cJSON_free(s_up.releases);
         s_up.releases = NULL;
         xSemaphoreGive(s_up.lock);
@@ -472,14 +460,14 @@ static esp_err_t install(void)
     return ESP_OK;
 }
 
-/* c6fw.bin into the PSRAM staging buffer, checked against the manifest (sha256) and then bundle by
- * bundle while it is stored (c6fw_stage_commit); the C6 itself is flashed at the next start. */
-static esp_err_t download_c6(const char *url, const uint8_t want[32], uint32_t size)
+/* A radio package (c6fw.bin, c5fw.bin) into the PSRAM staging buffer, checked against the manifest
+ * (sha256), then bundle by bundle and for its chip (c6fw_stage_commit); the radio is flashed from PSRAM. */
+static esp_err_t download_package(const char *url, const uint8_t want[32], uint32_t size, uint32_t want_chip, int *pct)
 {
     uint32_t capacity;
     uint8_t *data = c6fw_stage_buffer(&capacity);
     if (size > capacity) {
-        set_error("%s", "the C6 package is larger than the staging buffer");
+        set_error("%s", "the package is larger than the staging buffer");
         return ESP_ERR_INVALID_SIZE;
     }
     esp_http_client_config_t cfg;
@@ -491,40 +479,45 @@ static esp_err_t download_c6(const char *url, const uint8_t want[32], uint32_t s
         if (status != 200) {
             char code[16];
             snprintf(code, sizeof(code), "%d", status);
-            set_error("C6 package: HTTP %s", code);
+            set_error("radio package: HTTP %s", code);
             err = ESP_FAIL;
         }
         for (int n; err == ESP_OK && got < size && (n = esp_http_client_read(client, (char *)data + got, size - got)) > 0;) {
             got += n;
             int percent = (int)(90LL * got / size);
-            if (percent / 10 != s_up.c6.percent / 10) {
-                s_up.c6.percent = percent;
+            if (percent / 10 != *pct / 10) {
+                *pct = percent;
                 gw_update_mqtt_state();
             }
-            s_up.c6.percent = percent;
+            *pct = percent;
             vTaskDelay(1);
         }
     } else {
-        set_error("cannot download the C6 package (%s)", esp_err_to_name(err));
+        set_error("cannot download the radio package (%s)", esp_err_to_name(err));
     }
     esp_http_client_cleanup(client);
     if (err == ESP_OK && got != size) {
-        set_error("%s", "C6 package incomplete");
+        set_error("%s", "radio package incomplete");
         err = ESP_ERR_INVALID_SIZE;
     }
     if (err == ESP_OK) {
         uint8_t sha[32];
         mbedtls_sha256(data, size, sha, 0);
         if (memcmp(sha, want, 32) != 0) {
-            set_error("%s", "C6 package sha256 does not match the manifest");
+            set_error("%s", "radio package sha256 does not match the manifest");
             err = ESP_ERR_INVALID_CRC;
         }
     }
     if (err == ESP_OK) {
-        s_up.c6.percent = 92;
-        err = c6fw_stage_commit(size);
+        *pct = 92;
+        uint32_t chip = 0;
+        err = c6fw_stage_commit(size, &chip);
         if (err != ESP_OK) {
-            set_error("C6 package not stored: %s", esp_err_to_name(err));
+            set_error("radio package not usable: %s", esp_err_to_name(err));
+        } else if (chip != want_chip) {
+            c6fw_stage_drop();
+            set_error("%s", "the radio package of the manifest is for another chip");
+            err = ESP_ERR_INVALID_RESPONSE;
         }
     }
     return err;
@@ -540,7 +533,7 @@ static esp_err_t install_c6(void)
     memcpy(want, s_up.c6.sha256, 32);
     size = s_up.c6.size;
     xSemaphoreGive(s_up.lock);
-    esp_err_t err = download_c6(url, want, size);
+    esp_err_t err = download_package(url, want, size, C6FW_CHIP_C6, &s_up.c6.percent);
     if (err == ESP_OK) {
         s_up.c6.current = true;
         c6_installed_id();
@@ -569,14 +562,34 @@ esp_err_t gw_update_fetch_c6(void)
         return ESP_ERR_NOT_FOUND;
     }
     ESP_LOGW(TAG, "downloading the C6 package (%lu kB) to flash the C6", (unsigned long)(size / 1024));
-    esp_err_t err = download_c6(url, want, size);
-    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    esp_err_t err = download_package(url, want, size, C6FW_CHIP_C6, &s_up.c6.percent);
     s_up.c6.percent = 0;
-    if (err == ESP_OK) {
-        s_up.c6.current = true;
-        c6_installed_id();
+    return err;
+}
+
+esp_err_t gw_update_fetch_package(uint32_t chip)
+{
+    if (chip != C6FW_CHIP_C5) {
+        return gw_update_fetch_c6();
     }
+    if (!s_up.lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    check();
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    bool offered = s_up.c5.offered;
+    char url[URL_MAX];
+    uint8_t want[32];
+    uint32_t size = s_up.c5.size;
+    strlcpy(url, s_up.c5.url, sizeof(url));
+    memcpy(want, s_up.c5.sha256, 32);
     xSemaphoreGive(s_up.lock);
+    if (!offered) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    ESP_LOGW(TAG, "downloading the C5 package (%lu kB) to flash radio B", (unsigned long)(size / 1024));
+    esp_err_t err = download_package(url, want, size, C6FW_CHIP_C5, &s_up.c5.percent);
+    s_up.c5.percent = 0;
     return err;
 }
 
@@ -750,7 +763,7 @@ void gw_update_c6_changed(void)
     }
     xSemaphoreTake(s_up.lock, portMAX_DELAY);
     uint8_t have[32];
-    s_up.c6.current = s_up.c6.offered && (c6fw_package_sha(have) || c6_partition_sha(s_up.c6.size, have)) &&
+    s_up.c6.current = s_up.c6.offered && c6fw_package_sha(C6_RADIO_A, have) &&
                       memcmp(have, s_up.c6.sha256, 32) == 0;
     c6_installed_id();
     xSemaphoreGive(s_up.lock);
@@ -796,6 +809,21 @@ static cJSON *state_json(void)
                  s_up.c6.sha256[3]);
     }
     cJSON_AddStringToObject(c6, "offered_id", offered);
+    cJSON *c5 = cJSON_AddObjectToObject(j, "c5");
+    cJSON_AddBoolToObject(c5, "offered", s_up.c5.offered);
+    char c5_offered[9] = "";
+    if (s_up.c5.offered) {
+        snprintf(c5_offered, sizeof(c5_offered), "%02x%02x%02x%02x", s_up.c5.sha256[0], s_up.c5.sha256[1], s_up.c5.sha256[2],
+                 s_up.c5.sha256[3]);
+    }
+    cJSON_AddStringToObject(c5, "offered_id", c5_offered);
+    cJSON_AddNumberToObject(c5, "size", s_up.c5.size);
+    uint8_t c5_have[32];
+    char c5_installed[9] = "";
+    if (c6fw_package_sha(C6_RADIO_B, c5_have)) {
+        snprintf(c5_installed, sizeof(c5_installed), "%02x%02x%02x%02x", c5_have[0], c5_have[1], c5_have[2], c5_have[3]);
+    }
+    cJSON_AddStringToObject(c5, "installed_id", c5_installed);
     xSemaphoreGive(s_up.lock);
     return j;
 }
@@ -824,7 +852,7 @@ cJSON *gw_update_status(void)
     }
     cJSON *inst = cJSON_AddObjectToObject(c6, "installed_versions");
     c6fw_dir_t dir;
-    if (c6fw_read_dir(&dir) == ESP_OK) {
+    if (c6fw_read_dir(C6_RADIO_A, &dir) == ESP_OK) {
         for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
             char name[17], version[33];
             strlcpy(name, dir.entries[i].name, sizeof(name));

@@ -235,6 +235,8 @@ void gw_update_c6_changed(void);
 /* Start-up: the C6 needs firmwares the gateway does not hold; downloads the package of the manifest
  * into PSRAM (blocking). ESP_ERR_NOT_FOUND: no manifest URL or no package offered. */
 esp_err_t gw_update_fetch_c6(void);
+/* The same for the package of a chip (C6FW_CHIP_C6 or C6FW_CHIP_C5, manifest "c6fw" / "c5fw"). */
+esp_err_t gw_update_fetch_package(uint32_t chip);
 cJSON *gw_update_status(void);
 /* MQTT: discovery of the update entity and its state (called by gw_mqtt on connect and on change). */
 void gw_update_mqtt_discovery(void);

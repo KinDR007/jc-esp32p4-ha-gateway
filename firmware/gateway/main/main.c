@@ -29,43 +29,46 @@ static const char *TAG = "main";
 #define STABLE_AFTER_MS (60 * 1000)
 #define C6_FLASH_MAX_TRIES 3
 
-/* Makes sure the radio runs the bundle the role needs; flashes it when not. */
-static bool ensure_c6(c6_radio_t radio, const char *bundle)
+/* Makes sure the radio runs the bundle the role needs; flashes it when not (force: always). The
+ * package comes from PSRAM, else from the release (radio B: the package of its chip). On failure
+ * why tells the reason. */
+static bool ensure_c6(c6_radio_t radio, const char *bundle, bool force_flash, char *why, size_t why_len)
 {
+    uint32_t chip = c6fw_radio_chip(radio);
     const gw_radio_keys_t *keys = gw_radio_keys(radio);
     c6fw_entry_t entry;
     char current[16];
     uint8_t current_sha[32] = {0};
 
-    esp_err_t err = c6fw_find(bundle, &entry);
+    esp_err_t err = c6fw_find(radio, bundle, &entry);
     if (err != ESP_OK) {
         /* no package at all yet (a factory image without one): the release offers it */
-        if (gw_eth_wait_ip(pdMS_TO_TICKS(30000)) && gw_update_fetch_c6() == ESP_OK) {
-            err = c6fw_find(bundle, &entry);
+        if (gw_eth_wait_ip(pdMS_TO_TICKS(30000)) && gw_update_fetch_package(chip) == ESP_OK) {
+            err = c6fw_find(radio, bundle, &entry);
         }
     }
     if (err != ESP_OK) {
-        gw_set_maintenance("C6 image '%s' missing in the c6fw partition (%s), upload c6fw.bin", bundle,
+        snprintf(why, why_len, "firmware '%s' for the radio not on the gateway (%s): online update or upload of the package", bundle,
                            esp_err_to_name(err));
         return false;
     }
     gw_config_get_str(keys->bundle, current, sizeof(current));
     gw_config_get_blob(keys->sha, current_sha, sizeof(current_sha));
-    bool force = gw_config_get_u8(keys->force, 0);
+    bool force = force_flash || gw_config_get_u8(keys->force, 0);
     if (!force && strcmp(current, bundle) == 0 && memcmp(current_sha, entry.sha256, sizeof(current_sha)) == 0) {
         return true;
     }
 
     uint8_t tries = gw_config_get_u8(keys->tries, 0);
     if (tries >= C6_FLASH_MAX_TRIES) {
-        gw_set_maintenance("flashing the C6 failed %u times, check the JP1 jumpers and retry from the UI", tries);
+        snprintf(why, why_len, "flashing the radio failed %u times, check its wiring (JP1) and retry from the UI", tries);
         return false;
     }
     gw_config_set_u8(keys->tries, tries + 1);
     if (force) {
         c6_slots_invalidate(radio); /* "Reflash C6" rewrites the whole slots layout, not only the slot choice */
     }
-    ESP_LOGW(TAG, "C6: %s -> %s %s%s", current[0] ? current : "unknown", entry.name, entry.version,
+    ESP_LOGW(TAG, "radio %c: %s -> %s %s%s", 'A' + radio, current[0] ? current : "unknown", entry.name, entry.version,
              force ? " (forced)" : "");
 
     /* Flash only once the web UI is reachable (it polls once a second), so it shows the whole progress. */
@@ -75,15 +78,15 @@ static bool ensure_c6(c6_radio_t radio, const char *bundle)
     /* The large firmwares (slots layout, esp-hosted) live only in the package in PSRAM when the c6fw
      * partition is small: after a power cut it is gone and the release has to provide it again. */
     if (!c6_flash_ready(radio, &entry)) {
-        ESP_LOGW(TAG, "C6 firmwares for %s not on the gateway, fetching the package", entry.name);
-        err = gw_eth_wait_ip(pdMS_TO_TICKS(30000)) ? gw_update_fetch_c6() : ESP_ERR_TIMEOUT;
-        if (err == ESP_OK && c6fw_find(bundle, &entry) != ESP_OK) {
+        ESP_LOGW(TAG, "firmwares for %s not on the gateway, fetching the package", entry.name);
+        err = gw_eth_wait_ip(pdMS_TO_TICKS(30000)) ? gw_update_fetch_package(chip) : ESP_ERR_TIMEOUT;
+        if (err == ESP_OK && c6fw_find(radio, bundle, &entry) != ESP_OK) {
             err = ESP_ERR_NOT_FOUND;
         }
         if (err != ESP_OK || !c6_flash_ready(radio, &entry)) {
             gw_config_set_u8(keys->tries, tries); /* not a failed flash */
-            gw_set_maintenance("the C6 firmware package is not on the gateway (%s): connect it to the internet "
-                               "(online update) or upload c6fw.bin under System > Firmware", esp_err_to_name(err));
+            snprintf(why, why_len, "the radio firmware package is not on the gateway (%s): connect it to the internet "
+                               "(online update) or upload the package under System > Firmware", esp_err_to_name(err));
             return false;
         }
     }
@@ -91,7 +94,7 @@ static bool ensure_c6(c6_radio_t radio, const char *bundle)
     err = c6_flash_bundle(radio, &entry, current);
     gw_flash_unlock();
     if (err != ESP_OK) {
-        gw_set_maintenance("%s", c6_progress(radio)->last_error);
+        snprintf(why, why_len, "%s", c6_progress(radio)->last_error);
         return false;
     }
     gw_config_set_str(keys->bundle, entry.name);
@@ -125,8 +128,12 @@ static void apply_role(gw_role_t role)
         /* The factory firmware cannot be downloaded again: never overwrite it before a backup. */
         gw_set_maintenance("back up the C6 factory firmware first (System tab) or confirm skipping the backup");
         return;
-    } else if (!ensure_c6(C6_RADIO_A, gw_role_c6_bundle(role))) {
-        return;
+    } else {
+        char why[160];
+        if (!ensure_c6(C6_RADIO_A, gw_role_c6_bundle(role), false, why, sizeof(why))) {
+            gw_set_maintenance("%s", why);
+            return;
+        }
     }
     if ((role == GW_ROLE_ZIGBEE_COORD || role == GW_ROLE_ZIGBEE_ROUTER) && gw_config_get_u8(GW_KEY_ZB_SNAP_REQ, 0)) {
         gw_config_erase(GW_KEY_ZB_SNAP_REQ);
@@ -183,6 +190,90 @@ static void request_zigbee_backup(void)
 {
     gw_config_set_u8(GW_KEY_ZB_SNAP_REQ, 1);
     gw_restart_later(1000);
+}
+
+/* ---- radios: state, and flashing radio B on request (docs/dual-radio.md) ---- */
+static struct {
+    char bundle[16];
+    bool force;
+    char error[160];
+    TaskHandle_t task;
+} s_flash_b;
+
+static void radio_b_flash_task(void *arg)
+{
+    c6_probe_t probe;
+    char why[160] = "";
+    if (c6fw_radio_chip(C6_RADIO_B) == 0 && c6_radio_probe(C6_RADIO_B, &probe) != ESP_OK) {
+        snprintf(why, sizeof(why), "radio B not reached: %.130s", probe.verdict);
+    } else if (!ensure_c6(C6_RADIO_B, s_flash_b.bundle, s_flash_b.force, why, sizeof(why)) && !why[0]) {
+        strlcpy(why, "flashing failed", sizeof(why));
+    }
+    strlcpy(s_flash_b.error, why, sizeof(s_flash_b.error));
+    ESP_LOGI(TAG, "radio B %s: %s", s_flash_b.bundle, why[0] ? why : "done");
+    s_flash_b.task = NULL;
+    vTaskDelete(NULL);
+}
+
+/* {"bundle": "ot_rcp", "force": false}: radio B gets the firmware (no role uses it yet) */
+static esp_err_t radio_b_flash_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    const char *bundle = GW_JSON_STR(body, "bundle");
+    static const char *const allowed[] = {"ot_rcp", "zigbee_ncp", "zigbee_router", "scanner"};
+    bool ok = false;
+    for (size_t i = 0; bundle && i < sizeof(allowed) / sizeof(allowed[0]); i++) {
+        ok |= strcmp(bundle, allowed[i]) == 0;
+    }
+    if (!ok) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router or scanner");
+    }
+    if (s_flash_b.task || c6_progress(C6_RADIO_B)->busy) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 409, "radio B is being flashed");
+    }
+    strlcpy(s_flash_b.bundle, bundle, sizeof(s_flash_b.bundle));
+    s_flash_b.force = cJSON_IsTrue(cJSON_GetObjectItem(body, "force"));
+    s_flash_b.error[0] = '\0';
+    cJSON_Delete(body);
+    if (xTaskCreate(radio_b_flash_task, "radio_b_flash", 12288, NULL, 4, &s_flash_b.task) != pdPASS) {
+        s_flash_b.task = NULL;
+        return gw_http_send_error(req, 500, "no memory for the flashing task");
+    }
+    return gw_http_send_json(req, cJSON_CreateObject());
+}
+
+static esp_err_t radios_get(httpd_req_t *req)
+{
+    cJSON *arr = cJSON_CreateArray();
+    for (int r = 0; r < C6_RADIOS; r++) {
+        const gw_radio_keys_t *keys = gw_radio_keys(r);
+        const c6_progress_t *p = c6_progress(r);
+        cJSON *j = cJSON_CreateObject();
+        char bundle[16] = "", id[9] = "";
+        uint8_t sha[32];
+        uint32_t chip = c6fw_radio_chip(r);
+        gw_config_get_str(keys->bundle, bundle, sizeof(bundle));
+        if (c6fw_package_sha(r, sha)) {
+            snprintf(id, sizeof(id), "%02x%02x%02x%02x", sha[0], sha[1], sha[2], sha[3]);
+        }
+        cJSON_AddStringToObject(j, "radio", r == C6_RADIO_A ? "a" : "b");
+        cJSON_AddStringToObject(j, "chip", chip == C6FW_CHIP_C5 ? "ESP32-C5" : chip == C6FW_CHIP_C6 ? "ESP32-C6" : "");
+        cJSON_AddStringToObject(j, "bundle", bundle);
+        cJSON_AddStringToObject(j, "package_id", id);
+        cJSON_AddBoolToObject(j, "busy", p->busy || (r == C6_RADIO_B && s_flash_b.task));
+        cJSON_AddNumberToObject(j, "percent", p->percent);
+        cJSON_AddStringToObject(j, "stage", p->stage);
+        cJSON_AddStringToObject(j, "error", r == C6_RADIO_B && s_flash_b.error[0] ? s_flash_b.error : p->last_error);
+        cJSON_AddItemToArray(arr, j);
+    }
+    cJSON_AddStringToObject(cJSON_GetArrayItem(arr, 1), "package_in_psram",
+                            c6fw_stage_chip() == C6FW_CHIP_C5 ? "c5" : c6fw_stage_chip() == C6FW_CHIP_C6 ? "c6" : "");
+    return gw_http_send_json(req, arr);
 }
 
 static esp_err_t zigbee_snapshot_post(httpd_req_t *req)
@@ -318,6 +409,8 @@ void app_main(void)
     gw_telegram_start();
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
+    gw_http_register("/api/radios", HTTP_GET, radios_get);
+    gw_http_register("/api/radios/b/flash", HTTP_POST, radio_b_flash_post);
     netscan_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
