@@ -1,0 +1,46 @@
+# ESPHome Bluetooth proxy as a role of a gateway radio (docs/dual-radio.md, F6): runs on the C6 of the
+# board (radio A) or the XIAO ESP32-C5 (radio B) on its own, over Wi-Fi. Published with the release,
+# so it holds no secret: the gateway sets the Wi-Fi network over Improv on the radio's UART, Home
+# Assistant sets the API encryption key when it adopts the device. Updates come from the gateway
+# (no OTA on the device).
+#   esphome -s chip esp32c6 compile radio-proxy.yaml   (or esp32c5; -s build_path DIR when the
+#   checkout path has a space: PlatformIO refuses those)
+substitutions:
+  chip: esp32c6
+  build_path: .esphome/build/p4gw-ble-proxy
+
+esphome:
+  name: p4gw-ble-proxy
+  name_add_mac_suffix: true
+  build_path: ${build_path}
+  friendly_name: P4 Gateway BLE proxy
+  project:
+    name: p4gw.radio_ble_proxy
+    version: "1.0.0"
+
+esp32:
+  variant: ${chip}
+  framework:
+    type: esp-idf
+
+logger:
+  hardware_uart: UART0
+  baud_rate: 115200
+  level: INFO
+
+improv_serial:
+
+# no networks and no fallback access point: until the gateway provisions it over Improv the
+# radio offers nothing over the air
+wifi:
+  networks: []
+
+api:
+  encryption: {}
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  active: true

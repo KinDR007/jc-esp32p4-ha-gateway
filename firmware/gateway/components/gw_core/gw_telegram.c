@@ -794,14 +794,21 @@ static void cmd_install(const char *args, bool cz, char *out, size_t len)
              err == ESP_OK ? shown : why);
 }
 
+/* /role <name> for radio A, /role b <name> for radio B ("none" switches radio B off) */
 static void cmd_role(const char *args, bool cz, char *out, size_t len)
 {
-    char err[80];
-    if (gw_api_role_switch(args, false, err, sizeof(err)) == ESP_OK) {
-        snprintf(out, len, cz ? "Přepínám na roli %s, brána se restartuje." : "Switching to %s, the gateway restarts.", args);
+    char err[96];
+    int radio = 0;
+    if ((args[0] == 'b' || args[0] == 'a') && args[1] == ' ') {
+        radio = args[0] == 'b';
+        args += 2;
+    }
+    if (gw_api_role_switch_radio(radio, args, false, err, sizeof(err)) == ESP_OK) {
+        snprintf(out, len, cz ? "Rádio %c: přepínám na roli %s, brána se restartuje." : "Radio %c: switching to %s, the gateway restarts.",
+                 'A' + radio, args);
     } else {
-        snprintf(out, len, cz ? "Roli nejde přepnout: %s\nRole: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome"
-                              : "Cannot switch: %s\nRoles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome",
+        snprintf(out, len, cz ? "Roli nejde přepnout: %s\nRole: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome (rádio B i none: /role b none)"
+                              : "Cannot switch: %s\nRoles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome (radio B also none: /role b none)",
                  err);
     }
 }
@@ -1028,7 +1035,8 @@ void gw_telegram_start(void)
                    "system/firmware", 1, false, cmd_releases);
     gw_bot_command("install", "install the offered gateway firmware, /install v1.6 a listed release (/install c6 [v1.6]: the C6 radio package)",
                    "instalace nabízeného firmwaru brány, /install v1.6 vydání ze seznamu (/install c6 [v1.6]: balík rádia C6)", "system/firmware", 2, true, cmd_install);
-    gw_bot_command("role", "switch the role, e.g. /role zigbee_coordinator", "přepnutí role, např. /role zigbee_coordinator", "role", 2, true, cmd_role);
+    gw_bot_command("role", "switch the role, e.g. /role zigbee_coordinator (radio B: /role b thread_br)",
+                   "přepnutí role, např. /role zigbee_coordinator (rádio B: /role b thread_br)", "role", 2, true, cmd_role);
     gw_notify_set_listener(on_note);
     gw_http_register("/api/telegram", HTTP_GET, telegram_get);
     gw_http_register("/api/telegram", HTTP_POST, telegram_post);

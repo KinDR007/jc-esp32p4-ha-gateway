@@ -289,44 +289,41 @@ def tc08_thread_router():
     check(True, f'Thread router role {t["role"]} on {t["network_name"]}')
 
 
-def tc09_esphome_roundtrip():
-    """ESPHome: gateway hands over, BLE proxy scans, Return to gateway brings back thread_br."""
+def tc09_esphome_radio():
+    """ESPHome Bluetooth proxy as the role of a radio (radio B when present, else A): the ESPHome bundle is
+    flashed, the device answers over Improv; with Wi-Fi set (Home Assistant > ESPHome) it joins and
+    reports its URL. The radio's role comes back afterwards."""
+    b = (http('GET', '/api/radios')[1] or [{}, {}])[1]
+    radio = 'b' if b.get('wired') else 'a'
+    s0 = status()
+    before = s0['role']['b']['desired'] if radio == 'b' else s0['role']['active']
+    wifi = http('GET', '/api/esphome/wifi')[1]
     try:
-        from aioesphomeapi import APIClient
-    except ImportError:
-        raise Fail('aioesphomeapi missing, run with the ESPHome venv python')
-    if not ARGS.esphome_key:
-        raise Fail('--esphome-key required')
-    import asyncio
-    code, r = http('POST', '/api/role', {'role': 'esphome'})
-    check(code == 200, 'switch to esphome accepted')
-    wait_until('ESPHome API port 6053', lambda: port_open(6053), 240, 3)
-    check(not port_open(80), 'gateway web UI is gone (ESPHome runs)')
+        if radio == 'b':
+            if s0['role']['active'] == 'esphome':
+                switch('thread_br')
+            switch_b('esphome', timeout=400)
+        else:
+            if s0['role'].get('b', {}).get('desired') == 'esphome':
+                switch_b('none')
+            switch('esphome', timeout=400)
 
-    async def run():
-        cli = APIClient(ARGS.host, 6053, None, noise_psk=ARGS.esphome_key)
-        await cli.connect(login=True)
-        info = await cli.device_info()
-        seen = {}
-        unsub = cli.subscribe_bluetooth_le_raw_advertisements(lambda r: [seen.__setitem__(a.address, a.rssi) for a in r.advertisements])
-        await asyncio.sleep(10)
-        unsub()
-        entities, _ = await cli.list_entities_services()
-        sel = next(e for e in entities if e.object_id == 'gateway_role')
-        btn = next(e for e in entities if e.object_id == 'return_to_gateway')
-        cli.select_command(sel.key, 'Thread border router')
-        await asyncio.sleep(0.5)
-        cli.button_command(btn.key)
-        await asyncio.sleep(1)
-        await cli.disconnect()
-        return info, seen
-
-    info, seen = asyncio.run(run())
-    check(True, f'ESPHome {info.name} {info.esphome_version}')
-    check(len(seen) > 0, f'BLE advertisements from {len(seen)} devices in 10 s')
-    s = wait_restart('thread_br', 240)
-    check(s['role']['active'] == 'thread_br' and not s['role']['maintenance'], 'returned to thread_br')
-    check(s['c6']['bundle'] == 'ot_rcp', 'C6 reflashed back to ot_rcp')
+        def improv():
+            rs = status().get('role_status_b' if radio == 'b' else 'role_status') or {}
+            return rs if rs.get('mode') == 'esphome' and not rs.get('busy') else None
+        rs = wait_until('Improv of the ESPHome radio', improv, 150, 5)
+        log(f'radio {radio.upper()}: {rs.get("device")} improv={rs.get("improv")} {rs.get("note")} {rs.get("url")}')
+        check('ESPHome' in rs.get('device', '') or 'p4gw' in rs.get('device', ''), 'the radio runs ESPHome and answers over Improv')
+        if wifi.get('ssid'):
+            check(rs.get('improv') == 'provisioned' and rs.get('url'), f'joined Wi-Fi {wifi["ssid"]} ({rs.get("url")})')
+        else:
+            check(rs.get('improv') == 'not provisioned', 'not provisioned without Wi-Fi settings')
+            log('Wi-Fi not set: the join is not tested')
+    finally:
+        if radio == 'b':
+            switch_b(before)
+        elif status()['role']['active'] != before:
+            switch(before)
 
 
 def tc10_ota_rollback_slots():
@@ -1614,7 +1611,7 @@ def tc40_thread_per_radio():
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
-    ('TC07', tc07_zigbee_router), ('TC08', tc08_thread_router), ('TC09', tc09_esphome_roundtrip),
+    ('TC07', tc07_zigbee_router), ('TC08', tc08_thread_router), ('TC09', tc09_esphome_radio),
     ('TC10', tc10_ota_rollback_slots), ('TC11', tc11_auth), ('TC12', tc12_invalid_uploads),
     ('TC13', tc13_rcp_reflash), ('TC14', tc14_sound_service), ('TC15', tc15_sound_recognition),
     ('TC16', tc16_thread_dataset_isolation), ('TC17', tc17_sound_events_config),

@@ -292,6 +292,14 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(role_b, "active", gw_role_name(st->active_b));
     cJSON_AddStringToObject(role_b, "desired", gw_role_name(st->desired_b));
     cJSON_AddStringToObject(role_b, "maintenance", st->maintenance_b);
+    if (st->b_probed) {
+        cJSON_AddBoolToObject(role_b, "wired", st->b_wired);
+        cJSON_AddStringToObject(role_b, "chip", st->b_chip);
+    }
+    cJSON *tel_b = gw_c6_telemetry(1);
+    if (tel_b) {
+        cJSON_AddItemToObject(role_b, "telemetry", tel_b);
+    }
 
     cJSON_AddItemToObject(json, "eth", gw_eth_status());
 
@@ -427,7 +435,7 @@ esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup
     const gw_radio_keys_t *keys = gw_radio_keys(radio);
     char flashed[16];
     bool factory = !gw_config_get_str(keys->bundle, flashed, sizeof(flashed));
-    if (factory && role != GW_ROLE_ESPHOME && role != GW_ROLE_NONE && !gw_config_get_u8(keys->adopted, 0)) {
+    if (factory && role != GW_ROLE_NONE && !gw_config_get_u8(keys->adopted, 0)) {
         if (!skip_backup) {
             snprintf(err, err_len, radio == C6_RADIO_A ? "c6_backup_required" : "radio_b_backup_required");
             return ESP_ERR_INVALID_STATE;
@@ -446,15 +454,6 @@ esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup
                   gw_auth_who()[0] ? gw_auth_who() : "the web UI");
         gw_restart_later(500);
         return ESP_OK;
-    }
-    if (role == GW_ROLE_ESPHOME) {
-        const esp_partition_t *part =
-            esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_2, NULL);
-        esp_app_desc_t desc;
-        if (!part || esp_ota_get_partition_description(part, &desc) != ESP_OK) {
-            snprintf(err, err_len, "no ESPHome image uploaded");
-            return ESP_ERR_INVALID_STATE;
-        }
     }
     gw_config_set_u8(GW_KEY_ROLE, role);
     gw_config_set_u8(GW_KEY_C6_TRIES, 0);
@@ -726,12 +725,6 @@ static esp_err_t gateway_upload_inner(httpd_req_t *req)
     return app_upload(req, gw_other_gateway_slot(), true);
 }
 
-static esp_err_t esphome_upload_inner(httpd_req_t *req)
-{
-    return app_upload(req, esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_2, NULL),
-                      false);
-}
-
 /* c6fw.bin goes into the PSRAM staging buffer; the directory header is checked on the first block */
 typedef struct {
     uint8_t *buf;
@@ -781,7 +774,6 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
 }
 
 static esp_err_t gateway_upload(httpd_req_t *req) { return locked_upload(req, gateway_upload_inner); }
-static esp_err_t esphome_upload(httpd_req_t *req) { return locked_upload(req, esphome_upload_inner); }
 static esp_err_t c6fw_upload(httpd_req_t *req) { return locked_upload(req, c6fw_upload_inner); }
 
 static esp_err_t c6_reflash_post(httpd_req_t *req)
@@ -795,8 +787,15 @@ static esp_err_t c6_reflash_post(httpd_req_t *req)
 /* Wiring test of radio B: blocks the web server for a few seconds while it resets the radio. */
 static esp_err_t radio_b_probe_post(httpd_req_t *req)
 {
+    gw_state_t *st = gw_state();
+    if (st->active_b != GW_ROLE_NONE || c6_progress(C6_RADIO_B)->busy) {
+        return gw_http_send_error(req, 409, "radio B is in use: switch its role off first");
+    }
     c6_probe_t r;
     c6_radio_probe(C6_RADIO_B, &r);
+    st->b_probed = true;
+    st->b_wired = r.wired;
+    strlcpy(st->b_chip, r.wired ? r.chip : "", sizeof(st->b_chip));
     cJSON *j = cJSON_CreateObject();
     cJSON_AddBoolToObject(j, "wired", r.wired);
     cJSON_AddBoolToObject(j, "banner", r.banner);
@@ -1155,7 +1154,6 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/settings/export", HTTP_GET, settings_export_get);
     gw_http_register("/api/settings/import", HTTP_POST, settings_import_post);
     gw_http_register("/api/ota/gateway", HTTP_POST, gateway_upload);
-    gw_http_register("/api/ota/esphome", HTTP_POST, esphome_upload);
     gw_http_register("/api/ota/c6fw", HTTP_POST, c6fw_upload);
     gw_http_register("/api/c6/reflash", HTTP_POST, c6_reflash_post);
     gw_http_register("/api/radios/b/probe", HTTP_POST, radio_b_probe_post);

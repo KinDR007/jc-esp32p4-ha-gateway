@@ -58,19 +58,6 @@ void gw_boot_mark_stable(void)
     gw_state()->stable = true;
 }
 
-esp_err_t gw_boot_select_esphome(void)
-{
-    const esp_partition_t *part =
-        esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_2, NULL);
-    esp_app_desc_t desc;
-
-    if (!part || esp_ota_get_partition_description(part, &desc) != ESP_OK) {
-        return ESP_ERR_NOT_FOUND;
-    }
-    ESP_LOGI(TAG, "next boot: %s %s", desc.project_name, desc.version);
-    return esp_ota_set_boot_partition(part);
-}
-
 void gw_restart_on_failure(void)
 {
     gw_config_set_u8(GW_KEY_FAIL_RST, 1);

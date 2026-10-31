@@ -18,6 +18,7 @@
 #include "gw.h"
 #include "mdns.h"
 #include "netscan.h"
+#include "role_esphome.h"
 #include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
@@ -129,6 +130,9 @@ static void zigbee_backup_if_requested(c6_radio_t radio, gw_role_t role)
 
 static esp_err_t start_radio_role(c6_radio_t radio, gw_role_t role)
 {
+    if (role == GW_ROLE_ESPHOME) {
+        return role_esphome_start(radio);
+    }
     if (role == GW_ROLE_THREAD_BR || role == GW_ROLE_THREAD_ROUTER) {
         return role_thread_start(role == GW_ROLE_THREAD_BR, radio);
     }
@@ -143,19 +147,9 @@ static void apply_role(gw_role_t role)
         gw_set_maintenance("no role selected");
         return;
     }
-    if (role == GW_ROLE_ESPHOME && gw_config_get_u8(GW_KEY_ESPHOME_TRY, 0)) {
-        /* We are back although ESPHome was selected: its image did not boot (rollback). */
-        gw_config_erase(GW_KEY_ESPHOME_TRY);
-        gw_set_maintenance("the ESPHome image failed to boot, upload a working one or pick another role");
-        return;
-    }
     char flashed[16];
     bool factory_c6 = !gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed));
-    if (role == GW_ROLE_ESPHOME && factory_c6) {
-        /* The factory C6 firmware is esp-hosted already; ESPHome updates it over SDIO itself,
-         * so this role works without the JP1 jumpers. */
-        ESP_LOGI(TAG, "C6 keeps its factory esp-hosted firmware");
-    } else if (factory_c6 && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
+    if (factory_c6 && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
         /* The factory firmware cannot be downloaded again: never overwrite it before a backup. */
         gw_set_maintenance("back up the C6 factory firmware first (System tab) or confirm skipping the backup");
         return;
@@ -174,17 +168,8 @@ static void apply_role(gw_role_t role)
     case GW_ROLE_THREAD_ROUTER:
     case GW_ROLE_ZIGBEE_COORD:
     case GW_ROLE_ZIGBEE_ROUTER:
-        err = start_radio_role(C6_RADIO_A, role);
-        break;
     case GW_ROLE_ESPHOME:
-        err = gw_boot_select_esphome();
-        if (err == ESP_OK) {
-            /* ESPHome boots back into this slot, so record it now. */
-            gw_boot_mark_stable();
-            gw_config_set_u8(GW_KEY_ESPHOME_TRY, 1);
-            ESP_LOGW(TAG, "handing over to ESPHome");
-            gw_restart_later(1000);
-        }
+        err = start_radio_role(C6_RADIO_A, role);
         break;
     default:
         err = ESP_ERR_INVALID_ARG;
@@ -207,6 +192,9 @@ static void apply_role_b(gw_role_t role)
     gw_state_t *st = gw_state();
     s_probed_b = true;
     bool found = c6_radio_probe(C6_RADIO_B, &s_probe_b) == ESP_OK;
+    st->b_probed = true;
+    st->b_wired = found;
+    strlcpy(st->b_chip, found ? s_probe_b.chip : "", sizeof(st->b_chip));
     if (role == GW_ROLE_NONE) {
         return;
     }
@@ -307,14 +295,14 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
         return ESP_OK;
     }
     const char *bundle = GW_JSON_STR(body, "bundle");
-    static const char *const allowed[] = {"ot_rcp", "zigbee_ncp", "zigbee_router", "scanner"};
+    static const char *const allowed[] = {"ot_rcp", "zigbee_ncp", "zigbee_router", "scanner", "esphome"};
     bool ok = false;
     for (size_t i = 0; bundle && i < sizeof(allowed) / sizeof(allowed[0]); i++) {
         ok |= strcmp(bundle, allowed[i]) == 0;
     }
     if (!ok) {
         cJSON_Delete(body);
-        return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router or scanner");
+        return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router, scanner or esphome");
     }
     if (gw_state()->active_b != GW_ROLE_NONE) {
         cJSON_Delete(body);
@@ -574,6 +562,7 @@ void app_main(void)
     if (st->desired >= GW_ROLE_MAX) {
         st->desired = def_role;
     }
+    gw_config_erase(GW_KEY_ESPHOME_TRY); /* the ESPHome image on the P4 is gone (radio role now) */
     st->desired_b = gw_config_get_u8(GW_KEY_ROLE_B, GW_ROLE_NONE);
     if (st->desired_b >= GW_ROLE_MAX) {
         st->desired_b = GW_ROLE_NONE;
@@ -603,6 +592,7 @@ void app_main(void)
     gw_http_register("/api/radios/b/console", HTTP_GET, radio_b_console_get);
     gw_http_register("/api/radios/thread/forget", HTTP_POST, thread_forget_post);
     netscan_init();
+    role_esphome_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
     gw_mqtt_start();
@@ -620,9 +610,7 @@ void app_main(void)
             netscan_run_full();
         }
         apply_role(st->desired);
-        if (st->active != GW_ROLE_ESPHOME) {
-            apply_role_b(st->desired_b);
-        }
+        apply_role_b(st->desired_b);
     }
 
     vTaskDelay(pdMS_TO_TICKS(STABLE_AFTER_MS));

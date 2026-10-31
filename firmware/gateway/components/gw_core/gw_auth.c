@@ -819,7 +819,7 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/net/scan", HTTP_GET, "system/netscan", 1},
     {"/api/net/scan", HTTP_POST, "system/netscan", 2},
     {"/api/ota/gateway", -1, "system/firmware", 2},
-    {"/api/ota/esphome", -1, "system/firmware", 2},
+    {"/api/esphome/wifi", -1, "ha/esphome", 2}, /* GET too: which network */
     {"/api/ota/c6fw", -1, "system/firmware", 2},
     {"/api/ota/model", -1, "system/firmware", 2},
     {"/api/update/check", -1, "system/firmware", 2},

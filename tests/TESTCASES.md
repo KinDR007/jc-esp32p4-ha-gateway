@@ -6,7 +6,7 @@ přepínají role, flashují C6 a zapisují slot gateway.
 ```sh
 # výpis testů
 python3 tests/hw_test.py --list
-# celý běh (TC09 potřebuje aioesphomeapi, proto Python z ESPHome venv)
+# celý běh
 KEY=$(sed -n 's/^api_encryption_key: "\(.*\)"/\1/p' firmware/esphome/secrets.yaml)
 ../esphome/ble_proxy/.venv/bin/python tests/hw_test.py --host <ip> --esphome-key "$KEY" --report tests/results/<datum>/hw_test.json
 # jen vybrané
@@ -35,7 +35,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC06 | Zachování Zigbee sítě | koordinátor → Thread BR → koordinátor | při odchodu se uloží snapshot `zigbee_ncp`, Thread síť je beze změny, při návratu `restored 0x…` |
 | TC07 | Zigbee router | přepnutí na `zigbee_router` | C6 = `zigbee_router`, stavové řádky `@ZR` přichází do 40 s, příkazy se přijímají, snapshot koordinátora zůstává |
 | TC08 | Thread router | přepnutí na `thread_router`, vložení datasetu z TC04 | bez datasetu čeká, po vložení se připojí (child/router/leader) |
-| TC09 | ESPHome a návrat | přepnutí na `esphome`, BLE sken 10 s, „Return to gateway“ s rolí Thread BR | port 80 zmizí, API 6053 běží, BLE advertisementy > 0, gateway se vrátí do `thread_br`, C6 zpět na `ot_rcp` |
+| TC09 | ESPHome na rádiu | role `esphome` na rádiu B (bez něj na A) přes `/api/role` | rádio dostane bundle `esphome`, odpoví přes Improv (zařízení); s Wi-Fi v Home Assistant › ESPHome se připojí a hlásí URL, bez ní „not provisioned“; role rádia zpět |
 | TC10 | OTA gateway | upload `dist/p4gw.bin` | zápis do neaktivního slotu, start v `pending_verify`, po 60 s `valid`; gateway image do slotu ESPHome odmítnut |
 | TC11 | Přihlášení účtem | staré heslo přes `/api/settings`, účet správce, přístup bez/se/se špatným heslem (Basic), smazání | staré heslo 400; 401 / 200 / 401; po smazání účtu otevřená brána |
 | TC12 | Neplatné uploady | nesmysl do c6fw a gateway, pak platný c6fw | 400, uložené image nepoškozené, 4 balíky zpět |
@@ -60,6 +60,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC36 | Online aktualizace C6 | `/api/update/check`, `/api/update/install {"target":"c6"}` s vlastním HTTP serverem testu | balík s jiným popisem nabídnut; chybný sha256 odmítnut bez restartu; nový balík po restartu uložen, role zpět, C6 nepřepsán (stejné firmwary); původní balík vrácen |
 | TC37 | Seznam vydání (rollback) | `/api/update/check` s `releases.json` vlastního HTTP serveru testu, `/api/update/install {"version"}` | nabídnuta jen vydání s layoutem desky; vydání jiného layoutu i neuvedené odmítnuto (409); manifest bez layoutu odmítnut bez restartu, nabídka obnovena; poslední vydání jiného layoutu nenabídnuto |
 | TC39 | Dvě rádia | rádio A `thread_br`, rádio B (XIAO ESP32-C5 na JP1) `zigbee_coordinator` přes `/api/role {"radio":"b"}` | obě role běží; Thread síť na A; telemetrie NCP z B, čistá linka; TCP klient na 6638; druhá síť Thread i Zigbee odmítnuta (409); rádio B se nerestartuje. Bez rádia B přeskočeno |
+| TC40 | Thread síť per rádio | rádio A `zigbee_router`, rádio B `thread_br`, pak rádio B vypnuto a A zpět `thread_br` | rádio B (RCP na C5) má vlastní síť (jiné ext PAN ID), rádio A se vrátí do své původní sítě |
 | TC30 | Rozhraní integrace Home Assistant | mDNS dotaz `_p4gw._tcp`, WebSocket `/api/ws`, dočasná událost na třídu Silence, účet a token | mDNS odpoví s MAC brány; stav všech povolených událostí dorazí v jedné dávce celý a detekce ihned; bez hesla handshake 401, s heslem 101; události i účet a token obnoveny |
 | TC22 | Zigbee síť přes Zigbee2MQTT | `GET /api/zigbee/net`, zavření připojování | instance nalezena na brokeru, seznam zařízení s koordinátorem, Zigbee2MQTT odpoví na operaci, neznámá operace 400 |
 | TC21 | Mapa Thread sítě | `GET /api/thread/topology` v roli Thread BR | routery v mapě, tato brána jako border router se svými linkami, opakovaný dotaz funguje |

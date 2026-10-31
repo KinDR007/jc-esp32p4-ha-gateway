@@ -20,7 +20,7 @@ typedef enum {
     GW_ROLE_NONE = 0,          /* maintenance: web UI only, C6 untouched */
     GW_ROLE_THREAD_BR = 1,     /* OpenThread border router, C6 = RCP */
     GW_ROLE_ZIGBEE_COORD = 2,  /* ZBOSS NCP bridged to TCP for Z2M / ZHA */
-    GW_ROLE_ESPHOME = 3,       /* ESPHome BLE proxy image, C6 = esp-hosted */
+    GW_ROLE_ESPHOME = 3,       /* the radio runs the ESPHome Bluetooth proxy on its own (Wi-Fi), docs/dual-radio.md */
     GW_ROLE_THREAD_ROUTER = 4, /* Thread router joined to an existing network, C6 = RCP */
     GW_ROLE_ZIGBEE_ROUTER = 5, /* standalone Zigbee router on the C6, P4 monitors it */
     GW_ROLE_MAX,
@@ -58,7 +58,7 @@ const gw_radio_keys_t *gw_radio_keys(int radio);
 #define GW_KEY_ZR_TXPOWER "zr_txpower" /* i8 as u8+128, Zigbee router transmit power (restored after a reflash) */
 #define GW_KEY_THR_TXPOWER "thr_txpower" /* i8 as u8+128, Thread radio transmit power, 0 = default */
 #define GW_KEY_FAIL_RST "fail_rst"   /* u8, the last software restart was a recovery from a failure */
-#define GW_KEY_ESPHOME_TRY "esph_try" /* u8, set before booting ESPHome, cleared by its on_boot */
+#define GW_KEY_ESPHOME_TRY "esph_try" /* u8, of the former ESPHome image on the P4; erased at start */
 #define GW_KEY_TR_DATASET "tr_dataset" /* blob, dataset TLVs for the Thread router role */
 #define GW_KEY_BR_DATASET "br_dataset" /* blob, dataset TLVs of the Thread border router role */
 #define GW_KEY_UPDATE_URL "upd_url" /* str, manifest of the online update; absent = GitHub releases, empty = off */
@@ -92,6 +92,9 @@ typedef struct {
     gw_role_t desired_b;        /* radio B (external, docs/dual-radio.md) */
     gw_role_t active_b;
     char maintenance_b[160];    /* why radio B does not run its role; the gateway itself is not affected */
+    bool b_probed;              /* the wiring test of radio B ran at this start */
+    bool b_wired;               /* ... and found it */
+    char b_chip[16];            /* "ESP32-C5" */
     char hostname[32];
     bool stable;                /* survived the stability window */
 } gw_state_t;
@@ -106,8 +109,6 @@ bool gw_boot_loop_detected(void);
 bool gw_boot_after_failure(void);
 /* Marks the image valid and resets the boot loop counter, called once the gateway is up. */
 void gw_boot_mark_stable(void);
-/* Boots the ESPHome slot on the next restart. */
-esp_err_t gw_boot_select_esphome(void);
 /* Restarts after a short delay so pending HTTP responses get out. */
 void gw_restart_later(uint32_t delay_ms);
 /* Same, and resets the C6 just before (a restart of the whole hardware). */
