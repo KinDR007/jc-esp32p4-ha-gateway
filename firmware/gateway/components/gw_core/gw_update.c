@@ -431,9 +431,11 @@ static esp_err_t install(void)
     }
     int size = esp_https_ota_get_image_size(ota);
     while ((err = esp_https_ota_perform(ota)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-        /* perform returns at once while no data is waiting; without a yield this loop (at a priority
-         * inherited from the network stack) starves both idle tasks until the task watchdog fires */
-        vTaskDelay(1);
+        /* perform returns at once while no data is waiting, and every sector it erases stalls both
+         * cores; this loop runs at a priority inherited from the network stack. A tick of rest was not
+         * enough once two radios keep their UART bridges busy (IDLE1 starved, task watchdog during the
+         * download, 2026-10-31): 10 ms per step, about 7 s more for a whole image. */
+        vTaskDelay(pdMS_TO_TICKS(10));
         if (size > 0) {
             int percent = (int)(100LL * esp_https_ota_get_image_len_read(ota) / size);
             if (percent / 10 != s_up.percent / 10) {
