@@ -3,7 +3,8 @@
 ## Requirements
 
 - ESP-IDF **v5.5.5** (`IDF_PATH`, default `~/esp/esp-idf`); checked by `scripts/env.sh`
-- ESPHome 2026.10.x (`ESPHOME=` or the venv of `../esphome/ble_proxy`)
+- ESPHome 2026.10.1 for the ESPHome radio role (`scripts/build_esphome_radio.sh` creates
+  `build/esphome-venv`, or `ESPHOME=` names an installed one)
 - Python 3, git, bash
 
 Third-party sources are pinned in [deps.lock](../deps.lock) and fetched into `third_party/`
@@ -12,37 +13,38 @@ Third-party sources are pinned in [deps.lock](../deps.lock) and fetched into `th
 ## Build
 
 ```sh
-cp firmware/esphome/secrets.yaml.example firmware/esphome/secrets.yaml   # openssl rand -base64 32
 ./scripts/build_all.sh
 ```
 
 | Output in `dist/` | Content |
 |---|---|
-| `p4gw-factory.bin` | complete flash image (bootloader, partition table, gateway, ESPHome, C6 bundles) |
+| `p4gw-factory.bin` | complete flash image (bootloader, partition table, gateway, the small part of the C6 package) |
 | `p4gw.bin` | gateway application for OTA |
-| `esphome.bin` | ESPHome BLE proxy role image |
-| `c6fw.bin` | C6 package: slots layout (ot_rcp, zigbee_router, zigbee_ncp, scanner), esp_hosted ([c6-slots.md](c6-slots.md)) |
-| `c6fw-local.bin` | the part of it the c6fw partition holds (factory image) |
+| `c6fw.bin` | package of radio A (C6): slots layout (ot_rcp, zigbee_router, zigbee_ncp, scanner) and the ESPHome Bluetooth proxy ([c6-slots.md](c6-slots.md)) |
+| `c5fw.bin` | the same for radio B (XIAO ESP32-C5, [dual-radio.md](dual-radio.md)) |
+| `c6fw-local.bin` | directory and small bundles of `c6fw.bin` for the first USB flash (the gateway takes them into NVS) |
 | `SHA256SUMS` | checksums |
 
-Single parts: `scripts/build_c6.sh <name>`, `scripts/build_gateway.sh`, `scripts/build_esphome.sh`,
-`scripts/pack_c6fw.py`.
+Single parts: `scripts/build_c6.sh <name> [esp32c6|esp32c5]`, `scripts/build_gateway.sh`,
+`scripts/build_esphome_radio.sh [esp32c6|esp32c5]`, `scripts/pack_c6fw.py`.
 
 ## Flash layout (v3)
 
 [firmware/partitions.csv](../firmware/partitions.csv): `nvs` (settings, Thread network, users), `gw_a`/`gw_b`
-(3 MB each, gateway A/B with rollback), `esphome` (2 MB), `c6fw` (64 kB: directory of the C6 package
-and its small bundles), `c6data` (Zigbee network snapshots, one slot per Zigbee firmware), `model`
+(3 MB each, gateway A/B with rollback), `esphome` (2 MB, unused since v1.8), `c6fw` (64 kB: Zigbee
+snapshots of radio B; before v1.8 the directory of the C6 package), `c6data` (Zigbee network snapshots
+of radio A, one slot per Zigbee firmware), `model`
 (6 MB, YAMNet uses 4), `sounds` (1.56 MB, learning mode recordings), `coredump`.
 
-The large C6 firmwares (the slots layout with all role firmwares, esp-hosted) are not kept in the P4
-flash. They are needed only to install the layout on the C6 (first start, after a C6 update, after
-"Reflash C6", after a C6 failure) and for the ESPHome role. The gateway then reads them from the whole
-package (`c6fw.bin`) in a PSRAM buffer that survives a software restart: put there by an online
-update, an upload in the web UI or, when it is missing (after a power cut), downloaded at start from
-the manifest (by default the latest GitHub release). Without internet and without the package the
-gateway stays in maintenance and asks for `c6fw.bin` (System › Firmware › Manual update). Switching between the
-Thread and Zigbee roles needs only the small bundles and works offline.
+No radio firmware is kept in the P4 flash (v1.8). A package (`c6fw.bin` for the C6, `c5fw.bin` for
+the C5 of radio B) is needed only to install the layout on a radio (first start, after an update,
+after a reflash or a failure) and for the ESPHome role. The gateway reads it from a 4 MB PSRAM buffer
+that survives a software restart: put there by an online update, an upload in the web UI or, when it
+is missing, downloaded at start from the manifest (by default the latest GitHub release); after
+flashing it is dropped. Each radio keeps a local image in NVS (the package directory and the small
+bundles that select a slot, about 1.4 kB), so switching between the Thread and Zigbee roles works
+offline. Without internet and without the package a radio that needs one stays down and asks for
+the package (System › Firmware › Manual update).
 
 Migration v2 → v3 over USB, once: `scripts/migrate_layout_v3.sh <port>` (after the gateway runs
 v1.6 or later). It backs up NVS and the Zigbee snapshots, writes the v3 partition table, the small
@@ -73,7 +75,7 @@ factory image. To replace the model on a running board: turn sound off, restart,
 6. **System → Settings**: password. **Role**: choose the role.
 
 The gateway never overwrites a C6 it has not flashed itself until a backup is done or skipped
-explicitly. The ESPHome role works with the factory C6 firmware and without jumpers.
+explicitly.
 
 ## Updates
 
@@ -81,9 +83,8 @@ explicitly. The ESPHome role works with the factory C6 firmware and without jump
 |---|---|---|
 | Gateway | UI System → Firmware → Manual update → Gateway firmware (`p4gw.bin`) | inactive slot, confirmed after 60 s or by a requested restart, else rollback |
 | Sound model | UI Sound → Upload model (`yamnet_p4.espdl`) | ESP-DL header checked before the partition is erased; sound must be off |
-| ESPHome image | UI System → Firmware → Manual update → ESPHome image (`esphome.bin`) | project name checked before the slot is erased |
 | Gateway, online | UI System → Firmware → Online update (URL in System → Firmware → Settings), or the *Firmware* update entity in Home Assistant (MQTT): manifest URL, checked every 6 h | as above: the other gateway slot, image name checked before it is erased |
-| C6 firmware | UI System → Firmware → Manual update → C6 firmware bundle (`c6fw.bin`), after the gateway (format 3 needs gateway v1.5) | header checked before erase, sha256 per bundle; C6 updated on next start if its bundle changed |
+| Radio firmware | UI System → Firmware → Manual update → C6 firmware bundle (`c6fw.bin` or `c5fw.bin`), after the gateway (format 3 needs gateway v1.5) | checked in PSRAM (sha256 per bundle, chip from the bootloader image); the radio of that chip is updated at the next start if its bundle changed |
 | C6 firmware, online | UI System → Firmware → Online update → **Install C6 package**, the *C6 radio firmware* update entity in Home Assistant, or Telegram `/install c6` | downloaded into PSRAM, sha256 of the file compared with the manifest and the header checked before the c6fw partition is erased; then a restart updates the C6 |
 | Older release (rollback) | UI System → Firmware → Online update → *Releases for this gateway*, `update.install` with `version` in Home Assistant, or Telegram `/releases`, `/install v1.6`, `/install c6 v1.6` | only releases whose manifest names the flash layout of the board; the manifest of the picked release is checked again before the download |
 
@@ -105,7 +106,7 @@ URLs may be absolute. The gateway compares `version` with its own and the sha256
 with the file in its c6fw partition (versions shown as the first 8 hex digits of that sha256);
 nothing is downloaded until someone installs. A package of another `format` is offered only to a
 gateway that reads it, so the gateway goes first. HTTPS works with the ESP-IDF certificate bundle.
-The ESPHome image is still uploaded in the UI (CI does not build it, it needs the API key).
+The manifest offers `c5fw` (the package of radio B) the same way.
 
 `layouts` names the flash layouts the gateway firmware runs on (`LAYOUTS` in
 `scripts/make_update_manifest.py`; raise it with a new layout). A manifest that names layouts
@@ -138,16 +139,18 @@ tag (`scripts/release_notes.py`); the manifest only the section. Each release al
 `releases.json` (the list of older releases, see above).
 
 CI (GitHub Actions, `.github/workflows/ci.yml`): `scripts/ci_checks.sh` (unit test, Python and web
-UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 firmwares,
-gateway, `c6fw.bin`; artifacts `p4gw.bin` and `c6fw.bin`). The ESPHome image is not built there, it
-needs the API key. Run the build locally the same way:
+UI script syntax, icon block) and `scripts/ci_build.sh` in `espressif/idf:v5.5.5` (C6 and C5
+firmwares, ESPHome Bluetooth proxy for both, gateway; artifacts `p4gw.bin`, `c6fw.bin`, `c5fw.bin`).
+Run the build locally the same way:
 `docker run --rm -v "$PWD":/src espressif/idf:v5.5.5 bash -c 'cp -a /src /w && /w/scripts/ci_build.sh'`.
 
 ## Role switching
 
-Web UI (Role), MQTT (`p4gw/<host>/role/set`), API `POST /api/role {"role": ...}` or, in the ESPHome
-role, the *Gateway role* select and *Return to gateway* button. Typical times measured on the
-board: Thread roles 13–15 s, Zigbee roles 25–27 s (C6 flash), ESPHome hand-over about 60 s.
+Web UI (Role, both radios), Home Assistant (*Role* and *Radio B role* selects), MQTT
+(`p4gw/<host>/role/set`, radio A), Telegram (`/role <role>`, `/role b <role>`), API
+`POST /api/role {"role": ..., "radio": "a" | "b"}` (radio B also `none`). At most one Thread network,
+one Zigbee network and one ESPHome proxy. Typical times measured on the board: a slot switch 13–20 s,
+the first install of the layout on a radio about 80 s, the ESPHome role about 90 s (whole flash).
 
 ## LAN settings
 

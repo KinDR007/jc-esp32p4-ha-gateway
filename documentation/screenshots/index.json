@@ -15,8 +15,12 @@
     "file": "overview__3"
    },
    {
-    "title": "ESP32-C6 RADIO",
+    "title": "RADIO A: ESP32-C6",
     "file": "overview__4"
+   },
+   {
+    "title": "RADIO B: ESP32-C5",
+    "file": "overview__5"
    }
   ]
  },
@@ -24,8 +28,12 @@
   "page": "role",
   "cards": [
    {
-    "title": "SELECT ROLE",
+    "title": "RADIO A: C6 OF THE BOARD",
     "file": "role__1"
+   },
+   {
+    "title": "RADIO B: EXTERNAL ESP32-C5",
+    "file": "role__2"
    }
   ]
  },
@@ -205,8 +213,12 @@
   "page": "ha_esphome",
   "cards": [
    {
-    "title": "ESPHOME BLE PROXY ROLE",
+    "title": "ESPHOME BLE PROXY ON A RADIO",
     "file": "ha_esphome__1"
+   },
+   {
+    "title": "WI-FI OF THE ESPHOME RADIO",
+    "file": "ha_esphome__2"
    }
   ]
  },
@@ -569,6 +581,19 @@
    {
     "title": "UPDATE SETTINGS",
     "file": "system_firmware_settings__1"
+   }
+  ]
+ },
+ "system/radios": {
+  "page": "system_radios",
+  "cards": [
+   {
+    "title": "RADIO A (C6 OF THE BOARD)",
+    "file": "system_radios__1"
+   },
+   {
+    "title": "RADIO B (EXTERNAL, JP1)",
+    "file": "system_radios__2"
    }
   ]
  }

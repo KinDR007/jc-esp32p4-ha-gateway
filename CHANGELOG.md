@@ -2,13 +2,33 @@
 
 ## Unreleased
 
+**Two radios** ([docs/dual-radio.md](docs/dual-radio.md)): a XIAO ESP32-C5 on JP1 (powered over its own
+USB-C) is radio B next to the C6 of the board, so Thread and Zigbee run at the same time. **The
+ESPHome image on the P4 is gone**: ESPHome is now a role of a radio; a gateway with the old ESPHome
+role selected starts radio A as the ESPHome proxy.
+
+- Roles per radio (Role page, `/api/role {"radio"}`, HA *Radio B role* select, Telegram `/role b`):
+  at most one Thread network, one Zigbee network and one ESPHome proxy; a failure of radio B does
+  not stop the gateway. Each radio keeps its own networks: Thread settings per radio in the P4 NVS,
+  Zigbee snapshots per radio (radio B in the c6fw partition); *Forget Thread network* per radio.
+- No radio firmware in the P4 flash: the packages (`c6fw.bin`, new `c5fw.bin` in the release and the
+  manifest) are downloaded or uploaded into a 4 MB PSRAM buffer and dropped after flashing; a local
+  image per radio in NVS keeps role switches offline.
+- Radio B: wiring test at start and on request (names the line to check), reset line open-drain,
+  `/api/radios`, System › Radios page, header tag and overview card; the C5 builds use its 8 MB PSRAM
+  (Zigbee coordinator tables for 400 devices).
+- ESPHome Bluetooth proxy on a radio (C6 or C5, ESPHome 2026.10.1, built in CI): Wi-Fi set by the
+  gateway over Improv (Home Assistant › ESPHome), API key set by Home Assistant on adoption, no
+  secret and no access point in the image.
+- The Thread and Zigbee menus and pages follow the radio that runs them.
+- Fix: task watchdog while the online update writes the gateway image (10 ms rest per step).
 - Web UI: releases for this gateway as expandable rows (version, date, C6 package, install buttons)
   with the release notes formatted (lists, bold, code); the list carries the whole notes, notes cut at
   1000 characters end with "…".
 - Web UI, System › Firmware has subpages: *Online update* (gateway and C6 package in one aligned
   table: installed, offered, state, install; firmwares of the C6 package expandable; releases for
   this gateway in their own tile, **Reflash** writes the installed release again), *Manual update*
-  (uploads of the gateway, C6 package and ESPHome in one tile) and *Settings* (manifest URL).
+  (uploads of the gateway and the radio packages in one tile) and *Settings* (manifest URL).
 - Web UI, Home Assistant › Guide: the HACS and *Add integration* buttons look like the My Home
   Assistant badges.
 

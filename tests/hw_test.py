@@ -7,9 +7,6 @@ Runs against a real board over the LAN. Test cases are described in tests/TESTCA
     python3 tests/hw_test.py --host p4gw-xxxxxx.local --only TC04 TC05
     python3 tests/hw_test.py --list
 
-TC09 (ESPHome) needs aioesphomeapi and the API key; run it with the ESPHome venv python:
-    ../esphome/ble_proxy/.venv/bin/python tests/hw_test.py --host ... --esphome-key "$(...)"
-
 Destructive: switches roles, reflashes the C6 and writes the gateway slot.
 """
 import argparse
@@ -341,10 +338,6 @@ def tc10_ota_rollback_slots():
     time.sleep(70)
     slot = next(x for x in status()['slots'] if x['running'])
     check(slot['state'] == 'valid', 'confirmed valid after 60 s')
-    code, r = http('POST', '/api/ota/esphome', raw=image, timeout=120)
-    check(code in (400, 413), f'gateway image refused for the ESPHome slot ({code})')
-    esphome = next(x for x in status()['slots'] if x['label'] == 'esphome')
-    check(esphome.get('project') == 'ble-proxy-p4gw', 'ESPHome slot left intact')
 
 
 def tc11_auth():
@@ -1630,7 +1623,6 @@ def main():
     p.add_argument('--host', default='p4gw.local')
     p.add_argument('--only', nargs='*')
     p.add_argument('--token', help='API token (role admin) of a gateway with user accounts')
-    p.add_argument('--esphome-key')
     p.add_argument('--list', action='store_true')
     p.add_argument('--report', help='write results as JSON')
     p.add_argument('--play', action='store_true', help='TC15: play test sounds on this computer')

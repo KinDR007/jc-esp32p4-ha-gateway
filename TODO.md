@@ -26,16 +26,20 @@
 - [x] Návrat na starší vydání (jen kompatibilní s layoutem desky): releases.json, UI, HA, Telegram, TC37; ověřen rollback v1.6-dirty → v1.6 → zpět a balík C6 z v1.6
 - [ ] Ověřit /releases a /install v… se skutečným Telegram botem a update.install s verzí v UI HA
 - [x] Dvě rádia F0 (část): externí rádio XIAO ESP32-C5 místo C6; buildy ot_rcp, zigbee_ncp, zigbee_router, scanner pro esp32c5 (`scripts/build_c6.sh all esp32c5`); záloha továrního flash XIAO; skener na C5 ověřen (Wi-Fi i 802.15.4)
-- [ ] Dvě rádia F0: zapojení XIAO C5 na JP1, běh ot_rcp a zigbee_ncp na C5
+- [x] Dvě rádia F0: XIAO C5 na JP1 (napájení vlastním USB-C, EN open-drain), ot_rcp i zigbee_ncp na C5 běží
 - [x] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, klíče NVS per rádio; regrese TC04–08, 13, 19, 20, 23, 26, 33 prošla
 - [x] Dvě rádia F2 (jádro): test zapojení rádia B přes ROM bootloader (/api/radios/b/probe), ověřeno s XIAO C5
-- [ ] Dvě rádia F2: test při startu, UI, chybové stavy na HW (TC38, až na konci)
+- [x] Dvě rádia F2: test zapojení při startu a v UI (Systém › Rádia)
+- [ ] Dvě rádia TC38: chybové stavy zapojení na HW (odpojený vodič), až na konci s uživatelem
 - [x] Dvě rádia F3: role per rádio, Thread na A + Zigbee koordinátor na C5 současně (TC39); XIAO musí mít vlastní napájení USB (5 V z JP1 → RTC_PWR_GLITCH)
 - [x] Dvě rádia F4: firmwary rádií jen v PSRAM (4 MB buffer, po flashi zahozen), lokální soupis per rádio v NVS (přepnutí slotu offline), c5fw.bin v CI a vydání, /api/radios, /api/radios/b/flash; ověřeno: C5 naflashováno z manifestu (80 s), přepnutí slotu offline (5 s), regrese rádia A
 - [ ] Watchdog při stahování OTA (2026-10-31, jednou, ve starém buildu v1.7-13 při instalaci z lokálního manifestu s c5fw); sledovat, při opakování analyzovat coredump
-- [ ] Dvě rádia F5: nastavení sítě per rádio, záloha a obnova per rádio (TC40)
-- [ ] Dvě rádia F6: ESPHome BLE proxy jako role C6 (Wi-Fi + BLE), zrušení ESPHome role na P4
-- [ ] Dvě rádia F7–F8: UI, REST, MQTT, HA, Telegram, dokumentace, soak
+- [x] Dvě rádia F5: Thread nastavení per rádio (TC40), zálohy Zigbee per rádio, zapomenutí sítě; F4b PSRAM C5
+- [x] Dvě rádia F6: ESPHome BLE proxy jako role rádia (C6/C5), Wi-Fi přes Improv, ESPHome na P4 zrušeno
+- [ ] ESPHome na rádiu: připojení k Wi-Fi a převzetí v HA ověřit s Wi-Fi uživatele (TC09 s nastavenou Wi-Fi)
+- [x] Dvě rádia F7–F8: UI (Role, Rádia, ESPHome, hlavička, přehled, menu dle rádia), HA 1.4.0, Telegram, dokumentace
+- [ ] Zigbee router rádia A: znovu připojit do sítě (záloha ztracena během vývoje F3), pak TC23
+- [ ] Vydání v1.8 (dvě rádia) a nasazení HA integrace 1.4.0; soak až na pokyn
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
 - [x] Krok B na desce: migrace na layout v3 (2026-10-30), stažení balíku při startu, reinstalace layoutu z PSRAM, přepnutí rolí bez stahování, TC04/05/12/35/36; vydání v1.6
 - [x] Integrace 1.2.0 v HA (entita Firmware rádia C6, přihlášení tokenem) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)

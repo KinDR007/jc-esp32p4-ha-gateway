@@ -36,8 +36,10 @@ resets the board (DTR/RTS).
 ## P4 ↔ C6
 
 Inside the module only SDIO (P4 GPIO14–19) and the C6 reset (CHIP_PU = P4 GPIO54) are wired.
-SDIO is used by esp-hosted (ESPHome role). Thread and Zigbee need a UART, which exists only via
-header **JP1**, so three jumper wires are required for those roles and for flashing the C6.
+SDIO is unused since the ESPHome role runs on the radio itself (v1.8). The radio roles need a UART,
+which exists only via header **JP1**, so three jumper wires are required for them and for flashing
+the C6. A second radio (XIAO ESP32-C5) also goes on JP1: wiring and power in
+[dual-radio.md](dual-radio.md#wiring-jp1--xiao-esp32-c5).
 
 ### JP1 pinout (2×13, odd pins in one row, even in the other)
 
@@ -82,7 +84,7 @@ the link the role already uses, without changing what the host sees:
 | Thread (RCP) | spinel vendor property `0x3cf0`, read by the P4 every 30 s | needs the openthread patch on both sides (`firmware/patches/idf_openthread_telemetry.patch`, applied to a copy of the ESP-IDF component); an older RCP answers "not found". A request that does not finish in 3 s (RCP fails on it) turns telemetry off for that RCP image and restarts the P4. |
 | Zigbee coordinator (ZBOSS NCP) | ZBOSS low-level frame of type `0x7e` every 30 s | the P4 bridge removes these frames before the stream reaches Zigbee2MQTT (`role_zigbee/zb_filter.c`, host unit test `tests/unit/zb_filter_test.c`) |
 | Zigbee router | `@ZT {json}` line every 30 s | own line protocol |
-| ESPHome (esp-hosted) | none | the gateway UI does not run in that role |
+| ESPHome Bluetooth proxy | none | the radio runs on its own over Wi-Fi; the gateway reads its Improv state at the start of the role |
 
 The RCP links newlib nano printf: telemetry code must not use `%llu` or float conversions (that
 crashed the first RCP builds). The router console runs at the link rate (460800 Bd), so C6 panics

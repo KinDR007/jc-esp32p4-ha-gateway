@@ -61,8 +61,15 @@ LED the firmware can drive).
 
 ## ESPHome BLE proxy
 
-HA discovers the node (ESPHome integration); enter the API key from
-`firmware/esphome/secrets.yaml`. Return to a gateway role with *Gateway role* + *Return to gateway*.
+A role of a radio (A or B, [dual-radio.md](dual-radio.md)): the radio runs the ESPHome Bluetooth
+proxy of the release (`firmware/esphome/radio_proxy`) on its own over Wi-Fi, the gateway keeps
+working with the other radio.
+
+1. Gateway UI, Home Assistant › ESPHome: enter the Wi-Fi (SSID, password) and save.
+2. Role: pick *ESPHome BLE proxy* for a radio. The gateway flashes ESPHome from the release into it
+   and sets the Wi-Fi over Improv on the radio's UART; the page shows the Improv state and the URL.
+3. HA discovers the device (ESPHome integration, `p4gw-ble-proxy-xxxxxx`) and sets its API
+   encryption key when it adopts it. The image holds no key and offers no access point.
 
 ## P4 Gateway integration (native, without MQTT)
 
@@ -100,7 +107,8 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 |---|---|
 | Active role, Thread state | sensors |
 | Noise, Noise max | sound pressure in dB(A) over the last minute (LAeq, LAmax); calibration in the gateway UI, Sound › Live ([details](sound-detection.md)) |
-| Role (select) | switching restarts the gateway; the ESPHome role replaces the gateway firmware, so the entities stay unavailable until the gateway is back |
+| Role (select) | role of radio A; switching restarts the gateway |
+| Radio B role (select) | with a radio B on JP1: its role, `none` switches it off; restarts the gateway |
 | Sound recognition (switch) | microphone and model on/off |
 | `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
 | Firmware (update) | install with progress, from the online update manifest |

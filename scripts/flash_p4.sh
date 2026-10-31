@@ -26,7 +26,7 @@ args=()
 while read -r offset file; do
     args+=("$offset" "build/gateway/$file")
 done < <(tail -n +2 build/gateway/flash_args)
-args+=("$(part esphome 4)" dist/esphome.bin "$(part c6fw 4)" dist/c6fw-local.bin)
+args+=("$(part c6fw 4)" dist/c6fw-local.bin)
 [ -f dist/yamnet_p4.espdl ] && args+=("$(part model 4)" dist/yamnet_p4.espdl)
 for p in c6data sounds; do
     esptool erase-region "$(part $p 4)" "$(part $p 5)"

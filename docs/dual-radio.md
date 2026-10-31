@@ -1,6 +1,6 @@
-# Two radios: internal C6 and an external XIAO ESP32-C5 (plan)
+# Two radios: internal C6 and an external XIAO ESP32-C5
 
-Status: planned; build definitions for the C5 firmwares exist (`scripts/build_c6.sh all esp32c5`).
+Status: implemented (2026-10-31, F0–F7); open: the wiring fault cases on the hardware (TC38) and the Wi-Fi join of the ESPHome role with a real network.
 Decisions of the user (2026-10-30, changed 2026-10-31: XIAO ESP32-C5 instead of the C6, no moving
 of networks between radios).
 
