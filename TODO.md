@@ -27,10 +27,11 @@
 - [ ] Ověřit /releases a /install v… se skutečným Telegram botem a update.install s verzí v UI HA
 - [x] Dvě rádia F0 (část): externí rádio XIAO ESP32-C5 místo C6; buildy ot_rcp, zigbee_ncp, zigbee_router, scanner pro esp32c5 (`scripts/build_c6.sh all esp32c5`); záloha továrního flash XIAO; skener na C5 ověřen (Wi-Fi i 802.15.4)
 - [ ] Dvě rádia F0: zapojení XIAO C5 na JP1, běh ot_rcp a zigbee_ncp na C5
-- [ ] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, regrese s rádiem A
-- [ ] Dvě rádia F2: detekce a test zapojení externího C6 (TC38)
+- [x] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, klíče NVS per rádio; regrese TC04–08, 13, 19, 20, 23, 26, 33 prošla
+- [x] Dvě rádia F2 (jádro): test zapojení rádia B přes ROM bootloader (/api/radios/b/probe), ověřeno s XIAO C5
+- [ ] Dvě rádia F2: test při startu, UI, chybové stavy na HW (TC38, až na konci)
 - [ ] Dvě rádia F3: role per rádio (TC39 Thread + Zigbee současně)
-- [ ] Dvě rádia F4: C5 bundly v balíku, flasher pro C5 (bootloader 0x2000, 8 MB), c6fw.chips ve vydání, flash per rádio, C5 v CI
+- [ ] Dvě rádia F4: firmwary rádií jen v PSRAM (C6 i C5 z vydání), mapa slotů v NVS pro přepnutí role offline, balík c5fw.bin (packer hotový), c5fw v manifestu a CI, flash per rádio
 - [ ] Dvě rádia F5: nastavení sítě per rádio, záloha a obnova per rádio (TC40)
 - [ ] Dvě rádia F6: ESPHome BLE proxy jako role C6 (Wi-Fi + BLE), zrušení ESPHome role na P4
 - [ ] Dvě rádia F7–F8: UI, REST, MQTT, HA, Telegram, dokumentace, soak
