@@ -25,7 +25,7 @@ flashes either radio with the firmwares of the release (as far as the release su
 | Thread settings | the P4 keeps the Thread settings (dataset, OpenThread settings) per radio (2026-10-31): Thread on the other radio starts with that radio's own network |
 | Role change | restarts the whole gateway (as today) |
 | Antenna | the XIAO ESP32-C5 has only the U.FL connector (antenna included), nothing to switch |
-| Power and wiring | 5 V from JP1; RST and BOOT are pads on the back of the XIAO |
+| Power and wiring | the XIAO powered through its own USB-C (5 V from JP1 is too weak, see wiring); RST and BOOT are pads on the back of the XIAO |
 
 ## Wiring (JP1 → XIAO ESP32-C5)
 
@@ -35,11 +35,14 @@ flashes either radio with the firmwares of the release (as far as the release su
 | 21 | GPIO33 (UART2 RX) | D6 / GPIO11 (U0TXD) | C5 → P4 |
 | 12 | GPIO46 | RST pad (back) | reset |
 | 10 | GPIO47 | BOOT pad (back, GPIO28) | download mode |
-| 4 | 5V | 5V | power |
 | 6 | GND | GND | ground |
 
 GPIO32, 33, 46 and 47 are free on JP1 and unused by the firmware ([hardware.md](hardware.md)).
-Never connect the XIAO's USB-C while it is powered from JP1 (its 5V pin is VBUS). Wires up to
+Power the XIAO through its own USB-C (a 5 V supply), not from JP1: on the 5 V of JP1 the C5 resets
+with RTC_PWR_GLITCH as soon as its radio starts (2026-10-31: the scanner restarted 34 times in 6 s,
+also with 100 µF added; on USB power it scans normally and the Zigbee coordinator runs). Only GND
+and the four signals go to JP1; never connect JP1 5V and the USB-C at the same time (the 5V pin of
+the XIAO is its VBUS). The P4 drives the reset line open-drain (like the RESET button). Wires up to
 30 cm (460800 Bd without flow control). Factory flash of the XIAO used here:
 `backups/xiao_c5_factory.bin` (8 MB, read over its USB-C).
 

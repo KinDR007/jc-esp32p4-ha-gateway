@@ -1498,6 +1498,66 @@ def tc37_release_list():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def switch_b(role, timeout=300):
+    """Role of radio B (docs/dual-radio.md); waits for the restart and radio B's start."""
+    up = status()['uptime_s']
+    code, r = http('POST', '/api/role', {'role': role, 'radio': 'b'})
+    if code != 200:
+        raise Fail(f'radio B role {role}: {code} {r}')
+
+    def ready():
+        s = status()
+        rb = s['role'].get('b', {})
+        if s['uptime_s'] >= up or not s['role']['stable'] and rb.get('active') != role and not rb.get('maintenance'):
+            return None
+        return s if rb.get('active') == role or rb.get('maintenance') else None
+    s = wait_until(f'radio B with role {role}', ready, timeout, 5)
+    check(not s['role']['b']['maintenance'], f'radio B {role} started ({s["role"]["b"]["maintenance"]!r})')
+    return s
+
+
+def tc39_two_radios():
+    """Radio A Thread border router and radio B (external, JP1) Zigbee coordinator at the same time: both
+    run, radio B's NCP sends telemetry and frames, its TCP bridge takes a client, role conflicts are refused."""
+    radios = http('GET', '/api/radios')[1]
+    b = radios[1] if isinstance(radios, list) and len(radios) > 1 else {}
+    if not b.get('wired'):
+        log(f'skipped: no radio B on JP1 ({b.get("wiring")})')
+        return
+    s0 = status()
+    before_b = s0['role'].get('b', {}).get('desired', 'none')
+    if s0['role']['active'] != 'thread_br':
+        switch('thread_br')
+    try:
+        s = switch_b('zigbee_coordinator') if status()['role']['b']['active'] != 'zigbee_coordinator' else status()
+        check(s['role']['active'] == 'thread_br', 'radio A still Thread border router')
+        wait_thread_running()
+        t = http('GET', '/api/thread/status')[1]
+        check(t.get('role') in ('leader', 'router', 'child'), f'Thread network up on radio A ({t.get("role")})')
+
+        def telemetry():
+            r = http('GET', '/api/radios')[1][1]
+            return r if (r.get('telemetry') or {}).get('fw') == 'zigbee_ncp' else None
+        r = wait_until('telemetry of radio B', telemetry, 90, 5)
+        log(f'radio B: {r["chip"]}, {r["telemetry"].get("temp_c")} °C, up {r["telemetry"].get("uptime_s")} s')
+        rs = status()['role_status_b']
+        check(rs['uart_errors'] == 0 and rs['telemetry_frames'] > 0, f'radio B link clean ({rs["telemetry_frames"]} telemetry frames)')
+        with socket.create_connection((ARGS.host, 6638), timeout=5):
+            time.sleep(1)
+            check(status()['role_status_b']['client_connected'], 'TCP client on radio B registered')
+        time.sleep(1)
+        check(not status()['role_status_b']['client_connected'], 'client disconnect detected')
+        check(http('POST', '/api/role', {'role': 'thread_router', 'radio': 'b'})[0] == 409, 'second Thread network refused (409)')
+        check(http('POST', '/api/role', {'role': 'zigbee_router'})[0] == 409, 'second Zigbee network on radio A refused (409)')
+        t0 = r['telemetry'].get('uptime_s', 0)
+        time.sleep(35)
+        r2 = http('GET', '/api/radios')[1][1]
+        check(r2['telemetry'].get('uptime_s', 0) > t0, f'radio B did not restart ({t0} -> {r2["telemetry"].get("uptime_s")} s)')
+    finally:
+        if before_b != status()['role']['b']['desired']:
+            switch_b(before_b)
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1510,7 +1570,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios),
 ]
 
 

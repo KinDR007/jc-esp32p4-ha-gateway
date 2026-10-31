@@ -30,7 +30,7 @@
 - [x] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, klíče NVS per rádio; regrese TC04–08, 13, 19, 20, 23, 26, 33 prošla
 - [x] Dvě rádia F2 (jádro): test zapojení rádia B přes ROM bootloader (/api/radios/b/probe), ověřeno s XIAO C5
 - [ ] Dvě rádia F2: test při startu, UI, chybové stavy na HW (TC38, až na konci)
-- [ ] Dvě rádia F3: role per rádio (TC39 Thread + Zigbee současně)
+- [x] Dvě rádia F3: role per rádio, Thread na A + Zigbee koordinátor na C5 současně (TC39); XIAO musí mít vlastní napájení USB (5 V z JP1 → RTC_PWR_GLITCH)
 - [x] Dvě rádia F4: firmwary rádií jen v PSRAM (4 MB buffer, po flashi zahozen), lokální soupis per rádio v NVS (přepnutí slotu offline), c5fw.bin v CI a vydání, /api/radios, /api/radios/b/flash; ověřeno: C5 naflashováno z manifestu (80 s), přepnutí slotu offline (5 s), regrese rádia A
 - [ ] Watchdog při stahování OTA (2026-10-31, jednou, ve starém buildu v1.7-13 při instalaci z lokálního manifestu s c5fw); sledovat, při opakování analyzovat coredump
 - [ ] Dvě rádia F5: nastavení sítě per rádio, záloha a obnova per rádio (TC40)
