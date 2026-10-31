@@ -45,7 +45,8 @@ static const char *chip_name(target_chip_t chip)
 
 void c6_radio_init_pins(const c6_radio_pins_t *p)
 {
-    gpio_config_t reset = {.pin_bit_mask = 1ULL << p->reset, .mode = GPIO_MODE_OUTPUT};
+    gpio_config_t reset = {.pin_bit_mask = 1ULL << p->reset,
+                           .mode = p->reset_open_drain ? GPIO_MODE_INPUT_OUTPUT_OD : GPIO_MODE_OUTPUT};
     gpio_set_level(p->reset, 1);
     gpio_config(&reset);
     gpio_set_level(p->reset, 1);

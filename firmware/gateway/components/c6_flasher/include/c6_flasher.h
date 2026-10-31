@@ -72,6 +72,7 @@ typedef struct {
     int uart_port;
     int tx, rx; /* P4 GPIOs to the radio's RX and from its TX */
     int reset, boot;
+    bool reset_open_drain; /* reset only pulled low, released otherwise (the radio's own pull-up holds EN) */
 } c6_radio_pins_t;
 
 const c6_radio_pins_t *c6_radio_pins(c6_radio_t radio);
