@@ -117,9 +117,10 @@ def build_slots(layout_csv, bootloader_dir, slot_dirs):
                         layout_csv, pt], check=True, capture_output=True)
         table = open(pt, 'rb').read()
     parts = {name: (offset, size) for name, offset, size in parse_partition_table_bytes(table)}
-    boot = os.path.join(bootloader_dir, 'bootloader', 'bootloader.bin')
+    # the bootloader where the build put it: 0x0 on the C6, 0x2000 on the C5
+    boot_addr, boot = next((addr, path) for addr, path in parse_flash_args(bootloader_dir) if 'bootloader' in path)
     segments = [(parts['nvs'][0], parts['nvs'][1], b'', SEG_ERASE), (parts['phy_init'][0], parts['phy_init'][1], b'', SEG_ERASE),
-                (0, os.path.getsize(boot), open(boot, 'rb').read(), SEG_WRITE | SEG_DEFLATE),
+                (boot_addr, os.path.getsize(boot), open(boot, 'rb').read(), SEG_WRITE | SEG_DEFLATE),
                 (0x8000, len(table), table, SEG_WRITE | SEG_DEFLATE)]
     apps = {}
     for slot, (name, build_dir) in enumerate(slot_dirs):
