@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.8 (2026-10-31)
+
+Home Assistant integration 1.4.0 (role select of radio B).
+
 **Two radios** ([docs/dual-radio.md](docs/dual-radio.md)): a XIAO ESP32-C5 on JP1 (powered over its own
 USB-C) is radio B next to the C6 of the board, so Thread and Zigbee run at the same time. **The
 ESPHome image on the P4 is gone**: ESPHome is now a role of a radio; a gateway with the old ESPHome
