@@ -39,7 +39,8 @@
 - [ ] ESPHome na rádiu: připojení k Wi-Fi a převzetí v HA ověřit s Wi-Fi uživatele (TC09 s nastavenou Wi-Fi)
 - [x] Dvě rádia F7–F8: UI (Role, Rádia, ESPHome, hlavička, přehled, menu dle rádia), HA 1.4.0, Telegram, dokumentace
 - [ ] Zigbee router rádia A: znovu připojit do sítě (záloha ztracena během vývoje F3), pak TC23
-- [ ] Vydání v1.8 (dvě rádia) a nasazení HA integrace 1.4.0; soak až na pokyn
+- [x] Vydání v1.8.1 (dvě rádia; tag v1.8 bez vydání, CI chyba ESPHome)
+- [ ] Nasazení HA integrace 1.4.0; HW testy (Wi-Fi ESPHome, TC38, router) příště; soak až na pokyn
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
 - [x] Krok B na desce: migrace na layout v3 (2026-10-30), stažení balíku při startu, reinstalace layoutu z PSRAM, přepnutí rolí bez stahování, TC04/05/12/35/36; vydání v1.6
 - [x] Integrace 1.2.0 v HA (entita Firmware rádia C6, přihlášení tokenem) (token globálně, chat a notifikace per uživatel, úroveň per téma, tiché hodiny, příkazy /status /lan /thread /zigbee /noise /events /restart /identify /update /role /sound /mute s potvrzením a TOTP)
