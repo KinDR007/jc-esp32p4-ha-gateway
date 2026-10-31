@@ -128,6 +128,32 @@ typedef struct {
 } c6_chip_t;
 const c6_chip_t *c6_chip_info(void);
 
+/* A radio on its own UART, reset and boot lines (internal C6, external radio on JP1). */
+typedef struct {
+    int uart_port;
+    int tx, rx;     /* P4 GPIOs to the radio's RX and from its TX */
+    int reset, boot;
+} c6_radio_pins_t;
+
+/* Wiring test result (radio_probe.c). */
+typedef struct {
+    bool wired;         /* ROM sync: TX, RX, RESET and BOOT work */
+    bool banner;        /* without sync: the ROM banner came after a reset (power, RESET, radio TX work) */
+    bool download_mode; /* with BOOT held low the radio entered download mode (BOOT works) */
+    char chip[16];
+    uint8_t mac[6];
+    uint16_t revision; /* major * 100 + minor */
+    uint32_t flash_size;
+    char verdict[160];
+} c6_probe_t;
+
+/* External radio B on JP1 (docs/dual-radio.md). */
+const c6_radio_pins_t *c6_radio_b_pins(void);
+/* Releases the radio's reset and boot lines (radio running). */
+void c6_radio_init_pins(const c6_radio_pins_t *pins);
+/* Resets the radio a few times and tells which lines work; ESP_OK when all do. Takes a few seconds. */
+esp_err_t c6_radio_probe(const c6_radio_pins_t *pins, c6_probe_t *result);
+
 #ifdef __cplusplus
 }
 #endif

@@ -288,6 +288,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     c6_init_pins();
+    c6_radio_init_pins(c6_radio_b_pins()); /* external radio running, if connected */
     c6fw_stage_load(); /* a C6 package downloaded or uploaded before a software restart */
 
     gw_role_t def_role = GW_ROLE_THREAD_BR;

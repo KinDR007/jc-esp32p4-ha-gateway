@@ -40,6 +40,26 @@ menu "P4 gateway"
         int "P4 GPIO driving C6 IO9 / BOOT (JP1 17 -> 24)"
         default 20
 
+    config GW_RADIO_B_UART_PORT
+        int "UART to the external radio B (XIAO ESP32-C5 on JP1, docs/dual-radio.md)"
+        default 2
+
+    config GW_RADIO_B_UART_TX
+        int "P4 GPIO to radio B RX (JP1 19 -> XIAO D7)"
+        default 32
+
+    config GW_RADIO_B_UART_RX
+        int "P4 GPIO from radio B TX (JP1 21 <- XIAO D6)"
+        default 33
+
+    config GW_RADIO_B_RESET_GPIO
+        int "P4 GPIO driving radio B reset (JP1 12 -> XIAO RST pad)"
+        default 46
+
+    config GW_RADIO_B_BOOT_GPIO
+        int "P4 GPIO driving radio B boot (JP1 10 -> XIAO BOOT pad)"
+        default 47
+
     config GW_ETH_PHY_RST_GPIO
         int "IP101 reset GPIO"
         default 51

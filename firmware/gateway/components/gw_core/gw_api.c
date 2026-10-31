@@ -750,6 +750,27 @@ static esp_err_t c6_reflash_post(httpd_req_t *req)
     return gw_http_send_json(req, cJSON_CreateObject());
 }
 
+/* Wiring test of radio B: blocks the web server for a few seconds while it resets the radio. */
+static esp_err_t radio_b_probe_post(httpd_req_t *req)
+{
+    c6_probe_t r;
+    c6_radio_probe(c6_radio_b_pins(), &r);
+    cJSON *j = cJSON_CreateObject();
+    cJSON_AddBoolToObject(j, "wired", r.wired);
+    cJSON_AddBoolToObject(j, "banner", r.banner);
+    cJSON_AddBoolToObject(j, "download_mode", r.download_mode);
+    cJSON_AddStringToObject(j, "verdict", r.verdict);
+    if (r.wired) {
+        char mac[18];
+        snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x", r.mac[0], r.mac[1], r.mac[2], r.mac[3], r.mac[4], r.mac[5]);
+        cJSON_AddStringToObject(j, "chip", r.chip);
+        cJSON_AddStringToObject(j, "mac", mac);
+        cJSON_AddNumberToObject(j, "revision", r.revision);
+        cJSON_AddNumberToObject(j, "flash_size", r.flash_size);
+    }
+    return gw_http_send_json(req, j);
+}
+
 static esp_err_t snapshot_get(httpd_req_t *req)
 {
     char query[48], bundle[16] = "zigbee_ncp", disposition[80];
@@ -1093,6 +1114,7 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/ota/esphome", HTTP_POST, esphome_upload);
     gw_http_register("/api/ota/c6fw", HTTP_POST, c6fw_upload);
     gw_http_register("/api/c6/reflash", HTTP_POST, c6_reflash_post);
+    gw_http_register("/api/radios/b/probe", HTTP_POST, radio_b_probe_post);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_GET, snapshot_get);
     gw_http_register("/api/c6/backup", HTTP_GET, c6_backup_get);
     gw_http_register("/api/tools/ping", HTTP_POST, ping_post);
