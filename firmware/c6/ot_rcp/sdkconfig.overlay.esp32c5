@@ -1,0 +1,2 @@
+# XIAO ESP32-C5: the RCP uses UART0 on its default pins GPIO11 (TX, D6) / GPIO12 (RX, D7)
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y

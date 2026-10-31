@@ -1,3 +1,2 @@
-# OpenThread RCP on C6 UART0 (GPIO16 TX / GPIO17 RX), 460800 Bd as set in ot_rcp esp_ot_config.h.
+# OpenThread RCP on UART0 at its default pins (C6 GPIO16 TX / GPIO17 RX, C5 GPIO11 / GPIO12), 460800 Bd as set in ot_rcp esp_ot_config.h.
 # JP1 jumpers route these to P4 GPIO5 (RX) / GPIO4 (TX).
-CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y

@@ -1,8 +1,6 @@
 # ZBOSS NCP host link on the C6 UART0 pads, the only UART wired to P4 (JP1 jumpers).
 # The ROM boot banner on reset is dropped by the P4 bridge.
 CONFIG_NCP_UART_TRANSPORT=y
-CONFIG_NCP_UART_TX_GPIO=16
-CONFIG_NCP_UART_RX_GPIO=17
 CONFIG_NCP_UART_BAUD=460800
 # Keep the console off UART0 so nothing else drives the pads.
 CONFIG_ESP_CONSOLE_UART_DEFAULT=n

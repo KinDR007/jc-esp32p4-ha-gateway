@@ -1,51 +1,57 @@
-# Two radios: internal C6 and an external XIAO ESP32-C6 (plan)
+# Two radios: internal C6 and an external XIAO ESP32-C5 (plan)
 
-Status: planned, nothing implemented. Decisions of the user (2026-10-30) are marked **decided**.
+Status: planned; build definitions for the C5 firmwares exist (`scripts/build_c6.sh all esp32c5`).
+Decisions of the user (2026-10-30, changed 2026-10-31: XIAO ESP32-C5 instead of the C6, no moving
+of networks between radios).
 
 ## Goal
 
-A second ESP32-C6 (Seeed XIAO ESP32-C6) on the JP1 header works at the same time as the C6 on the
-board. Each radio gets its own role; the gateway detects the external one, tests its wiring, and
+A second radio, a Seeed XIAO ESP32-C5 (802.15.4 like the C6), on the JP1 header works at the same
+time as the C6 on the board. Each radio gets its own role; the gateway detects the external one, tests its wiring, and
 flashes either radio with the firmwares of the release (as far as the release supports the board).
 
 ## Decisions
 
 | Topic | Decision |
 |---|---|
-| External module | XIAO ESP32-C6 (4 MB flash, RF switch GPIO3/GPIO14, U.FL connector) |
+| External module | XIAO ESP32-C5 (ESP32-C5 rev 1.0, 48 MHz crystal, 8 MB flash, 8 MB PSRAM, U.FL antenna connector); the C6 firmwares are built for it as well |
 | Roles | free per radio: Thread BR / Thread router / Zigbee coordinator / Zigbee router / ESPHome / off; at most one Thread and one Zigbee network |
 | ESPHome | becomes a radio role: a standalone ESPHome BLE proxy on the C6 (Wi-Fi + BLE) on either radio; the current ESPHome role (ESPHome image on the P4, esp-hosted over SDIO) is dropped |
 | Detection | at start and with a "Test wiring" button in the UI, step by step |
-| Moving the Zigbee network between radios | yes, through the network snapshot (`c6data`) |
+| Networks and radios | no moving of networks between radios: each radio keeps its own network settings, and each can be backed up |
 | Role change | restarts the whole gateway (as today) |
-| XIAO antenna | chosen in the UI, external U.FL by default |
-| Power and wiring | 5 V from JP1, wires soldered to the RESET and BOOT button pads |
+| Antenna | the XIAO ESP32-C5 has only the U.FL connector (antenna included), nothing to switch |
+| Power and wiring | 5 V from JP1; RST and BOOT are pads on the back of the XIAO |
 
-## Wiring (JP1 → XIAO)
+## Wiring (JP1 → XIAO ESP32-C5)
 
-| JP1 | P4 | XIAO | Purpose |
+| JP1 | P4 | XIAO ESP32-C5 | Purpose |
 |---|---|---|---|
-| 19 | GPIO32 (UART2 TX) | D7 / GPIO17 (U0RXD) | P4 → C6 |
-| 21 | GPIO33 (UART2 RX) | D6 / GPIO16 (U0TXD) | C6 → P4 |
-| 12 | GPIO46 | RESET button pad (EN) | reset |
-| 10 | GPIO47 | BOOT button pad (GPIO9) | download mode |
+| 19 | GPIO32 (UART2 TX) | D7 / GPIO12 (U0RXD) | P4 → C5 |
+| 21 | GPIO33 (UART2 RX) | D6 / GPIO11 (U0TXD) | C5 → P4 |
+| 12 | GPIO46 | RST pad (back) | reset |
+| 10 | GPIO47 | BOOT pad (back, GPIO28) | download mode |
 | 4 | 5V | 5V | power |
 | 6 | GND | GND | ground |
 
 GPIO32, 33, 46 and 47 are free on JP1 and unused by the firmware ([hardware.md](hardware.md)).
 Never connect the XIAO's USB-C while it is powered from JP1 (its 5V pin is VBUS). Wires up to
-30 cm (460800 Bd without flow control).
+30 cm (460800 Bd without flow control). Factory flash of the XIAO used here:
+`backups/xiao_c5_factory.bin` (8 MB, read over its USB-C).
+
+Differences to the C6 that the gateway handles: bootloader at 0x2000 (C6: 0x0), 8 MB flash, ROM
+chip detection; the slots layout (`firmware/c6/slots.csv`, 4 MB) fits as it is.
 
 ## Phases
 
 | Phase | Content | Done when |
 |---|---|---|
-| F0 hardware | wiring; EN/GPIO9 pads measured; XIAO factory flash backed up over its USB-C; does the XIAO transmit without GPIO3 set; does a Zigbee network move to another chip with the coordinator's IEEE address | findings written here |
+| F0 hardware | done: C5 build definitions, factory backup, the scanner runs on the XIAO (Wi-Fi and 802.15.4 networks found); open: wiring to JP1, ot_rcp and zigbee_ncp on the C5 | findings written here |
 | F1 refactoring | radio context (UART, pins, NVS keys, progress, chip info, slots, snapshots) in `c6_flasher`, `role_thread`, `role_zigbee`, `netscan`; radio A keeps today's NVS keys (upgrade without migration), radio B uses `c6b_*` | full hw_test with radio A only passes, no behaviour change |
 | F2 detection | BOOT+RESET then ROM sync over UART2 (TX, RX, RESET, BOOT at once); if that fails, RESET only and listen for the ROM banner (tells RX/RESET from TX/BOOT faults, crossed TX/RX, no chip); chip must be an ESP32-C6 with 4 MB flash (MAC, revision); result per step with the wire to check; never resets radio A | TC38: connected, not connected, one wire off |
 | F3 roles per radio | NVS `role` (A) and `role_b`; validation; `apply_role`/`ensure_c6` per radio; Thread and Zigbee on UART1 or UART2, TCP 6638 unchanged; network scan on a radio without a role | TC39: Thread on A and Zigbee on B at once (ping, device join) |
-| F4 firmware and releases | board flag (`module`/`xiao`, antenna) in the slot selection sector, the C6 firmwares set the RF switch from it; `c6fw.boards` in the manifest and package; flashing B only from a package that supports the XIAO; flash/reflash per radio | external radio flashed from the release |
-| F5 Zigbee move | on a role move: snapshot from the source radio, restored on the target | TC40: roles swapped, devices still answer |
+| F4 firmware and releases | C5 bundles in the package (chip per bundle), `c6fw.chips` in the manifest; flasher for the C5 (ROM detection, bootloader at 0x2000, 8 MB); flashing B only from a package with C5 bundles; flash/reflash per radio | external radio flashed from the release |
+| F5 settings per radio | each radio keeps its own network settings (Zigbee in its own flash; snapshots per radio in `c6data`); backup and restore per radio | TC40: backup and restore of radio B |
 | F6 ESPHome on the C6 | ESPHome BLE proxy image for the C6 (Wi-Fi + BLE) as a slot or whole-flash bundle; Wi-Fi credentials and the API key set from the gateway (research: Improv serial over the UART, ESPHome key provisioning from HA), never in a public release; the P4 ESPHome role and its image removed, gateways with role `esphome` fall back with a notification | BLE proxy on radio B while radio A runs Thread |
 | F7 interfaces | System › Radios page (state, wiring test, flash, factory backup, antenna), roles of both radios, header tags, REST, MQTT, HA integration (radio B entities), Telegram (`/role b …`) | UI, HA and Telegram tests |
 | F8 tests and docs | TC38–TC40 and regression without radio B; hardware.md, installation.md, home-assistant.md, HTML documentation | 24 h soak when the user asks |
@@ -56,7 +62,7 @@ Estimate: 3–4 weeks including F6.
 
 | Risk | Impact | Handling |
 |---|---|---|
-| The Zigbee coordinator's IEEE address is the chip MAC; moving the network to the other C6 changes it | devices bound or reporting to the coordinator stop reporting | check in F0; set the address in the NCP from the snapshot (`esp_zb_set_long_address`), otherwise move with a warning |
+| C5 support of the stacks (esp-zboss-lib 1.6.8 and esp-zigbee-lib 1.6.4 ship esp32c5 libraries; ot_rcp lists the C5) | a stack misbehaves on the C5 | F0: run each firmware on the XIAO before F1 |
 | Two 2.4 GHz radios next to each other | interference, CCA busy | channels far apart (suggested from the network scan), XIAO antenna away from the board |
 | ESPHome on the C6 needs Wi-Fi and a per-installation API key | the image cannot be published as is | provisioning from the gateway (F6 research) |
 | Dropping the P4 ESPHome role | users of that role lose it on update | release notes, fallback with a notification |

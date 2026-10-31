@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Build one or all C6 co-processor firmwares into build/c6/<name>/.
-# Usage: build_c6.sh [ot_rcp|zigbee_ncp|zigbee_router|esp_hosted|scanner|all]
+# Build one or all radio co-processor firmwares into build/c6/<name>/ (C6 of the board) or
+# build/c5/<name>/ (external XIAO ESP32-C5, docs/dual-radio.md).
+# Usage: build_c6.sh [ot_rcp|zigbee_ncp|zigbee_router|esp_hosted|scanner|all] [esp32c6|esp32c5]
+# Settings per chip (UART0 pins, flash size): firmware/c6/<name>/sdkconfig.defaults.<chip> for our
+# projects, sdkconfig.overlay.<chip> for the third-party ones.
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 
@@ -21,7 +24,7 @@ build_one() {
     local name=$1 src out sub proj
     IFS="|" read -r src sub <<<"$(src_of "$name")"
     [ -d "$src" ] || { echo "missing $src, run scripts/fetch_deps.sh" >&2; return 1; }
-    out="$ROOT_DIR/build/c6/$name"
+    out="$ROOT_DIR/build/${CHIP#esp32}/$name"
     mkdir -p "$out"
     # Build from a copy so managed_components/ and lock files never land in pinned sources.
     rsync -a --delete --exclude .git --exclude build --exclude managed_components \
@@ -37,18 +40,26 @@ build_one() {
         git -C "$src" describe --tags --always > "$proj/version.txt"
     fi
     local defaults="$proj/sdkconfig.defaults"
-    [ -f "$proj/sdkconfig.defaults.esp32c6" ] && defaults="$defaults;$proj/sdkconfig.defaults.esp32c6"
+    [ -f "$proj/sdkconfig.defaults.$CHIP" ] && defaults="$defaults;$proj/sdkconfig.defaults.$CHIP"
     if [ "$src" != "$ROOT_DIR/firmware/c6/$name" ]; then
         defaults="$defaults;$ROOT_DIR/firmware/c6/$name/sdkconfig.overlay"
+        local overlay="$ROOT_DIR/firmware/c6/$name/sdkconfig.overlay.$CHIP"
+        [ -f "$overlay" ] && defaults="$defaults;$overlay"
     fi
     rm -f "$out/sdkconfig"
-    idf.py -C "$proj" -B "$out/build" -DIDF_TARGET=esp32c6 \
+    idf.py -C "$proj" -B "$out/build" -DIDF_TARGET="$CHIP" \
         -DSDKCONFIG="$out/sdkconfig" -DSDKCONFIG_DEFAULTS="$defaults" build
 }
 
 target=${1:-all}
+CHIP=${2:-esp32c6}
+case "$CHIP" in
+    esp32c6) all="ot_rcp zigbee_ncp zigbee_router esp_hosted scanner" ;;
+    esp32c5) all="ot_rcp zigbee_ncp zigbee_router scanner" ;; # no esp-hosted: the C5 is never the P4's Wi-Fi
+    *) echo "unknown chip: $CHIP (esp32c6, esp32c5)" >&2; exit 1 ;;
+esac
 if [ "$target" = all ]; then
-    for n in ot_rcp zigbee_ncp zigbee_router esp_hosted scanner; do build_one "$n"; done
+    for n in $all; do build_one "$n"; done
 else
     build_one "$target"
 fi

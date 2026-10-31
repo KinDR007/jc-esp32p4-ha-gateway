@@ -25,12 +25,13 @@
 - [x] Repozitář veřejný, vydání v1.5 a v1.6 na GitHubu, výchozí URL manifestu GitHub Releases
 - [x] Návrat na starší vydání (jen kompatibilní s layoutem desky): releases.json, UI, HA, Telegram, TC37; ověřen rollback v1.6-dirty → v1.6 → zpět a balík C6 z v1.6
 - [ ] Ověřit /releases a /install v… se skutečným Telegram botem a update.install s verzí v UI HA
-- [ ] Dvě rádia (plán docs/dual-radio.md): F0 ověření HW (zapojení XIAO, pady EN/BOOT, záloha továrního FW, RF přepínač, přesun Zigbee sítě s IEEE adresou)
+- [x] Dvě rádia F0 (část): externí rádio XIAO ESP32-C5 místo C6; buildy ot_rcp, zigbee_ncp, zigbee_router, scanner pro esp32c5 (`scripts/build_c6.sh all esp32c5`); záloha továrního flash XIAO; skener na C5 ověřen (Wi-Fi i 802.15.4)
+- [ ] Dvě rádia F0: zapojení XIAO C5 na JP1, běh ot_rcp a zigbee_ncp na C5
 - [ ] Dvě rádia F1: kontext rádia v c6_flasher/role_thread/role_zigbee/netscan, regrese s rádiem A
 - [ ] Dvě rádia F2: detekce a test zapojení externího C6 (TC38)
 - [ ] Dvě rádia F3: role per rádio (TC39 Thread + Zigbee současně)
-- [ ] Dvě rádia F4: příznak desky a anténa ve firmwarech C6, c6fw.boards ve vydání, flash per rádio
-- [ ] Dvě rádia F5: přesun Zigbee sítě mezi rádii (TC40)
+- [ ] Dvě rádia F4: C5 bundly v balíku, flasher pro C5 (bootloader 0x2000, 8 MB), c6fw.chips ve vydání, flash per rádio, C5 v CI
+- [ ] Dvě rádia F5: nastavení sítě per rádio, záloha a obnova per rádio (TC40)
 - [ ] Dvě rádia F6: ESPHome BLE proxy jako role C6 (Wi-Fi + BLE), zrušení ESPHome role na P4
 - [ ] Dvě rádia F7–F8: UI, REST, MQTT, HA, Telegram, dokumentace, soak
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript

@@ -1,0 +1,3 @@
+# C6 module of the board: UART0 pins
+CONFIG_NCP_UART_TX_GPIO=16
+CONFIG_NCP_UART_RX_GPIO=17
