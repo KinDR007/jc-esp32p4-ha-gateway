@@ -21,7 +21,14 @@
     "active": "thread_br",
     "desired": "thread_br",
     "maintenance": "",
-    "stable": true
+    "stable": true,
+    "b": {
+      "active": "zigbee_coordinator",
+      "desired": "zigbee_coordinator",
+      "maintenance": "",
+      "wired": true,
+      "chip": "ESP32-C5"
+    }
   },
   "eth": {
     "link": true,

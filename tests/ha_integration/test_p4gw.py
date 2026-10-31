@@ -328,3 +328,12 @@ async def test_rollback(hass: HomeAssistant, gateway) -> None:
     assert ("/api/update/install", {"target": "c6", "version": "v1.6"}) in gateway.posts
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call("update", "install", {"entity_id": c6, "version": "deadbeef"}, blocking=True)
+
+
+async def test_radio_b_role(hass: HomeAssistant, gateway) -> None:
+    """A gateway with radio B gets its role select; picking a role posts it for radio B."""
+    await setup_entry(hass, gateway)
+    select = entity_id(hass, "select", "radio_b_role")
+    assert hass.states.get(select).state == "zigbee_coordinator"
+    await hass.services.async_call("select", "select_option", {"entity_id": select, "option": "none"}, blocking=True)
+    assert ("/api/role", {"role": "none", "radio": "b"}) in gateway.posts

@@ -134,6 +134,17 @@
           "zigbee_router": "Zigbee router",
           "esphome": "ESPHome BLE proxy"
         }
+      },
+      "radio_b_role": {
+        "name": "Role rádia B",
+        "state": {
+          "none": "Vypnuto",
+          "thread_br": "Thread border router",
+          "thread_router": "Thread router",
+          "zigbee_coordinator": "Zigbee koordinátor",
+          "zigbee_router": "Zigbee router",
+          "esphome": "ESPHome BLE proxy"
+        }
       }
     },
     "button": {
