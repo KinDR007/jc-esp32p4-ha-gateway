@@ -31,7 +31,8 @@
 - [x] Dvě rádia F2 (jádro): test zapojení rádia B přes ROM bootloader (/api/radios/b/probe), ověřeno s XIAO C5
 - [ ] Dvě rádia F2: test při startu, UI, chybové stavy na HW (TC38, až na konci)
 - [ ] Dvě rádia F3: role per rádio (TC39 Thread + Zigbee současně)
-- [ ] Dvě rádia F4: firmwary rádií jen v PSRAM (C6 i C5 z vydání), mapa slotů v NVS pro přepnutí role offline, balík c5fw.bin (packer hotový), c5fw v manifestu a CI, flash per rádio
+- [x] Dvě rádia F4: firmwary rádií jen v PSRAM (4 MB buffer, po flashi zahozen), lokální soupis per rádio v NVS (přepnutí slotu offline), c5fw.bin v CI a vydání, /api/radios, /api/radios/b/flash; ověřeno: C5 naflashováno z manifestu (80 s), přepnutí slotu offline (5 s), regrese rádia A
+- [ ] Watchdog při stahování OTA (2026-10-31, jednou, ve starém buildu v1.7-13 při instalaci z lokálního manifestu s c5fw); sledovat, při opakování analyzovat coredump
 - [ ] Dvě rádia F5: nastavení sítě per rádio, záloha a obnova per rádio (TC40)
 - [ ] Dvě rádia F6: ESPHome BLE proxy jako role C6 (Wi-Fi + BLE), zrušení ESPHome role na P4
 - [ ] Dvě rádia F7–F8: UI, REST, MQTT, HA, Telegram, dokumentace, soak
