@@ -62,7 +62,8 @@ typedef struct {
     c6_radio_pins_t pins;
     const char *name;     /* "C6" / "radio B" in messages */
     const char *nvs_ns;   /* chip data and the installed slots layout */
-    const char *snap_tag; /* prefix of its Zigbee snapshots in c6data ("" keeps the names of radio A) */
+    const char *snap_tag; /* prefix of its Zigbee snapshot names ("" keeps the names of radio A) */
+    uint8_t snap_subtype; /* partition of its Zigbee snapshots: c6data for A, the unused c6fw for B */
     c6_progress_t progress;
     c6_chip_t chip;
     bool chip_loaded;
@@ -72,11 +73,11 @@ typedef struct {
 static radio_t s_radios[C6_RADIOS] = {
     [C6_RADIO_A] = {.pins = {.uart_port = CONFIG_GW_C6_UART_PORT, .tx = CONFIG_GW_C6_UART_TX, .rx = CONFIG_GW_C6_UART_RX,
                              .reset = CONFIG_GW_C6_RESET_GPIO, .boot = CONFIG_GW_C6_BOOT_GPIO},
-                    .name = "C6", .nvs_ns = "c6chip", .snap_tag = ""},
+                    .name = "C6", .nvs_ns = "c6chip", .snap_tag = "", .snap_subtype = C6DATA_SUBTYPE},
     [C6_RADIO_B] = {.pins = {.uart_port = CONFIG_GW_RADIO_B_UART_PORT, .tx = CONFIG_GW_RADIO_B_UART_TX,
                              .rx = CONFIG_GW_RADIO_B_UART_RX, .reset = CONFIG_GW_RADIO_B_RESET_GPIO,
                              .boot = CONFIG_GW_RADIO_B_BOOT_GPIO, .reset_open_drain = true},
-                    .name = "radio B", .nvs_ns = "radiob", .snap_tag = "b/"},
+                    .name = "radio B", .nvs_ns = "radiob", .snap_tag = "b/", .snap_subtype = C6FW_SUBTYPE},
 };
 
 static radio_t *radio(c6_radio_t r)
@@ -791,9 +792,9 @@ static uint32_t slot_size(const esp_partition_t *part)
     return part->size / SNAP_SLOTS;
 }
 
-static bool snapshot_header(int slot, snap_header_t *hdr)
+static bool snapshot_header(const radio_t *rd, int slot, snap_header_t *hdr)
 {
-    const esp_partition_t *part = partition(C6DATA_SUBTYPE);
+    const esp_partition_t *part = partition(rd->snap_subtype);
     if (!part || esp_partition_read(part, slot * slot_size(part), hdr, sizeof(*hdr)) != ESP_OK ||
         memcmp(hdr->magic, SNAP_MAGIC, 4) != 0 || hdr->count > SNAP_MAX) {
         return false;
@@ -808,10 +809,10 @@ static void snap_name(const radio_t *rd, const char *bundle, char out[16])
     snprintf(out, 16, "%s%s", rd->snap_tag, bundle);
 }
 
-static int snapshot_find(const char *bundle, snap_header_t *hdr)
+static int snapshot_find(const radio_t *rd, const char *bundle, snap_header_t *hdr)
 {
     for (int slot = 0; slot < SNAP_SLOTS; slot++) {
-        if (snapshot_header(slot, hdr) && strcmp(hdr->bundle, bundle) == 0) {
+        if (snapshot_header(rd, slot, hdr) && strcmp(hdr->bundle, bundle) == 0) {
             return slot;
         }
     }
@@ -819,14 +820,14 @@ static int snapshot_find(const char *bundle, snap_header_t *hdr)
 }
 
 /* Same bundle's slot, else an empty one, else the oldest. */
-static int snapshot_pick_slot(const char *bundle, uint32_t *next_generation)
+static int snapshot_pick_slot(const radio_t *rd, const char *bundle, uint32_t *next_generation)
 {
     snap_header_t hdr;
     int same = -1, empty = -1, oldest = 0;
     uint32_t oldest_gen = UINT32_MAX, newest_gen = 0;
 
     for (int slot = 0; slot < SNAP_SLOTS; slot++) {
-        if (!snapshot_header(slot, &hdr)) {
+        if (!snapshot_header(rd, slot, &hdr)) {
             empty = empty < 0 ? slot : empty;
             continue;
         }
@@ -866,13 +867,13 @@ static uint32_t c6_region_addr(session_t *s, const c6fw_segment_t *seg)
 
 static esp_err_t snapshot_save(session_t *s, const bundle_t *from)
 {
-    const esp_partition_t *part = partition(C6DATA_SUBTYPE);
-    ESP_RETURN_ON_FALSE(part, ESP_ERR_NOT_FOUND, TAG, "no c6data partition");
+    const esp_partition_t *part = partition(s->radio->snap_subtype);
+    ESP_RETURN_ON_FALSE(part, ESP_ERR_NOT_FOUND, TAG, "no snapshot partition");
     snap_header_t hdr = {0};
     memcpy(hdr.magic, SNAP_MAGIC, 4);
     snap_name(s->radio, from->entry.name, hdr.bundle);
     uint32_t generation;
-    int slot = snapshot_pick_slot(hdr.bundle, &generation);
+    int slot = snapshot_pick_slot(s->radio, hdr.bundle, &generation);
     hdr.generation = generation;
     uint32_t base = slot * slot_size(part);
 
@@ -925,8 +926,8 @@ static esp_err_t snapshot_restore(session_t *s, const bundle_t *to)
     snap_header_t hdr;
     char name[16];
     snap_name(s->radio, to->entry.name, name);
-    int slot = snapshot_find(name, &hdr);
-    const esp_partition_t *part = partition(C6DATA_SUBTYPE);
+    int slot = snapshot_find(s->radio, name, &hdr);
+    const esp_partition_t *part = partition(s->radio->snap_subtype);
 
     for (uint32_t i = 0; i < to->count; i++) {
         const c6fw_segment_t *seg = &to->segs[i];
@@ -998,7 +999,7 @@ esp_err_t c6_snapshot_info(c6_radio_t r, const char *bundle, uint32_t *total_siz
     snap_header_t hdr;
     char name[16];
     snap_name(radio(r), bundle, name);
-    if (snapshot_find(name, &hdr) < 0) {
+    if (snapshot_find(radio(r), name, &hdr) < 0) {
         return ESP_ERR_NOT_FOUND;
     }
     *total_size = 0;
@@ -1017,9 +1018,9 @@ esp_err_t c6_snapshot_read(c6_radio_t r, const char *bundle, uint32_t offset, vo
     snap_header_t hdr;
     char name[16];
     snap_name(radio(r), bundle, name);
-    int slot = snapshot_find(name, &hdr);
+    int slot = snapshot_find(radio(r), name, &hdr);
     ESP_RETURN_ON_FALSE(slot >= 0, ESP_ERR_NOT_FOUND, TAG, "no snapshot");
-    const esp_partition_t *part = partition(C6DATA_SUBTYPE);
+    const esp_partition_t *part = partition(radio(r)->snap_subtype);
     uint32_t base = slot * slot_size(part);
     uint8_t *out = buf;
     /* The snapshot is exposed as the concatenation of its regions. */

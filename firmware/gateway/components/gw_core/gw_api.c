@@ -336,11 +336,15 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(c6, "snapshot_days", gw_config_get_u8(GW_KEY_ZB_SNAP_DAYS, GW_ZB_SNAP_DAYS_DEFAULT));
     cJSON *snaps = cJSON_AddArrayToObject(c6, "snapshots");
     static const char *const snap_bundles[] = {"zigbee_ncp", "zigbee_router"};
-    for (size_t i = 0; i < sizeof(snap_bundles) / sizeof(snap_bundles[0]); i++) {
+    /* both radios: each keeps its own Zigbee networks (radio B: docs/dual-radio.md) */
+    for (size_t k = 0; k < 2 * sizeof(snap_bundles) / sizeof(snap_bundles[0]); k++) {
+        size_t i = k % 2;
+        c6_radio_t radio = k < 2 ? C6_RADIO_A : C6_RADIO_B;
         uint32_t snap_size, snap_gen, snap_time;
-        if (c6_snapshot_info(C6_RADIO_A, snap_bundles[i], &snap_size, &snap_gen, &snap_time) == ESP_OK) {
+        if (c6_snapshot_info(radio, snap_bundles[i], &snap_size, &snap_gen, &snap_time) == ESP_OK) {
             cJSON *snap = cJSON_CreateObject();
             cJSON_AddStringToObject(snap, "bundle", snap_bundles[i]);
+            cJSON_AddStringToObject(snap, "radio", radio == C6_RADIO_A ? "a" : "b");
             cJSON_AddNumberToObject(snap, "size", snap_size);
             cJSON_AddNumberToObject(snap, "generation", snap_gen);
             cJSON_AddNumberToObject(snap, "saved", snap_time);
@@ -811,12 +815,14 @@ static esp_err_t radio_b_probe_post(httpd_req_t *req)
 
 static esp_err_t snapshot_get(httpd_req_t *req)
 {
-    char query[48], bundle[16] = "zigbee_ncp", disposition[80];
+    char query[64], bundle[16] = "zigbee_ncp", which[4] = "a", disposition[96];
     uint32_t size, gen;
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         httpd_query_key_value(query, "bundle", bundle, sizeof(bundle));
+        httpd_query_key_value(query, "radio", which, sizeof(which));
     }
-    if (c6_snapshot_info(C6_RADIO_A, bundle, &size, &gen, NULL) != ESP_OK) {
+    c6_radio_t radio = strcmp(which, "b") == 0 ? C6_RADIO_B : C6_RADIO_A;
+    if (c6_snapshot_info(radio, bundle, &size, &gen, NULL) != ESP_OK) {
         return gw_http_send_error(req, 404, "no Zigbee snapshot");
     }
     char *buf = malloc(UPLOAD_CHUNK);
@@ -824,13 +830,13 @@ static esp_err_t snapshot_get(httpd_req_t *req)
         return gw_http_send_error(req, 500, "out of memory");
     }
     httpd_resp_set_type(req, "application/octet-stream");
-    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s_nvram_%lu.bin\"", bundle,
-             (unsigned long)gen);
+    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s%s_nvram_%lu.bin\"",
+             radio == C6_RADIO_B ? "radio_b_" : "", bundle, (unsigned long)gen);
     httpd_resp_set_hdr(req, "Content-Disposition", disposition);
     esp_err_t err = ESP_OK;
     for (uint32_t off = 0; off < size && err == ESP_OK; off += UPLOAD_CHUNK) {
         size_t n = MIN(UPLOAD_CHUNK, size - off);
-        err = c6_snapshot_read(C6_RADIO_A, bundle, off, buf, n);
+        err = c6_snapshot_read(radio, bundle, off, buf, n);
         if (err == ESP_OK) {
             err = httpd_resp_send_chunk(req, buf, n);
         }

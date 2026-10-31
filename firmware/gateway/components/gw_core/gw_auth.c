@@ -837,6 +837,7 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/radios/b/probe", -1, "system/maint", 2},
     {"/api/radios/b/flash", -1, "system/maint", 2},
     {"/api/radios/b/console", -1, "system/maint", 2},
+    {"/api/radios/thread/forget", -1, "thread/settings", 2},
     {"/api/radios", -1, "system/maint", 1},
     {"/api/c6/backup", -1, "system/maint", 2},
     {"/api/ws", -1, "*", 1},

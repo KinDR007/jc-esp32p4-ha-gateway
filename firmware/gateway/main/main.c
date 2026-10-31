@@ -386,6 +386,33 @@ static esp_err_t radio_b_console_get(httpd_req_t *req)
     return err;
 }
 
+/* {"radio": "a" | "b"}: the radio starts its next Thread role with a new network */
+static esp_err_t thread_forget_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    const char *which = GW_JSON_STR(body, "radio");
+    c6_radio_t radio = which && strcmp(which, "b") == 0 ? C6_RADIO_B : C6_RADIO_A;
+    bool bad = !which || (strcmp(which, "a") != 0 && strcmp(which, "b") != 0);
+    cJSON_Delete(body);
+    if (bad) {
+        return gw_http_send_error(req, 400, "radio: a or b");
+    }
+    gw_role_t active = radio == C6_RADIO_B ? gw_state()->active_b : gw_state()->active;
+    if (active == GW_ROLE_THREAD_BR || active == GW_ROLE_THREAD_ROUTER) {
+        return gw_http_send_error(req, 409, "Thread runs on that radio: switch its role first");
+    }
+    esp_err_t err = role_thread_forget(radio);
+    if (err != ESP_OK) {
+        return gw_http_send_error(req, err == ESP_ERR_INVALID_STATE ? 409 : 500, esp_err_to_name(err));
+    }
+    gw_notify("security", GW_NOTIFY_INFO, "Thread network of radio %c forgotten by %s", 'A' + radio,
+              gw_auth_who()[0] ? gw_auth_who() : "the web UI");
+    return gw_http_send_json(req, cJSON_CreateObject());
+}
+
 static esp_err_t radios_get(httpd_req_t *req)
 {
     cJSON *arr = cJSON_CreateArray();
@@ -574,6 +601,7 @@ void app_main(void)
     gw_http_register("/api/radios", HTTP_GET, radios_get);
     gw_http_register("/api/radios/b/flash", HTTP_POST, radio_b_flash_post);
     gw_http_register("/api/radios/b/console", HTTP_GET, radio_b_console_get);
+    gw_http_register("/api/radios/thread/forget", HTTP_POST, thread_forget_post);
     netscan_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();

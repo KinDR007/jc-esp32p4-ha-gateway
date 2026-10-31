@@ -1498,18 +1498,29 @@ def tc37_release_list():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def boot_id():
+    """Changes with every start of the gateway (notification ring)."""
+    code, r = http('GET', '/api/notify?since=0', timeout=5)
+    return r.get('boot') if code == 200 and isinstance(r, dict) else None
+
+
 def switch_b(role, timeout=300):
     """Role of radio B (docs/dual-radio.md); waits for the restart and radio B's start."""
-    up = status()['uptime_s']
+    boot = boot_id()
     code, r = http('POST', '/api/role', {'role': role, 'radio': 'b'})
     if code != 200:
         raise Fail(f'radio B role {role}: {code} {r}')
 
     def ready():
-        s = status()
+        try:
+            if boot_id() == boot:
+                return None
+            s = status()
+        except (OSError, Fail):
+            return None  # restarting
         rb = s['role'].get('b', {})
-        if s['uptime_s'] >= up or not s['role']['stable'] and rb.get('active') != role and not rb.get('maintenance'):
-            return None
+        if role == 'none':
+            return s if rb.get('desired') == 'none' and s['role']['active'] != 'none' or s['role']['maintenance'] else None
         return s if rb.get('active') == role or rb.get('maintenance') else None
     s = wait_until(f'radio B with role {role}', ready, timeout, 5)
     check(not s['role']['b']['maintenance'], f'radio B {role} started ({s["role"]["b"]["maintenance"]!r})')
@@ -1558,6 +1569,48 @@ def tc39_two_radios():
             switch_b(before_b)
 
 
+def tc40_thread_per_radio():
+    """Each radio keeps its own Thread network: Thread on radio B starts with B's settings (not radio A's
+    network), and back on radio A the first network returns unchanged."""
+    radios = http('GET', '/api/radios')[1]
+    if not (isinstance(radios, list) and len(radios) > 1 and radios[1].get('wired')):
+        log('skipped: no radio B on JP1')
+        return
+    s0 = status()
+    a0, b0 = s0['role']['active'], s0['role']['b']['desired']
+    if a0 not in ('thread_br', 'thread_router'):
+        switch('thread_br')
+    wait_thread_running()
+    net_a = http('GET', '/api/thread/status')[1]
+    log(f'radio A network {net_a.get("network_name")} {net_a.get("ext_pan_id")}')
+    try:
+        if status()['role']['b']['desired'] != 'none':
+            switch_b('none')
+        switch('zigbee_router')
+        switch_b('thread_br')
+
+        def running():
+            t = http('GET', '/api/thread/status')[1]
+            return t if t.get('ext_pan_id') and t.get('role') in ('leader', 'router') else None
+        net_b = wait_until('Thread network on radio B', running, 120, 3)
+        log(f'radio B network {net_b.get("network_name")} {net_b.get("ext_pan_id")}, RCP {net_b.get("rcp_version")}')
+        check('esp32c5' in net_b.get('rcp_version', '') or 'esp32c6' in net_b.get('rcp_version', ''), 'RCP of radio B answers')
+        check(net_b['ext_pan_id'] != net_a.get('ext_pan_id'), 'radio B has its own Thread network')
+        switch_b('none')
+        switch('thread_br')
+        net = wait_until('Thread network on radio A', running, 120, 3)
+        check(net['ext_pan_id'] == net_a.get('ext_pan_id') and net['network_name'] == net_a.get('network_name'),
+              f'radio A back on its network ({net["network_name"]})')
+    finally:
+        s = status()
+        if s['role']['b']['desired'] != 'none' and b0 != s['role']['b']['desired']:
+            switch_b('none')
+        if s['role']['active'] != a0:
+            switch(a0)
+        if b0 != status()['role']['b']['desired']:
+            switch_b(b0)
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1570,7 +1623,7 @@ TESTS = [
     ('TC24', tc24_previous_log), ('TC25', tc25_settings_backup),
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
-    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios),
+    ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
 ]
 
 
@@ -1590,9 +1643,18 @@ def main():
         for tid, fn in TESTS:
             print(f'{tid}  {fn.__doc__}')
         return 0
-    for tid, fn in TESTS:
-        if ARGS.only and tid not in ARGS.only:
-            continue
+    # the single-radio cases switch radio A freely: radio B off meanwhile, its role back at the end
+    selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
+    b_role = None
+    if any(tid not in ('TC39', 'TC40') for tid, _ in selected):
+        try:
+            b_role = status()['role'].get('b', {}).get('desired', 'none')
+        except Exception:  # noqa: BLE001 - gateway without radio B support
+            b_role = None
+        if b_role and b_role != 'none':
+            log(f'radio B {b_role} switched off for the run')
+            switch_b('none')
+    for tid, fn in selected:
         print(f'{tid} {fn.__doc__}', flush=True)
         t0 = time.time()
         try:
@@ -1604,6 +1666,12 @@ def main():
             result, detail = 'ERROR', f'{type(err).__name__}: {err}'
         RESULTS.append({'id': tid, 'result': result, 'detail': detail, 'seconds': round(time.time() - t0)})
         print(f'{tid} {result} ({time.time() - t0:.0f} s) {detail}\n', flush=True)
+    if b_role and b_role != 'none':
+        try:
+            switch_b(b_role)
+            log(f'radio B {b_role} again')
+        except Exception as err:  # noqa: BLE001
+            print(f'radio B {b_role} not restored: {err}')
     print('Summary: ' + ', '.join(f'{r["id"]} {r["result"]}' for r in RESULTS))
     if ARGS.report:
         with open(ARGS.report, 'w') as f:

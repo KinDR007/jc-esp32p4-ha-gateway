@@ -24,6 +24,7 @@
 #include "freertos/task.h"
 #include "gw.h"
 #include "netscan.h"
+#include "nvs.h"
 #include "openthread/border_agent.h"
 #include "openthread/border_routing.h"
 #include "openthread/cli.h"
@@ -58,6 +59,9 @@ static size_t s_cli_len;
 static bool s_cli_capture;
 
 static c6_radio_t s_radio; /* the radio running the RCP */
+/* the datasets the roles keep are per radio as well (radio A: the keys of the single-radio gateway) */
+#define BR_DATASET_KEY (s_radio == C6_RADIO_B ? GW_KEY_BR_DATASET "_b" : GW_KEY_BR_DATASET)
+#define TR_DATASET_KEY (s_radio == C6_RADIO_B ? GW_KEY_TR_DATASET "_b" : GW_KEY_TR_DATASET)
 
 static esp_openthread_config_t s_config = {
     .netif_config = ESP_NETIF_DEFAULT_OPENTHREAD(),
@@ -188,11 +192,11 @@ static void save_br_dataset(otInstance *instance)
     if (otDatasetGetActiveTlvs(instance, &active) != OT_ERROR_NONE) {
         return;
     }
-    if (gw_config_get_blob(GW_KEY_BR_DATASET, &saved, sizeof(saved)) && saved.mLength == active.mLength &&
+    if (gw_config_get_blob(BR_DATASET_KEY, &saved, sizeof(saved)) && saved.mLength == active.mLength &&
         memcmp(saved.mTlvs, active.mTlvs, active.mLength) == 0) {
         return;
     }
-    gw_config_set_blob(GW_KEY_BR_DATASET, &active, sizeof(active));
+    gw_config_set_blob(BR_DATASET_KEY, &active, sizeof(active));
     ESP_LOGI(TAG, "border router dataset saved (%s)", otThreadGetNetworkName(instance));
 }
 
@@ -202,7 +206,7 @@ static void start_border_router(otInstance *instance)
     esp_openthread_set_backbone_netif(gw_eth_netif());
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
 
-    if (gw_config_get_blob(GW_KEY_BR_DATASET, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
+    if (gw_config_get_blob(BR_DATASET_KEY, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
         ESP_LOGI(TAG, "using the saved border router dataset");
     } else if (otDatasetGetActiveTlvs(instance, &dataset) != OT_ERROR_NONE) {
         otOperationalDataset fresh;
@@ -220,7 +224,7 @@ static void start_border_router(otInstance *instance)
 static void start_router(otInstance *instance)
 {
     otOperationalDatasetTlvs dataset;
-    if (gw_config_get_blob(GW_KEY_TR_DATASET, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
+    if (gw_config_get_blob(TR_DATASET_KEY, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
         otError error = apply_dataset(instance, &dataset);
         snprintf(s_phase, sizeof(s_phase), error == OT_ERROR_NONE ? "joining" : "dataset rejected: %s",
                  otThreadErrorToString(error));
@@ -937,7 +941,7 @@ static esp_err_t dataset_post(httpd_req_t *req)
         return gw_http_send_error(req, 400, "not a valid active dataset");
     }
     if (!s_border_router) {
-        gw_config_set_blob(GW_KEY_TR_DATASET, &tlvs, sizeof(tlvs));
+        gw_config_set_blob(TR_DATASET_KEY, &tlvs, sizeof(tlvs));
     }
     if (!s_started || !esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
         return gw_http_send_error(req, 503, "OpenThread not running");
@@ -1001,8 +1005,136 @@ static esp_err_t cli_post(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
+/* ---- Thread settings per radio (docs/dual-radio.md) ----
+ * OpenThread keeps its settings (dataset, frame counters, child table) in the NVS namespace
+ * "openthread". Each radio has a network of its own: the settings of the radio that does not run
+ * Thread now are parked in "ot_a" / "ot_b". Namespace "otsel": "owner" = whose settings
+ * "openthread" holds (radio A on gateways from before), "swap" = target of a swap in progress. */
+#define OT_NS "openthread"
+#define OT_SEL_NS "otsel"
+static const char *const s_ot_park[2] = {"ot_a", "ot_b"};
+
+/* Replaces namespace to with a copy of namespace from (empty when from has nothing). */
+static esp_err_t ns_copy(const char *from, const char *to)
+{
+    nvs_handle_t dst;
+    ESP_RETURN_ON_ERROR(nvs_open(to, NVS_READWRITE, &dst), TAG, "open %s", to);
+    esp_err_t err = nvs_erase_all(dst);
+    nvs_iterator_t it = NULL;
+    nvs_handle_t src = 0;
+    bool have = err == ESP_OK && nvs_entry_find("nvs", from, NVS_TYPE_ANY, &it) == ESP_OK &&
+                nvs_open(from, NVS_READONLY, &src) == ESP_OK;
+    while (have && err == ESP_OK) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info);
+        size_t len = 0;
+        if (info.type == NVS_TYPE_BLOB || info.type == NVS_TYPE_STR) {
+            err = info.type == NVS_TYPE_BLOB ? nvs_get_blob(src, info.key, NULL, &len) : nvs_get_str(src, info.key, NULL, &len);
+            void *buf = err == ESP_OK ? malloc(len ? len : 1) : NULL;
+            if (err == ESP_OK && !buf) {
+                err = ESP_ERR_NO_MEM;
+            }
+            if (err == ESP_OK) {
+                err = info.type == NVS_TYPE_BLOB ? nvs_get_blob(src, info.key, buf, &len) : nvs_get_str(src, info.key, buf, &len);
+            }
+            if (err == ESP_OK) {
+                err = info.type == NVS_TYPE_BLOB ? nvs_set_blob(dst, info.key, buf, len) : nvs_set_str(dst, info.key, buf);
+            }
+            free(buf);
+        } else {
+            uint64_t v = 0; /* integers: the same bytes through the widest type of the same signedness */
+            switch (info.type) {
+            case NVS_TYPE_U8: err = nvs_get_u8(src, info.key, (uint8_t *)&v); if (!err) err = nvs_set_u8(dst, info.key, (uint8_t)v); break;
+            case NVS_TYPE_U16: err = nvs_get_u16(src, info.key, (uint16_t *)&v); if (!err) err = nvs_set_u16(dst, info.key, (uint16_t)v); break;
+            case NVS_TYPE_U32: err = nvs_get_u32(src, info.key, (uint32_t *)&v); if (!err) err = nvs_set_u32(dst, info.key, (uint32_t)v); break;
+            case NVS_TYPE_U64: err = nvs_get_u64(src, info.key, &v); if (!err) err = nvs_set_u64(dst, info.key, v); break;
+            case NVS_TYPE_I8: err = nvs_get_i8(src, info.key, (int8_t *)&v); if (!err) err = nvs_set_i8(dst, info.key, (int8_t)v); break;
+            case NVS_TYPE_I16: err = nvs_get_i16(src, info.key, (int16_t *)&v); if (!err) err = nvs_set_i16(dst, info.key, (int16_t)v); break;
+            case NVS_TYPE_I32: err = nvs_get_i32(src, info.key, (int32_t *)&v); if (!err) err = nvs_set_i32(dst, info.key, (int32_t)v); break;
+            case NVS_TYPE_I64: err = nvs_get_i64(src, info.key, (int64_t *)&v); if (!err) err = nvs_set_i64(dst, info.key, (int64_t)v); break;
+            default: break;
+            }
+        }
+        have = nvs_entry_next(&it) == ESP_OK;
+    }
+    nvs_release_iterator(it);
+    if (src) {
+        nvs_close(src);
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(dst);
+    }
+    nvs_close(dst);
+    return err;
+}
+
+/* Makes "openthread" hold the settings of radio; a swap cut by a power loss is finished first. */
+static esp_err_t thread_settings_select(c6_radio_t radio)
+{
+    nvs_handle_t h;
+    ESP_RETURN_ON_ERROR(nvs_open(OT_SEL_NS, NVS_READWRITE, &h), TAG, "open %s", OT_SEL_NS);
+    uint8_t owner = C6_RADIO_A, swap = 0xff;
+    nvs_get_u8(h, "owner", &owner);
+    nvs_get_u8(h, "swap", &swap);
+    esp_err_t err = ESP_OK;
+    if (swap < 2) {
+        /* the previous owner's settings were parked completely before the flag was set */
+        err = ns_copy(s_ot_park[swap], OT_NS);
+        if (err == ESP_OK) {
+            owner = swap;
+            nvs_set_u8(h, "owner", owner);
+            nvs_erase_key(h, "swap");
+            nvs_commit(h);
+        }
+    }
+    if (err == ESP_OK && owner != radio && owner < 2) {
+        ESP_LOGW(TAG, "Thread settings: radio %c parked, radio %c brought back", 'A' + owner, 'A' + radio);
+        err = ns_copy(OT_NS, s_ot_park[owner]);
+        if (err == ESP_OK) {
+            nvs_set_u8(h, "swap", radio);
+            err = nvs_commit(h);
+        }
+        if (err == ESP_OK) {
+            err = ns_copy(s_ot_park[radio], OT_NS);
+        }
+        if (err == ESP_OK) {
+            nvs_set_u8(h, "owner", radio);
+            nvs_erase_key(h, "swap");
+            err = nvs_commit(h);
+        }
+    }
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t role_thread_forget(c6_radio_t radio)
+{
+    nvs_handle_t h;
+    uint8_t owner = C6_RADIO_A;
+    if (nvs_open(OT_SEL_NS, NVS_READONLY, &h) == ESP_OK) {
+        nvs_get_u8(h, "owner", &owner);
+        nvs_close(h);
+    }
+    /* the radio whose settings "openthread" holds forgets them only while Thread does not run */
+    const char *ns = owner == radio ? OT_NS : s_ot_park[radio];
+    if (owner == radio && s_cli_lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    ESP_RETURN_ON_ERROR(nvs_open(ns, NVS_READWRITE, &h), TAG, "open %s", ns);
+    esp_err_t err = nvs_erase_all(h);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    gw_config_erase(radio == C6_RADIO_B ? GW_KEY_BR_DATASET "_b" : GW_KEY_BR_DATASET);
+    gw_config_erase(radio == C6_RADIO_B ? GW_KEY_TR_DATASET "_b" : GW_KEY_TR_DATASET);
+    ESP_LOGW(TAG, "Thread network of radio %c forgotten", 'A' + radio);
+    return err;
+}
+
 esp_err_t role_thread_start(bool border_router, c6_radio_t radio)
 {
+    ESP_RETURN_ON_ERROR(thread_settings_select(radio), TAG, "Thread settings of the radio");
     s_radio = radio;
     /* the RCP on the chosen radio's UART */
     const c6_radio_pins_t *pins = c6_radio_pins(radio);

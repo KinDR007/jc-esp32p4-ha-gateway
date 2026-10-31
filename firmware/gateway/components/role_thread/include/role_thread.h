@@ -15,6 +15,9 @@ extern "C" {
  * the network from the dataset stored in NVS and stays idle until one is set.
  */
 esp_err_t role_thread_start(bool border_router, c6_radio_t radio);
+/* Forgets the Thread network of a radio (its OpenThread settings and saved datasets); not while
+ * Thread runs on it (ESP_ERR_INVALID_STATE). */
+esp_err_t role_thread_forget(c6_radio_t radio);
 
 #ifdef __cplusplus
 }
