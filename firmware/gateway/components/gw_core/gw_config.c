@@ -134,7 +134,7 @@ const gw_radio_keys_t *gw_radio_keys(int radio)
 {
     static const gw_radio_keys_t keys[] = {
         {GW_KEY_C6_BUNDLE, GW_KEY_C6_SHA, GW_KEY_C6_FORCE, GW_KEY_C6_TRIES, GW_KEY_C6_ADOPTED},
-        {"c6b_name", "c6b_sha", "c6b_force", "c6b_tries", "c6b_ok"},
+        {"rb_name", "rb_sha", "rb_force", "rb_tries", "rb_ok"},
     };
     return &keys[radio == 1 ? 1 : 0];
 }
@@ -142,7 +142,7 @@ const gw_radio_keys_t *gw_radio_keys(int radio)
 /* Keys that describe this board and its radios, not the user's settings: never exported or imported. */
 static const char *const s_board_keys[] = {
     GW_KEY_BOOT_COUNT, GW_KEY_GW_SLOT, GW_KEY_C6_BUNDLE, GW_KEY_C6_SHA, GW_KEY_C6_FORCE, GW_KEY_C6_TRIES,
-    GW_KEY_C6_ADOPTED, "c6b_*", GW_KEY_RCP_TEL_OFF, GW_KEY_HA_SEEN, GW_KEY_FAIL_RST, GW_KEY_ESPHOME_TRY,
+    GW_KEY_C6_ADOPTED, "rb_*", GW_KEY_RCP_TEL_OFF, GW_KEY_HA_SEEN, GW_KEY_FAIL_RST, GW_KEY_ESPHOME_TRY,
     GW_KEY_ZB_SNAP_REQ, "netscan", "netscan_req", "auth_ses", "auth_req",
 };
 /* users (password hashes, 2FA secrets) and API tokens go only into a backup with passwords */

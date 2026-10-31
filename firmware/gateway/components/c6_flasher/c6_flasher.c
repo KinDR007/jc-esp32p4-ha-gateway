@@ -76,7 +76,7 @@ static radio_t s_radios[C6_RADIOS] = {
     [C6_RADIO_B] = {.pins = {.uart_port = CONFIG_GW_RADIO_B_UART_PORT, .tx = CONFIG_GW_RADIO_B_UART_TX,
                              .rx = CONFIG_GW_RADIO_B_UART_RX, .reset = CONFIG_GW_RADIO_B_RESET_GPIO,
                              .boot = CONFIG_GW_RADIO_B_BOOT_GPIO},
-                    .name = "radio B", .nvs_ns = "c6chipb", .snap_tag = "b/"},
+                    .name = "radio B", .nvs_ns = "radiob", .snap_tag = "b/"},
 };
 
 static radio_t *radio(c6_radio_t r)
