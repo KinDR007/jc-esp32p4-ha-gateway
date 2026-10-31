@@ -30,10 +30,14 @@ const char *gw_role_name(gw_role_t role);
 bool gw_role_from_name(const char *name, gw_role_t *role);
 /* Name of the c6fw bundle the role runs on the C6, NULL for none. */
 const char *gw_role_c6_bundle(gw_role_t role);
+/* Roles of the two radios (docs/dual-radio.md): at most one Thread and one Zigbee network, radio B
+ * no ESPHome; NULL when the pair is allowed, else why not. */
+const char *gw_roles_conflict(gw_role_t radio_a, gw_role_t radio_b);
 
 /* ---- persistent settings (NVS namespace "p4gw", also read by the ESPHome image) ---- */
 #define GW_NVS_NAMESPACE "p4gw"
-#define GW_KEY_ROLE "role"          /* u8 gw_role_t, desired role */
+#define GW_KEY_ROLE "role"          /* u8 gw_role_t, desired role of radio A */
+#define GW_KEY_ROLE_B "role_b"      /* u8 gw_role_t, desired role of radio B (external), none by default */
 #define GW_KEY_PASSWORD "password"  /* str, empty = no auth */
 #define GW_KEY_HOSTNAME "hostname"  /* str, empty = default */
 #define GW_KEY_BOOT_COUNT "bootcnt" /* u8, boots without reaching stable uptime */
@@ -85,6 +89,9 @@ typedef struct {
     gw_role_t desired;          /* from NVS */
     gw_role_t active;           /* what actually runs */
     char maintenance[96];       /* why the gateway fell back to GW_ROLE_NONE */
+    gw_role_t desired_b;        /* radio B (external, docs/dual-radio.md) */
+    gw_role_t active_b;
+    char maintenance_b[160];    /* why radio B does not run its role; the gateway itself is not affected */
     char hostname[32];
     bool stable;                /* survived the stability window */
 } gw_state_t;
@@ -189,10 +196,13 @@ esp_err_t gw_http_receive(httpd_req_t *req, gw_sink_fn sink, void *ctx);
 /* System API: status, logs, role switching, OTA, settings, tools. */
 esp_err_t gw_api_register(void);
 /* The running role adds its summary to /api/status under "role_status". */
-void gw_api_set_role_status(cJSON *(*provider)(void));
-cJSON *gw_api_role_status(void);
+/* State of the role running on a radio (0 = A, 1 = B), from its provider; NULL when none. */
+void gw_api_set_role_status(int radio, cJSON *(*provider)(void));
+cJSON *gw_api_role_status(int radio);
 /* Stores the role and restarts (also from the Telegram bot); err says why not. */
 esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len);
+/* The same for a radio (c6_radio_t: 0 = A, 1 = B; radio B also takes "none"). */
+esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup, char *err, size_t err_len);
 bool gw_api_temperature(float *celsius);
 
 /*
@@ -201,7 +211,9 @@ bool gw_api_temperature(float *celsius);
  */
 #define GW_C6_TELEMETRY_MAX 256
 #define GW_C6_TELEMETRY_SPINEL_PROP 0x3cf0 /* P4GW_SPINEL_PROP_TELEMETRY of the C6 side */
-void gw_c6_telemetry_set(const char *json);
+void gw_c6_telemetry_set(int radio, const char *json);
+/* Last telemetry of a radio (0 = A, 1 = B) with its age, NULL when its firmware sent none since the start. */
+cJSON *gw_c6_telemetry(int radio);
 
 /* Long P4 flash writes and the sound model exclude each other: every flash write stalls both
  * cores, and a model run slowed down that way keeps CPU 1 busy until the task watchdog fires.

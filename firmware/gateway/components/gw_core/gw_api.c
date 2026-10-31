@@ -27,19 +27,19 @@ static const char *TAG = "gw_api";
 
 #define UPLOAD_CHUNK 4096
 
-static cJSON *(*s_role_status)(void);
+static cJSON *(*s_role_status[2])(void); /* per radio */
 static temperature_sensor_handle_t s_temp;
 static SemaphoreHandle_t s_upload_lock;
 static SemaphoreHandle_t s_flash_lock;
 
-void gw_api_set_role_status(cJSON *(*provider)(void))
+void gw_api_set_role_status(int radio, cJSON *(*provider)(void))
 {
-    s_role_status = provider;
+    s_role_status[radio == 1] = provider;
 }
 
-cJSON *gw_api_role_status(void)
+cJSON *gw_api_role_status(int radio)
 {
-    return s_role_status ? s_role_status() : NULL;
+    return s_role_status[radio == 1] ? s_role_status[radio == 1]() : NULL;
 }
 
 /* Hardware sampled every 2 s: CPU load per core from the FreeRTOS idle counters, P4 temperature range. */
@@ -145,41 +145,43 @@ static esp_err_t identify_post(httpd_req_t *req)
     return gw_http_send_json(req, json);
 }
 
+/* per radio (0 = A, 1 = B) */
 static portMUX_TYPE s_c6_tel_mux = portMUX_INITIALIZER_UNLOCKED;
-static char s_c6_tel[GW_C6_TELEMETRY_MAX];
-static int64_t s_c6_tel_us;
-static float s_c6_temp_min = NAN, s_c6_temp_max = NAN; /* since the gateway start, any C6 firmware */
+static char s_c6_tel[2][GW_C6_TELEMETRY_MAX];
+static int64_t s_c6_tel_us[2];
+static float s_c6_temp_min[2] = {NAN, NAN}, s_c6_temp_max[2] = {NAN, NAN}; /* since the gateway start, any firmware */
 
-void gw_c6_telemetry_set(const char *json)
+void gw_c6_telemetry_set(int radio, const char *json)
 {
+    int r = radio == 1;
     cJSON *j = cJSON_Parse(json);
     const cJSON *t = cJSON_GetObjectItem(j, "temp_c");
     if (cJSON_IsNumber(t)) {
-        s_c6_temp_min = isnan(s_c6_temp_min) || t->valuedouble < s_c6_temp_min ? t->valuedouble : s_c6_temp_min;
-        s_c6_temp_max = isnan(s_c6_temp_max) || t->valuedouble > s_c6_temp_max ? t->valuedouble : s_c6_temp_max;
+        s_c6_temp_min[r] = isnan(s_c6_temp_min[r]) || t->valuedouble < s_c6_temp_min[r] ? t->valuedouble : s_c6_temp_min[r];
+        s_c6_temp_max[r] = isnan(s_c6_temp_max[r]) || t->valuedouble > s_c6_temp_max[r] ? t->valuedouble : s_c6_temp_max[r];
     }
     cJSON_Delete(j);
     portENTER_CRITICAL(&s_c6_tel_mux);
-    strlcpy(s_c6_tel, json, sizeof(s_c6_tel));
-    s_c6_tel_us = esp_timer_get_time();
+    strlcpy(s_c6_tel[r], json, sizeof(s_c6_tel[r]));
+    s_c6_tel_us[r] = esp_timer_get_time();
     portEXIT_CRITICAL(&s_c6_tel_mux);
 }
 
-/* Last telemetry with its age; NULL when the running C6 firmware sent none since the start. */
-static cJSON *c6_telemetry_json(void)
+cJSON *gw_c6_telemetry(int radio)
 {
+    int r = radio == 1;
     char buf[GW_C6_TELEMETRY_MAX];
     int64_t at;
     portENTER_CRITICAL(&s_c6_tel_mux);
-    memcpy(buf, s_c6_tel, sizeof(buf));
-    at = s_c6_tel_us;
+    memcpy(buf, s_c6_tel[r], sizeof(buf));
+    at = s_c6_tel_us[r];
     portEXIT_CRITICAL(&s_c6_tel_mux);
     cJSON *j = at ? cJSON_Parse(buf) : NULL;
     if (cJSON_IsObject(j)) {
         cJSON_AddNumberToObject(j, "age_s", (double)((esp_timer_get_time() - at) / 1000000));
-        if (!isnan(s_c6_temp_min)) {
-            cJSON_AddNumberToObject(j, "temp_min_c", round(s_c6_temp_min * 10) / 10.0);
-            cJSON_AddNumberToObject(j, "temp_max_c", round(s_c6_temp_max * 10) / 10.0);
+        if (!isnan(s_c6_temp_min[r])) {
+            cJSON_AddNumberToObject(j, "temp_min_c", round(s_c6_temp_min[r] * 10) / 10.0);
+            cJSON_AddNumberToObject(j, "temp_max_c", round(s_c6_temp_max[r] * 10) / 10.0);
         }
         return j;
     }
@@ -286,6 +288,10 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(role, "desired", gw_role_name(st->desired));
     cJSON_AddStringToObject(role, "maintenance", st->maintenance);
     cJSON_AddBoolToObject(role, "stable", st->stable);
+    cJSON *role_b = cJSON_AddObjectToObject(role, "b");
+    cJSON_AddStringToObject(role_b, "active", gw_role_name(st->active_b));
+    cJSON_AddStringToObject(role_b, "desired", gw_role_name(st->desired_b));
+    cJSON_AddStringToObject(role_b, "maintenance", st->maintenance_b);
 
     cJSON_AddItemToObject(json, "eth", gw_eth_status());
 
@@ -315,7 +321,7 @@ static esp_err_t status_get(httpd_req_t *req)
     free(dir);
     const c6_progress_t *p = c6_progress(C6_RADIO_A);
     cJSON_AddItemToObject(c6, "chip", c6_chip_json());
-    cJSON *tel = c6_telemetry_json();
+    cJSON *tel = gw_c6_telemetry(0);
     if (tel) {
         cJSON_AddItemToObject(c6, "telemetry", tel);
     }
@@ -356,8 +362,11 @@ static esp_err_t status_get(httpd_req_t *req)
         cJSON_AddBoolToObject(links, "internet", gw_inet_state());
     }
     cJSON_AddNumberToObject(links, "internet_age_s", (int)gw_inet_age_s());
-    if (s_role_status) {
-        cJSON_AddItemToObject(json, "role_status", s_role_status());
+    if (s_role_status[0]) {
+        cJSON_AddItemToObject(json, "role_status", s_role_status[0]());
+    }
+    if (s_role_status[1]) {
+        cJSON_AddItemToObject(json, "role_status_b", s_role_status[1]());
     }
     return gw_http_send_json(req, json);
 }
@@ -396,26 +405,43 @@ static esp_err_t logs_previous_get(httpd_req_t *req)
     return httpd_resp_send(req, text, n);
 }
 
-/* Stores the role and restarts; ESP_ERR_INVALID_ARG unknown role, ESP_ERR_INVALID_STATE with err set. */
-esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len)
+/* Stores the role of a radio and restarts; ESP_ERR_INVALID_ARG unknown role, ESP_ERR_INVALID_STATE
+ * with err set. Radio B may also be switched off ("none"). */
+esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup, char *err, size_t err_len)
 {
     gw_role_t role;
-    if (!gw_role_from_name(name, &role) || role == GW_ROLE_NONE) {
+    gw_state_t *st = gw_state();
+    if (!gw_role_from_name(name, &role) || (role == GW_ROLE_NONE && radio == C6_RADIO_A)) {
         snprintf(err, err_len, "unknown role");
         return ESP_ERR_INVALID_ARG;
     }
+    const char *conflict = radio == C6_RADIO_A ? gw_roles_conflict(role, st->desired_b) : gw_roles_conflict(st->desired, role);
+    if (conflict) {
+        snprintf(err, err_len, "%s", conflict);
+        return ESP_ERR_INVALID_STATE;
+    }
+    const gw_radio_keys_t *keys = gw_radio_keys(radio);
     char flashed[16];
-    bool factory_c6 = !gw_config_get_str(GW_KEY_C6_BUNDLE, flashed, sizeof(flashed));
-    if (factory_c6 && role != GW_ROLE_ESPHOME && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
+    bool factory = !gw_config_get_str(keys->bundle, flashed, sizeof(flashed));
+    if (factory && role != GW_ROLE_ESPHOME && role != GW_ROLE_NONE && !gw_config_get_u8(keys->adopted, 0)) {
         if (!skip_backup) {
-            snprintf(err, err_len, "c6_backup_required");
+            snprintf(err, err_len, radio == C6_RADIO_A ? "c6_backup_required" : "radio_b_backup_required");
             return ESP_ERR_INVALID_STATE;
         }
-        gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
+        gw_config_set_u8(keys->adopted, 1);
     }
-    if (c6_progress(C6_RADIO_A)->busy) {
-        snprintf(err, err_len, "C6 flashing in progress");
+    if (c6_progress(radio)->busy) {
+        snprintf(err, err_len, "radio flashing in progress");
         return ESP_ERR_INVALID_STATE;
+    }
+    if (radio == C6_RADIO_B) {
+        gw_config_set_u8(GW_KEY_ROLE_B, role);
+        gw_config_set_u8(keys->tries, 0);
+        ESP_LOGW(TAG, "radio B role %s requested", gw_role_name(role));
+        gw_notify("system", GW_NOTIFY_INFO, "Radio B role %s requested by %s, restarting", gw_role_name(role),
+                  gw_auth_who()[0] ? gw_auth_who() : "the web UI");
+        gw_restart_later(500);
+        return ESP_OK;
     }
     if (role == GW_ROLE_ESPHOME) {
         const esp_partition_t *part =
@@ -435,17 +461,29 @@ esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size
     return ESP_OK;
 }
 
+esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len)
+{
+    return gw_api_role_switch_radio(C6_RADIO_A, name, skip_backup, err, err_len);
+}
+
+/* {"role": "...", "radio": "a" | "b", "skip_backup": bool} */
 static esp_err_t role_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
     if (!body) {
         return ESP_OK;
     }
-    char name[24], err[64];
+    char name[24], err[96];
     strlcpy(name, GW_JSON_STR(body, "role") ? GW_JSON_STR(body, "role") : "", sizeof(name));
     bool skip_backup = cJSON_IsTrue(cJSON_GetObjectItem(body, "skip_backup"));
+    const char *radio = GW_JSON_STR(body, "radio");
+    int r = radio && strcmp(radio, "b") == 0 ? C6_RADIO_B : C6_RADIO_A;
+    bool bad_radio = radio && strcmp(radio, "a") != 0 && strcmp(radio, "b") != 0;
     cJSON_Delete(body);
-    esp_err_t res = gw_api_role_switch(name, skip_backup, err, sizeof(err));
+    if (bad_radio) {
+        return gw_http_send_error(req, 400, "radio: a or b");
+    }
+    esp_err_t res = gw_api_role_switch_radio(r, name, skip_backup, err, sizeof(err));
     if (res != ESP_OK) {
         return gw_http_send_error(req, res == ESP_ERR_INVALID_ARG ? 400 : 409, err);
     }

@@ -57,6 +57,8 @@ static char *s_cli_buf;
 static size_t s_cli_len;
 static bool s_cli_capture;
 
+static c6_radio_t s_radio; /* the radio running the RCP */
+
 static esp_openthread_config_t s_config = {
     .netif_config = ESP_NETIF_DEFAULT_OPENTHREAD(),
     .platform_config =
@@ -268,7 +270,7 @@ static void read_rcp_telemetry(otInstance *instance)
     esp_timer_stop(s_tel_guard);
     if (err == ESP_OK) {
         buf[len] = '\0';
-        gw_c6_telemetry_set(buf);
+        gw_c6_telemetry_set(s_radio, buf);
     }
 }
 
@@ -1001,6 +1003,7 @@ static esp_err_t cli_post(httpd_req_t *req)
 
 esp_err_t role_thread_start(bool border_router, c6_radio_t radio)
 {
+    s_radio = radio;
     /* the RCP on the chosen radio's UART */
     const c6_radio_pins_t *pins = c6_radio_pins(radio);
     s_config.platform_config.radio_config.radio_uart_config.port = pins->uart_port;
@@ -1020,7 +1023,7 @@ esp_err_t role_thread_start(bool border_router, c6_radio_t radio)
     s_topo_done = xSemaphoreCreateBinary();
     gw_http_register("/api/thread/topology", HTTP_GET, topology_get);
     gw_http_register("/api/thread/txpower", HTTP_POST, txpower_post);
-    gw_api_set_role_status(thread_summary);
+    gw_api_set_role_status(radio, thread_summary);
     netscan_set_quick(quick_scan);
 
     return xTaskCreate(thread_task, "thread_start", 6144, NULL, 5, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;

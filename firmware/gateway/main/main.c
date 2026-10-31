@@ -5,6 +5,7 @@
 
 #include "c6_flasher.h"
 #include "cJSON.h"
+#include "driver/uart.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_heap_caps.h"
@@ -104,6 +105,36 @@ static bool ensure_c6(c6_radio_t radio, const char *bundle, bool force_flash, ch
     return true;
 }
 
+static bool is_zigbee(gw_role_t role)
+{
+    return role == GW_ROLE_ZIGBEE_COORD || role == GW_ROLE_ZIGBEE_ROUTER;
+}
+
+/* A backup requested before the restart (zigbee_snapshot_post, the nightly one): saved before the
+ * role starts, the radio restarts anyway. */
+static void zigbee_backup_if_requested(c6_radio_t radio, gw_role_t role)
+{
+    if (!is_zigbee(role) || !gw_config_get_u8(GW_KEY_ZB_SNAP_REQ, 0)) {
+        return;
+    }
+    gw_config_erase(GW_KEY_ZB_SNAP_REQ);
+    if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+    gw_flash_lock();
+    esp_err_t err = c6_snapshot_take(radio, gw_role_c6_bundle(role));
+    gw_flash_unlock();
+    ESP_LOGI(TAG, "Zigbee network backup of radio %c: %s", 'A' + radio, esp_err_to_name(err));
+}
+
+static esp_err_t start_radio_role(c6_radio_t radio, gw_role_t role)
+{
+    if (role == GW_ROLE_THREAD_BR || role == GW_ROLE_THREAD_ROUTER) {
+        return role_thread_start(role == GW_ROLE_THREAD_BR, radio);
+    }
+    return role_zigbee_start(role == GW_ROLE_ZIGBEE_COORD, radio);
+}
+
 static void apply_role(gw_role_t role)
 {
     gw_state_t *st = gw_state();
@@ -135,26 +166,15 @@ static void apply_role(gw_role_t role)
             return;
         }
     }
-    if ((role == GW_ROLE_ZIGBEE_COORD || role == GW_ROLE_ZIGBEE_ROUTER) && gw_config_get_u8(GW_KEY_ZB_SNAP_REQ, 0)) {
-        gw_config_erase(GW_KEY_ZB_SNAP_REQ);
-        if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
-            vTaskDelay(pdMS_TO_TICKS(2000));
-        }
-        gw_flash_lock();
-        esp_err_t err = c6_snapshot_take(C6_RADIO_A, gw_role_c6_bundle(role));
-        gw_flash_unlock();
-        ESP_LOGI(TAG, "Zigbee network backup: %s", esp_err_to_name(err));
-    }
+    zigbee_backup_if_requested(C6_RADIO_A, role);
 
     esp_err_t err = ESP_OK;
     switch (role) {
     case GW_ROLE_THREAD_BR:
     case GW_ROLE_THREAD_ROUTER:
-        err = role_thread_start(role == GW_ROLE_THREAD_BR, C6_RADIO_A);
-        break;
     case GW_ROLE_ZIGBEE_COORD:
     case GW_ROLE_ZIGBEE_ROUTER:
-        err = role_zigbee_start(role == GW_ROLE_ZIGBEE_COORD, C6_RADIO_A);
+        err = start_radio_role(C6_RADIO_A, role);
         break;
     case GW_ROLE_ESPHOME:
         err = gw_boot_select_esphome();
@@ -175,6 +195,70 @@ static void apply_role(gw_role_t role)
         return;
     }
     st->active = role;
+}
+
+/* ---- radio B (external, docs/dual-radio.md): its own role next to radio A's ---- */
+static c6_probe_t s_probe_b; /* wiring test at start */
+static bool s_probed_b;
+
+/* A failure stops radio B only (maintenance_b); the gateway and radio A keep running. */
+static void apply_role_b(gw_role_t role)
+{
+    gw_state_t *st = gw_state();
+    s_probed_b = true;
+    bool found = c6_radio_probe(C6_RADIO_B, &s_probe_b) == ESP_OK;
+    if (role == GW_ROLE_NONE) {
+        return;
+    }
+    const char *conflict = gw_roles_conflict(st->desired, role);
+    if (conflict) {
+        snprintf(st->maintenance_b, sizeof(st->maintenance_b), "%s", conflict);
+        return;
+    }
+    if (!found) {
+        snprintf(st->maintenance_b, sizeof(st->maintenance_b), "radio B not reached: %.130s", s_probe_b.verdict);
+        gw_notify("system", GW_NOTIFY_WARNING, "Radio B (%s) not reached: %s", gw_role_name(role), s_probe_b.verdict);
+        return;
+    }
+    char flashed[16];
+    const gw_radio_keys_t *keys = gw_radio_keys(C6_RADIO_B);
+    if (!gw_config_get_str(keys->bundle, flashed, sizeof(flashed)) && !gw_config_get_u8(keys->adopted, 0)) {
+        snprintf(st->maintenance_b, sizeof(st->maintenance_b),
+                 "back up the factory firmware of radio B first or confirm skipping the backup");
+        return;
+    }
+    char why[160];
+    if (!ensure_c6(C6_RADIO_B, gw_role_c6_bundle(role), false, why, sizeof(why))) {
+        snprintf(st->maintenance_b, sizeof(st->maintenance_b), "%s", why);
+        gw_notify("system", GW_NOTIFY_WARNING, "Radio B (%s) not started: %s", gw_role_name(role), why);
+        return;
+    }
+    zigbee_backup_if_requested(C6_RADIO_B, role);
+    esp_err_t err = start_radio_role(C6_RADIO_B, role);
+    if (err != ESP_OK) {
+        snprintf(st->maintenance_b, sizeof(st->maintenance_b), "starting %s failed: %s", gw_role_name(role),
+                 esp_err_to_name(err));
+        return;
+    }
+    st->active_b = role;
+    ESP_LOGI(TAG, "radio B runs %s", gw_role_name(role));
+}
+
+/* the radio whose active role is Zigbee (false: none) */
+static bool zigbee_radio(c6_radio_t *radio, gw_role_t *role)
+{
+    gw_state_t *st = gw_state();
+    if (is_zigbee(st->active)) {
+        *radio = C6_RADIO_A;
+        *role = st->active;
+        return true;
+    }
+    if (is_zigbee(st->active_b)) {
+        *radio = C6_RADIO_B;
+        *role = st->active_b;
+        return true;
+    }
+    return false;
 }
 
 /* ---- Zigbee network backup ----
@@ -215,7 +299,7 @@ static void radio_b_flash_task(void *arg)
     vTaskDelete(NULL);
 }
 
-/* {"bundle": "ot_rcp", "force": false}: radio B gets the firmware (no role uses it yet) */
+/* {"bundle": "ot_rcp", "force": false}: radio B gets the firmware (only while it has no role) */
 static esp_err_t radio_b_flash_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -232,6 +316,10 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
         cJSON_Delete(body);
         return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router or scanner");
     }
+    if (gw_state()->active_b != GW_ROLE_NONE) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 409, "radio B runs a role: switch it off first");
+    }
     if (s_flash_b.task || c6_progress(C6_RADIO_B)->busy) {
         cJSON_Delete(body);
         return gw_http_send_error(req, 409, "radio B is being flashed");
@@ -245,6 +333,57 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
         return gw_http_send_error(req, 500, "no memory for the flashing task");
     }
     return gw_http_send_json(req, cJSON_CreateObject());
+}
+
+/* GET /api/radios/b/console?baud=115200&ms=3000&reset=1: what radio B prints on its UART (ROM
+ * banner, boot log, panic), for diagnostics while no role uses it. */
+static esp_err_t radio_b_console_get(httpd_req_t *req)
+{
+    char query[64], val[12];
+    int baud = 115200, ms = 3000;
+    bool reset = false;
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        if (httpd_query_key_value(query, "baud", val, sizeof(val)) == ESP_OK) {
+            baud = atoi(val);
+        }
+        if (httpd_query_key_value(query, "ms", val, sizeof(val)) == ESP_OK) {
+            ms = atoi(val);
+        }
+        if (httpd_query_key_value(query, "reset", val, sizeof(val)) == ESP_OK) {
+            reset = atoi(val) != 0;
+        }
+    }
+    if (baud < 9600 || baud > 2000000 || ms < 100 || ms > 10000) {
+        return gw_http_send_error(req, 400, "baud 9600..2000000, ms 100..10000");
+    }
+    if (gw_state()->active_b != GW_ROLE_NONE || s_flash_b.task || c6_progress(C6_RADIO_B)->busy) {
+        return gw_http_send_error(req, 409, "radio B is in use");
+    }
+    const c6_radio_pins_t *p = c6_radio_pins(C6_RADIO_B);
+    uart_config_t cfg = {.baud_rate = baud, .data_bits = UART_DATA_8_BITS, .parity = UART_PARITY_DISABLE,
+                         .stop_bits = UART_STOP_BITS_1, .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT};
+    char *buf = calloc(1, 8192);
+    if (!buf || uart_driver_install(p->uart_port, 8192, 0, 0, NULL, 0) != ESP_OK) {
+        free(buf);
+        return gw_http_send_error(req, 500, "UART unavailable");
+    }
+    uart_param_config(p->uart_port, &cfg);
+    uart_set_pin(p->uart_port, p->tx, p->rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_flush_input(p->uart_port);
+    if (reset) {
+        c6_reset(C6_RADIO_B);
+    }
+    int n = uart_read_bytes(p->uart_port, buf, 8191, pdMS_TO_TICKS(ms));
+    uart_driver_delete(p->uart_port);
+    for (int i = 0; i < n; i++) {
+        if ((buf[i] < 0x20 || buf[i] > 0x7e) && buf[i] != '\n' && buf[i] != '\r') {
+            buf[i] = '.'; /* binary frames */
+        }
+    }
+    httpd_resp_set_type(req, "text/plain");
+    esp_err_t err = httpd_resp_send(req, buf, n > 0 ? n : 0);
+    free(buf);
+    return err;
 }
 
 static esp_err_t radios_get(httpd_req_t *req)
@@ -271,6 +410,22 @@ static esp_err_t radios_get(httpd_req_t *req)
         cJSON_AddStringToObject(j, "error", r == C6_RADIO_B && s_flash_b.error[0] ? s_flash_b.error : p->last_error);
         cJSON_AddItemToArray(arr, j);
     }
+    cJSON *b = cJSON_GetArrayItem(arr, 1);
+    cJSON *tel = gw_c6_telemetry(1);
+    if (tel) {
+        cJSON_AddItemToObject(b, "telemetry", tel);
+    }
+    cJSON_AddStringToObject(b, "role", gw_role_name(gw_state()->active_b));
+    cJSON_AddStringToObject(b, "desired", gw_role_name(gw_state()->desired_b));
+    cJSON_AddStringToObject(b, "maintenance", gw_state()->maintenance_b);
+    if (s_probed_b) {
+        cJSON_AddBoolToObject(b, "wired", s_probe_b.wired);
+        cJSON_AddStringToObject(b, "wiring", s_probe_b.verdict);
+    }
+    cJSON *a = cJSON_GetArrayItem(arr, 0);
+    cJSON_AddStringToObject(a, "role", gw_role_name(gw_state()->active));
+    cJSON_AddStringToObject(a, "desired", gw_role_name(gw_state()->desired));
+    cJSON_AddStringToObject(a, "maintenance", gw_state()->maintenance);
     cJSON_AddStringToObject(cJSON_GetArrayItem(arr, 1), "package_in_psram",
                             c6fw_stage_chip() == C6FW_CHIP_C5 ? "c5" : c6fw_stage_chip() == C6FW_CHIP_C6 ? "c6" : "");
     return gw_http_send_json(req, arr);
@@ -278,12 +433,13 @@ static esp_err_t radios_get(httpd_req_t *req)
 
 static esp_err_t zigbee_snapshot_post(httpd_req_t *req)
 {
-    gw_role_t role = gw_state()->active;
-    if (role != GW_ROLE_ZIGBEE_COORD && role != GW_ROLE_ZIGBEE_ROUTER) {
+    c6_radio_t radio;
+    gw_role_t role;
+    if (!zigbee_radio(&radio, &role)) {
         return gw_http_send_error(req, 409, "only in a Zigbee role");
     }
-    if (c6_progress(C6_RADIO_A)->busy) {
-        return gw_http_send_error(req, 409, "C6 flashing in progress");
+    if (c6_progress(radio)->busy) {
+        return gw_http_send_error(req, 409, "radio flashing in progress");
     }
     cJSON *json = cJSON_CreateObject();
     cJSON_AddBoolToObject(json, "restarting", true);
@@ -293,14 +449,16 @@ static esp_err_t zigbee_snapshot_post(httpd_req_t *req)
 
 static bool zigbee_backup_due(void)
 {
-    gw_role_t role = gw_state()->active;
+    c6_radio_t radio;
+    gw_role_t role;
+    bool zigbee = zigbee_radio(&radio, &role);
     uint8_t days = gw_config_get_u8(GW_KEY_ZB_SNAP_DAYS, GW_ZB_SNAP_DAYS_DEFAULT);
     time_t now = time(NULL);
     struct tm utc;
     uint32_t size, gen, saved = 0;
 
     /* up for an hour at least: a failed attempt (it restarts) is not repeated in the same night */
-    if ((role != GW_ROLE_ZIGBEE_COORD && role != GW_ROLE_ZIGBEE_ROUTER) || !days || now < 1700000000 ||
+    if (!zigbee || !days || now < 1700000000 ||
         esp_timer_get_time() < 3600LL * 1000000) {
         return false;
     }
@@ -308,7 +466,7 @@ static bool zigbee_backup_due(void)
     if (utc.tm_hour != SNAP_HOUR_UTC || (role == GW_ROLE_ZIGBEE_COORD && role_zigbee_host_connected())) {
         return false;
     }
-    c6_snapshot_info(C6_RADIO_A, gw_role_c6_bundle(role), &size, &gen, &saved);
+    c6_snapshot_info(radio, gw_role_c6_bundle(role), &size, &gen, &saved);
     /* an hour of slack: the check runs every 10 minutes, so yesterday's backup may be 23.9 h old */
     return !saved || now - (time_t)saved >= (time_t)days * 86400 - 3600;
 }
@@ -389,6 +547,10 @@ void app_main(void)
     if (st->desired >= GW_ROLE_MAX) {
         st->desired = def_role;
     }
+    st->desired_b = gw_config_get_u8(GW_KEY_ROLE_B, GW_ROLE_NONE);
+    if (st->desired_b >= GW_ROLE_MAX) {
+        st->desired_b = GW_ROLE_NONE;
+    }
     if (!gw_config_get_str(GW_KEY_HOSTNAME, st->hostname, sizeof(st->hostname)) || !st->hostname[0]) {
         uint8_t mac[6];
         esp_read_mac(mac, ESP_MAC_BASE);
@@ -411,6 +573,7 @@ void app_main(void)
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);
     gw_http_register("/api/radios", HTTP_GET, radios_get);
     gw_http_register("/api/radios/b/flash", HTTP_POST, radio_b_flash_post);
+    gw_http_register("/api/radios/b/console", HTTP_GET, radio_b_console_get);
     netscan_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
@@ -429,6 +592,9 @@ void app_main(void)
             netscan_run_full();
         }
         apply_role(st->desired);
+        if (st->active != GW_ROLE_ESPHOME) {
+            apply_role_b(st->desired_b);
+        }
     }
 
     vTaskDelay(pdMS_TO_TICKS(STABLE_AFTER_MS));

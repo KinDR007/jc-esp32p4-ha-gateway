@@ -652,13 +652,18 @@ static void cmd_lan(const char *args, bool cz, char *out, size_t len)
 /* state of the active role, from its status provider (flat values only) */
 static void role_status(const char *prefix, bool cz, char *out, size_t len)
 {
-    if (strncmp(gw_role_name(gw_state()->active), prefix, strlen(prefix)) != 0) {
+    /* the radio that runs it (radio B: docs/dual-radio.md) */
+    int radio = strncmp(gw_role_name(gw_state()->active), prefix, strlen(prefix)) == 0 ? 0
+                : strncmp(gw_role_name(gw_state()->active_b), prefix, strlen(prefix)) == 0 ? 1
+                                                                                         : -1;
+    if (radio < 0) {
         snprintf(out, len, cz ? "Role %s neběží (aktivní: %s)." : "The %s role is not active (active: %s).", prefix,
                  gw_role_name(gw_state()->active));
         return;
     }
-    cJSON *j = gw_api_role_status();
-    size_t n = snprintf(out, len, "<b>%s</b>\n", gw_role_name(gw_state()->active));
+    cJSON *j = gw_api_role_status(radio);
+    size_t n = snprintf(out, len, "<b>%s</b>%s\n", gw_role_name(radio ? gw_state()->active_b : gw_state()->active),
+                        radio ? (cz ? " (rádio B)" : " (radio B)") : "");
     const cJSON *v;
     cJSON_ArrayForEach(v, j)
     {

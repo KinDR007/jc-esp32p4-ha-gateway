@@ -108,7 +108,7 @@ static zb_filter_t *s_filter; /* owned by uart_to_tcp_task, counters read by the
 
 static void on_telemetry(const char *json, void *ctx)
 {
-    gw_c6_telemetry_set(json);
+    gw_c6_telemetry_set(s_radio, json);
 }
 
 /* Sends coordinator bytes (telemetry frames already removed) to the connected host. */
@@ -325,7 +325,7 @@ static void router_reader_task(void *arg)
                 xSemaphoreGive(s_router_lock);
                 router_tx_power(line + 4);
             } else if (len > 4 && strncmp(line, "@ZT ", 4) == 0) {
-                gw_c6_telemetry_set(line + 4);
+                gw_c6_telemetry_set(s_radio, line + 4);
             } else if (len > 4 && strncmp(line, "@ZI ", 4) == 0) {
                 /* identify from the network (Zigbee2MQTT, Home Assistant): until it ends, at most a minute;
                  * Zigbee2MQTT asks for 3 s, the header icon blinks at least 10 s to be noticed */
@@ -459,7 +459,7 @@ esp_err_t role_zigbee_start(bool coordinator, c6_radio_t radio)
 
     gw_http_register("/api/zigbee/status", HTTP_GET, status_get);
     gw_http_register("/api/zigbee/reset", HTTP_POST, reset_post);
-    gw_api_set_role_status(zigbee_status);
+    gw_api_set_role_status(radio, zigbee_status);
 
     if (coordinator) {
         xTaskCreate(uart_to_tcp_task, "zb_uart", 4096, NULL, BRIDGE_PRIO, NULL);

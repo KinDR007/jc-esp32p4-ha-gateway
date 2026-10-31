@@ -56,6 +56,33 @@ const char *gw_role_c6_bundle(gw_role_t role)
     }
 }
 
+static bool role_thread(gw_role_t r)
+{
+    return r == GW_ROLE_THREAD_BR || r == GW_ROLE_THREAD_ROUTER;
+}
+
+static bool role_zigbee(gw_role_t r)
+{
+    return r == GW_ROLE_ZIGBEE_COORD || r == GW_ROLE_ZIGBEE_ROUTER;
+}
+
+const char *gw_roles_conflict(gw_role_t a, gw_role_t b)
+{
+    if (b == GW_ROLE_ESPHOME) {
+        return "ESPHome is not a role of radio B";
+    }
+    if (a == GW_ROLE_ESPHOME && b != GW_ROLE_NONE) {
+        return "ESPHome replaces the gateway firmware: switch radio B off first";
+    }
+    if (role_thread(a) && role_thread(b)) {
+        return "one Thread network only: the other radio runs Thread";
+    }
+    if (role_zigbee(a) && role_zigbee(b)) {
+        return "one Zigbee network only: the other radio runs Zigbee";
+    }
+    return NULL;
+}
+
 esp_err_t gw_config_init(void)
 {
     esp_err_t err = nvs_flash_init();
@@ -228,7 +255,7 @@ static esp_err_t import_entry(const cJSON *entry, bool write, char *err, size_t 
         return ESP_ERR_INVALID_ARG;
     }
     if (cJSON_IsNumber(u8) && u8->valuedouble >= 0 && u8->valuedouble <= UINT8_MAX) {
-        if (strcmp(key, GW_KEY_ROLE) == 0 && u8->valueint >= GW_ROLE_MAX) {
+        if ((strcmp(key, GW_KEY_ROLE) == 0 || strcmp(key, GW_KEY_ROLE_B) == 0) && u8->valueint >= GW_ROLE_MAX) {
             snprintf(err, err_len, "%s: unknown role %d", key, u8->valueint);
             return ESP_ERR_INVALID_ARG;
         }

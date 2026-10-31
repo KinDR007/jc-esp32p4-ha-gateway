@@ -337,7 +337,7 @@ static void publish_state(void)
     if (s_ext_state) {
         s_ext_state(state);
     }
-    cJSON *role = gw_api_role_status();
+    cJSON *role = gw_api_role_status(0);
     if (role) {
         /* Only the Thread roles report an OpenThread device role. */
         const char *thread_role = GW_JSON_STR(role, "role");
