@@ -37,11 +37,12 @@ jobs:
           fetch-depth: 0 # git describe gives the firmware version
       - run: ./scripts/ci_build.sh
         shell: bash
-      # p4gw.bin and c6fw.bin hold no secrets (the ESPHome image with the API key is not built here)
+      # p4gw.bin, c6fw.bin and c5fw.bin hold no secrets (the ESPHome image with the API key is not built here)
       - uses: actions/upload-artifact@v7
         with:
           name: firmware
           path: |
             dist/p4gw.bin
             dist/c6fw.bin
+            dist/c5fw.bin
           retention-days: 14

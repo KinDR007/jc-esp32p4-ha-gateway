@@ -3,7 +3,8 @@
 
     {"version", "p4gw", "notes", "release_url", "layouts",
      "build": {"commit", "date", "idf", "ci"},
-     "c6fw": {"url", "sha256", "size", "format", "bundles": {name: version}}}
+     "c6fw": {"url", "sha256", "size", "format", "bundles": {name: version}},
+     "c5fw": {...the same for the XIAO ESP32-C5 of radio B (docs/dual-radio.md)}}
 
 The gateway compares "version" with its own, and the sha256 of c6fw.bin with the C6 firmware it
 holds; both download only on request. URLs are relative to the manifest unless --base-url is
@@ -84,9 +85,10 @@ def main() -> None:
                   "idf": idf.group(0) if idf else ""}
     if a.ci:
         m["build"]["ci"] = a.ci
-    c6 = dist / "c6fw.bin"
-    if c6.exists():
-        m["c6fw"] = {"url": url("c6fw.bin"), **c6fw_info(c6)}
+    for key in ("c6fw", "c5fw"):
+        pkg = dist / f"{key}.bin"
+        if pkg.exists():
+            m[key] = {"url": url(f"{key}.bin"), **c6fw_info(pkg)}
     out = dist / "manifest.json"
     out.write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n")
     print(out.read_text())

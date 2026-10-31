@@ -45,8 +45,8 @@ jobs:
             --ci "$url/actions/runs/$GITHUB_RUN_ID"
           # older releases the gateways can go back to (rollback), next to the manifest
           python3 scripts/make_releases_index.py --repo "$GITHUB_REPOSITORY" --tag "$TAG"
-          sha256sum dist/p4gw.bin dist/c6fw.bin > dist/SHA256SUMS
-      # p4gw.bin and c6fw.bin hold no secrets (the ESPHome image with the API key is not built here)
+          sha256sum dist/p4gw.bin dist/c6fw.bin dist/c5fw.bin > dist/SHA256SUMS
+      # p4gw.bin, c6fw.bin and c5fw.bin hold no secrets (the ESPHome image with the API key is not built here)
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
@@ -54,6 +54,7 @@ jobs:
           files: |
             dist/p4gw.bin
             dist/c6fw.bin
+            dist/c5fw.bin
             dist/manifest.json
             dist/releases.json
             dist/SHA256SUMS
