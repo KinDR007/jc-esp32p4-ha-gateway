@@ -1,0 +1,21 @@
+--- main/zb_ncp.h
++++ main/zb_ncp.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "sdkconfig.h"
+ #include "zboss_decl.h"
+ #include "commands.h"
+ 
+@@ -24,7 +25,12 @@
+ 	// + zb_set_max_children). GETSET-2: SET_MAX_CHILDREN rejects host values
+ 	// above it — they can't be honored and oversizing children feeds the
+ 	// zb_address.c:395 table-exhaustion assertion family.
++#if CONFIG_SPIRAM
++	// P4 gateway: with PSRAM (XIAO ESP32-C5) the tables are larger, their memory comes from PSRAM
++	static constexpr uint16_t OVERALL_NETWORK_SIZE = 400;
++#else
+ 	static constexpr uint16_t OVERALL_NETWORK_SIZE = 200;
++#endif
+ private:
+ 	template <command_id_t Cmd>
+ 	struct cmd_handle;

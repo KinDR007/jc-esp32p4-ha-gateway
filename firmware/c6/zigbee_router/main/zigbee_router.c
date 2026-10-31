@@ -241,13 +241,24 @@ static void uart_task(void *arg)
     }
 }
 
+/* With PSRAM (the XIAO ESP32-C5 of radio B, docs/dual-radio.md) the stack tables grow: they are
+ * allocated at init, the large ones from PSRAM. */
+#if CONFIG_SPIRAM
+#define NETWORK_SIZE 200
+#define MAX_CHILDREN 64
+#else
+#define NETWORK_SIZE 64 /* esp-zigbee default */
+#define MAX_CHILDREN 32
+#endif
+
 static void zigbee_task(void *arg)
 {
     esp_zb_cfg_t cfg = {
         .esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER,
         .install_code_policy = false,
-        .nwk_cfg.zczr_cfg = {.max_children = 32},
+        .nwk_cfg.zczr_cfg = {.max_children = MAX_CHILDREN},
     };
+    esp_zb_overall_network_size_set(NETWORK_SIZE);
     esp_zb_init(&cfg);
 
     esp_zb_basic_cluster_cfg_t basic_cfg = {
