@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: the gateway could hang (web UI and API stop answering, the radios keep running) when an
+  update check ended while MQTT was connecting, typically right after a role switch of radio B that
+  fetches the C5 package: the update notification was published with the update lock held, while
+  the MQTT task waited for that lock. Notifications are now sent after the lock is released.
+
 ## v1.8.1 (2026-10-31)
 
 First release of v1.8 (the v1.8 tag was not released: the ESPHome build failed in CI).

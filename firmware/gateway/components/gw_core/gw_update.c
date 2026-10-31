@@ -209,8 +209,10 @@ static void c5_offer(const char *manifest_url, const cJSON *c5)
     }
 }
 
-/* Called with the lock held: the C6 part of a manifest (absent: nothing offered). */
-static void c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
+/* Called with the lock held: the C6 part of a manifest (absent: nothing offered). Returns true when
+ * the package is to be announced, which the caller does after releasing the lock: a notification
+ * publishes over MQTT, whose task takes the lock in gw_update_mqtt_state(). */
+static bool c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
 {
     const cJSON *size = cJSON_GetObjectItem(c6, "size"), *fmt = cJSON_GetObjectItem(c6, "format");
     uint8_t sha[32];
@@ -220,12 +222,12 @@ static void c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
     s_up.c6.bundles = NULL;
     s_up.c6.offered = false;
     if (!valid) {
-        return;
+        return false;
     }
     if (fmt->valueint != C6FW_FORMAT_VERSION) {
         /* a C6 package of another format waits for the gateway firmware that reads it */
         ESP_LOGI(TAG, "C6 package format %d, this gateway reads %d", fmt->valueint, C6FW_FORMAT_VERSION);
-        return;
+        return false;
     }
     s_up.c6.offered = true;
     resolve_url(manifest_url, GW_JSON_STR(c6, "url"), s_up.c6.url, sizeof(s_up.c6.url));
@@ -236,8 +238,9 @@ static void c6_offer(const char *manifest_url, const cJSON *c6, bool notify)
     s_up.c6.current = c6fw_package_sha(C6_RADIO_A, have) && memcmp(have, sha, 32) == 0;
     if (notify && !s_up.c6.current && memcmp(s_up.c6.notified, sha, 32) != 0) {
         memcpy(s_up.c6.notified, sha, 32);
-        gw_notify("system", GW_NOTIFY_INFO, "C6 radio firmware update available (%lu kB)", (unsigned long)(s_up.c6.size / 1024));
+        return true;
     }
+    return false;
 }
 
 /* Makes the manifest at url the offer; latest: the configured manifest (announced, sets the time of
@@ -247,6 +250,7 @@ static esp_err_t check_manifest(const char *url, bool latest)
     char *body;
     esp_err_t err;
     int status = fetch(url, MANIFEST_MAX, &body, &err);
+    char announce[96] = "", announce_c6[64] = "";
 
     xSemaphoreTake(s_up.lock, portMAX_DELAY);
     cJSON *m = status == 200 ? cJSON_Parse(body) : NULL;
@@ -268,8 +272,8 @@ static esp_err_t check_manifest(const char *url, bool latest)
         err = ESP_ERR_NOT_SUPPORTED;
     } else {
         if (latest && strcmp(s_up.latest, version) != 0 && strcmp(version, esp_app_get_description()->version) != 0) {
-            gw_notify("system", GW_NOTIFY_INFO, "Firmware update %s available (running %s)", version,
-                      esp_app_get_description()->version);
+            snprintf(announce, sizeof(announce), "Firmware update %s available (running %s)", version,
+                     esp_app_get_description()->version);
         }
         strlcpy(s_up.latest, version, sizeof(s_up.latest));
         resolve_url(url, image, s_up.image_url, sizeof(s_up.image_url));
@@ -280,7 +284,10 @@ static esp_err_t check_manifest(const char *url, bool latest)
         snprintf(s_up.build, sizeof(s_up.build), "%s%s%s%s%s", GW_JSON_STR(b, "commit") ? GW_JSON_STR(b, "commit") : "",
                  GW_JSON_STR(b, "date") ? " · " : "", GW_JSON_STR(b, "date") ? GW_JSON_STR(b, "date") : "",
                  GW_JSON_STR(b, "idf") ? " · ESP-IDF " : "", GW_JSON_STR(b, "idf") ? GW_JSON_STR(b, "idf") : "");
-        c6_offer(url, cJSON_GetObjectItem(m, "c6fw"), latest);
+        if (c6_offer(url, cJSON_GetObjectItem(m, "c6fw"), latest)) {
+            snprintf(announce_c6, sizeof(announce_c6), "C6 radio firmware update available (%lu kB)",
+                     (unsigned long)(s_up.c6.size / 1024));
+        }
         c5_offer(url, cJSON_GetObjectItem(m, "c5fw"));
         s_up.error[0] = '\0';
         if (latest) {
@@ -296,6 +303,12 @@ static esp_err_t check_manifest(const char *url, bool latest)
     cJSON_Delete(m);
     free(body);
     xSemaphoreGive(s_up.lock);
+    if (announce[0]) {
+        gw_notify("system", GW_NOTIFY_INFO, "%s", announce);
+    }
+    if (announce_c6[0]) {
+        gw_notify("system", GW_NOTIFY_INFO, "%s", announce_c6);
+    }
     return err;
 }
 
