@@ -11,7 +11,11 @@
 - Web UI: the overview and Radios › Status and maintenance show the same details for radio B as for
   radio A (firmware version, MAC, chip revision, flash size, flash count, temperature min/max,
   memory, uptime, last reset); `/api/radios` carries the chip data of each radio as `chip_info`,
-  `/api/status` that of radio B and its bundle under `role.b`.
+  `/api/status` that of radio B and its bundle under `role.b`. Radio B also gets its firmware list,
+  tooltips, Reflash radio B now (`POST /api/c6/reflash?radio=b`) and a flash backup while it has no
+  role (`GET /api/c6/backup?radio=b`); the role switch points to that backup for both radios.
+- Fix: a C6 backup requested while the C6 was being flashed kept the upload lock, so later uploads
+  and backups answered busy until a restart.
 
 - Fix: the gateway could hang (web UI and API stop answering, the radios keep running) when an
   update check ended while MQTT was connecting, typically right after a role switch of radio B that

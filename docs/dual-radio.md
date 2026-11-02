@@ -44,7 +44,9 @@ also with 100 µF added; on USB power it scans normally and the Zigbee coordinat
 and the four signals go to JP1; never connect JP1 5V and the USB-C at the same time (the 5V pin of
 the XIAO is its VBUS). The P4 drives the reset line open-drain (like the RESET button). Wires up to
 30 cm (460800 Bd without flow control). Factory flash of the XIAO used here:
-`backups/xiao_c5_factory.bin` (8 MB, read over its USB-C).
+`backups/xiao_c5_factory.bin` (8 MB, read over its USB-C). The gateway reads it too: Radios › Status
+and maintenance › Back up radio B flash, while radio B has no role (`GET /api/c6/backup?radio=b`);
+Reflash radio B now rewrites its role's firmware on the next start (`POST /api/c6/reflash?radio=b`).
 
 Differences to the C6 that the gateway handles: bootloader at 0x2000 (C6: 0x0), 8 MB flash, ROM
 chip detection; the slots layout (`firmware/c6/slots.csv`, 4 MB) fits as it is.

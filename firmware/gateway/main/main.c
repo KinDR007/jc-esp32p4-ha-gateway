@@ -404,6 +404,7 @@ static esp_err_t thread_forget_post(httpd_req_t *req)
 static esp_err_t radios_get(httpd_req_t *req)
 {
     cJSON *arr = cJSON_CreateArray();
+    c6fw_dir_t *dir = malloc(sizeof(*dir));
     for (int r = 0; r < C6_RADIOS; r++) {
         const gw_radio_keys_t *keys = gw_radio_keys(r);
         const c6_progress_t *p = c6_progress(r);
@@ -424,8 +425,18 @@ static esp_err_t radios_get(httpd_req_t *req)
         cJSON_AddStringToObject(j, "stage", p->stage);
         cJSON_AddStringToObject(j, "error", r == C6_RADIO_B && s_flash_b.error[0] ? s_flash_b.error : p->last_error);
         cJSON_AddItemToObject(j, "chip_info", gw_api_chip_json(r));
+        cJSON *images = cJSON_AddArrayToObject(j, "images");
+        if (dir && c6fw_read_dir(r, dir) == ESP_OK) {
+            for (uint32_t i = 0; i < dir->count; i++) {
+                cJSON *img = cJSON_CreateObject();
+                cJSON_AddStringToObject(img, "name", dir->entries[i].name);
+                cJSON_AddStringToObject(img, "version", dir->entries[i].version);
+                cJSON_AddItemToArray(images, img);
+            }
+        }
         cJSON_AddItemToArray(arr, j);
     }
+    free(dir);
     cJSON *b = cJSON_GetArrayItem(arr, 1);
     cJSON *tel = gw_c6_telemetry(1);
     if (tel) {

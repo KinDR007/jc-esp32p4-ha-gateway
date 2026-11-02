@@ -1072,6 +1072,18 @@ const TIPS = {
   'Link mode': ['Autonegotiation suits nearly every switch. Force speed and duplex only when the switch port is forced to the same values: a forced port against an autonegotiating one ends up in half duplex and loses packets.',
     'Autonegociace vyhovuje téměř každému switchi. Rychlost a duplex vynuťte, jen když je port switche nastavený napevno na stejné hodnoty: vynucený port proti autonegociaci skončí v half duplexu a ztrácí pakety.'],
   'Restart': ['Restarts the P4; the active role is back after about 10 s.', 'Restartuje P4; aktivní role naběhne asi za 10 s.'],
+  'Radio running': ['Firmware the radio runs, as it reports it itself.', 'Firmware, který rádio běží, jak ho samo hlásí.'],
+  'Radio MAC': ['Factory MAC of the radio chip, read from its ROM bootloader when it was last flashed.', 'Tovární MAC čipu rádia, načtená z jeho ROM bootloaderu při posledním flashování.'],
+  'Radio chip revision': ['Silicon revision of the radio chip.', 'Revize křemíku čipu rádia.'],
+  'Radio flash': ['Flash size of the radio module.', 'Velikost flash modulu rádia.'],
+  'Radio flashes': ['Successful reflashes of the radio done by the gateway (role switches that change its firmware).', 'Úspěšná přeflashování rádia bránou (přepnutí rolí, která mění jeho firmware).'],
+  'Radio temperature': ['Internal temperature sensor of the radio chip, sent by its firmware every 30 s. Min/max since the gateway start.', 'Vnitřní teplotní senzor čipu rádia, jeho firmware ho posílá každých 30 s. Min/max od startu brány.'],
+  'Radio memory': ['Free RAM of the radio now and the lowest value since its start.', 'Volná RAM rádia teď a nejnižší hodnota od jeho startu.'],
+  'Radio uptime': ['Time since the radio last started. Shorter than the gateway uptime means the radio was reset.', 'Doba od posledního startu rádia. Kratší než doba běhu brány znamená, že rádio bylo resetováno.'],
+  'Radio last reset': ['Why the radio last started: poweron (reset by the gateway), panic or watchdog point to a crash.', 'Proč rádio naposledy startovalo: poweron (reset od brány), panic nebo watchdog znamenají pád.'],
+  'Radio images': ['Firmwares for this radio on the gateway: the package of its chip, or what the radio was last flashed from. The rest comes with the package at a role switch.', 'Firmwary pro toto rádio na bráně: balík jeho čipu, nebo z čeho bylo naposledy flashováno. Ostatní přijdou s balíkem při přepnutí role.'],
+  'Reflash radio B now': ['Rewrites radio B with the firmware of its role on the next start. Use after repeated radio failures.', 'Přepíše rádio B firmwarem jeho role při příštím startu. Použijte po opakovaných výpadcích rádia.'],
+  'Back up radio B flash': ['Reads the whole flash of radio B to a file. Works only while radio B has no role.', 'Přečte celou flash rádia B do souboru. Funguje jen, když rádio B nemá roli.'],
   'Reflash C6 now': ['Rewrites the C6 with the firmware of the current role. Use after repeated radio failures.', 'Přepíše C6 firmwarem aktuální role. Použijte po opakovaných výpadcích rádia.'],
   'Back up C6 flash': ['Reads the whole 4 MB C6 flash to a file. Works only in maintenance mode.', 'Přečte celou 4MB flash C6 do souboru. Funguje jen v režimu údržby.'],
   'Matter Server': ['WebSocket of the Matter Server add-on (Home Assistant), e.g. ws://homeassistant.local:5580/ws. Port 5580 has to be exposed in the add-on (Configuration, Network). Gives vendor, product, name, serial number and device type of each Matter device; they are matched with the map by Thread MAC or IPv6 address.', 'WebSocket doplňku Matter Server (Home Assistant), např. ws://homeassistant.local:5580/ws. Port 5580 musí být v doplňku zpřístupněný (Konfigurace, Síť). Dodá výrobce, produkt, název, sériové číslo a typ každého zařízení Matter; s mapou se párují podle MAC Thread nebo IPv6 adresy.'],
@@ -1216,16 +1228,16 @@ const cpuLoad = hw => (hw?.cpu_load || []).map((l, i) => `<div class="row">core 
 /* radio temperature with min/max since the gateway start and the age of a stale report */
 const telTemp = t => `${t.temp_c} °C` + (t.temp_max_c !== undefined ? ` <span class="muted">(min ${t.temp_min_c}, max ${t.temp_max_c})</span>` : '') + (t.age_s > 90 ? ` <span class="warn-text">(${t.age_s} s old)</span>` : '');
 /* radio B rows shared by the overview and Radios › Status and maintenance: its telemetry and the chip data
- * read at its last flashing ('-': no tooltip, the MAC and Flash ones describe the P4) */
+ * read at its last flashing */
 function radioBRows(bundle, c = {}, t) {
   return [
-    [L('Running', 'Běží'), bundle ? `<span data-notr>${esc(t?.fw || bundle)}</span>${t?.ver ? ` <span class="muted">${esc(t.ver)}</span>` : ''}` : ''],
-    ['MAC', c.mac ? esc(c.mac) : `<span class="muted">${L('read at the next flashing', 'načte se při příštím flashování')}</span>`, '-'],
-    [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : t?.rev !== undefined ? rev(t.rev) : ''],
-    ['Flash', c.flash_size ? fmtBytes(c.flash_size) : '', '-'], [L('Flashes', 'Počet flashování'), c.flashes || ''],
-    [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : ''],
-    [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : ''],
-    [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : ''], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '']];
+    [L('Running', 'Běží'), bundle ? `<span data-notr>${esc(t?.fw || bundle)}</span>${t?.ver ? ` <span class="muted">${esc(t.ver)}</span>` : ''}` : '', 'Radio running'],
+    ['MAC', c.mac ? esc(c.mac) : `<span class="muted">${L('read at the next flashing', 'načte se při příštím flashování')}</span>`, 'Radio MAC'],
+    [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : t?.rev !== undefined ? rev(t.rev) : '', 'Radio chip revision'],
+    ['Flash', c.flash_size ? fmtBytes(c.flash_size) : '', 'Radio flash'], [L('Flashes', 'Počet flashování'), c.flashes || '', 'Radio flashes'],
+    [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : '', 'Radio temperature'],
+    [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : '', 'Radio memory'],
+    [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : '', 'Radio uptime'], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '', 'Radio last reset']];
 }
 /* C6 rows shared by the overview and Radios › Status and maintenance */
 function c6Rows(s, full) {
@@ -1924,7 +1936,9 @@ async function loadRadios() {
     const head = [[L('Chip', 'Čip'), esc(x.chip || '')], [L('Role', 'Role'), esc(role)], [L('State', 'Stav'), x.maintenance ? `<span class="bad-text">${esc(x.maintenance)}</span>` : ''],
       [L('Package', 'Balík'), x.package_id ? `<code>${esc(x.package_id)}</code>` : '']];
     /* radio A: the full C6 details (former System › Information card) */
-    const rows = b ? [...head, [L('Wiring', 'Zapojení'), esc(x.wiring || '')], ...radioBRows(x.bundle, x.chip_info, t)]
+    const rows = b ? [...head, [L('Wiring', 'Zapojení'), esc(x.wiring || '')], ...radioBRows(x.bundle, x.chip_info, t),
+      [L('Images', 'Firmwary'), (x.images || []).map(i => `<span data-notr>${esc(i.name)}</span> <span class="muted">${esc(i.version)}</span>`).join('<br>')
+        || `<span class="muted">${L('come with the package at a role switch', 'přijdou s balíkem při přepnutí role')}</span>`, 'Radio images']]
       : [...head, ...c6Rows(status, true)];
     return `<div class="card">${h3(b ? 'chip' : 'developer-board', b ? L('Radio B (external, JP1)', 'Rádio B (externí, JP1)') : L('Radio A (C6 of the board)', 'Rádio A (C6 na desce)'))}${dl([...rows,
       [L('Flashing', 'Flashování'), x.busy ? `${x.percent} % ${esc(x.stage)}` : ''], [L('Last error', 'Poslední chyba'), esc(x.error || '')]])}
@@ -1932,7 +1946,11 @@ async function loadRadios() {
         ${b ? `<button class="btn" data-radio-probe ${x.role !== 'none' ? 'disabled' : ''}>${ic('radar')}${L('Test wiring', 'Otestovat zapojení')}</button>` : ''}
         <button class="btn" data-thread-forget="${x.radio}" ${x.role === 'thread_br' || x.role === 'thread_router' ? 'disabled' : ''}>${ic('delete-outline')}${L('Forget Thread network', 'Zapomenout síť Thread')}</button>
       </div>
-      ${b ? '' : `<div class="row"><button class="btn danger" id="sys-reflash">${ic('chip')}${L('Reflash C6 now', 'Přeflashovat C6 teď')}</button>${tip('Reflash C6 now')}
+      ${b ? `<div class="row"><button class="btn danger" id="b-reflash" ${x.role === 'none' ? 'disabled' : ''}>${ic('chip')}${L('Reflash radio B now', 'Přeflashovat rádio B teď')}</button>${tip('Reflash radio B now')}
+        <button class="btn" id="b-backup" ${x.role === 'none' ? '' : 'disabled'}>${ic('backup-restore')}${L('Back up radio B flash', 'Záloha flash rádia B')}</button>${tip('Back up radio B flash')}</div>
+      <p class="muted">${L('Reflash rewrites radio B with the firmware of its role on the next start. The backup reads its whole flash over JP1 (about 4 minutes for 8 MB) and works only while radio B has no role (Radios › Roles: off). Keep the first backup: it is the only copy of its factory firmware.',
+        'Přeflashování přepíše rádio B firmwarem jeho role při příštím startu. Záloha přečte celou jeho flash přes JP1 (asi 4 minuty pro 8 MB) a jde jen, když rádio B nemá roli (Rádia › Role: vypnuto). První zálohu si nechte: je to jediná kopie jeho továrního firmwaru.')}</p>`
+        : `<div class="row"><button class="btn danger" id="sys-reflash">${ic('chip')}${L('Reflash C6 now', 'Přeflashovat C6 teď')}</button>${tip('Reflash C6 now')}
         <button class="btn" id="c6-backup" ${activeRole() === 'none' ? '' : 'disabled'}>${ic('backup-restore')}${L('Back up C6 flash', 'Záloha flash C6')}</button>${tip('Back up C6 flash')}</div>
       <p class="muted">${L('Reflash rewrites the C6 with the image of the current role on the next start (use after an RCP or NCP failure). The C6 backup reads its whole flash over JP1 (about 2 minutes) and works only in maintenance mode. Keep the first backup: it is the only copy of the factory esp-hosted firmware.',
         'Přeflashování přepíše C6 obrazem aktuální role při příštím startu (po selhání RCP nebo NCP). Záloha C6 přečte celou jeho flash přes JP1 (asi 2 minuty) a jde jen v režimu údržby. První zálohu si nechte: je to jediná kopie továrního firmwaru esp-hosted.')}</p>`}</div>`;
@@ -3821,9 +3839,9 @@ document.addEventListener('click', async e => {
       } catch (err) {
         if (err.message !== 'c6_backup_required' && err.message !== 'radio_b_backup_required') throw err;
         if (!await confirmDialog(L('No backup of the factory firmware yet', 'Zatím bez zálohy továrního firmwaru'),
-          L('This role overwrites the factory firmware of the radio, which cannot be downloaded again. Cancel and back it up first (Radios › Status and maintenance for radio A, over its USB-C for radio B), or continue without a backup.',
-            'Role přepíše tovární firmware rádia, který už nejde znovu stáhnout. Zrušte a nejdřív ho zazálohujte (Rádia › Stav a údržba pro rádio A, přes jeho USB-C pro rádio B), nebo pokračujte bez zálohy.'))) {
-          if (radio === 'a') go('radios/status');
+          L('This role overwrites the factory firmware of the radio, which cannot be downloaded again. Cancel and back it up first (Radios › Status and maintenance), or continue without a backup.',
+            'Role přepíše tovární firmware rádia, který už nejde znovu stáhnout. Zrušte a nejdřív ho zazálohujte (Rádia › Stav a údržba), nebo pokračujte bez zálohy.'))) {
+          go('radios/status');
           return;
         }
         await api('/api/role', { json: { role: t.dataset.role, radio, skip_backup: true } });
@@ -3902,6 +3920,14 @@ document.addEventListener('click', async e => {
       toast('Reading the C6 flash, about 2 minutes…');
       t.disabled = true;
       try { await download('/api/c6/backup', status.hostname + '_c6_flash.bin'); toast('C6 backup saved'); } finally { t.disabled = false; }
+    } else if (t.id === 'b-backup') {
+      toast(L('Reading the flash of radio B, about 4 minutes…', 'Čtu flash rádia B, asi 4 minuty…'));
+      t.disabled = true;
+      try { await download('/api/c6/backup?radio=b', status.hostname + '_radio_b_flash.bin'); toast(L('Radio B backup saved', 'Záloha rádia B uložena')); } finally { t.disabled = false; }
+    } else if (t.id === 'b-reflash') {
+      if (!await confirmDialog(L('Reflash radio B?', 'Přeflashovat rádio B?'), L('The gateway restarts and rewrites radio B with the firmware of its role.', 'Brána se restartuje a přepíše rádio B firmwarem jeho role.'))) return;
+      await api('/api/c6/reflash?radio=b', { method: 'POST' });
+      waitForRestart();
     } else if (t.id === 'copy-btn') {
       toast(await copyText($('#copy-text').value) ? 'Copied to the clipboard' : 'Select the text and copy it (Ctrl/Cmd+C)');
     } else if (t.id === 'ev-preset-apply') {

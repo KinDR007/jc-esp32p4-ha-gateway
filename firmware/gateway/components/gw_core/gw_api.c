@@ -785,10 +785,25 @@ static esp_err_t c6fw_upload_inner(httpd_req_t *req)
 static esp_err_t gateway_upload(httpd_req_t *req) { return locked_upload(req, gateway_upload_inner); }
 static esp_err_t c6fw_upload(httpd_req_t *req) { return locked_upload(req, c6fw_upload_inner); }
 
+/* ?radio=a|b (radio A by default), the same for the other radio endpoints */
+static c6_radio_t query_radio(httpd_req_t *req)
+{
+    char query[32], which[4] = "a";
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        httpd_query_key_value(query, "radio", which, sizeof(which));
+    }
+    return strcmp(which, "b") == 0 ? C6_RADIO_B : C6_RADIO_A;
+}
+
+/* The radio is rewritten with the firmware of its role on the next start (radio B only while it has one). */
 static esp_err_t c6_reflash_post(httpd_req_t *req)
 {
-    gw_config_set_u8(GW_KEY_C6_FORCE, 1);
-    gw_config_set_u8(GW_KEY_C6_TRIES, 0);
+    c6_radio_t radio = query_radio(req);
+    if (radio == C6_RADIO_B && gw_state()->active_b == GW_ROLE_NONE) {
+        return gw_http_send_error(req, 409, "radio B has no role: its firmware is flashed with the role");
+    }
+    gw_config_set_u8(gw_radio_keys(radio)->force, 1);
+    gw_config_set_u8(gw_radio_keys(radio)->tries, 0);
     gw_restart_later(500);
     return gw_http_send_json(req, cJSON_CreateObject());
 }
@@ -855,6 +870,7 @@ static esp_err_t snapshot_get(httpd_req_t *req)
 
 typedef struct {
     httpd_req_t *req;
+    c6_radio_t radio;
     size_t sent;
 } backup_ctx_t;
 
@@ -864,30 +880,36 @@ static esp_err_t http_sink(void *arg, const void *data, size_t len)
     if (ctx->sent == 0) {
         /* Headers only once the C6 answered, so a failed connect still gets a proper error. */
         httpd_resp_set_type(ctx->req, "application/octet-stream");
-        httpd_resp_set_hdr(ctx->req, "Content-Disposition", "attachment; filename=\"c6_flash_backup.bin\"");
+        httpd_resp_set_hdr(ctx->req, "Content-Disposition", ctx->radio == C6_RADIO_B ? "attachment; filename=\"radio_b_flash_backup.bin\""
+                                                                                    : "attachment; filename=\"c6_flash_backup.bin\"");
     }
     ctx->sent += len;
     return httpd_resp_send_chunk(ctx->req, data, len);
 }
 
-/* Full C6 flash dump, only while no role uses the C6 UART. */
+/* Full flash dump of a radio (?radio=b), only while no role uses its UART. */
 static esp_err_t c6_backup_get(httpd_req_t *req)
 {
-    if (gw_state()->active != GW_ROLE_NONE) {
+    c6_radio_t radio = query_radio(req);
+    if ((radio == C6_RADIO_B ? gw_state()->active_b : gw_state()->active) != GW_ROLE_NONE) {
         return gw_http_send_error(req, 409, "only in maintenance mode (no active role)");
     }
-    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE || c6_progress(C6_RADIO_A)->busy) {
+    if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE) {
         return gw_http_send_error(req, 409, "C6 busy");
     }
-    backup_ctx_t ctx = {.req = req};
-    esp_err_t err = c6_read_flash(C6_RADIO_A, http_sink, &ctx);
+    if (c6_progress(radio)->busy) {
+        xSemaphoreGive(s_upload_lock);
+        return gw_http_send_error(req, 409, "C6 busy");
+    }
+    backup_ctx_t ctx = {.req = req, .radio = radio};
+    esp_err_t err = c6_read_flash(radio, http_sink, &ctx);
     xSemaphoreGive(s_upload_lock);
     if (err == ESP_OK) {
-        gw_config_set_u8(GW_KEY_C6_ADOPTED, 1);
+        gw_config_set_u8(gw_radio_keys(radio)->adopted, 1);
     } else {
-        ESP_LOGE(TAG, "C6 backup failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "radio %c backup failed: %s", 'A' + radio, esp_err_to_name(err));
         if (ctx.sent == 0) {
-            return gw_http_send_error(req, 503, c6_progress(C6_RADIO_A)->last_error);
+            return gw_http_send_error(req, 503, c6_progress(radio)->last_error);
         }
         /* Mid-transfer: an aborted download is the error signal. */
         return ESP_FAIL;
