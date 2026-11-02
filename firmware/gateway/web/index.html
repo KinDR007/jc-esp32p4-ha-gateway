@@ -141,8 +141,13 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
 .tip { display: inline-flex; margin-left: 4px; color: var(--muted); cursor: help; vertical-align: middle; }
 .tip .mdi { width: 14px; height: 14px; }
 .tip:hover, .tip:focus { color: var(--accent); outline: none; }
-#tipbox { position: fixed; z-index: 50; max-width: 340px; padding: 8px 11px; border-radius: 8px; font-size: 13px; line-height: 1.4;
-  background: var(--text); color: var(--bg); box-shadow: 0 4px 16px rgba(0,0,0,.25); pointer-events: none; display: none; }
+/* the same box as the header tags and network maps (#nodebox): title, text, optional table */
+#tipbox { position: fixed; z-index: 50; max-width: 360px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4; display: none;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); pointer-events: none; }
+#tipbox.rows { max-width: min(480px, calc(100vw - 16px)); }
+#tipbox table { width: auto; margin-top: 8px; }
+#tipbox td.num { text-align: right; padding-left: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#tipbox tr.sum th, #tipbox tr.sum td { border-top: 1px solid var(--border); padding-top: 4px; }
 .card + .card, .grid + .card, .card + .grid, main > * + *, #thread-status > * + * { margin-top: 14px; }
 .grid > .card { margin-top: 0; }
 /* one label column width on every tile, so values line up across the whole UI */
@@ -205,10 +210,10 @@ code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
 .log-tag { color: var(--accent); text-decoration: none; } .log mark { background: var(--warn); color: var(--bg); }
 #nodebox { position: fixed; z-index: 50; max-width: 420px; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: none;
   background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); pointer-events: none; }
-#nodebox .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
+#nodebox .nb-title, #tipbox .nb-title { font-weight: 650; font-size: 14px; margin-bottom: 6px; }
 #nodebox table { width: auto; }
-#nodebox th { color: var(--muted); font-weight: 400; padding: 2px 12px 2px 0; border: 0; vertical-align: top; white-space: nowrap; }
-#nodebox td { padding: 2px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+#nodebox th, #tipbox th { color: var(--muted); font-weight: 400; padding: 2px 12px 2px 0; border: 0; vertical-align: top; white-space: nowrap; text-align: left; }
+#nodebox td, #tipbox td { padding: 2px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
 /* header boxes: short values, each on one line */
 #nodebox.htip { max-width: calc(100vw - 16px); }
 #nodebox.htip td { white-space: nowrap; overflow-wrap: normal; }
@@ -943,7 +948,7 @@ const TIPS = {
   'C6 flash': ['Flash size of the C6 module.', 'Velikost flash modulu C6.'],
   'Flashes': ['Successful C6 reflashes done by the gateway (role switches that change the radio firmware).', 'Úspěšná přeflashování C6 bránou (přepnutí rolí, která mění firmware rádia).'],
   'Heap (internal)': ['Free internal RAM now and the lowest value since the start. A low minimum means memory pressure.', 'Volná interní RAM teď a nejnižší hodnota od startu. Nízké minimum znamená nedostatek paměti.'],
-  'PSRAM free': ['Free external PSRAM (32 MB on the board), used by the sound model and buffers.', 'Volná externí PSRAM (32 MB na desce), používá ji model zvuku a buffery.'],
+  'PSRAM free': ['Free external PSRAM (32 MB on the board). Use by part below; "other" is everything the heap holds besides the listed parts.', 'Volná externí PSRAM (32 MB na desce). Využití po částech níže; „ostatní“ je vše, co heap drží mimo uvedené části.'],
   'Zigbee Ext PAN ID': ['64-bit identifier of the Zigbee network the router joined.', '64bitový identifikátor Zigbee sítě, do které je router připojený.'],
   'C6 running': ['Firmware bundle currently flashed in the ESP32-C6 radio.', 'Balík firmwaru, který je právě nahraný v rádiu ESP32-C6.'],
   'Running': ['Firmware bundle currently flashed in the ESP32-C6 radio.', 'Balík firmwaru, který je právě nahraný v rádiu ESP32-C6.'],
@@ -1389,12 +1394,37 @@ $('#brand-icon').innerHTML = ic('access-point-network');
   [tab, sub] = parseRoute(location.hash.slice(1) || saved);
 }
 
-/* tooltip box shared by all (i) icons: hover or keyboard focus shows it, a tap toggles it */
+/* (i) tips with a table of live values under the text: key -> [[label, html value, class], ...] */
+const TIP_ROWS = {
+  'PSRAM free': psramRows, 'PSRAM used': psramRows,
+};
+/* PSRAM by use: static buffers outside the heap, the parts the firmware reports, the rest of the heap */
+function psramRows() {
+  const h = status?.heap || {}, size = status?.hw?.psram_size;
+  if (!size || h.psram_heap === undefined) return [];
+  const NAMES = { log: L('Log', 'Log'), sound_model: L('Sound model (YAMNet)', 'Model zvuku (YAMNet)'), sound_audio: L('Sound audio buffers', 'Audio buffery zvuku') };
+  const pct = b => `${fmtBytes(b)}</td><td class="num muted">${(b / size * 100).toFixed(1)} %`;
+  const parts = h.psram_parts || [], noted = parts.reduce((a, p) => a + p.bytes, 0);
+  const other = Math.max(0, h.psram_heap - h.psram_free - noted);
+  return [
+    [L('Radio package buffer, static', 'Buffer balíku rádií, statický'), pct(size - h.psram_heap)],
+    ...parts.map(p => [NAMES[p.name] || p.name, pct(p.bytes)]),
+    [L('Other (web server, JSON, MQTT, TLS…)', 'Ostatní (web server, JSON, MQTT, TLS…)'), pct(other)],
+    [L('Free', 'Volné'), pct(h.psram_free), 'sum'],
+    [L('Total', 'Celkem'), pct(size), 'sum'],
+  ];
+}
+/* tooltip box shared by all (i) icons: hover or keyboard focus shows it, a tap toggles it; the label it
+ * belongs to is its title when short */
 function showTip(el) {
-  const t = TIPS[el.dataset.tip];
+  const key = el.dataset.tip, t = TIPS[key];
   if (!t) return;
-  const box = $('#tipbox');
-  box.textContent = lang === 'cs' ? t[1] : t[0];
+  const box = $('#tipbox'), label = el.parentElement?.textContent.trim() || '';
+  const rows = TIP_ROWS[key]?.() || [];
+  box.innerHTML = (label && label.length <= 40 ? `<div class="nb-title">${esc(label)}</div>` : '') + `<div>${esc(lang === 'cs' ? t[1] : t[0])}</div>`
+    + (rows.length ? `<table>${rows.map(r => `<tr class="${r[2] || ''}"><th>${esc(r[0])}</th><td class="num">${r[1]}</td></tr>`).join('')}</table>` : '');
+  box.classList.toggle('rows', rows.length > 0);
+  box.style.left = '0px';
   box.style.display = 'block';
   const r = el.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
   box.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';

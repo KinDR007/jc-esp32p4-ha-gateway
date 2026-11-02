@@ -144,6 +144,7 @@ esp_err_t gw_log_init(size_t size)
         return ESP_ERR_NO_MEM;
     }
     s_size = size;
+    gw_psram_note("log", size);
     kept_init();
     s_lock = xSemaphoreCreateMutex();
     s_orig = esp_log_set_vprintf(log_vprintf);

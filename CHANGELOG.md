@@ -8,6 +8,9 @@
 - Online update: the C5 package of radio B is listed like the C6 one (installed and offered
   package, firmwares in it) and can be installed (`{"target": "c5"}`); a release row has a C5
   button when `releases.json` names the package of the release (from the next release on).
+- Web UI: the (i) tooltips use the box of the header tags (title, text, table); the PSRAM tooltip
+  lists the use by part (radio package buffer, sound model, audio buffers, log, other), from the
+  new `heap.psram_heap` and `heap.psram_parts` of `/api/status`.
 - UI tests: `--token` (or `P4GW_TOKEN`) signs in with an API token, for users with 2FA.
 
 ## v1.9 (2026-11-02)

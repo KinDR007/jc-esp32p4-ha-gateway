@@ -207,6 +207,9 @@ esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup
 bool gw_api_temperature(float *celsius);
 /* Chip data of a radio read at its last flashing (MAC, revision, flash size) and its flash count. */
 cJSON *gw_api_chip_json(int radio);
+/* Long-lived PSRAM use of a part (name: a string constant), listed in /api/status heap.psram_parts;
+ * a second call with the same name replaces the size. */
+void gw_psram_note(const char *name, size_t bytes);
 
 /*
  * Runtime telemetry of the C6 (one JSON object from firmware/c6/common/p4gw_telemetry), delivered by the

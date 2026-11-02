@@ -316,7 +316,12 @@ static void infer_task(void *arg)
     float window_peak_db = -120.0f;
 
     int64_t t0 = esp_timer_get_time();
+    /* other tasks allocate meanwhile too: the size is close, not exact */
+    size_t before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     esp_err_t err = sound_model_load();
+    if (err == ESP_OK && before > heap_caps_get_free_size(MALLOC_CAP_SPIRAM)) {
+        gw_psram_note("sound_model", before - heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    }
     s.model_load_ms = (esp_timer_get_time() - t0) / 1000;
     if (err != ESP_OK) {
         snprintf(s.model_error, sizeof(s.model_error), "model not loaded: %s", esp_err_to_name(err));
@@ -432,6 +437,8 @@ static esp_err_t start(void)
 {
     s.ring = heap_caps_calloc(RING, sizeof(int16_t), MALLOC_CAP_SPIRAM);
     ESP_RETURN_ON_FALSE(s.ring, ESP_ERR_NO_MEM, TAG, "ring");
+    gw_psram_note("sound_audio", RING * sizeof(int16_t) + 2 * MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float) +
+                                     LEARN_AUDIO * sizeof(int16_t));
     s.floor_db = 0;
     mel_init();
     ESP_RETURN_ON_ERROR(audio_open(), TAG, "audio");

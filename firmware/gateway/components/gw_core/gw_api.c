@@ -205,6 +205,23 @@ cJSON *gw_api_chip_json(int radio)
     return j;
 }
 
+#define PSRAM_PARTS 8
+static struct {
+    const char *name;
+    size_t bytes;
+} s_psram[PSRAM_PARTS];
+
+void gw_psram_note(const char *name, size_t bytes)
+{
+    for (int i = 0; i < PSRAM_PARTS; i++) {
+        if (!s_psram[i].name || strcmp(s_psram[i].name, name) == 0) {
+            s_psram[i].bytes = bytes;
+            s_psram[i].name = name;
+            return;
+        }
+    }
+}
+
 bool gw_api_temperature(float *celsius)
 {
     return s_temp && temperature_sensor_get_celsius(s_temp, celsius) == ESP_OK;
@@ -278,6 +295,15 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddNumberToObject(heap, "internal_min", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(heap, "internal_largest", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(heap, "psram_free", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    /* PSRAM outside the heap: static buffers (the radio package buffer) */
+    cJSON_AddNumberToObject(heap, "psram_heap", heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+    cJSON *parts = cJSON_AddArrayToObject(heap, "psram_parts");
+    for (int i = 0; i < PSRAM_PARTS && s_psram[i].name; i++) {
+        cJSON *p = cJSON_CreateObject();
+        cJSON_AddStringToObject(p, "name", s_psram[i].name);
+        cJSON_AddNumberToObject(p, "bytes", s_psram[i].bytes);
+        cJSON_AddItemToArray(parts, p);
+    }
     float temp;
     if (gw_api_temperature(&temp)) {
         cJSON_AddNumberToObject(json, "temperature_c", (int)(temp * 10) / 10.0);
