@@ -1196,7 +1196,9 @@ def tc33_full_restart():
     """Restart from the menu: the C6 is reset right before the P4, the role comes back."""
     s = status()
     role = s['role']['active']
+    boot = boot_id()
     check(http('POST', '/api/reboot', {'full': True})[0] == 200, 'full restart accepted')
+    wait_until('restart', lambda: boot_id() not in (None, boot), 120, 3)
     s = wait_restart(role)
     tel = wait_until('C6 telemetry', lambda: (lambda x: x['c6'].get('telemetry') and x['c6']['telemetry']['age_s'] < 40 and x)(status()), 90, 5)
     p4, c6 = tel['uptime_s'], tel['c6']['telemetry']['uptime_s'] + tel['c6']['telemetry']['age_s']

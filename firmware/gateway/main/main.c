@@ -32,6 +32,22 @@ static const char *TAG = "main";
 #define STABLE_AFTER_MS (60 * 1000)
 #define C6_FLASH_MAX_TRIES 3
 
+/* The radio package of the chip from the release. A few tries: name lookups fail for a moment while
+ * the Wi-Fi uplink comes up at the start. */
+static esp_err_t fetch_package(uint32_t chip)
+{
+    esp_err_t err = ESP_ERR_TIMEOUT;
+    for (int i = 0; i < 3; i++) {
+        if (i) {
+            vTaskDelay(pdMS_TO_TICKS(10000));
+        }
+        if (gw_eth_wait_ip(pdMS_TO_TICKS(30000)) && (err = gw_update_fetch_package(chip)) == ESP_OK) {
+            break;
+        }
+    }
+    return err;
+}
+
 /* Makes sure the radio runs the bundle the role needs; flashes it when not (force: always). The
  * package comes from PSRAM, else from the release (radio B: the package of its chip). On failure
  * why tells the reason. */
@@ -46,7 +62,7 @@ static bool ensure_c6(c6_radio_t radio, const char *bundle, bool force_flash, ch
     esp_err_t err = c6fw_find(radio, bundle, &entry);
     if (err != ESP_OK) {
         /* no package at all yet (a factory image without one): the release offers it */
-        if (gw_eth_wait_ip(pdMS_TO_TICKS(30000)) && gw_update_fetch_package(chip) == ESP_OK) {
+        if (fetch_package(chip) == ESP_OK) {
             err = c6fw_find(radio, bundle, &entry);
         }
     }
@@ -82,7 +98,7 @@ static bool ensure_c6(c6_radio_t radio, const char *bundle, bool force_flash, ch
      * partition is small: after a power cut it is gone and the release has to provide it again. */
     if (!c6_flash_ready(radio, &entry)) {
         ESP_LOGW(TAG, "firmwares for %s not on the gateway, fetching the package", entry.name);
-        err = gw_eth_wait_ip(pdMS_TO_TICKS(30000)) ? gw_update_fetch_package(chip) : ESP_ERR_TIMEOUT;
+        err = fetch_package(chip);
         if (err == ESP_OK && c6fw_find(radio, bundle, &entry) != ESP_OK) {
             err = ESP_ERR_NOT_FOUND;
         }
