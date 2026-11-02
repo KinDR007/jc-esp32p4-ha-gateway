@@ -1,0 +1,4 @@
+dependencies:
+  # host and co-processor (firmware/c6/wifi_uplink, deps.lock esp-hosted-mcu) run the same version
+  espressif/esp_hosted: "==3.0.10"
+  espressif/esp_wifi_remote: "==1.6.5"

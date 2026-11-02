@@ -21,6 +21,7 @@ static const char *const s_role_names[GW_ROLE_MAX] = {
     [GW_ROLE_ESPHOME] = "esphome",
     [GW_ROLE_THREAD_ROUTER] = "thread_router",
     [GW_ROLE_ZIGBEE_ROUTER] = "zigbee_router",
+    [GW_ROLE_WIFI_UPLINK] = "wifi_uplink",
 };
 
 const char *gw_role_name(gw_role_t role)
@@ -51,6 +52,8 @@ const char *gw_role_c6_bundle(gw_role_t role)
         return "zigbee_router";
     case GW_ROLE_ESPHOME:
         return "esphome";
+    case GW_ROLE_WIFI_UPLINK:
+        return "wifi_uplink";
     default:
         return NULL;
     }
@@ -70,6 +73,9 @@ const char *gw_roles_conflict(gw_role_t a, gw_role_t b)
 {
     if (a == GW_ROLE_ESPHOME && b == GW_ROLE_ESPHOME) {
         return "one ESPHome Bluetooth proxy only: the other radio runs it";
+    }
+    if (a == GW_ROLE_WIFI_UPLINK && b == GW_ROLE_WIFI_UPLINK) {
+        return "one Wi-Fi uplink only: the other radio is the Wi-Fi of the gateway";
     }
     if (role_thread(a) && role_thread(b)) {
         return "one Thread network only: the other radio runs Thread";
@@ -170,7 +176,7 @@ static const char *const s_board_keys[] = {
     GW_KEY_ZB_SNAP_REQ, "netscan", "netscan_req", "auth_ses", "auth_req",
 };
 /* users (password hashes, 2FA secrets) and API tokens go only into a backup with passwords */
-static const char *const s_secret_keys[] = {GW_KEY_PASSWORD, "mqtt_pass", "usr*", "auth_tok", "tg_token", "espw_pass"};
+static const char *const s_secret_keys[] = {GW_KEY_PASSWORD, "mqtt_pass", "usr*", "auth_tok", "tg_token", "espw_pass", "upw_pass"};
 
 /* an entry ending with '*' matches every key with that prefix */
 static bool key_in(const char *key, const char *const *list, size_t count)

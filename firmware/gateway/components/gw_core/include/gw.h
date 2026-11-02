@@ -23,6 +23,7 @@ typedef enum {
     GW_ROLE_ESPHOME = 3,       /* the radio runs the ESPHome Bluetooth proxy on its own (Wi-Fi), docs/dual-radio.md */
     GW_ROLE_THREAD_ROUTER = 4, /* Thread router joined to an existing network, C6 = RCP */
     GW_ROLE_ZIGBEE_ROUTER = 5, /* standalone Zigbee router on the C6, P4 monitors it */
+    GW_ROLE_WIFI_UPLINK = 6,   /* the radio is the gateway's Wi-Fi interface (ESP-Hosted), docs/wifi-uplink.md */
     GW_ROLE_MAX,
 } gw_role_t;
 
@@ -120,11 +121,22 @@ void gw_restart_on_failure(void) __attribute__((noreturn));
 /* ---- Ethernet ---- */
 esp_err_t gw_eth_init(const char *hostname);
 esp_netif_t *gw_eth_netif(void);
-/* Waits for an IPv4 or global IPv6 address. */
+/* Waits for an IPv4 or global IPv6 address, on the LAN or on the Wi-Fi uplink. */
 bool gw_eth_wait_ip(TickType_t timeout);
+/* The Wi-Fi uplink got (true) or lost its IPv4 address; gw_eth_wait_ip() counts it. */
+void gw_net_uplink_ip(bool up);
 cJSON *gw_eth_status(void);
 /* Bytes and packets through the Ethernet interface since boot, in total and per service. */
 cJSON *gw_eth_traffic(void);
+/* The same for another interface (GW_TRAFFIC_WIFI): counting starts at the hook. */
+#define GW_TRAFFIC_ETH 0
+#define GW_TRAFFIC_WIFI 1
+void gw_traffic_hook(int iface, esp_netif_t *netif);
+cJSON *gw_traffic_json(int iface);
+/* {"mode": "dhcp"|"static", "ip", "mask", "gw", "dns1", "dns2"} (mode missing: DHCP) checked into ip
+ * and dns; fixed tells static. On false err says why. */
+bool gw_net_parse_ipv4(const cJSON *json, bool *fixed, esp_netif_ip_info_t *ip, esp_ip4_addr_t dns[2], char *err,
+                       size_t err_len);
 /* LAN settings: DHCP or static IPv4, link mode. A change applies at once and must be confirmed
  * (gw_lan_confirm) within 120 s, else the stored settings come back. */
 esp_err_t gw_lan_set(const cJSON *json, char *err, size_t err_len);

@@ -19,6 +19,7 @@
 #include "mdns.h"
 #include "netscan.h"
 #include "role_esphome.h"
+#include "role_wifi.h"
 #include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
@@ -133,6 +134,9 @@ static esp_err_t start_radio_role(c6_radio_t radio, gw_role_t role)
     if (role == GW_ROLE_ESPHOME) {
         return role_esphome_start(radio);
     }
+    if (role == GW_ROLE_WIFI_UPLINK) {
+        return role_wifi_start(radio);
+    }
     if (role == GW_ROLE_THREAD_BR || role == GW_ROLE_THREAD_ROUTER) {
         return role_thread_start(role == GW_ROLE_THREAD_BR, radio);
     }
@@ -169,6 +173,7 @@ static void apply_role(gw_role_t role)
     case GW_ROLE_ZIGBEE_COORD:
     case GW_ROLE_ZIGBEE_ROUTER:
     case GW_ROLE_ESPHOME:
+    case GW_ROLE_WIFI_UPLINK:
         err = start_radio_role(C6_RADIO_A, role);
         break;
     default:
@@ -295,14 +300,14 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
         return ESP_OK;
     }
     const char *bundle = GW_JSON_STR(body, "bundle");
-    static const char *const allowed[] = {"ot_rcp", "zigbee_ncp", "zigbee_router", "scanner", "esphome"};
+    static const char *const allowed[] = {"ot_rcp", "zigbee_ncp", "zigbee_router", "scanner", "esphome", "wifi_uplink"};
     bool ok = false;
     for (size_t i = 0; bundle && i < sizeof(allowed) / sizeof(allowed[0]); i++) {
         ok |= strcmp(bundle, allowed[i]) == 0;
     }
     if (!ok) {
         cJSON_Delete(body);
-        return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router, scanner or esphome");
+        return gw_http_send_error(req, 400, "bundle: ot_rcp, zigbee_ncp, zigbee_router, scanner, esphome or wifi_uplink");
     }
     if (gw_state()->active_b != GW_ROLE_NONE) {
         cJSON_Delete(body);
@@ -323,13 +328,13 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
     return gw_http_send_json(req, cJSON_CreateObject());
 }
 
-/* GET /api/radios/b/console?baud=115200&ms=3000&reset=1: what radio B prints on its UART (ROM
- * banner, boot log, panic), for diagnostics while no role uses it. */
+/* GET /api/radios/b/console?baud=115200&ms=3000&reset=1&raw=0: what radio B prints on its UART (ROM
+ * banner, boot log, panic), for diagnostics while no role uses it; raw=1 keeps binary frames. */
 static esp_err_t radio_b_console_get(httpd_req_t *req)
 {
     char query[64], val[12];
     int baud = 115200, ms = 3000;
-    bool reset = false;
+    bool reset = false, raw = false;
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
         if (httpd_query_key_value(query, "baud", val, sizeof(val)) == ESP_OK) {
             baud = atoi(val);
@@ -339,6 +344,9 @@ static esp_err_t radio_b_console_get(httpd_req_t *req)
         }
         if (httpd_query_key_value(query, "reset", val, sizeof(val)) == ESP_OK) {
             reset = atoi(val) != 0;
+        }
+        if (httpd_query_key_value(query, "raw", val, sizeof(val)) == ESP_OK) {
+            raw = atoi(val) != 0;
         }
     }
     if (baud < 9600 || baud > 2000000 || ms < 100 || ms > 10000) {
@@ -363,12 +371,12 @@ static esp_err_t radio_b_console_get(httpd_req_t *req)
     }
     int n = uart_read_bytes(p->uart_port, buf, 8191, pdMS_TO_TICKS(ms));
     uart_driver_delete(p->uart_port);
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; !raw && i < n; i++) {
         if ((buf[i] < 0x20 || buf[i] > 0x7e) && buf[i] != '\n' && buf[i] != '\r') {
             buf[i] = '.'; /* binary frames */
         }
     }
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, raw ? "application/octet-stream" : "text/plain");
     esp_err_t err = httpd_resp_send(req, buf, n > 0 ? n : 0);
     free(buf);
     return err;
@@ -605,6 +613,7 @@ void app_main(void)
     gw_http_register("/api/radios/thread/forget", HTTP_POST, thread_forget_post);
     netscan_init();
     role_esphome_init();
+    role_wifi_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
     sound_init();
     gw_mqtt_start();

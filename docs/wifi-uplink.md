@@ -4,7 +4,7 @@ Goal: a radio (internal C6 = radio A, external XIAO ESP32-C5 = radio B) gives th
 connection to the home network, for a place without Ethernet or as a fallback when the LAN link is
 down. A new radio role `wifi_uplink`, next to Thread, Zigbee and ESPHome.
 
-Status: W1 done (radio firmware built and packed), W2 next (2026-11-02).
+Status: W1 and W2 done, W3 (roles UI) in progress (2026-11-02).
 
 ## Decisions (2026-11-02)
 
@@ -15,6 +15,8 @@ Status: W1 done (radio firmware built and packed), W2 next (2026-11-02).
 - Wi-Fi gets the same settings and statistics as the LAN: DHCP or static IPv4, traffic counters
   and throughput per service.
 - Implementation order: radio B (C5) first, then radio A (same firmware, other pins).
+- Setup access point: open, only for a few minutes after start (no password to print or show).
+- LAN and Wi-Fi up together: Ethernet carries the default route, Wi-Fi stays as standby.
 
 ## How
 
@@ -68,11 +70,37 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
 |---|---|---|
 | W0 spike | host build footprint (above) | done |
 | W1 co-processor | `wifi_uplink` bundle: ESP-Hosted 3.0.10 co-processor (example `wifi/apsta`, station and access point), UART1 on the radio's UART0 pads (C6 GPIO16/17, C5 GPIO11/12, console off), 921600 Bd, no Bluetooth, optimized for size; in both radio packages with its own whole-flash layout like ESPHome | done: C6 926 kB, C5 965 kB (too large for the 768 kB slots, so a switch to or from the uplink rewrites the slots layout, ~70 s); packed 550 kB, c6fw.bin 2.8 MB, c5fw.bin 2.9 MB of 4 MB; 7 of 8 package entries used |
-| W2 host | `role_wifi` on the P4 (`espressif/esp_hosted` 3.0.10, same version as the co-processor): ESP-Hosted host on the pins of the radio that has the role, Wi-Fi settings (SSID, password secret, band preference), station netif, route priority, status in `/api/status` (`wifi`: state, SSID, RSSI, channel, band, IP, link speed of the transport) | the gateway gets an IP over radio B, web UI reachable over Wi-Fi |
+| W2 host | `role_wifi` on the P4 (`espressif/esp_hosted` 3.0.10, same version as the co-processor): ESP-Hosted host on the pins of the radio that has the role, Wi-Fi settings (SSID, password secret, band preference), station netif, route priority, status in `/api/status` (`wifi`: state, SSID, RSSI, channel, band, IP, link speed of the transport) | done: radio B joins in 12 s after the start, own IPv4 (DHCP) and IPv6 link-local, web UI over Wi-Fi 81 kB/s (LAN 1 MB/s), Ethernet keeps the default route; image 2 987 824 B (158 kB left in the slot), internal heap free 108 kB, minimum 58 kB |
 | W3 roles | the role in Radios › Roles for A and B (at most one uplink), conflicts (radio A uplink → no Thread/Zigbee unless radio B runs it), Telegram `/role`, the overview diagram shows the uplink | every allowed combination switches |
 | W3b portal | access point on the uplink radio when no LAN and no working Wi-Fi: DHCP server and DNS redirect on the P4, the setup page (Wi-Fi networks from a scan, password, DHCP/static); WPA2 with a password shown in the UI and printed in the docs, or open for a limited time after start (decide in W3b) | a gateway without LAN is set up from a phone |
 | W4 fallback | backbone choice at start, failover with hysteresis (LAN down > 60 s → Wi-Fi; LAN back > 5 min → Ethernet at the next quiet moment or immediately when Thread BR is off), notifications | pulling the LAN cable keeps the gateway reachable |
 | W5 tests and docs | test matrix below in `tests/hw_test.py` (TC), `tests/ui/ui_test.mjs` (UI), HA integration over Wi-Fi; docs/hardware, installation, CHANGELOG | matrix green on the board |
+
+## Notes from the hardware
+
+- The radio's ROM prints its boot banner at 115200 Bd on the transport pins. At 921600 Bd it is noise
+  in which the host's frame decoder finds a false header and waits for bytes that never come, so the
+  co-processor's INIT is never read. The host holds the radio in reset until its UART listens, then
+  drops everything up to the first quiet gap of 20 ms before it opens the transport.
+- The host has no reset line of its own (`pin_reset = -1`): radio B's reset is open drain, driven by
+  the flasher's `c6_hold_reset()`.
+- The flasher runs the same wiring at 460800 Bd only, so speeds above 921600 Bd are not proven on the
+  jumper wires yet.
+- ESP-Hosted is not started at boot (`CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n`) and never
+  restarts the gateway on a transport failure (`..._RESTART_ON_FAILURE=n`); its task stacks and
+  buffers go to PSRAM.
+
+## API
+
+| | |
+|---|---|
+| `GET /api/net/wifi` | settings (`ssid`, `password_set`, `from_esphome`, `mode`, static fields) and status |
+| `POST /api/net/wifi` | `{"ssid", "password" (left out: kept), "mode": "dhcp"\|"static", "ip", "mask", "gw", "dns1", "dns2"}`, applied at once |
+| `GET /api/net/wifi/traffic` | counters per service like `/api/net/traffic`, from the first connection |
+| `GET /api/net/wifi/scan` | networks in range (while the uplink runs) |
+| `/api/status` `role_status` / `role_status_b` | `mode: "wifi_uplink"`, `state`, `error`, `ssid`, `rssi`, `channel`, `band`, `phy`, `ipv4`, `default_route`, … |
+
+Without a network of its own the uplink uses the Wi-Fi set for ESPHome.
 
 ## Test matrix
 

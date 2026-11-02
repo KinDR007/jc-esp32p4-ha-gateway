@@ -501,6 +501,8 @@ const CS = {
   'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.': 'Síťový koprocesor ZBOSS přes TCP pro Zigbee2MQTT (adapter zboss). Data sítě se při přepínání zachovají.',
   'Standalone Zigbee router (range extender) that joins your existing Zigbee network.': 'Samostatný Zigbee router (zesilovač dosahu), který se připojí do vaší Zigbee sítě.',
   'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (ESPHome page), Home Assistant adopts the device.': 'Rádio běží jako ESPHome Bluetooth proxy samostatně přes Wi-Fi; brána mu nastaví Wi-Fi (stránka ESPHome), Home Assistant zařízení převezme.',
+  'The radio is the Wi-Fi interface of the gateway: the connection to the home network where there is no Ethernet, a standby while the LAN link is up. Network and addressing under System › Wi-Fi.': 'Rádio je Wi-Fi rozhraní brány: připojení do domácí sítě tam, kde není Ethernet, a záloha, dokud má LAN linku. Síť a adresace v Systém › Wi-Fi.',
+  'Wi-Fi uplink': 'Wi-Fi uplink', 'Wi-Fi settings': 'Nastavení Wi-Fi',
   'Upload an ESPHome image under System first.': 'Nejdřív nahrajte ESPHome image v záložce Systém.',
   'No C6 backup yet': 'Chybí záloha C6',
   'This role overwrites the factory firmware of the C6, which cannot be downloaded again. Cancel and use System → Back up C6 flash first (needs the JP1 jumpers), or continue without a backup.':
@@ -737,6 +739,7 @@ const ROLES = {
   zigbee_coordinator: { icon: 'zigbee', name: 'Zigbee coordinator', group: 'Zigbee', desc: 'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.' },
   zigbee_router: { icon: 'zigbee', name: 'Zigbee router', group: 'Zigbee', desc: 'Standalone Zigbee router (range extender) that joins your existing Zigbee network.' },
   esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'ESPHome', desc: 'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (ESPHome page), Home Assistant adopts the device.' },
+  wifi_uplink: { icon: 'wifi', name: 'Wi-Fi uplink', group: 'Wi-Fi', desc: 'The radio is the Wi-Fi interface of the gateway: the connection to the home network where there is no Ethernet, a standby while the LAN link is up. Network and addressing under System › Wi-Fi.' },
 };
 
 async function api(path, opts = {}) {
@@ -1152,6 +1155,7 @@ const TIPS = {
   'role:thread_router': ['Extra router for an existing Thread network to improve range; no connection to the LAN.', 'Další router pro existující Thread síť, zlepší dosah; bez propojení s LAN.'],
   'role:zigbee_coordinator': ['The C6 runs the Zigbee network; Zigbee2MQTT controls it over the network.', 'C6 řídí Zigbee síť; Zigbee2MQTT ji ovládá po síti.'],
   'role:zigbee_router': ['Range extender joined to another Zigbee network.', 'Zesilovač dosahu připojený do jiné Zigbee sítě.'],
+  'role:wifi_uplink': ['ESP-Hosted on the radio: the gateway gets an ordinary Wi-Fi interface with its own address, IPv6 and mDNS. About 0.7 Mbit/s over the radio UART; the radio has no other role meanwhile.', 'ESP-Hosted na rádiu: brána dostane běžné Wi-Fi rozhraní s vlastní adresou, IPv6 a mDNS. Asi 0,7 Mbit/s přes UART rádia; rádio mezitím jinou roli nemá.'],
   'role:esphome': ['Bluetooth proxy for Home Assistant (ESPHome) running on the radio itself over Wi-Fi; the gateway keeps working with the other radio.', 'Bluetooth proxy pro Home Assistant (ESPHome) běžící přímo na rádiu přes Wi-Fi; brána dál pracuje s druhým rádiem.'],
 };
 
@@ -1203,6 +1207,7 @@ const ICONS = {
   'lock-reset': 'M12.63,2C18.16,2 22.64,6.5 22.64,12C22.64,17.5 18.16,22 12.63,22C9.12,22 6.05,20.18 4.26,17.43L5.84,16.18C7.25,18.47 9.76,20 12.64,20A8,8 0 0,0 20.64,12A8,8 0 0,0 12.64,4C8.56,4 5.2,7.06 4.71,11H7.47L3.73,14.73L0,11H2.69C3.19,5.95 7.45,2 12.63,2M15.59,10.24C16.09,10.25 16.5,10.65 16.5,11.16V15.77C16.5,16.27 16.09,16.69 15.58,16.69H10.05C9.54,16.69 9.13,16.27 9.13,15.77V11.16C9.13,10.65 9.54,10.25 10.04,10.24V9.23C10.04,7.7 11.29,6.46 12.81,6.46C14.34,6.46 15.59,7.7 15.59,9.23V10.24M12.81,7.86C12.06,7.86 11.44,8.47 11.44,9.23V10.24H14.19V9.23C14.19,8.47 13.57,7.86 12.81,7.86Z',
   'login': 'M11 7L9.6 8.4L12.2 11H2V13H12.2L9.6 15.6L11 17L16 12L11 7M20 19H12V21H20C21.1 21 22 20.1 22 19V5C22 3.9 21.1 3 20 3H12V5H20V19Z',
   'logout': 'M17 7L15.59 8.41L18.17 11H8V13H18.17L15.59 15.58L17 17L22 12M4 5H12V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H12V19H4V5Z',
+  'magnify': 'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
   'matter': 'M7.94 7.25c0.84 0.68 1.84 1.14 2.91 1.34V2.89l1.16-0.67 1.16 0.67v5.69c1.07-0.19 2.07-0.65 2.91-1.34l2.1 1.21c-3.42 3.38-8.93 3.38-12.35 0zm2.56 14.52C11.71 17.12 8.96 12.35 4.32 11.08v2.43c1.01 0.39 1.91 1.02 2.61 1.85L2 18.21v1.34l1.16 0.66 4.93-2.84c0.37 1.02 0.47 2.12 0.3 3.18zm9.19-10.69C15.05 12.35 12.3 17.12 13.52 21.77l2.11-1.22c-0.17-1.07-0.07-2.16 0.3-3.18l4.92 2.84 1.16-0.67v-1.34l-4.93-2.84c0.7-0.83 1.6-1.46 2.61-1.85z',
   'memory': 'M17,17H7V7H17M21,11V9H19V7C19,5.89 18.1,5 17,5H15V3H13V5H11V3H9V5H7C5.89,5 5,5.89 5,7V9H3V11H5V13H3V15H5V17A2,2 0 0,0 7,19H9V21H11V19H13V21H15V19H17A2,2 0 0,0 19,17V15H21V13H19V11M13,13H11V11H13M15,9H9V15H15V9Z',
   'menu': 'M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z',
@@ -1241,6 +1246,8 @@ const ICONS = {
   'weather-night': 'M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z',
   'web': 'M16.36,14C16.44,13.34 16.5,12.68 16.5,12C16.5,11.32 16.44,10.66 16.36,10H19.74C19.9,10.64 20,11.31 20,12C20,12.69 19.9,13.36 19.74,14M14.59,19.56C15.19,18.45 15.65,17.25 15.97,16H18.92C17.96,17.65 16.43,18.93 14.59,19.56M14.34,14H9.66C9.56,13.34 9.5,12.68 9.5,12C9.5,11.32 9.56,10.65 9.66,10H14.34C14.43,10.65 14.5,11.32 14.5,12C14.5,12.68 14.43,13.34 14.34,14M12,19.96C11.17,18.76 10.5,17.43 10.09,16H13.91C13.5,17.43 12.83,18.76 12,19.96M8,8H5.08C6.03,6.34 7.57,5.06 9.4,4.44C8.8,5.55 8.35,6.75 8,8M5.08,16H8C8.35,17.25 8.8,18.45 9.4,19.56C7.57,18.93 6.03,17.65 5.08,16M4.26,14C4.1,13.36 4,12.69 4,12C4,11.31 4.1,10.64 4.26,10H7.64C7.56,10.66 7.5,11.32 7.5,12C7.5,12.68 7.56,13.34 7.64,14M12,4.03C12.83,5.23 13.5,6.57 13.91,8H10.09C10.5,6.57 11.17,5.23 12,4.03M18.92,8H15.97C15.65,6.75 15.19,5.55 14.59,4.44C16.43,5.07 17.96,6.34 18.92,8M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z',
   'white-balance-sunny': 'M3.55 19.09L4.96 20.5L6.76 18.71L5.34 17.29M12 6C8.69 6 6 8.69 6 12S8.69 18 12 18 18 15.31 18 12C18 8.68 15.31 6 12 6M20 13H23V11H20M17.24 18.71L19.04 20.5L20.45 19.09L18.66 17.29M20.45 5L19.04 3.6L17.24 5.39L18.66 6.81M13 1H11V4H13M6.76 5.39L4.96 3.6L3.55 5L5.34 6.81L6.76 5.39M1 13H4V11H1M13 20H11V23H13',
+  'wifi': 'M12,21L15.6,16.2C14.6,15.45 13.35,15 12,15C10.65,15 9.4,15.45 8.4,16.2L12,21M12,3C7.95,3 4.21,4.34 1.2,6.6L3,9C5.5,7.12 8.62,6 12,6C15.38,6 18.5,7.12 21,9L22.8,6.6C19.79,4.34 16.05,3 12,3M12,9C9.3,9 6.81,9.89 4.8,11.4L6.6,13.8C8.1,12.67 9.97,12 12,12C14.03,12 15.9,12.67 17.4,13.8L19.2,11.4C17.19,9.89 14.7,9 12,9Z',
+  'wifi-cog': 'M12 12C9.97 12 8.1 12.67 6.6 13.8L4.8 11.4C6.81 9.89 9.3 9 12 9S17.19 9.89 19.2 11.4L18.74 12C17.66 12.05 16.63 12.33 15.73 12.81C14.6 12.29 13.33 12 12 12M21 9L22.8 6.6C19.79 4.34 16.05 3 12 3S4.21 4.34 1.2 6.6L3 9C5.5 7.12 8.62 6 12 6S18.5 7.12 21 9M12 15C10.65 15 9.4 15.45 8.4 16.2L12 21L12.22 20.71C12.08 20.16 12 19.59 12 19C12 17.57 12.43 16.24 13.17 15.13C12.79 15.05 12.4 15 12 15M23.8 20.4C23.9 20.4 23.9 20.5 23.8 20.6L22.8 22.3C22.7 22.4 22.6 22.4 22.5 22.4L21.3 22C21 22.2 20.8 22.3 20.5 22.5L20.3 23.8C20.3 23.9 20.2 24 20.1 24H18.1C18 24 17.9 23.9 17.8 23.8L17.6 22.5C17.3 22.4 17 22.2 16.8 22L15.6 22.5C15.5 22.5 15.4 22.5 15.3 22.4L14.3 20.7C14.2 20.6 14.3 20.5 14.4 20.4L15.5 19.6V18.6L14.4 17.8C14.3 17.7 14.3 17.6 14.3 17.5L15.3 15.8C15.4 15.7 15.5 15.7 15.6 15.7L16.8 16.2C17.1 16 17.3 15.9 17.6 15.7L17.8 14.4C17.8 14.3 17.9 14.2 18.1 14.2H20.1C20.2 14.2 20.3 14.3 20.3 14.4L20.5 15.7C20.8 15.8 21.1 16 21.4 16.2L22.6 15.7C22.7 15.7 22.9 15.7 22.9 15.8L23.9 17.5C24 17.6 23.9 17.7 23.8 17.8L22.7 18.6V19.6L23.8 20.4M20.5 19C20.5 18.2 19.8 17.5 19 17.5S17.5 18.2 17.5 19 18.2 20.5 19 20.5 20.5 19.8 20.5 19Z',
   'wrench-outline': 'M22.61,19L13.53,9.91C14.46,7.57 14,4.81 12.09,2.91C9.79,0.61 6.21,0.4 3.66,2.26L7.5,6.11L6.08,7.5L2.25,3.69C0.39,6.23 0.6,9.82 2.9,12.11C4.76,13.97 7.47,14.46 9.79,13.59L18.9,22.7C19.29,23.09 19.92,23.09 20.31,22.7L22.61,20.4C23,20 23,19.39 22.61,19M19.61,20.59L10.15,11.13C9.54,11.58 8.86,11.85 8.15,11.95C6.79,12.15 5.36,11.74 4.32,10.7C3.37,9.76 2.93,8.5 3,7.26L6.09,10.35L10.33,6.11L7.24,3C8.5,2.95 9.73,3.39 10.68,4.33C11.76,5.41 12.17,6.9 11.92,8.29C11.8,9 11.5,9.66 11.04,10.25L20.5,19.7L19.61,20.59Z',
   'zigbee': 'M4.06,6.15C3.97,6.17 3.88,6.22 3.8,6.28C2.66,7.9 2,9.87 2,12A10,10 0 0,0 12,22C15,22 17.68,20.68 19.5,18.6L17,18.85C14.25,19.15 11.45,19.19 8.66,18.96C7.95,18.94 7.24,18.76 6.59,18.45C5.73,18.06 5.15,17.23 5.07,16.29C5.06,16.13 5.12,16 5.23,15.87L7.42,13.6L15.03,5.7V5.6H10.84C8.57,5.64 6.31,5.82 4.06,6.15M20.17,17.5C20.26,17.47 20.35,17.44 20.43,17.39C21.42,15.83 22,14 22,12A10,10 0 0,0 12,2C9.22,2 6.7,3.13 4.89,4.97H5.17C8.28,4.57 11.43,4.47 14.56,4.65C15.5,4.64 16.45,4.82 17.33,5.17C18.25,5.53 18.89,6.38 19,7.37C19,7.53 18.93,7.7 18.82,7.82L9.71,17.19L9,17.95V18.06H13.14C15.5,18 17.84,17.81 20.17,17.5Z',
 };
@@ -1322,6 +1329,7 @@ const NAV = [
     { id: 'matter', label: 'Matter', icon: 'matter' }] },
   { id: 'system', label: 'System', icon: 'developer-board', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
+    { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
     { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
@@ -1338,7 +1346,7 @@ const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbe
   role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
   'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
 /* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
-const PERM = { 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
+const PERM = { 'system/wifi': 'system/lan', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -1633,6 +1641,28 @@ const views = {};
 
 /* What a radio runs and the network it serves (overview cards): role, a pending switch, the state of
  * its network from the role status of that radio. */
+/* Wi-Fi uplink (docs/wifi-uplink.md): its state from the role status of the radio that runs it */
+const WIFI_STATES = { off: ['off', 'vypnuto'], starting: ['starting', 'startuje'], radio_unreachable: ['radio not answering', 'rádio neodpovídá'],
+  no_settings: ['no network set', 'síť nenastavena'], connecting: ['connecting', 'připojuje se'], connected: ['connected', 'připojeno'], disconnected: ['disconnected', 'odpojeno'] };
+const wifiState = w => L(...(WIFI_STATES[w.state] || [w.state || '', w.state || '']));
+const wifiBand = w => w.channel ? `${w.channel > 14 ? '5 GHz' : L('2.4 GHz', '2,4 GHz')} · ${L('channel', 'kanál')} ${w.channel}` : '';
+const wifiUplink = () => status.role_status_b?.mode === 'wifi_uplink' ? status.role_status_b : status.role_status?.mode === 'wifi_uplink' ? status.role_status : null;
+function wifiRows(w, full) {
+  const state = w.state === 'connected' && w.ipv4 ? pill('ok', wifiState(w)) : pill(w.state === 'radio_unreachable' || w.state === 'disconnected' ? 'bad' : 'warn', wifiState(w));
+  const rows = [[L('Wi-Fi', 'Wi-Fi'), state + (w.error ? ` <span class="muted">${esc(w.error)}</span>` : '')],
+    [L('Network', 'Síť'), `<span data-notr>${esc(w.ssid || '')}</span>`], ['IPv4', esc(w.ipv4 || '')],
+    [L('Signal', 'Signál'), w.rssi ? `${w.rssi} dBm · ${wifiBand(w)}${w.phy ? ' · 802.' + esc(w.phy) : ''}` : ''],
+    [L('Traffic', 'Provoz'), w.ipv4 ? (w.default_route ? L('default route', 'výchozí trasa') : L('standby: LAN has the default route', 'záloha: výchozí trasa vede přes LAN')) : '']];
+  if (full) {
+    rows.push([L('Addressing', 'Adresace'), w.ip_mode === 'static' ? L('static', 'statická') : 'DHCP'], [L('Netmask', 'Maska'), esc(w.netmask || '')],
+      [L('Gateway', 'Výchozí brána'), esc(w.gateway || '')], ['IPv6', (w.ipv6 || []).map(esc).join('<br>')], ['MAC', esc(w.mac || '')],
+      [L('Connected for', 'Připojeno'), w.connected_s !== undefined ? fmtUptime(w.connected_s) : ''],
+      [L('Connections / drops', 'Připojení / výpadky'), `${w.connects ?? 0} / ${w.disconnects ?? 0}`],
+      [L('Radio', 'Rádio'), `${w.radio === 'b' ? L('B (external)', 'B (externí)') : L('A (internal)', 'A (interní)')} · ESP-Hosted ${esc(w.cp_version || '–')} · UART ${w.baud / 1000} kBd`]);
+  }
+  return rows;
+}
+
 function radioRoleRows(active, desired, rs) {
   const rows = [[L('Role', 'Role'), `<b>${esc(ROLES[active]?.name || L('off', 'vypnuto'))}</b>`, 'Active'],
     desired && desired !== active ? [L('Selected', 'Vybráno'), pill('warn', ROLES[desired]?.name || desired), 'Selected'] : null];
@@ -1645,6 +1675,8 @@ function radioRoleRows(active, desired, rs) {
     const z = rs.router;
     rows.push([L('Router', 'Router'), z ? pill(z.joined ? 'ok' : 'warn', z.state) : pill('warn', L('no status from the radio', 'rádio nehlásí stav'))],
       ['PAN ID', z?.joined ? esc(z.pan_id) : ''], [L('Channel', 'Kanál'), z?.joined ? z.channel : '']);
+  } else if (active === 'wifi_uplink') {
+    rows.push(...wifiRows(rs, false));
   }
   return rows;
 }
@@ -1660,6 +1692,8 @@ function radioNet(active, rs) {
   }
   if (active === 'zigbee_coordinator') return [rs.client_connected ? 'ok' : 'warn', '#zigbee/info', 'Zigbee', L('coordinator', 'koordinátor'), [rs.client_connected ? `Zigbee2MQTT ${esc(rs.client)}` : L('Zigbee2MQTT not connected', 'Zigbee2MQTT nepřipojen')]];
   if (active === 'esphome') return ['ok', '#esphome', 'ESPHome', L('BLE proxy', 'BLE proxy'), [L('own Wi-Fi to Home Assistant', 'vlastní Wi-Fi do Home Assistant')]];
+  if (active === 'wifi_uplink') return [rs.ipv4 ? 'ok' : 'warn', '#system/wifi', 'Wi-Fi', `<span data-notr>${esc(rs.ssid || L('not set', 'nenastaveno'))}</span>`,
+    [rs.ipv4 ? `${esc(rs.ipv4)} · ${wifiBand(rs)}` : esc(wifiState(rs)), rs.ipv4 ? (rs.default_route ? L('carries the traffic', 'nese provoz') : L('standby, LAN carries the traffic', 'záloha, provoz nese LAN')) : '']];
   return ['off', '#radios/roles', L('Network', 'Síť'), L('none', 'žádná'), [L('radio without a role', 'rádio bez role')]];
 }
 
@@ -1723,7 +1757,7 @@ views['radios/roles'] = () => {
         <div><button class="btn ${id === active ? '' : 'primary'}" data-role="${id}" data-radio="${radio}" ${id === active || clash ? 'disabled' : ''}>${ic(id === active ? 'check' : 'swap-horizontal')}${id === active ? L('Running', 'Běží') : L('Switch', 'Přepnout')}</button></div>
       </div>`;
     };
-    const groups = [['Thread', 'access-point-network'], ['Zigbee', 'zigbee'], ['ESPHome', 'bluetooth']].map(([g, icon]) =>
+    const groups = [['Thread', 'access-point-network'], ['Zigbee', 'zigbee'], ['ESPHome', 'bluetooth'], ['Wi-Fi', 'wifi']].map(([g, icon]) =>
       `<div class="role-group"><h4>${ic(icon)}<span>${g}</span></h4><div class="roles">${Object.entries(ROLES).filter(([, x]) => x.group === g).map(card).join('')}</div></div>`).join('');
     return groups;
   };
@@ -3569,6 +3603,11 @@ views['system/lan'] = () => `<div class="grid"><div class="card">${h3('ethernet'
     <p class="muted">${L('The gateway is reachable as', 'Brána je dostupná jako')} <code>${esc(status.hostname)}.local</code>.</p></div>
   <div class="card wide">${h3('swap-horizontal', L('Traffic', 'Provoz'))}<div id="traffic-box" class="muted">${L('Loading…', 'Načítám…')}</div></div></div>`;
 
+views['system/wifi'] = () => `<div class="grid"><div class="card">${h3('wifi-cog', L('Wi-Fi settings', 'Nastavení Wi-Fi'))}
+    <div id="wifi-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>
+  <div class="card">${h3('information-outline', L('Current state', 'Aktuální stav'))}<div id="wifi-state"></div></div>
+  <div class="card wide">${h3('swap-horizontal', L('Traffic over Wi-Fi', 'Provoz přes Wi-Fi'))}<div id="traffic-box" class="muted">${L('Loading…', 'Načítám…')}</div></div></div>`;
+
 const LAN_FIELDS = [['ip', 'IPv4'], ['mask', ['Netmask', 'Maska']], ['gw', ['Gateway', 'Výchozí brána']], ['dns1', ['DNS server', 'DNS server']], ['dns2', ['Backup DNS server', 'Záložní DNS server']]];
 async function loadLan() {
   const box = $('#lan-box');
@@ -3590,6 +3629,40 @@ async function loadLan() {
       'Změna platí hned a musí se potvrdit do 120 s, při změně adresy z nové adresy; jinak se vrátí předchozí nastavení. Thread a Zigbee běží dál. Při DHCP je brána dostupná i jako')} <code>${esc(status.hostname)}.local</code>.</p>`;
   lanFields();
 }
+async function loadWifi() {
+  const box = $('#wifi-box');
+  if (!box) return;
+  let c;
+  try { c = (await api('/api/net/wifi')).settings; } catch (e) { box.textContent = e.message; return; }
+  const w = wifiUplink() || {}, cur = { ip: w.ipv4, mask: w.netmask, gw: w.gateway };
+  box.classList.remove('muted');
+  box.innerHTML = `<label class="field"><span>${L('Network (SSID)', 'Síť (SSID)')}</span><input type="text" id="wifi-ssid" maxlength="32" value="${esc(c.ssid)}" data-notr></label>
+    <div class="row"><button class="btn" id="wifi-scan">${ic('magnify')}${L('Networks in range', 'Sítě v dosahu')}</button></div><div id="wifi-scan-out"></div>
+    <label class="field"><span>${L('Password', 'Heslo')}</span><input type="password" id="wifi-pass" maxlength="64" autocomplete="new-password"
+      placeholder="${c.password_set ? L('unchanged', 'beze změny') : L('empty: open network', 'prázdné: otevřená síť')}"></label>
+    <label class="field"><span>${L('Addressing', 'Adresace')}</span><select id="wifi-mode">
+      <option value="dhcp" ${c.mode === 'dhcp' ? 'selected' : ''}>DHCP</option><option value="static" ${c.mode === 'static' ? 'selected' : ''}>${L('Static', 'Statická')}</option></select></label>
+    ${LAN_FIELDS.map(([k, t]) => `<label class="field"><span>${Array.isArray(t) ? L(...t) : t}</span>
+      <input type="text" id="wifi-${k}" inputmode="decimal" value="${esc(c.mode === 'static' ? c[k] || '' : cur[k] || '')}" placeholder="${k.startsWith('dns') || k === 'gw' ? L('optional', 'nepovinné') : ''}"></label>`).join('')}
+    <div class="row"><button class="btn primary" id="wifi-save">${ic('check')}${L('Apply', 'Použít')}</button></div>
+    <p class="muted">${c.from_esphome ? L('No network of its own yet: the uplink uses the Wi-Fi set for ESPHome. ', 'Zatím bez vlastní sítě: uplink používá Wi-Fi nastavenou pro ESPHome. ') : ''}${L(
+      'The Wi-Fi runs on the radio with the role Wi-Fi uplink (Radios › Roles). While the LAN link is up, Ethernet carries the traffic and Wi-Fi is the standby. Over Wi-Fi the gateway has another address; it stays reachable as',
+      'Wi-Fi běží na rádiu s rolí Wi-Fi uplink (Rádia › Role). Dokud má LAN linku, provoz nese Ethernet a Wi-Fi je záloha. Přes Wi-Fi má brána jinou adresu; dostupná zůstává jako')} <code>${esc(status.hostname)}.local</code>.</p>`;
+  wifiFields();
+}
+function wifiFields() {
+  if (!$('#wifi-mode')) return;
+  const fixed = $('#wifi-mode').value === 'static';
+  for (const [k] of LAN_FIELDS) $('#wifi-' + k).disabled = !fixed;
+}
+document.addEventListener('change', e => { if (e.target.id === 'wifi-mode') wifiFields(); });
+function renderWifiState() {
+  const box = $('#wifi-state');
+  if (!box) return;
+  const w = wifiUplink();
+  box.innerHTML = w ? dl(wifiRows(w, true)) : `<p class="muted">${L('No radio runs the role Wi-Fi uplink.', 'Žádné rádio nemá roli Wi-Fi uplink.')} <a href="#radios/roles">${L('Radios › Roles', 'Rádia › Role')}</a></p>`;
+}
+
 /* static addresses only with mode static; switching to it starts from the address DHCP gave */
 function lanFields() {
   if (!$('#lan-mode')) return;
@@ -3612,13 +3685,15 @@ function renderLanState() {
 
 /* traffic: counters since boot from the gateway, rates from the difference of two samples taken
  * every 2 s while the page is open */
-let trafficTimer = null, trafficPrev = null, trafficRates = null, trafficHist = [];
+let trafficTimer = null, trafficPrev = null, trafficRates = null, trafficHist = [], trafficRoute = '';
+const TRAFFIC_API = { 'system/lan': '/api/net/traffic', 'system/wifi': '/api/net/wifi/traffic' };
 const TRAFFIC_HIST = 150;
 const fmtRate = b => { const v = b * 8; return v >= 1e6 ? (v / 1e6).toFixed(2) + ' Mb/s' : v >= 1e3 ? (v / 1e3).toFixed(1) + ' kb/s' : Math.round(v) + ' b/s'; };
 async function loadTraffic() {
-  if (route() !== 'system/lan') { clearInterval(trafficTimer); trafficTimer = null; return; }
+  if (!TRAFFIC_API[route()]) { clearInterval(trafficTimer); trafficTimer = null; return; }
+  if (trafficRoute !== route()) { trafficRoute = route(); trafficPrev = trafficRates = null; trafficHist = []; }
   let t;
-  try { t = await api('/api/net/traffic'); } catch (e) { return; }
+  try { t = await api(TRAFFIC_API[route()]); } catch (e) { return; }
   if (trafficPrev && t.uptime_ms > trafficPrev.uptime_ms) {
     const dt = (t.uptime_ms - trafficPrev.uptime_ms) / 1000, d = (a, b) => Math.max(0, (a - b) / dt);
     trafficRates = { rx: d(t.rx, trafficPrev.rx), tx: d(t.tx, trafficPrev.tx), svc: {} };
@@ -3631,6 +3706,7 @@ async function loadTraffic() {
   trafficPrev = t;
   renderTraffic(t);
   renderLanState();
+  renderWifiState();
 }
 function spark(hist) {
   const W = 600, H = 120, max = Math.max(1250, ...hist.flat()) * 1.1;
@@ -3642,6 +3718,10 @@ function spark(hist) {
 function renderTraffic(t) {
   const box = $('#traffic-box');
   if (!box) return;
+  if (!t.uptime_ms) {
+    box.innerHTML = L('The Wi-Fi uplink has not run since the start.', 'Wi-Fi uplink od startu neběžel.');
+    return;
+  }
   const r = trafficRates, sp = spark(trafficHist);
   const NAMES = { web: [L('Web UI, API, HA integration', 'Web UI, API, integrace HA'), '80'], otbr_rest: ['OTBR REST', '8081'],
     zigbee: ['Zigbee2MQTT (TCP)', '6638'], mqtt: ['MQTT', '1883, 8883'], mdns: ['mDNS', '5353'], dns_ntp: ['DNS, NTP', '53, 123'],
@@ -3661,8 +3741,8 @@ function renderTraffic(t) {
       ${svcs.map(([k, v]) => `<tr><td>${esc(NAMES[k]?.[0] || k)}</td><td class="muted">${NAMES[k]?.[1] || ''}</td>
         <td>${r ? fmtRate(r.svc[k].rx) : ''}</td><td>${r ? fmtRate(r.svc[k].tx) : ''}</td>
         <td>${fmtBytes(v.rx)}</td><td>${fmtBytes(v.tx)}</td><td class="muted">${v.rx_packets} / ${v.tx_packets}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted" style="margin-bottom:0">${L('Counted per Ethernet frame by port; the counting adds a few header reads per frame and does not delay Thread or Zigbee.',
-      'Počítáno po ethernetových rámcích podle portu; počítání přidá jen pár čtení hlavičky na rámec a Thread ani Zigbee nezdržuje.')}</p>`;
+    <p class="muted" style="margin-bottom:0">${L('Counted per frame of the interface by port; the counting adds a few header reads per frame and does not delay Thread or Zigbee.',
+      'Počítáno po rámcích rozhraní podle portu; počítání přidá jen pár čtení hlavičky na rámec a Thread ani Zigbee nezdržuje.')}</p>`;
 }
 
 /* ---------------- users and permissions ---------------- */
@@ -4375,6 +4455,25 @@ document.addEventListener('click', async e => {
       toast(L('LAN settings saved', 'Nastavení LAN uloženo'));
       status = await api('/api/status');
       renderHeader();
+    } else if (t.id === 'wifi-scan') {
+      const out = $('#wifi-scan-out');
+      out.innerHTML = `<p class="muted">${L('Scanning…', 'Hledám…')}</p>`;
+      const list = await api('/api/net/wifi/scan').catch(e => { out.innerHTML = `<p class="bad-text">${esc(e.message)}</p>`; return null; });
+      if (!list) return;
+      const nets = [...new Map(list.filter(a => a.ssid).map(a => [a.ssid, a])).values()];
+      out.innerHTML = nets.length ? `<div class="table-wrap"><table>${nets.map(a => `<tr><td data-notr><button class="btn" data-wifi-ssid="${esc(a.ssid)}">${esc(a.ssid)}</button></td>
+        <td>${a.rssi} dBm</td><td>${wifiBand(a)}</td><td>${a.open ? L('open', 'otevřená') : ''}</td></tr>`).join('')}</table></div>`
+        : `<p class="muted">${L('No network found.', 'Žádná síť nenalezena.')}</p>`;
+    } else if (t.dataset.wifiSsid !== undefined) {
+      $('#wifi-ssid').value = t.dataset.wifiSsid;
+      $('#wifi-pass').focus();
+    } else if (t.id === 'wifi-save') {
+      const body = { ssid: $('#wifi-ssid').value.trim(), mode: $('#wifi-mode').value }, pass = $('#wifi-pass').value;
+      if (pass) body.password = pass;
+      if (body.mode === 'static') for (const k of ['ip', 'mask', 'gw', 'dns1', 'dns2']) body[k] = $('#wifi-' + k).value.trim();
+      await api('/api/net/wifi', { json: body });
+      toast(L('Wi-Fi settings saved', 'Nastavení Wi-Fi uloženo'));
+      loadWifi();
     } else if (t.id === 'lan-save') {
       const mode = $('#lan-mode').value, body = { mode, link: $('#lan-link').value }, e0 = status.eth;
       if (mode === 'static') for (const k of ['ip', 'mask', 'gw', 'dns1', 'dns2']) body[k] = $('#lan-' + k).value.trim();
@@ -4692,9 +4791,8 @@ function render(full) {
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
     if (route() === 'radios/scan') loadNetscan();
-    if (route() === 'system/lan') {
-      loadLan();
-      renderLanState();
+    if (route() === 'system/lan' || route() === 'system/wifi') {
+      if (route() === 'system/lan') { loadLan(); renderLanState(); } else { loadWifi(); renderWifiState(); }
       loadTraffic();
       if (!trafficTimer) trafficTimer = setInterval(loadTraffic, 2000);
     }

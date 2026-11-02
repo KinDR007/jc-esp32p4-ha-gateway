@@ -807,8 +807,8 @@ static void cmd_role(const char *args, bool cz, char *out, size_t len)
         snprintf(out, len, cz ? "Rádio %c: přepínám na roli %s, brána se restartuje." : "Radio %c: switching to %s, the gateway restarts.",
                  'A' + radio, args);
     } else {
-        snprintf(out, len, cz ? "Roli nejde přepnout: %s\nRole: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome (rádio B i none: /role b none)"
-                              : "Cannot switch: %s\nRoles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome (radio B also none: /role b none)",
+        snprintf(out, len, cz ? "Roli nejde přepnout: %s\nRole: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome, wifi_uplink (rádio B i none: /role b none)"
+                              : "Cannot switch: %s\nRoles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome, wifi_uplink (radio B also none: /role b none)",
                  err);
     }
 }

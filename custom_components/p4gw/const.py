@@ -14,7 +14,7 @@ MANUFACTURER = "Guition"
 MODEL = "JC-ESP32P4-M3-DEV gateway"
 
 # Roles a user can switch to (the gateway falls back to "none" by itself).
-ROLES = ["thread_br", "thread_router", "zigbee_coordinator", "zigbee_router", "esphome"]
+ROLES = ["thread_br", "thread_router", "zigbee_coordinator", "zigbee_router", "esphome", "wifi_uplink"]
 ZIGBEE_ROLES = ("zigbee_coordinator", "zigbee_router")
 
 # Notifications of the gateway: topics and the lowest level shown as a persistent notification.

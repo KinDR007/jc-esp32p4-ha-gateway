@@ -20,6 +20,7 @@ static const char *TAG = "gw_eth";
 
 #define BIT_IP4 BIT0
 #define BIT_IP6 BIT1
+#define BIT_UPLINK BIT2 /* the Wi-Fi uplink has an address */
 
 static esp_netif_t *s_netif;
 static esp_eth_handle_t s_eth;
@@ -29,10 +30,10 @@ static uint32_t s_link_changes;
 static int64_t s_link_down_us;
 
 /* ---- traffic counters ----
- * The lwIP input and link output functions of the Ethernet netif are wrapped: every frame adds its
- * length to the totals and to one service, told by the TCP/UDP port. A few header reads per frame,
- * nothing is copied or delayed. IPv6 packets that are neither from nor to this gateway are the
- * Thread traffic it routes. */
+ * The lwIP input and link output functions of the Ethernet netif (and the Wi-Fi uplink) are wrapped:
+ * every frame adds its length to the totals and to one service, told by the TCP/UDP port. A few
+ * header reads per frame, nothing is copied or delayed. IPv6 packets that are neither from nor to
+ * this gateway are the Thread traffic it routes. */
 enum { SVC_WEB, SVC_OTBR, SVC_ZIGBEE, SVC_MQTT, SVC_MDNS, SVC_DNS_NTP, SVC_HTTPS, SVC_THREAD, SVC_OTHER, SVC_COUNT };
 static const char *const s_svc_names[SVC_COUNT] = {"web", "otbr_rest", "zigbee", "mqtt", "mdns",
                                                    "dns_ntp", "https", "thread", "other"};
@@ -40,16 +41,24 @@ typedef struct {
     uint64_t bytes;
     uint32_t packets;
 } counter_t;
-static counter_t s_rx[SVC_COUNT], s_tx[SVC_COUNT];
-static struct netif *s_lwip;
-static netif_input_fn s_input;
-static netif_linkoutput_fn s_linkoutput;
+typedef struct {
+    counter_t rx[SVC_COUNT], tx[SVC_COUNT];
+    struct netif *lwip;
+    netif_input_fn input;
+    netif_linkoutput_fn linkoutput;
+    int64_t since_us;
+} traffic_t;
+static traffic_t s_traffic[2]; /* GW_TRAFFIC_ETH, GW_TRAFFIC_WIFI */
 
-static bool own_ip6(const uint8_t *addr)
+static traffic_t *traffic_of(const struct netif *n)
+{
+    return n == s_traffic[GW_TRAFFIC_WIFI].lwip ? &s_traffic[GW_TRAFFIC_WIFI] : &s_traffic[GW_TRAFFIC_ETH];
+}
+
+static bool own_ip6(const struct netif *n, const uint8_t *addr)
 {
     for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
-        if (ip6_addr_isvalid(netif_ip6_addr_state(s_lwip, i)) &&
-            memcmp(netif_ip6_addr(s_lwip, i)->addr, addr, 16) == 0) {
+        if (ip6_addr_isvalid(netif_ip6_addr_state(n, i)) && memcmp(netif_ip6_addr(n, i)->addr, addr, 16) == 0) {
             return true;
         }
     }
@@ -57,12 +66,12 @@ static bool own_ip6(const uint8_t *addr)
 }
 
 /* routed: unicast, not link-local, and not an address of this gateway */
-static bool routed_ip6(const uint8_t *addr)
+static bool routed_ip6(const struct netif *n, const uint8_t *addr)
 {
-    return addr[0] != 0xff && !(addr[0] == 0xfe && (addr[1] & 0xc0) == 0x80) && addr[0] | addr[1] && !own_ip6(addr);
+    return addr[0] != 0xff && !(addr[0] == 0xfe && (addr[1] & 0xc0) == 0x80) && addr[0] | addr[1] && !own_ip6(n, addr);
 }
 
-static int classify(const uint8_t *f, size_t len, bool rx)
+static int classify(const struct netif *n, const uint8_t *f, size_t len, bool rx)
 {
     const uint8_t *l4;
     uint8_t proto;
@@ -78,7 +87,7 @@ static int classify(const uint8_t *f, size_t len, bool rx)
         proto = f[23];
         l4 = f + 14 + ihl;
     } else if (type == 0x86dd && len >= 58) {
-        if (routed_ip6(rx ? f + 38 : f + 22)) {
+        if (routed_ip6(n, rx ? f + 38 : f + 22)) {
             return SVC_THREAD;
         }
         proto = f[20];
@@ -109,54 +118,74 @@ static int classify(const uint8_t *f, size_t len, bool rx)
     return SVC_OTHER;
 }
 
-static void count(counter_t *c, const struct pbuf *p, bool rx)
+static void count(const struct netif *n, counter_t *c, const struct pbuf *p, bool rx)
 {
-    int svc = classify(p->payload, p->len, rx);
+    int svc = classify(n, p->payload, p->len, rx);
     c[svc].bytes += p->tot_len;
     c[svc].packets++;
 }
 
 static err_t count_input(struct pbuf *p, struct netif *netif)
 {
-    count(s_rx, p, true);
-    return s_input(p, netif);
+    traffic_t *t = traffic_of(netif);
+    count(netif, t->rx, p, true);
+    return t->input(p, netif);
 }
 
 static err_t count_linkoutput(struct netif *netif, struct pbuf *p)
 {
-    count(s_tx, p, false);
-    return s_linkoutput(netif, p);
+    traffic_t *t = traffic_of(netif);
+    count(netif, t->tx, p, false);
+    return t->linkoutput(netif, p);
 }
 
-static void hook_counters(void)
+void gw_traffic_hook(int iface, esp_netif_t *netif)
 {
-    struct netif *n = esp_netif_get_netif_impl(s_netif);
-    if (!n || !n->input || !n->linkoutput || n->input == count_input) {
+    struct netif *n = netif ? esp_netif_get_netif_impl(netif) : NULL;
+    if (iface < 0 || iface > GW_TRAFFIC_WIFI || !n || !n->input || !n->linkoutput || n->input == count_input) {
         return;
     }
-    s_lwip = n;
-    s_input = n->input;
-    s_linkoutput = n->linkoutput;
+    traffic_t *t = &s_traffic[iface];
+    t->input = n->input;
+    t->linkoutput = n->linkoutput;
+    if (!t->since_us) {
+        t->since_us = esp_timer_get_time();
+    }
+    t->lwip = n;
     n->input = count_input;
     n->linkoutput = count_linkoutput;
 }
 
+static void hook_counters(void)
+{
+    gw_traffic_hook(GW_TRAFFIC_ETH, s_netif);
+}
+
 cJSON *gw_eth_traffic(void)
 {
+    return gw_traffic_json(GW_TRAFFIC_ETH);
+}
+
+cJSON *gw_traffic_json(int iface)
+{
+    const traffic_t *t = &s_traffic[iface == GW_TRAFFIC_WIFI ? GW_TRAFFIC_WIFI : GW_TRAFFIC_ETH];
     cJSON *json = cJSON_CreateObject();
-    cJSON_AddNumberToObject(json, "uptime_ms", (double)(esp_timer_get_time() / 1000));
+    /* Ethernet counts from boot, the uplink from its first start (0: never started) */
+    bool wifi = iface == GW_TRAFFIC_WIFI;
+    int64_t ms = wifi && !t->since_us ? 0 : (esp_timer_get_time() - (wifi ? t->since_us : 0)) / 1000;
+    cJSON_AddNumberToObject(json, "uptime_ms", (double)ms);
     cJSON *svcs = cJSON_AddObjectToObject(json, "services");
     counter_t rx = {0}, tx = {0};
     for (int i = 0; i < SVC_COUNT; i++) {
         cJSON *svc = cJSON_AddObjectToObject(svcs, s_svc_names[i]);
-        cJSON_AddNumberToObject(svc, "rx", (double)s_rx[i].bytes);
-        cJSON_AddNumberToObject(svc, "tx", (double)s_tx[i].bytes);
-        cJSON_AddNumberToObject(svc, "rx_packets", s_rx[i].packets);
-        cJSON_AddNumberToObject(svc, "tx_packets", s_tx[i].packets);
-        rx.bytes += s_rx[i].bytes;
-        rx.packets += s_rx[i].packets;
-        tx.bytes += s_tx[i].bytes;
-        tx.packets += s_tx[i].packets;
+        cJSON_AddNumberToObject(svc, "rx", (double)t->rx[i].bytes);
+        cJSON_AddNumberToObject(svc, "tx", (double)t->tx[i].bytes);
+        cJSON_AddNumberToObject(svc, "rx_packets", t->rx[i].packets);
+        cJSON_AddNumberToObject(svc, "tx_packets", t->tx[i].packets);
+        rx.bytes += t->rx[i].bytes;
+        rx.packets += t->rx[i].packets;
+        tx.bytes += t->tx[i].bytes;
+        tx.packets += t->tx[i].packets;
     }
     cJSON_AddNumberToObject(json, "rx", (double)rx.bytes);
     cJSON_AddNumberToObject(json, "tx", (double)tx.bytes);
@@ -205,16 +234,13 @@ static bool link_valid(const char *link)
     return false;
 }
 
-static bool lan_parse(const cJSON *json, lan_cfg_t *cfg, char *err, size_t err_len)
+bool gw_net_parse_ipv4(const cJSON *json, bool *fixed, esp_netif_ip_info_t *info, esp_ip4_addr_t dns[2], char *err,
+                       size_t err_len)
 {
-    memset(cfg, 0, sizeof(*cfg));
     const char *mode = GW_JSON_STR(json, "mode");
-    const char *link = GW_JSON_STR(json, "link");
-    strlcpy(cfg->link, link && link[0] ? link : "auto", sizeof(cfg->link));
-    if (!link_valid(cfg->link)) {
-        snprintf(err, err_len, "link: auto, 100full, 100half, 10full or 10half");
-        return false;
-    }
+    *fixed = false;
+    memset(info, 0, sizeof(*info));
+    memset(dns, 0, 2 * sizeof(*dns));
     if (!mode || strcmp(mode, "dhcp") == 0) {
         return true;
     }
@@ -222,17 +248,17 @@ static bool lan_parse(const cJSON *json, lan_cfg_t *cfg, char *err, size_t err_l
         snprintf(err, err_len, "mode: dhcp or static");
         return false;
     }
-    cfg->fixed = true;
-    if (!parse_ip(json, "ip", &cfg->ip.ip, true) || !parse_ip(json, "mask", &cfg->ip.netmask, true)) {
+    *fixed = true;
+    if (!parse_ip(json, "ip", &info->ip, true) || !parse_ip(json, "mask", &info->netmask, true)) {
         snprintf(err, err_len, "address and netmask are required");
         return false;
     }
-    if (!parse_ip(json, "gw", &cfg->ip.gw, false) || !parse_ip(json, "dns1", &cfg->dns[0], false) ||
-        !parse_ip(json, "dns2", &cfg->dns[1], false)) {
+    if (!parse_ip(json, "gw", &info->gw, false) || !parse_ip(json, "dns1", &dns[0], false) ||
+        !parse_ip(json, "dns2", &dns[1], false)) {
         snprintf(err, err_len, "invalid gateway or DNS address");
         return false;
     }
-    uint32_t mask = ntohl(cfg->ip.netmask.addr), ip = ntohl(cfg->ip.ip.addr);
+    uint32_t mask = ntohl(info->netmask.addr), ip = ntohl(info->ip.addr);
     if (mask == 0 || mask == 0xffffffff || (~mask & (~mask + 1)) != 0) {
         snprintf(err, err_len, "invalid netmask");
         return false;
@@ -241,11 +267,23 @@ static bool lan_parse(const cJSON *json, lan_cfg_t *cfg, char *err, size_t err_l
         snprintf(err, err_len, "invalid address for this netmask");
         return false;
     }
-    if (cfg->ip.gw.addr && ((ntohl(cfg->ip.gw.addr) ^ ip) & mask)) {
+    if (info->gw.addr && ((ntohl(info->gw.addr) ^ ip) & mask)) {
         snprintf(err, err_len, "the gateway is not in the subnet of the address");
         return false;
     }
     return true;
+}
+
+static bool lan_parse(const cJSON *json, lan_cfg_t *cfg, char *err, size_t err_len)
+{
+    memset(cfg, 0, sizeof(*cfg));
+    const char *link = GW_JSON_STR(json, "link");
+    strlcpy(cfg->link, link && link[0] ? link : "auto", sizeof(cfg->link));
+    if (!link_valid(cfg->link)) {
+        snprintf(err, err_len, "link: auto, 100full, 100half, 10full or 10half");
+        return false;
+    }
+    return gw_net_parse_ipv4(json, &cfg->fixed, &cfg->ip, cfg->dns, err, err_len);
 }
 
 static cJSON *lan_json(const lan_cfg_t *cfg)
@@ -496,7 +534,16 @@ esp_netif_t *gw_eth_netif(void)
 
 bool gw_eth_wait_ip(TickType_t timeout)
 {
-    return xEventGroupWaitBits(s_events, BIT_IP4 | BIT_IP6, pdFALSE, pdFALSE, timeout) != 0;
+    return xEventGroupWaitBits(s_events, BIT_IP4 | BIT_IP6 | BIT_UPLINK, pdFALSE, pdFALSE, timeout) != 0;
+}
+
+void gw_net_uplink_ip(bool up)
+{
+    if (up) {
+        xEventGroupSetBits(s_events, BIT_UPLINK);
+    } else {
+        xEventGroupClearBits(s_events, BIT_UPLINK);
+    }
 }
 
 cJSON *gw_eth_status(void)

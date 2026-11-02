@@ -46,7 +46,8 @@
           "thread_router": "Thread router",
           "zigbee_coordinator": "Zigbee coordinator",
           "zigbee_router": "Zigbee router",
-          "esphome": "ESPHome BLE proxy"
+          "esphome": "ESPHome BLE proxy",
+          "wifi_uplink": "Wi-Fi uplink"
         }
       },
       "maintenance": {
@@ -132,7 +133,8 @@
           "thread_router": "Thread router",
           "zigbee_coordinator": "Zigbee coordinator",
           "zigbee_router": "Zigbee router",
-          "esphome": "ESPHome BLE proxy"
+          "esphome": "ESPHome BLE proxy",
+          "wifi_uplink": "Wi-Fi uplink"
         }
       }
     },
