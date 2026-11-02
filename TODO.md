@@ -76,6 +76,8 @@
 - [ ] Role ESPHome na layoutu v3: návrat potřebuje balík C6 (stažení); ověřit celou cestu tam a zpět
 - [x] Deadlock kontroly aktualizací a MQTT (zaseknutí brány po přepnutí rádia B), oprava 0b13d95, ověřeno 4 přepnutími
 - [x] Přepracované menu webového UI (menu_redesign/): sekce Rádia a ESPHome, rozpuštěné Systém › Nastavení, zálohy Zigbee per rádio; testy přes proxy jen pro čtení
-- [ ] Nové menu nahrát na bránu (vydání) a projít UI testy s heslem přímo na bráně (UI21–UI23 zapisují)
+- [x] Nové menu nahráno na bránu (v1.8.1-4, USB, pak 3× OTA upload z UI bez watchdogu)
+- [ ] Projít UI testy s heslem přímo na bráně (UI21–UI23 zapisují); vydání s novým menu
+- [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
 - [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI18 (rádio B bez min/max teploty), UI25 (formát logu) neodpovídají současnému UI
 - [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu

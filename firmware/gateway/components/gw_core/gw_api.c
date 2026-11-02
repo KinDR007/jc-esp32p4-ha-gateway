@@ -618,13 +618,18 @@ static esp_err_t ota_sink(void *arg, uint32_t offset, const void *data, size_t l
             ctx->reject = ctx->gateway ? "not a p4gw image" : "this is the gateway image, not ESPHome";
             return ESP_ERR_INVALID_ARG;
         }
-        esp_err_t err = esp_ota_begin(ctx->target, ctx->size, &ctx->handle);
+        /* Erase sector by sector while writing: erasing the whole slot at once stalls both cores for
+         * seconds (task watchdog during an upload with two radios busy, 2026-11-02). */
+        esp_err_t err = esp_ota_begin(ctx->target, OTA_WITH_SEQUENTIAL_WRITES, &ctx->handle);
         if (err != ESP_OK) {
             return err;
         }
         ctx->begun = true;
     }
-    return esp_ota_write(ctx->handle, data, len);
+    esp_err_t err = esp_ota_write(ctx->handle, data, len);
+    /* every write may erase a sector: rest as the online update does (gw_update.c) */
+    vTaskDelay(pdMS_TO_TICKS(10));
+    return err;
 }
 
 const esp_partition_t *gw_other_gateway_slot(void)

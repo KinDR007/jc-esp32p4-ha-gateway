@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fix: an upload of the gateway firmware in the web UI could end in a task watchdog restart into the
+  old firmware (two radios busy): the slot was erased at once, stalling both cores for seconds. The
+  slot is now erased while writing, with a 10 ms rest per block like the online update.
+- Web UI: the menu is arranged by task (menu_redesign/): Radios (roles, status and maintenance,
+  radio surroundings), ESPHome as its own section, System › Settings split to the pages it belongs
+  to; Zigbee backups show their radio and download the right one.
+
 - Fix: the gateway could hang (web UI and API stop answering, the radios keep running) when an
   update check ended while MQTT was connecting, typically right after a role switch of radio B that
   fetches the C5 package: the update notification was published with the update lock held, while
