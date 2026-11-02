@@ -77,10 +77,10 @@
 - [x] Deadlock kontroly aktualizací a MQTT (zaseknutí brány po přepnutí rádia B), oprava 0b13d95, ověřeno 4 přepnutími
 - [x] Přepracované menu webového UI (menu_redesign/): sekce Rádia a ESPHome, rozpuštěné Systém › Nastavení, zálohy Zigbee per rádio; testy přes proxy jen pro čtení
 - [x] Nové menu nahráno na bránu (v1.8.1-4, USB, pak 3× OTA upload z UI bez watchdogu)
-- [ ] Projít UI testy s heslem přímo na bráně (UI21–UI23 zapisují)
+- [x] Projít UI testy s přihlášením přímo na bráně (UI21–UI23 zapisují): prošly, UI22 našel ponechanou nabídku staré URL (opraveno)
 - [x] Vydání v1.9 s novým menu
 - [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
-- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI25 (formát logu) neodpovídají současnému UI
+- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI25 (formát logu) neodpovídají současnému UI (UI25 na bráně 2026-11-02 prošel)
 - [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu
 - [x] Rádio B v UI se stejnými údaji a akcemi jako rádio A (přehled, Stav a údržba: přeflashování, záloha flash, firmwary)
 - [x] Úplný sken na rádiu A i B (C5: 5 GHz, šířka, standardy), oprava WPA3 hlášené jako otevřená (skener 1.1.0); TC20 prošel

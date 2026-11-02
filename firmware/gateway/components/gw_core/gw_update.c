@@ -70,6 +70,7 @@ static struct {
         uint32_t size;
         int percent;
     } c5;
+    char source[URL_MAX]; /* manifest URL the offer and the release list came from */
     char want[32];   /* release picked for the requested installation, "" = the offered one */
     char *releases;  /* JSON array of the listed releases this board runs (PSRAM), NULL = no list */
     char error[96];
@@ -346,14 +347,20 @@ static void fetch_releases(const char *manifest)
 static void check(void)
 {
     char url[URL_MAX];
-    if (!manifest_url(url, sizeof(url))) {
-        xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    bool set = manifest_url(url, sizeof(url));
+    /* a failed check keeps the offer (server down), a changed URL drops the offer of the old one */
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    if (!set || strcmp(url, s_up.source) != 0) {
         s_up.latest[0] = s_up.error[0] = s_up.build[0] = '\0';
         c6_offer(NULL, NULL, false);
         c5_offer(NULL, NULL);
         cJSON_free(s_up.releases);
         s_up.releases = NULL;
-        xSemaphoreGive(s_up.lock);
+        s_up.checked = 0;
+        strlcpy(s_up.source, set ? url : "", sizeof(s_up.source));
+    }
+    xSemaphoreGive(s_up.lock);
+    if (!set) {
         return;
     }
     if (check_manifest(url, true) == ESP_OK) {

@@ -113,7 +113,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI19 | log před restartem | Systém › Diagnostika: tlačítko stáhne log předchozího běhu (`*-previous.log`) |
 | UI20 | záloha nastavení (Systém › Údržba a záloha) | export stáhne JSON bez hesel, cizí soubor skončí chybou, potvrzení importu uvádí původ a zrušení nic nemění |
 | UI21 | zálohy Zigbee | stránka je otevřená v každé roli (tabulka uvádí rádio zálohy); výběr automatické zálohy se uloží; Zálohovat teď jen když některé rádio běží jako Zigbee |
-| UI22 | online aktualizace | uložení URL, zobrazení chyby kontroly, Instalovat zakázáno bez nabídky, vymazání URL |
+| UI22 | online aktualizace | uložení URL, zobrazení chyby kontroly, nabídka staré URL zmizí (Instalovat chybí nebo je zakázané), vymazání URL |
 | UI23 | naučené zvuky | stránka se načte, cizí soubor skončí chybou, test nahrávky ukáže skóre |
 | UI24 | MQTT | volby TLS jen pro mqtts:// a wss://, pole certifikátu jen pro vlastní CA, pokročilé volby |
 | UI25 | log | každý řádek začíná místním časem prohlížeče; úroveň, zdroj, tag (i kliknutím) a hledání (text se zvýrazněním, /regex/) filtrují |

@@ -2,7 +2,10 @@
 // has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI25).
 //
 //   npm --prefix tests/ui ci
-//   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw] [--html firmware/gateway/web/index.html]
+//   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw | --token t] [--html firmware/gateway/web/index.html]
+//
+// --token signs in with an admin API token (Authorization: Bearer on every request), for a user
+// with 2FA, where Basic is refused. P4GW_TOKEN in the environment does the same.
 //
 // --html serves the page from a local file while the API stays on the board (test a UI change
 // before flashing it, or check that a test fails on the old page).
@@ -40,7 +43,9 @@ async function test(id, title, fn) {
 const pnaOff = ['--disable-features=BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,LocalNetworkAccessChecks'];
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: args.html ? pnaOff : [] });
 // English locale: the UI picks Czech for a Czech browser and the error checks match English text.
-const context = await browser.newContext({ locale: 'en-US', ...(args.password ? { httpCredentials: { username: 'admin', password: args.password } } : {}) });
+const token = args.token || process.env.P4GW_TOKEN;
+const context = await browser.newContext({ locale: 'en-US', ...(args.password ? { httpCredentials: { username: 'admin', password: args.password } } : {}),
+  ...(token ? { extraHTTPHeaders: { Authorization: `Bearer ${token}` } } : {}) });
 const page = await context.newPage();
 page.on('pageerror', e => pageErrors.push(e.message));
 if (args.html && args.html !== true) {
@@ -570,7 +575,9 @@ await test('UI22', 'Online update: the card saves the URL and shows why a check 
   await page.click('#upd-save');
   await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('HTTP 404'), null, { timeout: 25000 });
   check(true, `error shown: ${(await page.textContent('#upd-state')).trim()}`);
-  check(await page.isDisabled('#upd-install'), 'Install disabled without an offer');
+  // the offer of the previous URL is dropped: no table, or Install disabled
+  const install = await page.$('#upd-install');
+  check(!install || await install.isDisabled(), 'no Install without an offer');
   await page.fill('#upd-url', '');
   await page.click('#upd-save');
   await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('Off'), null, { timeout: 10000 });
