@@ -28,6 +28,11 @@ async def setup_entry(hass: HomeAssistant, gateway, **data) -> MockConfigEntry:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         await asyncio.wait_for(gateway.connected.wait(), 5)
+        # the push connection refreshes on connect: let that poll land before a test pushes, or it
+        # overwrites the pushed state (a slow runner connects after the setup settled)
+        for _ in range(20):
+            await asyncio.sleep(0.01)
+            await hass.async_block_till_done()
     return entry
 
 
