@@ -1,0 +1,15 @@
+--- host/mcu/eh_host_mcu_transport/src/eh_host_mcu_transport_init_event.c
++++ host/mcu/eh_host_mcu_transport/src/eh_host_mcu_transport_init_event.c
+@@ -411,6 +411,12 @@
+     uint8_t expected = expected_chip_id();
+     if (expected == EH_PRIV_FIRMWARE_CHIP_UNRECOGNIZED) return 0;
+     if (slave_chip_id == expected) return 0;
++    /* p4gw: one gateway image serves the co-processor on either radio (ESP32-C6 or ESP32-C5);
++     * the RPCs are the same, only the target's extra features differ. */
++    if (chip_id_is_known(slave_chip_id)) {
++        ESP_LOGW(TAG, "co-processor 0x%02x, host built for 0x%02x", (unsigned int)slave_chip_id, (unsigned int)expected);
++        return 0;
++    }
+     ESP_LOGE(TAG, "chip mismatch: expect=0x%02x got=0x%02x",
+              (unsigned int)expected, (unsigned int)slave_chip_id);
+     return -1;

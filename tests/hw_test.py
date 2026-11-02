@@ -28,6 +28,10 @@ class Fail(Exception):
     pass
 
 
+class Skip(Exception):
+    """The case cannot run here (hardware or test host missing); reported as SKIP."""
+
+
 def log(msg):
     print(f'  {time.strftime("%H:%M:%S")} {msg}', flush=True)
 
@@ -1616,6 +1620,267 @@ def tc40_thread_per_radio():
             switch_b(b0)
 
 
+# ---------------------------------------------------------------- Wi-Fi uplink (docs/wifi-uplink.md)
+
+def http_at(ip, method, path, body=None, timeout=10):
+    """Like http(), to another address of the gateway (its Wi-Fi uplink or setup access point)."""
+    host = ARGS.host
+    try:
+        ARGS.host = ip
+        return http(method, path, body, timeout=timeout)
+    finally:
+        ARGS.host = host
+
+
+def uplink(s=None):
+    """Status of the Wi-Fi uplink role (radio A or B), {} without it."""
+    s = s or status()
+    for key in ('role_status_b', 'role_status'):
+        if (s.get(key) or {}).get('mode') == 'wifi_uplink':
+            return s[key]
+    return {}
+
+
+def thread_status(s):
+    for key in ('role_status', 'role_status_b'):
+        if (s.get(key) or {}).get('mode') == 'border_router':
+            return s[key]
+    return {}
+
+
+def ensure_uplink_b():
+    s = status()
+    if not s['role'].get('b', {}).get('wired'):
+        raise Skip('no radio B on JP1')
+    if s['role']['b'].get('active') != 'wifi_uplink':
+        switch_b('wifi_uplink')
+    w = wait_until('Wi-Fi uplink connected', lambda: (lambda w: w if w.get('ipv4') else None)(uplink()), 120, 3)
+    log(f'uplink on radio {w["radio"].upper()}: {w["ipv4"]}, {w.get("band")} channel {w.get("channel")}, {w.get("rssi")} dBm')
+    return w
+
+
+def outage(seconds):
+    code, r = http('POST', '/api/net/lan/outage', {'seconds': seconds})
+    if code != 200:
+        raise Fail(f'LAN outage test: {code} {r}')
+    return time.time() + seconds
+
+
+def wait_backbone(which, timeout):
+    def ready():
+        s = status()
+        t = thread_status(s)
+        return s if t.get('backbone') == which and t.get('phase') == 'running' else None
+    return wait_until(f'Thread backbone {which}', ready, timeout, 5)
+
+
+def tc41_wifi_uplink():
+    """Radio B as the Wi-Fi uplink next to Thread on radio A, LAN up: Wi-Fi joins with its own address,
+    Ethernet keeps the default route, the web UI answers over Wi-Fi, its traffic is counted, no password
+    in the API, a second uplink is refused, throughput over Wi-Fi recorded."""
+    w = ensure_uplink_b()
+    s = status()
+    check(s['eth']['link'] and not w['default_route'], 'Ethernet keeps the default route, Wi-Fi is the standby')
+    check(thread_status(s).get('backbone') == 'ethernet', 'Thread backbone on Ethernet')
+    code, ws = http_at(w['ipv4'], 'GET', '/api/status')
+    check(code == 200 and ws.get('hostname') == s['hostname'], f'web UI over Wi-Fi ({w["ipv4"]})')
+    t0 = http('GET', '/api/net/wifi/traffic')[1]
+    t1 = time.time()
+    req = urllib.request.Request(f'http://{w["ipv4"]}/')
+    with urllib.request.urlopen(req, timeout=30) as res:
+        size = len(res.read())
+    rate = size / (time.time() - t1)
+    log(f'web UI over Wi-Fi: {size} B in {time.time() - t1:.2f} s ({rate / 1000:.0f} kB/s)')
+    check(rate > 30000, 'throughput over Wi-Fi above 30 kB/s')
+    t2 = http('GET', '/api/net/wifi/traffic')[1]
+    check(t2['services']['web']['tx'] - t0['services']['web']['tx'] >= size, 'the page counted under web on Wi-Fi')
+    cfg = http('GET', '/api/net/wifi')[1]
+    check('password' not in json.dumps(cfg['settings']).replace('password_set', ''), 'no password in the API')
+    code, nets = http('GET', '/api/net/wifi/scan', timeout=30)
+    check(code == 200 and isinstance(nets, list) and nets, f'scan: {len(nets) if isinstance(nets, list) else nets} networks')
+    code, r = http('POST', '/api/role', {'role': 'wifi_uplink', 'radio': 'a'})
+    check(code == 409 and 'Wi-Fi uplink' in str(r), f'second uplink refused ({code})')
+
+
+def tc42_wifi_failover():
+    """LAN pulled while running (outage test): the gateway stays reachable over Wi-Fi and reaches the
+    internet, the Thread border router moves to the Wi-Fi backbone (restart); LAN back: traffic on
+    Ethernet at once, the backbone back on Ethernet after the 5 min hysteresis."""
+    w = ensure_uplink_b()
+    ip = w['ipv4']
+    end = outage(150)
+
+    def over_wifi():
+        code, ws = http_at(ip, 'GET', '/api/status', timeout=4)
+        return ws if code == 200 and not ws['eth']['link'] and uplink(ws).get('default_route') else None
+    ws = wait_until('the gateway over Wi-Fi with the default route', over_wifi, 30, 2)
+    check(True, f'reachable over Wi-Fi {ip} {int(150 - (end - time.time()))} s into the outage')
+    ws = wait_until('internet over Wi-Fi', lambda: (lambda c, ws: ws if c == 200 and ws.get('links', {}).get('internet') else None)(
+        *http_at(ip, 'GET', '/api/status', timeout=4)), 120, 5)
+    check(True, 'internet reachable over Wi-Fi (TCP to github.com:443)')
+
+    def moved():
+        code, ws = http_at(ip, 'GET', '/api/status', timeout=4)
+        t = thread_status(ws) if code == 200 else {}
+        return ws if t.get('backbone') == 'wifi' and t.get('phase') == 'running' else None
+    ws = wait_until('Thread backbone on Wi-Fi', moved, 150, 5)
+    check(ws['uptime_s'] < 150, f'border router restarted onto the Wi-Fi backbone (up {ws["uptime_s"]} s)')
+    code, t = http_at(ip, 'GET', '/api/thread/status')
+    check(code == 200 and t.get('role') in ('leader', 'router'), f'Thread network {t.get("network_name")} {t.get("role")} over Wi-Fi')
+    time.sleep(max(0, end - time.time()))
+    s = wait_until('LAN back', lambda: (lambda s: s if s['eth']['link'] else None)(status()), 60, 3)
+    check(not uplink(s).get('default_route'), 'Ethernet has the default route again')
+    s = wait_backbone('ethernet', 480)
+    check(True, f'backbone back on Ethernet (up {s["uptime_s"]} s)')
+
+
+def tc43_wifi_wrong_network():
+    """A network that is not there: clear error in the status, retries, LAN untouched; dropping the own
+    setting returns to the ESPHome Wi-Fi."""
+    ensure_uplink_b()
+    code, r = http('POST', '/api/net/wifi', {'ssid': 'p4gw-test-absent'})
+    check(code == 200 and r['settings']['ssid'] == 'p4gw-test-absent', 'network set')
+    w = wait_until('error shown', lambda: (lambda w: w if w.get('state') in ('disconnected', 'connecting') and
+                   'not found' in w.get('error', '') else None)(uplink()), 90, 3)
+    check(True, f'state {w["state"]}: {w["error"]}')
+    check(status()['eth']['link'], 'LAN untouched')
+    code, r = http('POST', '/api/net/wifi', {'ssid': '', })
+    check(code == 200 and r['settings']['from_esphome'], 'own setting dropped')
+    w = wait_until('Wi-Fi connected again', lambda: (lambda w: w if w.get('ipv4') else None)(uplink()), 150, 3)
+    check(w['connects'] >= 2, f'connected again ({w["connects"]} connections)')
+    code, r = http('POST', '/api/net/wifi', {'ssid': 'x', 'password': 'short'})
+    check(code == 400, 'password shorter than 8 refused')
+    code, r = http('POST', '/api/net/wifi', {'ssid': 'x', 'mode': 'static', 'ip': '10.0.0.1'})
+    check(code == 400, 'static without netmask refused')
+
+
+def _dns_a(server, name, src_ip):
+    q = os.urandom(2) + b'\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00'
+    q += b''.join(bytes([len(p)]) + p.encode() for p in name.split('.')) + b'\x00\x00\x01\x00\x01'
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.bind((src_ip, 0))
+        sock.settimeout(3)
+        sock.sendto(q, (server, 53))
+        r = sock.recv(512)
+    return socket.inet_ntoa(r[-4:]) if r[7] else None
+
+
+def _iface_ip(iface):
+    import subprocess
+    out = subprocess.run(['ipconfig', 'getifaddr', iface], capture_output=True, text=True).stdout.strip()
+    return out or None
+
+
+def tc44_wifi_setup_portal():
+    """No LAN and no Wi-Fi: the open setup access point appears, gives an address and the gateway as DNS,
+    every name resolves to it, phone connectivity checks are sent to the web UI, the API works over it
+    and a network set there is joined (macOS test host with --wifi-iface)."""
+    import subprocess
+    if not ARGS.wifi_iface or sys.platform != 'darwin':
+        raise Skip('needs --wifi-iface on a macOS test host')
+    w = ensure_uplink_b()
+    hostname = status()['hostname']
+    if status()['uptime_s'] > 300:  # the access point opens only in the first minutes after a start
+        http('POST', '/api/reboot', {})
+        time.sleep(10)
+        wait_until('restart', lambda: (lambda w: w if w.get('ipv4') else None)(uplink()), 180, 3)
+    code, r = http('POST', '/api/net/wifi', {'ssid': 'p4gw-test-absent'})
+    check(code == 200, 'Wi-Fi set to an absent network')
+    end = outage(300)
+    iface = ARGS.wifi_iface
+    try:
+        def joined():
+            out = subprocess.run(['networksetup', '-setairportnetwork', iface, hostname], capture_output=True, text=True)
+            return (out.stdout + out.stderr).strip() == '' and _iface_ip(iface)
+        src = wait_until(f'joined the setup access point {hostname}', joined, 150, 8)
+        time.sleep(3)
+        src = _iface_ip(iface) or src
+        check(src.startswith('192.168.4.'), f'address from the access point ({src})')
+        ap = '192.168.4.1'
+        check(_dns_a(ap, 'connectivitycheck.gstatic.com', src) == ap, 'every name resolves to the gateway')
+        req = urllib.request.Request(f'http://{ap}/generate_204')
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+        try:
+            urllib.request.build_opener(NoRedirect).open(req, timeout=5)
+            code, loc = 200, ''
+        except urllib.error.HTTPError as err:
+            code, loc = err.code, err.headers.get('Location', '')
+        check(code == 302 and loc.startswith(f'http://{ap}/'), f'connectivity check sent to the web UI ({code} {loc})')
+        code, ps = http_at(ap, 'GET', '/api/status')
+        p = uplink(ps).get('portal', {})
+        check(code == 200 and p.get('on') and p.get('clients', 0) >= 1, f'API over the access point, portal {p}')
+        code, r = http_at(ap, 'POST', '/api/net/wifi', {'ssid': ''}, timeout=30)
+        check(code == 200, 'network set over the access point')
+    finally:
+        subprocess.run(['networksetup', '-removepreferredwirelessnetwork', iface, hostname], capture_output=True)
+        subprocess.run(['networksetup', '-setairportpower', iface, 'off'], capture_output=True)
+        subprocess.run(['networksetup', '-setairportpower', iface, 'on'], capture_output=True)
+        time.sleep(max(0, end - time.time()))
+        wait_until('LAN back', lambda: (lambda s: s if s['eth']['link'] else None)(status()), 240, 5)
+        if not http('GET', '/api/net/wifi')[1]['settings']['from_esphome']:
+            http('POST', '/api/net/wifi', {'ssid': ''})  # the case failed before the portal set it
+    w = wait_until('uplink joined the network set over the portal', lambda: (lambda w: w if w.get('ipv4') else None)(uplink()), 120, 3)
+    check(not w['portal']['on'], 'access point closed once online')
+    wait_backbone('ethernet', 480)
+
+
+def stage_package(chip):
+    """--packages DIR: the radio package of the chip ('c6'/'c5') staged on the gateway, for bundles a
+    release does not have yet; the radio is flashed from it at the next start."""
+    if not ARGS.packages:
+        return
+    with open(os.path.join(ARGS.packages, f'{chip}fw.bin'), 'rb') as f:
+        code, r = http('POST', '/api/ota/c6fw', raw=f.read(), timeout=120)
+    if code != 200:
+        raise Fail(f'{chip} package upload: {code} {r}')
+    log(f'{chip} package from {ARGS.packages} staged')
+
+
+def tc45_wifi_swap():
+    """The Wi-Fi uplink moves to radio A (C6) by swapping the roles: radio A joins the Wi-Fi, radio B runs
+    radio A's former role; swapped back, radio A returns to its Thread network unchanged."""
+    w = ensure_uplink_b()
+    s0 = status()
+    a0 = s0['role']['active']
+    net0 = http('GET', '/api/thread/status')[1].get('network_name') if a0.startswith('thread') else None
+    stage_package('c6')
+    boot = boot_id()
+    code, r = http('POST', '/api/role', {'swap': True})
+    check(code == 200, 'swap accepted')
+
+    def swapped():
+        if boot_id() == boot:
+            return None
+        s = status()
+        u = uplink(s)
+        return s if s['role']['active'] == 'wifi_uplink' and s['role']['b']['active'] == a0 and u.get('ipv4') else None
+    s = wait_until('roles swapped', swapped, 420, 5)
+    u = uplink(s)
+    check(u['radio'] == 'a', f'radio A (C6) is the Wi-Fi uplink: {u["ipv4"]}, {u.get("band")} channel {u.get("channel")}')
+    code, ws = http_at(u['ipv4'], 'GET', '/api/status')
+    check(code == 200, 'web UI over the Wi-Fi of radio A')
+    if a0 == 'thread_br':
+        wait_until('Thread on radio B', lambda: (lambda t: t if t.get('phase') == 'running' else None)(thread_status(status())), 120, 5)
+        check(True, 'Thread border router runs on radio B')
+    stage_package('c5')
+    boot = boot_id()
+    code, r = http('POST', '/api/role', {'swap': True})
+    check(code == 200, 'swap back accepted')
+
+    def back():
+        if boot_id() == boot:
+            return None
+        s = status()
+        return s if s['role']['active'] == a0 and s['role']['b']['active'] == 'wifi_uplink' and uplink(s).get('ipv4') else None
+    s = wait_until('roles swapped back', back, 420, 5)
+    if net0:
+        t = wait_thread_running(120)
+        check(t.get('network_name') == net0, f'radio A back on its Thread network ({net0})')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -1629,6 +1894,8 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
+    ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
 
@@ -1642,6 +1909,8 @@ def main():
     p.add_argument('--report', help='write results as JSON')
     p.add_argument('--play', action='store_true', help='TC15: play test sounds on this computer')
     p.add_argument('--mqtt-test', metavar='HOST:DIR', help='TC29: test mosquitto (anonymous, TLS with DIR/ca.crt) on HOST')
+    p.add_argument('--packages', help='TC45: directory with c6fw.bin and c5fw.bin holding the wifi_uplink bundle (before a release has it)')
+    p.add_argument('--wifi-iface', help='TC44: Wi-Fi interface of this macOS host that joins the setup access point (e.g. en0)')
     ARGS = p.parse_args()
     if ARGS.list:
         for tid, fn in TESTS:
@@ -1650,7 +1919,7 @@ def main():
     # the single-radio cases switch radio A freely: radio B off meanwhile, its role back at the end
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
-    if any(tid not in ('TC39', 'TC40') for tid, _ in selected):
+    if any(tid not in ('TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45') for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')
         except Exception:  # noqa: BLE001 - gateway without radio B support
@@ -1666,6 +1935,8 @@ def main():
             result, detail = 'PASS', ''
         except Fail as err:
             result, detail = 'FAIL', str(err)
+        except Skip as err:
+            result, detail = 'SKIP', str(err)
         except Exception as err:  # noqa: BLE001 - report and continue with the next case
             result, detail = 'ERROR', f'{type(err).__name__}: {err}'
         RESULTS.append({'id': tid, 'result': result, 'detail': detail, 'seconds': round(time.time() - t0)})
@@ -1680,7 +1951,7 @@ def main():
     if ARGS.report:
         with open(ARGS.report, 'w') as f:
             json.dump(RESULTS, f, indent=2)
-    return 0 if all(r['result'] == 'PASS' for r in RESULTS) else 1
+    return 0 if all(r['result'] in ('PASS', 'SKIP') for r in RESULTS) else 1
 
 
 if __name__ == '__main__':

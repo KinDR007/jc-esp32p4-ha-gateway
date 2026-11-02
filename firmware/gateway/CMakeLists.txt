@@ -24,6 +24,28 @@ if(NOT EXISTS ${PATCHED_DIR}/esp_ot_br_server/.patched_${patch_hash})
     file(TOUCH ${PATCHED_DIR}/esp_ot_br_server/.patched_${patch_hash})
 endif()
 
+# ESP-Hosted host (role_wifi) from the pinned checkout the co-processor is built from, patched so one
+# image serves the co-processor on either radio (ESP32-C6 or ESP32-C5); role_wifi's manifest points
+# the dependency at this copy (override_path, relative to the build directory build/gateway).
+set(EH_DIR ${ROOT_DIR}/third_party/esp-hosted-mcu)
+set(EH_PATCH ${CMAKE_CURRENT_LIST_DIR}/patches/esp_hosted_any_cp.patch)
+set(EH_COPY ${PATCHED_DIR}/espressif__esp_hosted)
+file(SHA256 ${EH_PATCH} eh_hash)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${EH_PATCH})
+if(NOT EXISTS ${EH_COPY}/.patched_${eh_hash})
+    if(NOT EXISTS ${EH_DIR}/host)
+        message(FATAL_ERROR "esp-hosted-mcu missing, run scripts/fetch_deps.sh")
+    endif()
+    file(REMOVE_RECURSE ${EH_COPY})
+    file(COPY ${EH_DIR}/ DESTINATION ${EH_COPY}
+         PATTERN .git EXCLUDE PATTERN .github EXCLUDE PATTERN examples EXCLUDE PATTERN docs EXCLUDE)
+    execute_process(COMMAND patch -p0 -s -i ${EH_PATCH} WORKING_DIRECTORY ${EH_COPY} RESULT_VARIABLE patch_result)
+    if(NOT patch_result EQUAL 0)
+        message(FATAL_ERROR "Failed to apply ${EH_PATCH}")
+    endif()
+    file(TOUCH ${EH_COPY}/.patched_${eh_hash})
+endif()
+
 include(${ROOT_DIR}/firmware/cmake/patched_openthread.cmake)
 
 set(EXTRA_COMPONENT_DIRS

@@ -1155,6 +1155,7 @@ const TIPS = {
   'role:thread_router': ['Extra router for an existing Thread network to improve range; no connection to the LAN.', 'Další router pro existující Thread síť, zlepší dosah; bez propojení s LAN.'],
   'role:zigbee_coordinator': ['The C6 runs the Zigbee network; Zigbee2MQTT controls it over the network.', 'C6 řídí Zigbee síť; Zigbee2MQTT ji ovládá po síti.'],
   'role:zigbee_router': ['Range extender joined to another Zigbee network.', 'Zesilovač dosahu připojený do jiné Zigbee sítě.'],
+  'Setup access point': ['Opens on its own after a start without LAN and without a Wi-Fi connection: an open network named like the gateway, for a few minutes (longer while a phone is on it). Join it and the phone opens this page; sign in and set the Wi-Fi.', 'Otevře se sám po startu bez LAN a bez připojení k Wi-Fi: otevřená síť pojmenovaná jako brána, na několik minut (déle, dokud je na ní telefon). Po připojení telefon otevře tuto stránku; přihlaste se a nastavte Wi-Fi.'],
   'role:wifi_uplink': ['ESP-Hosted on the radio: the gateway gets an ordinary Wi-Fi interface with its own address, IPv6 and mDNS. About 0.7 Mbit/s over the radio UART; the radio has no other role meanwhile.', 'ESP-Hosted na rádiu: brána dostane běžné Wi-Fi rozhraní s vlastní adresou, IPv6 a mDNS. Asi 0,7 Mbit/s přes UART rádia; rádio mezitím jinou roli nemá.'],
   'role:esphome': ['Bluetooth proxy for Home Assistant (ESPHome) running on the radio itself over Wi-Fi; the gateway keeps working with the other radio.', 'Bluetooth proxy pro Home Assistant (ESPHome) běžící přímo na rádiu přes Wi-Fi; brána dál pracuje s druhým rádiem.'],
 };
@@ -1652,7 +1653,9 @@ function wifiRows(w, full) {
   const rows = [[L('Wi-Fi', 'Wi-Fi'), state + (w.error ? ` <span class="muted">${esc(w.error)}</span>` : '')],
     [L('Network', 'Síť'), `<span data-notr>${esc(w.ssid || '')}</span>`], ['IPv4', esc(w.ipv4 || '')],
     [L('Signal', 'Signál'), w.rssi ? `${w.rssi} dBm · ${wifiBand(w)}${w.phy ? ' · 802.' + esc(w.phy) : ''}` : ''],
-    [L('Traffic', 'Provoz'), w.ipv4 ? (w.default_route ? L('default route', 'výchozí trasa') : L('standby: LAN has the default route', 'záloha: výchozí trasa vede přes LAN')) : '']];
+    [L('Traffic', 'Provoz'), w.ipv4 ? (w.default_route ? L('default route', 'výchozí trasa') : L('standby: LAN has the default route', 'záloha: výchozí trasa vede přes LAN')) : ''],
+    [L('Setup access point', 'Nastavovací přístupový bod'), w.portal?.on ? pill('warn', L(`open: ${w.portal.ssid}, ${w.portal.ip}`, `otevřený: ${w.portal.ssid}, ${w.portal.ip}`))
+      + ` <span class="muted">${w.portal.clients} ${L('connected', 'připojeno')}${w.portal.closes_s ? ` · ${L('closes in', 'zavře se za')} ${fmtUptime(w.portal.closes_s)}` : ''}</span>` : '']];
   if (full) {
     rows.push([L('Addressing', 'Adresace'), w.ip_mode === 'static' ? L('static', 'statická') : 'DHCP'], [L('Netmask', 'Maska'), esc(w.netmask || '')],
       [L('Gateway', 'Výchozí brána'), esc(w.gateway || '')], ['IPv6', (w.ipv6 || []).map(esc).join('<br>')], ['MAC', esc(w.mac || '')],
@@ -1764,7 +1767,12 @@ views['radios/roles'] = () => {
   const showB = b.wired || (b.desired && b.desired !== 'none');
   const offB = `<div class="row" style="margin-top:8px"><button class="btn" data-role="none" data-radio="b" ${b.desired === 'none' ? 'disabled' : ''}>${ic('close')}${L('Switch radio B off', 'Vypnout rádio B')}</button>
     ${b.maintenance ? `<span class="bad-text">${esc(b.maintenance)}</span>` : ''}</div>`;
-  return maintenanceBanner() + `<div class="card">${h3('swap-horizontal', L('Radio A: C6 of the board', 'Rádio A: C6 na desce'))}
+  const up = [r.desired, b.desired].indexOf('wifi_uplink'), canSwap = up >= 0 && showB && b.desired && b.desired !== 'none';
+  const swap = canSwap ? `<div class="card" style="margin-bottom:16px">${h3('wifi', L('Wi-Fi on the other radio', 'Wi-Fi na druhém rádiu'))}
+    <p class="muted">${L(`Radio ${up ? 'B' : 'A'} is the Wi-Fi uplink. Swapping gives radio ${up ? 'A' : 'B'} the Wi-Fi and radio ${up ? 'B' : 'A'} the role ${ROLES[up ? r.desired : b.desired]?.name}, in one restart. Thread and Zigbee then run with the network data of the radio they land on.`,
+      `Rádio ${up ? 'B' : 'A'} je Wi-Fi uplink. Prohozením dostane Wi-Fi rádio ${up ? 'A' : 'B'} a rádio ${up ? 'B' : 'A'} roli ${ROLES[up ? r.desired : b.desired]?.name}, jedním restartem. Thread a Zigbee pak běží s daty sítě rádia, na které přejdou.`)}</p>
+    <button class="btn" id="role-swap">${ic('swap-horizontal')}${L('Swap radio A and B', 'Prohodit rádio A a B')}</button></div>` : '';
+  return maintenanceBanner() + swap + `<div class="card">${h3('swap-horizontal', L('Radio A: C6 of the board', 'Rádio A: C6 na desce'))}
     <p class="muted">${L('Switching restarts the gateway and reflashes the radio when the role needs other firmware (about 30 s). Each radio keeps its own Thread and Zigbee networks.',
       'Přepnutí restartuje bránu a přeflashuje rádio, když role potřebuje jiný firmware (asi 30 s). Každé rádio si drží své vlastní sítě Thread a Zigbee.')}</p>
     ${section('a', activeRole(), r.desired, b.desired)}</div>
@@ -4455,6 +4463,12 @@ document.addEventListener('click', async e => {
       toast(L('LAN settings saved', 'Nastavení LAN uloženo'));
       status = await api('/api/status');
       renderHeader();
+    } else if (t.id === 'role-swap') {
+      if (!await confirmDialog(L('Swap the roles of radio A and B?', 'Prohodit role rádia A a B?'),
+        L('The gateway restarts and reflashes both radios (a few minutes). Thread and Zigbee run with the network data of the radio they land on.',
+          'Brána se restartuje a přeflashuje obě rádia (několik minut). Thread a Zigbee poběží s daty sítě rádia, na které přejdou.'))) return;
+      await api('/api/role', { json: { swap: true } });
+      waitForRestart();
     } else if (t.id === 'wifi-scan') {
       const out = $('#wifi-scan-out');
       out.innerHTML = `<p class="muted">${L('Scanning…', 'Hledám…')}</p>`;

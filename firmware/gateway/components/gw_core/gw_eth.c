@@ -6,6 +6,8 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_attr.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/event_groups.h"
 #include "lwip/ip6_addr.h"
@@ -28,6 +30,12 @@ static EventGroupHandle_t s_events;
 static bool s_link_up;
 static uint32_t s_link_changes;
 static int64_t s_link_down_us;
+static esp_netif_t *s_uplink; /* the Wi-Fi uplink, docs/wifi-uplink.md */
+static esp_timer_handle_t s_outage_timer;
+/* an outage test goes on across a software restart (the border router moving to the uplink restarts) */
+#define OUTAGE_MAGIC 0x4c414e30
+static __NOINIT_ATTR uint32_t s_outage_magic, s_outage_left_s;
+static esp_err_t outage_start(uint32_t seconds);
 
 /* ---- traffic counters ----
  * The lwIP input and link output functions of the Ethernet netif (and the Wi-Fi uplink) are wrapped:
@@ -450,6 +458,11 @@ static void on_eth_event(void *arg, esp_event_base_t base, int32_t id, void *dat
         }
         esp_netif_create_ip6_linklocal(s_netif);
         break;
+    case ETHERNET_EVENT_STOP: /* the outage test */
+        if (!s_link_up) {
+            break;
+        }
+        /* fall through */
     case ETHERNET_EVENT_DISCONNECTED:
         s_link_up = false;
         s_link_changes++;
@@ -524,6 +537,11 @@ esp_err_t gw_eth_init(const char *hostname)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_ip_event, NULL));
     lan_load(&s_lan_saved);
     lan_apply(&s_lan_saved, false);
+    bool outage = s_outage_magic == OUTAGE_MAGIC && esp_reset_reason() == ESP_RST_SW;
+    s_outage_magic = 0;
+    if (outage && outage_start(s_outage_left_s) == ESP_OK) {
+        return ESP_OK; /* started when the test is over */
+    }
     return esp_eth_start(s_eth);
 }
 
@@ -537,13 +555,68 @@ bool gw_eth_wait_ip(TickType_t timeout)
     return xEventGroupWaitBits(s_events, BIT_IP4 | BIT_IP6 | BIT_UPLINK, pdFALSE, pdFALSE, timeout) != 0;
 }
 
-void gw_net_uplink_ip(bool up)
+void gw_net_uplink_ip(esp_netif_t *netif, bool up)
 {
+    s_uplink = netif;
     if (up) {
         xEventGroupSetBits(s_events, BIT_UPLINK);
     } else {
         xEventGroupClearBits(s_events, BIT_UPLINK);
     }
+}
+
+esp_netif_t *gw_net_uplink(void)
+{
+    return xEventGroupGetBits(s_events) & BIT_UPLINK ? s_uplink : NULL;
+}
+
+bool gw_eth_link_up(void)
+{
+    return s_link_up;
+}
+
+bool gw_eth_has_ip(void)
+{
+    return xEventGroupGetBits(s_events) & (BIT_IP4 | BIT_IP6);
+}
+
+static void outage_end(void *arg)
+{
+    ESP_LOGW(TAG, "LAN outage test over");
+    esp_eth_start(s_eth);
+}
+
+static void outage_carry(void)
+{
+    uint64_t left_us;
+    if (s_outage_timer && esp_timer_is_active(s_outage_timer) &&
+        esp_timer_get_expiry_time(s_outage_timer, &left_us) == ESP_OK) {
+        int64_t left = ((int64_t)left_us - esp_timer_get_time()) / 1000000;
+        s_outage_magic = OUTAGE_MAGIC;
+        s_outage_left_s = left > 10 ? (uint32_t)left : 10;
+    }
+}
+
+static esp_err_t outage_start(uint32_t seconds)
+{
+    if (!s_outage_timer) {
+        const esp_timer_create_args_t args = {.callback = outage_end, .name = "lan_outage"};
+        ESP_RETURN_ON_ERROR(esp_timer_create(&args, &s_outage_timer), TAG, "timer");
+        esp_register_shutdown_handler(outage_carry);
+    }
+    if (esp_timer_is_active(s_outage_timer)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    ESP_LOGW(TAG, "LAN outage test: Ethernet off for %lu s", (unsigned long)seconds);
+    return esp_timer_start_once(s_outage_timer, (uint64_t)seconds * 1000000);
+}
+
+esp_err_t gw_eth_outage(uint32_t seconds)
+{
+    ESP_RETURN_ON_ERROR(outage_start(seconds), TAG, "outage");
+    gw_notify("network", GW_NOTIFY_INFO, "LAN outage test by %s: Ethernet off for %lu s", gw_auth_who()[0] ? gw_auth_who() : "the web UI",
+              (unsigned long)seconds);
+    return esp_eth_stop(s_eth);
 }
 
 cJSON *gw_eth_status(void)

@@ -4,7 +4,7 @@ Goal: a radio (internal C6 = radio A, external XIAO ESP32-C5 = radio B) gives th
 connection to the home network, for a place without Ethernet or as a fallback when the LAN link is
 down. A new radio role `wifi_uplink`, next to Thread, Zigbee and ESPHome.
 
-Status: W1 and W2 done, W3 (roles UI) in progress (2026-11-02).
+Status: W0–W4 done, W5 tests (2026-11-02).
 
 ## Decisions (2026-11-02)
 
@@ -71,10 +71,10 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
 | W0 spike | host build footprint (above) | done |
 | W1 co-processor | `wifi_uplink` bundle: ESP-Hosted 3.0.10 co-processor (example `wifi/apsta`, station and access point), UART1 on the radio's UART0 pads (C6 GPIO16/17, C5 GPIO11/12, console off), 921600 Bd, no Bluetooth, optimized for size; in both radio packages with its own whole-flash layout like ESPHome | done: C6 926 kB, C5 965 kB (too large for the 768 kB slots, so a switch to or from the uplink rewrites the slots layout, ~70 s); packed 550 kB, c6fw.bin 2.8 MB, c5fw.bin 2.9 MB of 4 MB; 7 of 8 package entries used |
 | W2 host | `role_wifi` on the P4 (`espressif/esp_hosted` 3.0.10, same version as the co-processor): ESP-Hosted host on the pins of the radio that has the role, Wi-Fi settings (SSID, password secret, band preference), station netif, route priority, status in `/api/status` (`wifi`: state, SSID, RSSI, channel, band, IP, link speed of the transport) | done: radio B joins in 12 s after the start, own IPv4 (DHCP) and IPv6 link-local, web UI over Wi-Fi 81 kB/s (LAN 1 MB/s), Ethernet keeps the default route; image 2 987 824 B (158 kB left in the slot), internal heap free 108 kB, minimum 58 kB |
-| W3 roles | the role in Radios › Roles for A and B (at most one uplink), conflicts (radio A uplink → no Thread/Zigbee unless radio B runs it), Telegram `/role`, the overview diagram shows the uplink | every allowed combination switches |
-| W3b portal | access point on the uplink radio when no LAN and no working Wi-Fi: DHCP server and DNS redirect on the P4, the setup page (Wi-Fi networks from a scan, password, DHCP/static); WPA2 with a password shown in the UI and printed in the docs, or open for a limited time after start (decide in W3b) | a gateway without LAN is set up from a phone |
-| W4 fallback | backbone choice at start, failover with hysteresis (LAN down > 60 s → Wi-Fi; LAN back > 5 min → Ethernet at the next quiet moment or immediately when Thread BR is off), notifications | pulling the LAN cable keeps the gateway reachable |
-| W5 tests and docs | test matrix below in `tests/hw_test.py` (TC), `tests/ui/ui_test.mjs` (UI), HA integration over Wi-Fi; docs/hardware, installation, CHANGELOG | matrix green on the board |
+| W3 roles | the role in Radios › Roles for A and B (at most one uplink), swap of the roles of A and B in one restart (`POST /api/role {"swap": true}`), System › Wi-Fi (settings, scan, state, traffic), Telegram `/role`, the overview diagram, HA integration | done |
+| W3b portal | open access point named like the gateway on the uplink radio, only after a start without LAN and without Wi-Fi (from 45 s to 10 min after the start, open longer while a phone is on it, 30 min at most): DHCP with the gateway as DNS, every name answered with the gateway, unknown pages (phone connectivity checks) redirected to the web UI; no station scans while a phone is on it | done: a Mac joins, gets 192.168.4.x, is sent to the web UI, sets the network, the gateway joins it |
+| W4 fallback | the default route follows the route priority (Ethernet 50, Wi-Fi 20) at once; the Thread backbone is chosen at the start (Ethernet when it has a link and an address within 30 s, else Wi-Fi) and moves by a restart (LAN down 60 s with Wi-Fi up; LAN back 5 min); `POST /api/net/lan/outage` stops Ethernet for a test, across a software restart | done: reachable over Wi-Fi at once, backbone on Wi-Fi 60–90 s after the outage began, back on Ethernet 318 s after the LAN returned |
+| W5 tests and docs | TC41–TC45 in `tests/hw_test.py`, UI26 in `tests/ui/ui_test.mjs`, docs, CHANGELOG | see the test results |
 
 ## Notes from the hardware
 
@@ -86,6 +86,11 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
   the flasher's `c6_hold_reset()`.
 - The flasher runs the same wiring at 460800 Bd only, so speeds above 921600 Bd are not proven on the
   jumper wires yet.
+- One host image serves both radios: the host is built for the ESP32-C5 co-processor and refuses
+  any other chip, so the gateway builds it from the pinned checkout with a patch that accepts a
+  known chip with a warning (`firmware/gateway/patches/esp_hosted_any_cp.patch`).
+- In access point plus station mode the radio has one channel: when the station joins a network
+  on another channel, the phone on the setup access point drops and has to join again.
 - ESP-Hosted is not started at boot (`CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n`) and never
   restarts the gateway on a transport failure (`..._RESTART_ON_FAILURE=n`); its task stacks and
   buffers go to PSRAM.

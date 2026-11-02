@@ -200,10 +200,51 @@ static void save_br_dataset(otInstance *instance)
     ESP_LOGI(TAG, "border router dataset saved (%s)", otThreadGetNetworkName(instance));
 }
 
+/* ---- backbone: Ethernet, or the Wi-Fi uplink when the LAN has no link at the start
+ * (docs/wifi-uplink.md). The border router stays on the interface it started on, so a lasting change
+ * restarts the gateway onto the other one: LAN gone for 60 s with the uplink up, or back for 5 min. */
+#define BACKBONE_TO_WIFI_S 60
+#define BACKBONE_TO_ETH_S 300
+
+static esp_netif_t *s_backbone;
+static int64_t s_backbone_since; /* when the other interface became the better one, 0 none */
+
+static esp_netif_t *choose_backbone(void)
+{
+    for (int i = 0; i < 30 && gw_eth_link_up() && !gw_eth_has_ip(); i++) {
+        vTaskDelay(pdMS_TO_TICKS(1000)); /* the LAN has a link: its address comes before the uplink's */
+    }
+    esp_netif_t *uplink = gw_net_uplink();
+    return !gw_eth_has_ip() && uplink ? uplink : gw_eth_netif();
+}
+
+static void backbone_check(void)
+{
+    bool on_eth = s_backbone == gw_eth_netif();
+    bool better = on_eth ? !gw_eth_link_up() && gw_net_uplink() : gw_eth_has_ip();
+    int64_t now = esp_timer_get_time();
+    if (!better) {
+        s_backbone_since = 0;
+        return;
+    }
+    if (!s_backbone_since) {
+        s_backbone_since = now;
+    }
+    if (now - s_backbone_since >= (on_eth ? BACKBONE_TO_WIFI_S : BACKBONE_TO_ETH_S) * 1000000LL) {
+        ESP_LOGW(TAG, "Thread backbone moves to %s, restarting", on_eth ? "the Wi-Fi uplink" : "Ethernet");
+        gw_notify("network", GW_NOTIFY_WARNING, on_eth ? "LAN down for %d s: the Thread border router moves to the Wi-Fi uplink, restarting"
+                                                       : "LAN back for %d s: the Thread border router moves back to Ethernet, restarting",
+                  (int)((now - s_backbone_since) / 1000000));
+        gw_restart_later(1000);
+        s_backbone_since = 0;
+    }
+}
+
 static void start_border_router(otInstance *instance)
 {
     otOperationalDatasetTlvs dataset;
-    esp_openthread_set_backbone_netif(gw_eth_netif());
+    ESP_LOGI(TAG, "backbone: %s", s_backbone == gw_eth_netif() ? "Ethernet" : "Wi-Fi uplink");
+    esp_openthread_set_backbone_netif(s_backbone);
     ESP_ERROR_CHECK(esp_openthread_border_router_init());
 
     if (gw_config_get_blob(BR_DATASET_KEY, &dataset, sizeof(dataset)) && dataset.mLength > 0) {
@@ -302,10 +343,11 @@ static void thread_task(void *arg)
     esp_openthread_lock_release();
 
     if (s_border_router) {
-        snprintf(s_phase, sizeof(s_phase), "waiting for the Ethernet backbone");
+        snprintf(s_phase, sizeof(s_phase), "waiting for the backbone network");
         while (!gw_eth_wait_ip(pdMS_TO_TICKS(30000))) {
-            ESP_LOGW(TAG, "no IP on Ethernet yet, border router start deferred");
+            ESP_LOGW(TAG, "no IP on Ethernet or Wi-Fi yet, border router start deferred");
         }
+        s_backbone = choose_backbone();
         esp_openthread_lock_acquire(portMAX_DELAY);
         start_border_router(instance);
         esp_openthread_lock_release();
@@ -328,6 +370,9 @@ static void thread_task(void *arg)
         }
         read_rcp_telemetry(instance);
         esp_openthread_lock_release();
+        if (s_border_router) {
+            backbone_check();
+        }
         vTaskDelay(pdMS_TO_TICKS(30000));
     }
 }
@@ -868,6 +913,9 @@ static cJSON *thread_summary(void)
 {
     cJSON *json = cJSON_CreateObject();
     cJSON_AddStringToObject(json, "mode", s_border_router ? "border_router" : "router");
+    if (s_backbone) {
+        cJSON_AddStringToObject(json, "backbone", s_backbone == gw_eth_netif() ? "ethernet" : "wifi");
+    }
     add_rest_client(json);
     if (s_started && esp_openthread_lock_acquire(OT_LOCK_TIMEOUT)) {
         otInstance *ot = esp_openthread_get_instance();

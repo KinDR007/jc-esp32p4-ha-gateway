@@ -14,6 +14,7 @@
 #include "freertos/task.h"
 #include "gw.h"
 #include "lwip/ip6_addr.h"
+#include "lwip/udp.h"
 #include "role_wifi.h"
 
 static const char *TAG = "role_wifi";
@@ -29,6 +30,12 @@ static const char *TAG = "role_wifi";
 #define RETRY_MAX_S 60
 
 #define EV_APPLY BIT0 /* worker task notification: settings changed */
+
+/* Setup access point (captive portal): open, only after a start without LAN and without a Wi-Fi
+ * connection, and only for a few minutes, longer while a phone is on it. */
+#define PORTAL_AFTER_S 45   /* gateway uptime before it may open */
+#define PORTAL_UNTIL_S 600  /* opens only this long after the start, closes then without a client */
+#define PORTAL_MAX_S 1800   /* closes in any case */
 
 static struct {
     c6_radio_t radio;
@@ -49,6 +56,14 @@ static struct {
     bool has_ip;
     bool fixed;           /* static IPv4 */
 } s_wifi = {.state = "off"};
+
+static struct {
+    bool on, done;        /* done: opened once since the start, not again */
+    esp_netif_t *netif;
+    char ssid[33];
+    uint32_t ip;          /* network order */
+    int clients;
+} s_portal;
 
 /* ---- settings ---- */
 
@@ -198,6 +213,10 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         gw_traffic_hook(GW_TRAFFIC_WIFI, s_wifi.netif); /* the lwIP netif has its input function once up */
         esp_netif_create_ip6_linklocal(s_wifi.netif);
         ESP_LOGI(TAG, "joined %s, channel %u", s_wifi.ssid, e->channel);
+    } else if (id == WIFI_EVENT_AP_STACONNECTED) {
+        s_portal.clients++;
+    } else if (id == WIFI_EVENT_AP_STADISCONNECTED) {
+        s_portal.clients -= s_portal.clients > 0;
     } else if (id == WIFI_EVENT_STA_DISCONNECTED) {
         wifi_event_sta_disconnected_t *e = data;
         bool was_connected = s_wifi.connected_us != 0;
@@ -205,7 +224,7 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         s_wifi.rssi = 0;
         s_wifi.connected_us = 0;
         s_wifi.has_ip = false;
-        gw_net_uplink_ip(false);
+        gw_net_uplink_ip(s_wifi.netif, false);
         if (strcmp(s_wifi.state, "no_settings") == 0 || e->reason == WIFI_REASON_ASSOC_LEAVE) {
             return; /* left on purpose: new settings */
         }
@@ -228,11 +247,11 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
     if (id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *e = data;
         s_wifi.has_ip = true;
-        gw_net_uplink_ip(true);
+        gw_net_uplink_ip(s_wifi.netif, true);
         ESP_LOGI(TAG, "IPv4 " IPSTR, IP2STR(&e->ip_info.ip));
     } else if (id == IP_EVENT_STA_LOST_IP) {
         s_wifi.has_ip = false;
-        gw_net_uplink_ip(false);
+        gw_net_uplink_ip(s_wifi.netif, false);
     } else if (id == IP_EVENT_GOT_IP6) {
         ip_event_got_ip6_t *e = data;
         if (e->esp_netif == s_wifi.netif) {
@@ -249,7 +268,7 @@ static void on_hosted_event(void *arg, esp_event_base_t base, int32_t id, void *
         s_wifi.state = "radio_unreachable";
         strlcpy(s_wifi.error, "the link to the radio failed", sizeof(s_wifi.error));
         s_wifi.has_ip = false;
-        gw_net_uplink_ip(false);
+        gw_net_uplink_ip(s_wifi.netif, false);
         gw_notify("network", GW_NOTIFY_WARNING, "Wi-Fi uplink: the link to radio %c failed", 'A' + s_wifi.radio);
     }
 }
@@ -337,6 +356,161 @@ static void refresh(void)
     }
 }
 
+/* ---- setup access point ---- */
+
+/* Every name resolves to the gateway, so a phone's connectivity check lands on its web UI. A raw lwIP
+ * PCB bound to the access point's address: port 53 is also held by the Thread border router's DNS
+ * server (any address), lwIP binds a second PCB to a port only when both allow address reuse, and
+ * then prefers the one bound to the address the query went to. */
+static struct udp_pcb *s_dns_pcb;
+static uint32_t s_dns_answers;
+
+static void dns_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
+{
+    static uint8_t buf[512]; /* the lwIP thread is the only caller */
+    int n = pbuf_copy_partial(p, buf, sizeof(buf) - 16, 0);
+    pbuf_free(p);
+    if (n < 17 || (buf[2] & 0x80)) {
+        return;
+    }
+    size_t q = 12;
+    while (q < (size_t)n && buf[q]) {
+        q += buf[q] + 1;
+    }
+    q += 5; /* end of the name, type, class */
+    if (q > (size_t)n) {
+        return;
+    }
+    bool a = buf[q - 4] == 0 && buf[q - 3] == 1;
+    buf[2] = 0x84 | (buf[2] & 0x01); /* answer, authoritative, recursion desired as asked */
+    buf[3] = 0x80;
+    memset(buf + 6, 0, 6);
+    buf[7] = a;
+    size_t len = q;
+    if (a) {
+        static const uint8_t rr[] = {0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4};
+        memcpy(buf + len, rr, sizeof(rr));
+        memcpy(buf + len + sizeof(rr), &s_portal.ip, 4);
+        len += sizeof(rr) + 4;
+    }
+    struct pbuf *r = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
+    if (r) {
+        memcpy(r->payload, buf, len);
+        s_dns_answers += udp_sendto(pcb, r, addr, port) == ERR_OK;
+        pbuf_free(r);
+    }
+}
+
+static esp_err_t dns_open(void *ctx)
+{
+    for (struct udp_pcb *o = udp_pcbs; o; o = o->next) {
+        if (o->local_port == 53) {
+            ESP_LOGI(TAG, "port 53 also bound to %s, netif %u", ipaddr_ntoa(&o->local_ip), o->netif_idx);
+            ip_set_option(o, SOF_REUSEADDR);
+        }
+    }
+    s_dns_pcb = udp_new();
+    if (!s_dns_pcb) {
+        return ESP_ERR_NO_MEM;
+    }
+    ip_set_option(s_dns_pcb, SOF_REUSEADDR);
+    ip_addr_t ip = IPADDR4_INIT(s_portal.ip);
+    if (udp_bind(s_dns_pcb, &ip, 53) != ERR_OK) {
+        udp_remove(s_dns_pcb);
+        s_dns_pcb = NULL;
+        return ESP_FAIL;
+    }
+    udp_recv(s_dns_pcb, dns_recv, NULL);
+    return ESP_OK;
+}
+
+static esp_err_t dns_close(void *ctx)
+{
+    if (s_dns_pcb) {
+        udp_remove(s_dns_pcb);
+        s_dns_pcb = NULL;
+    }
+    return ESP_OK;
+}
+
+/* Unknown pages (Android generate_204, Apple hotspot-detect.html, Windows connecttest.txt) open the
+ * web UI while the access point is up; a plain 404 otherwise. */
+static esp_err_t portal_404(httpd_req_t *req, httpd_err_code_t err)
+{
+    if (!s_portal.on) {
+        return httpd_resp_send_err(req, err, NULL);
+    }
+    char url[40];
+    snprintf(url, sizeof(url), "http://" IPSTR "/#system/wifi", IP2STR((esp_ip4_addr_t *)&s_portal.ip));
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", url);
+    return httpd_resp_send(req, NULL, 0);
+}
+
+static void portal_start(void)
+{
+    if (!s_portal.netif) {
+        s_portal.netif = esp_netif_create_default_wifi_ap();
+        httpd_register_err_handler(gw_http_server(), HTTPD_404_NOT_FOUND, portal_404);
+    }
+    esp_netif_ip_info_t ip;
+    esp_netif_get_ip_info(s_portal.netif, &ip);
+    s_portal.ip = ip.ip.addr;
+    /* the phones get the gateway as their DNS server */
+    uint8_t offer = 1;
+    esp_netif_dhcps_stop(s_portal.netif);
+    esp_netif_dhcps_option(s_portal.netif, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer, sizeof(offer));
+    esp_netif_dns_info_t dns = {.ip.type = ESP_IPADDR_TYPE_V4, .ip.u_addr.ip4 = ip.ip};
+    esp_netif_set_dns_info(s_portal.netif, ESP_NETIF_DNS_MAIN, &dns);
+    esp_netif_dhcps_start(s_portal.netif);
+
+    wifi_config_t ap = {.ap = {.authmode = WIFI_AUTH_OPEN, .max_connection = 4, .channel = 0}};
+    strlcpy(s_portal.ssid, gw_state()->hostname, sizeof(s_portal.ssid));
+    memcpy(ap.ap.ssid, s_portal.ssid, strlen(s_portal.ssid));
+    ap.ap.ssid_len = strlen(s_portal.ssid);
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (err == ESP_OK) {
+        err = esp_wifi_set_config(WIFI_IF_AP, &ap);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "setup access point: %s", esp_err_to_name(err));
+        esp_wifi_set_mode(WIFI_MODE_STA);
+        s_portal.done = true;
+        return;
+    }
+    s_portal.on = true;
+    s_portal.clients = 0;
+    if (esp_netif_tcpip_exec(dns_open, NULL) != ESP_OK) {
+        ESP_LOGW(TAG, "portal DNS not started");
+    }
+    ESP_LOGW(TAG, "no LAN and no Wi-Fi: setup access point %s open at " IPSTR, s_portal.ssid, IP2STR(&ip.ip));
+    gw_notify("network", GW_NOTIFY_WARNING, "No LAN and no Wi-Fi: setup access point %s open for a few minutes", s_portal.ssid);
+}
+
+static void portal_stop(const char *why)
+{
+    s_portal.on = false;
+    esp_netif_tcpip_exec(dns_close, NULL);
+    s_portal.done = true;
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    ESP_LOGI(TAG, "setup access point closed: %s", why);
+}
+
+static void portal_check(void)
+{
+    int64_t up_s = esp_timer_get_time() / 1000000;
+    bool online = s_wifi.has_ip || gw_eth_has_ip();
+    if (!s_portal.on) {
+        if (!s_portal.done && !online && up_s >= PORTAL_AFTER_S && up_s < PORTAL_UNTIL_S) {
+            portal_start();
+        }
+    } else if (up_s >= PORTAL_MAX_S) {
+        portal_stop("time is up");
+    } else if (!s_portal.clients && (online || up_s >= PORTAL_UNTIL_S)) {
+        portal_stop(online ? "the gateway is online" : "time is up");
+    }
+}
+
 static void wifi_task(void *arg)
 {
     s_wifi.state = "starting";
@@ -354,12 +528,14 @@ static void wifi_task(void *arg)
         xTaskNotifyWait(0, UINT32_MAX, &ev, pdMS_TO_TICKS(POLL_MS));
         if (ev & EV_APPLY) {
             station_apply();
-        } else if (s_wifi.retry_at_us && esp_timer_get_time() >= s_wifi.retry_at_us) {
+        } else if (s_wifi.retry_at_us && esp_timer_get_time() >= s_wifi.retry_at_us && !s_portal.clients) {
+            /* no scans while a phone is on the setup access point: the radio would leave its channel */
             s_wifi.retry_at_us = 0;
             s_wifi.state = "connecting";
             esp_wifi_connect();
         }
         refresh();
+        portal_check();
     }
 }
 
@@ -388,6 +564,17 @@ static cJSON *wifi_status(void)
     cJSON_AddNumberToObject(j, "last_reason", s_wifi.reason);
     cJSON_AddStringToObject(j, "ip_mode", s_wifi.fixed ? "static" : "dhcp");
     cJSON_AddBoolToObject(j, "default_route", s_wifi.netif && esp_netif_get_default_netif() == s_wifi.netif);
+    cJSON *portal = cJSON_AddObjectToObject(j, "portal");
+    cJSON_AddBoolToObject(portal, "on", s_portal.on);
+    if (s_portal.on) {
+        snprintf(buf, sizeof(buf), IPSTR, IP2STR((esp_ip4_addr_t *)&s_portal.ip));
+        cJSON_AddStringToObject(portal, "ssid", s_portal.ssid);
+        cJSON_AddStringToObject(portal, "ip", buf);
+        cJSON_AddNumberToObject(portal, "clients", s_portal.clients);
+        cJSON_AddNumberToObject(portal, "dns_answers", s_dns_answers);
+        int64_t left = PORTAL_UNTIL_S - esp_timer_get_time() / 1000000;
+        cJSON_AddNumberToObject(portal, "closes_s", left > 0 ? (double)left : 0); /* 0: open while a phone is on it */
+    }
     if (s_wifi.netif) {
         uint8_t mac[6];
         if (esp_netif_get_mac(s_wifi.netif, mac) == ESP_OK) {
@@ -432,7 +619,7 @@ static esp_err_t wifi_get(httpd_req_t *req)
 }
 
 /* {"ssid", "password" (left out: kept, "" open network), "mode", "ip", "mask", "gw", "dns1", "dns2"};
- * applied at once when the uplink runs. */
+ * applied at once when the uplink runs. "ssid": "" drops the own setting (the ESPHome Wi-Fi again). */
 static esp_err_t wifi_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -440,6 +627,17 @@ static esp_err_t wifi_post(httpd_req_t *req)
         return ESP_OK;
     }
     const char *ssid = GW_JSON_STR(body, "ssid"), *pass = GW_JSON_STR(body, "password");
+    if (ssid && !ssid[0]) {
+        cJSON_Delete(body);
+        gw_config_erase(KEY_CFG);
+        gw_config_erase(KEY_PASS);
+        gw_notify("network", GW_NOTIFY_INFO, "Wi-Fi uplink settings dropped by %s: the ESPHome Wi-Fi is used",
+                  gw_auth_who()[0] ? gw_auth_who() : "the web UI");
+        if (s_wifi.task && s_wifi.up) {
+            xTaskNotify(s_wifi.task, EV_APPLY, eSetBits);
+        }
+        return wifi_get(req);
+    }
     char err[80] = "ssid: 1-32 characters, password: 8-64 characters or empty for an open network";
     bool fixed;
     esp_netif_ip_info_t ip;

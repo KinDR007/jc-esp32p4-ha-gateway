@@ -124,7 +124,14 @@ esp_netif_t *gw_eth_netif(void);
 /* Waits for an IPv4 or global IPv6 address, on the LAN or on the Wi-Fi uplink. */
 bool gw_eth_wait_ip(TickType_t timeout);
 /* The Wi-Fi uplink got (true) or lost its IPv4 address; gw_eth_wait_ip() counts it. */
-void gw_net_uplink_ip(bool up);
+void gw_net_uplink_ip(esp_netif_t *netif, bool up);
+/* the Wi-Fi uplink while it has an address, else NULL */
+esp_netif_t *gw_net_uplink(void);
+bool gw_eth_link_up(void);
+/* the LAN has an IPv4 or global IPv6 address */
+bool gw_eth_has_ip(void);
+/* Test of the failover: the Ethernet driver stops for the given seconds, then starts again. */
+esp_err_t gw_eth_outage(uint32_t seconds);
 cJSON *gw_eth_status(void);
 /* Bytes and packets through the Ethernet interface since boot, in total and per service. */
 cJSON *gw_eth_traffic(void);
@@ -216,6 +223,8 @@ cJSON *gw_api_role_status(int radio);
 esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len);
 /* The same for a radio (c6_radio_t: 0 = A, 1 = B; radio B also takes "none"). */
 esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup, char *err, size_t err_len);
+/* Radio A takes radio B's role and the other way round, one restart; only to move the Wi-Fi uplink. */
+esp_err_t gw_api_role_swap(char *err, size_t err_len);
 bool gw_api_temperature(float *celsius);
 /* Chip data of a radio read at its last flashing (MAC, revision, flash size) and its flash count. */
 cJSON *gw_api_chip_json(int radio);

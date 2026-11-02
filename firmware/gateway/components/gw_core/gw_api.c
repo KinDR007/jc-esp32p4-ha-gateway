@@ -494,6 +494,43 @@ esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup
     return ESP_OK;
 }
 
+/* The roles of radio A and B trade places in one restart: the Wi-Fi uplink moves to the other radio
+ * (docs/wifi-uplink.md). Thread and Zigbee then run with the network data of the radio they land on. */
+esp_err_t gw_api_role_swap(char *err, size_t err_len)
+{
+    gw_state_t *st = gw_state();
+    gw_role_t a = st->desired, b = st->desired_b;
+    if (a != GW_ROLE_WIFI_UPLINK && b != GW_ROLE_WIFI_UPLINK) {
+        snprintf(err, err_len, "swap moves the Wi-Fi uplink: neither radio has it");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (b == GW_ROLE_NONE || !st->b_wired) {
+        snprintf(err, err_len, "radio B has no role or is not connected");
+        return ESP_ERR_INVALID_STATE;
+    }
+    char flashed[16];
+    for (int r = 0; r < C6_RADIOS; r++) {
+        const gw_radio_keys_t *keys = gw_radio_keys(r);
+        if (!gw_config_get_str(keys->bundle, flashed, sizeof(flashed)) && !gw_config_get_u8(keys->adopted, 0)) {
+            snprintf(err, err_len, r == C6_RADIO_A ? "c6_backup_required" : "radio_b_backup_required");
+            return ESP_ERR_INVALID_STATE;
+        }
+        if (c6_progress(r)->busy) {
+            snprintf(err, err_len, "radio flashing in progress");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+    gw_config_set_u8(GW_KEY_ROLE, b);
+    gw_config_set_u8(GW_KEY_ROLE_B, a);
+    gw_config_set_u8(GW_KEY_C6_TRIES, 0);
+    gw_config_set_u8(gw_radio_keys(C6_RADIO_B)->tries, 0);
+    ESP_LOGW(TAG, "roles swapped: radio A %s, radio B %s", gw_role_name(b), gw_role_name(a));
+    gw_notify("system", GW_NOTIFY_INFO, "Roles swapped by %s: radio A %s, radio B %s, restarting",
+              gw_auth_who()[0] ? gw_auth_who() : "the web UI", gw_role_name(b), gw_role_name(a));
+    gw_restart_later(500);
+    return ESP_OK;
+}
+
 esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size_t err_len)
 {
     return gw_api_role_switch_radio(C6_RADIO_A, name, skip_backup, err, err_len);
@@ -512,16 +549,17 @@ static esp_err_t role_post(httpd_req_t *req)
     const char *radio = GW_JSON_STR(body, "radio");
     int r = radio && strcmp(radio, "b") == 0 ? C6_RADIO_B : C6_RADIO_A;
     bool bad_radio = radio && strcmp(radio, "a") != 0 && strcmp(radio, "b") != 0;
+    bool swap = cJSON_IsTrue(cJSON_GetObjectItem(body, "swap"));
     cJSON_Delete(body);
     if (bad_radio) {
         return gw_http_send_error(req, 400, "radio: a or b");
     }
-    esp_err_t res = gw_api_role_switch_radio(r, name, skip_backup, err, sizeof(err));
+    esp_err_t res = swap ? gw_api_role_swap(err, sizeof(err)) : gw_api_role_switch_radio(r, name, skip_backup, err, sizeof(err));
     if (res != ESP_OK) {
         return gw_http_send_error(req, res == ESP_ERR_INVALID_ARG ? 400 : 409, err);
     }
     cJSON *json = cJSON_CreateObject();
-    cJSON_AddStringToObject(json, "role", name);
+    cJSON_AddStringToObject(json, "role", swap ? "swap" : name);
     cJSON_AddBoolToObject(json, "restarting", true);
     return gw_http_send_json(req, json);
 }
@@ -568,6 +606,29 @@ static esp_err_t lan_confirm_post(httpd_req_t *req)
         return gw_http_send_error(req, 409, "no LAN change waits for confirmation");
     }
     return gw_http_send_json(req, gw_lan_status());
+}
+
+/* {"seconds": 90}: Ethernet off for a while, to test the Wi-Fi uplink taking over (docs/wifi-uplink.md) */
+static esp_err_t lan_outage_post(httpd_req_t *req)
+{
+    cJSON *body = gw_http_read_json(req);
+    if (!body) {
+        return ESP_OK;
+    }
+    cJSON *sec = cJSON_GetObjectItem(body, "seconds");
+    int seconds = cJSON_IsNumber(sec) ? sec->valueint : 0;
+    cJSON_Delete(body);
+    if (seconds < 10 || seconds > 600) {
+        return gw_http_send_error(req, 400, "seconds: 10..600");
+    }
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "seconds", seconds);
+    gw_http_send_json(req, json);
+    vTaskDelay(pdMS_TO_TICKS(300)); /* the answer leaves before the link goes */
+    if (gw_eth_outage(seconds) != ESP_OK) {
+        ESP_LOGW(TAG, "LAN outage test not started");
+    }
+    return ESP_OK;
 }
 
 static esp_err_t traffic_get(httpd_req_t *req)
@@ -1207,6 +1268,7 @@ esp_err_t gw_api_register(void)
     gw_http_register("/api/net/lan", HTTP_POST, lan_post);
     gw_http_register("/api/net/lan/confirm", HTTP_POST, lan_confirm_post);
     gw_http_register("/api/net/traffic", HTTP_GET, traffic_get);
+    gw_http_register("/api/net/lan/outage", HTTP_POST, lan_outage_post);
     gw_http_register("/api/settings", HTTP_POST, settings_post);
     gw_http_register("/api/settings/export", HTTP_GET, settings_export_get);
     gw_http_register("/api/settings/import", HTTP_POST, settings_import_post);

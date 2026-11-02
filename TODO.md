@@ -91,9 +91,13 @@
 ## Wi-Fi uplink přes rádio ([docs/wifi-uplink.md](docs/wifi-uplink.md))
 - [x] W0 spike: host esp-hosted 3.0.10 přes UART se sestaví, +145 kB flash, +4,6 kB statické RAM
 - [x] W1 firmware rádia `wifi_uplink` (ESP-Hosted 3.0.10, UART, Wi-Fi STA+AP) pro C6 a C5, v balících s vlastním rozložením
-- [ ] W2 role na P4: host na pinech rádia, nastavení Wi-Fi, priorita tras, stav v /api/status
-- [ ] W3 role v UI (výchozí Wi-Fi na rádiu A, prohození A/B), Telegram, přehled
-- [ ] W3b přístupový bod s captive portálem pro nastavení bez LAN
-- [ ] W4 záložní přepnutí LAN ↔ Wi-Fi s hysterezí, páteř Thread
-- [ ] W5 testovací matice (TC, UI, HA) a dokumentace
+- [x] W2 role na P4: host na pinech rádia, nastavení Wi-Fi, priorita tras, stav v /api/status
+- [x] W3 role v UI, prohození A/B (`{"swap":true}`), Telegram, přehled, integrace HA
+- [x] W3b otevřený přístupový bod s captive portálem (jen pár minut po startu bez LAN a bez Wi-Fi)
+- [x] W4 záložní přepnutí LAN ↔ Wi-Fi, páteř Thread s hysterezí (60 s / 5 min)
+- [x] W5 testy TC41–TC45 (`tests/hw_test.py`), dokumentace
+- [ ] Rychlost UART nad 921600 Bd změřit na drátech JP1 (flasher jede jen 460800)
+- [ ] `dependencies.lock` zapisuje cestu záplatované kopie esp_hosted absolutně (správce komponent)
+- [ ] Test matice: Zigbee koordinátor přes Wi-Fi (#6), ESPHome + uplink (#10), odpojené rádio B (#13), soak přes Wi-Fi (#16) až na vyžádání
+- [ ] Automatická role Wi-Fi na rádiu A u brány bez LAN od první instalace (zatím volba v UI)
 

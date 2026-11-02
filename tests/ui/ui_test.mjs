@@ -1,5 +1,5 @@
 // Browser tests of the gateway web UI against a real board, in the same plain-HTTP context a user
-// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI25).
+// has (no clipboard API there, which API tests cannot catch). Test cases: tests/TESTCASES.md (UI01-UI26).
 //
 //   npm --prefix tests/ui ci
 //   node tests/ui/ui_test.mjs --host 192.168.88.243 [--password pw | --token t] [--html firmware/gateway/web/index.html]
@@ -649,6 +649,37 @@ await test('UI25', 'Log: every line has its local time, source, level, tag and s
   const rx = await page.$eval('#log-count', x => x.textContent);
   check(/^\d+ \//.test(rx), `regular expression: ${rx}`);
   await page.fill('#log-filter', '');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI26', 'Wi-Fi: the page shows the settings without the password, the state of the uplink and its traffic', async () => {
+  await tab('system/wifi');
+  await page.waitForSelector('#wifi-ssid', { timeout: 10000 });
+  check(await page.$eval('#wifi-pass', x => x.value) === '', 'password field empty (never sent by the gateway)');
+  const st = await page.evaluate(() => status.role_status_b?.mode === 'wifi_uplink' || status.role_status?.mode === 'wifi_uplink');
+  const state = await page.$eval('#wifi-state', x => x.innerText);
+  check(st ? /IPv4/.test(state) && /Radio/.test(state) : /No radio runs/.test(state), `state card: ${state.split('\n').slice(0, 2).join(' ')}`);
+  await page.selectOption('#wifi-mode', 'static');
+  check(!await page.$eval('#wifi-ip', x => x.disabled), 'static: address fields editable');
+  await page.selectOption('#wifi-mode', 'dhcp');
+  check(await page.$eval('#wifi-ip', x => x.disabled), 'DHCP: address fields locked');
+  if (st) {
+    await page.waitForFunction(() => /RX ↓/.test(document.querySelector('#traffic-box')?.innerText || ''), null, { timeout: 15000 });
+    check(true, 'traffic over Wi-Fi shown');
+    await page.click('#wifi-scan');
+    await page.waitForFunction(() => document.querySelector('#wifi-scan-out button, #wifi-scan-out p:not(.muted)') || /No network/.test(document.querySelector('#wifi-scan-out')?.innerText), null, { timeout: 40000 });
+    const first = await page.$('#wifi-scan-out button');
+    if (first) {
+      await first.click();
+      check(await page.$eval('#wifi-ssid', x => x.value) === await first.getAttribute('data-wifi-ssid'), 'a network of the scan fills the SSID');
+    }
+  }
+  await tab('radios/roles');
+  check(await page.$$eval('.role-group h4', x => x.some(h => h.textContent.includes('Wi-Fi'))), 'role group Wi-Fi in Radios › Roles');
+  check(!!(await page.$('#role-swap')) === st, `swap button ${st ? 'shown' : 'hidden'} with${st ? '' : 'out'} an uplink`);
+  await tab('overview');
+  const topo = await page.$eval('.topo-flow', x => x.innerText);
+  check(!st || /WI-FI/i.test(topo), 'overview diagram shows the Wi-Fi network');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

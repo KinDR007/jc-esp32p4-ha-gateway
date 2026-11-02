@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Wi-Fi uplink through a radio (docs/wifi-uplink.md): new radio role `wifi_uplink`. The radio runs
+  the ESP-Hosted co-processor (package bundle `wifi_uplink`, C6 and C5), the gateway gets an
+  ordinary Wi-Fi interface over the radio UART (own address, IPv6, mDNS), about 0.7 Mbit/s.
+  Ethernet keeps the default route while its link is up; without it the traffic goes over Wi-Fi at
+  once, and the Thread border router moves its backbone to Wi-Fi (restart after 60 s without LAN,
+  back to Ethernet after 5 min with LAN). System › Wi-Fi: network (with a scan), password, DHCP or
+  static address, state and traffic per service like the LAN page; without a network of its own the
+  ESPHome Wi-Fi is used. After a start without LAN and without Wi-Fi an open setup access point named
+  like the gateway opens for a few minutes; a phone joining it lands on the web UI. Radios › Roles
+  can swap the roles of radio A and B to move the Wi-Fi. API: `/api/net/wifi`, `/api/net/wifi/scan`,
+  `/api/net/wifi/traffic`, `POST /api/role {"swap": true}`, `POST /api/net/lan/outage` (failover test).
+  Home Assistant integration and Telegram `/role` know the role. Tests TC41–TC45.
 - Fix: after the manifest URL was changed, the offer of the old URL stayed installable when the
   check of the new one failed. A changed URL now drops the old offer first; a failed check of the
   same URL still keeps it (server down).

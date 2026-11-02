@@ -1,4 +1,7 @@
 dependencies:
-  # host and co-processor (firmware/c6/wifi_uplink, deps.lock esp-hosted-mcu) run the same version
-  espressif/esp_hosted: "==3.0.10"
+  # host and co-processor (firmware/c6/wifi_uplink, deps.lock esp-hosted-mcu) run the same version;
+  # the host is the patched copy of that checkout (firmware/gateway/CMakeLists.txt)
+  espressif/esp_hosted:
+    version: "==3.0.10"
+    override_path: "../../../../build/gateway/patched_components/espressif__esp_hosted"
   espressif/esp_wifi_remote: "==1.6.5"
