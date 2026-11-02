@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v1.9 (2026-11-02)
+
+Menu of the web UI arranged by task ([menu_redesign/](menu_redesign/README.md)), radio B with the
+same details and maintenance as radio A, full scan on either radio with 5 GHz Wi-Fi from radio B.
+New radio packages (scanner 1.1.0): the online update offers them. Home Assistant integration
+unchanged (1.4.0).
 
 - Fix: an upload of the gateway firmware in the web UI could end in a task watchdog restart into the
   old firmware (two radios busy): the slot was erased at once, stalling both cores for seconds. The
