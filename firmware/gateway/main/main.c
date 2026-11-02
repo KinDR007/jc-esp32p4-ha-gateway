@@ -631,8 +631,17 @@ void app_main(void)
             }
             netscan_run_full(scan_radio);
         }
+        /* A package staged for radio B's chip goes to radio B first: radio A may fetch its own package
+         * into the same PSRAM buffer. */
+        uint32_t staged = c6fw_stage_chip();
+        bool b_first = staged && staged == c6fw_radio_chip(C6_RADIO_B) && staged != c6fw_radio_chip(C6_RADIO_A);
+        if (b_first) {
+            apply_role_b(st->desired_b);
+        }
         apply_role(st->desired);
-        apply_role_b(st->desired_b);
+        if (!b_first) {
+            apply_role_b(st->desired_b);
+        }
     }
 
     vTaskDelay(pdMS_TO_TICKS(STABLE_AFTER_MS));

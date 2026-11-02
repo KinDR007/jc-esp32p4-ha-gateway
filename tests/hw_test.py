@@ -1653,6 +1653,7 @@ def ensure_uplink_b():
     if not s['role'].get('b', {}).get('wired'):
         raise Skip('no radio B on JP1')
     if s['role']['b'].get('active') != 'wifi_uplink':
+        stage_package('c5')
         switch_b('wifi_uplink')
     w = wait_until('Wi-Fi uplink connected', lambda: (lambda w: w if w.get('ipv4') else None)(uplink()), 120, 3)
     log(f'uplink on radio {w["radio"].upper()}: {w["ipv4"]}, {w.get("band")} channel {w.get("channel")}, {w.get("rssi")} dBm')
@@ -1919,7 +1920,9 @@ def main():
     # the single-radio cases switch radio A freely: radio B off meanwhile, its role back at the end
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
-    if any(tid not in ('TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45') for tid, _ in selected):
+    # cases that leave radio B alone or set it up themselves
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45')
+    if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')
         except Exception:  # noqa: BLE001 - gateway without radio B support

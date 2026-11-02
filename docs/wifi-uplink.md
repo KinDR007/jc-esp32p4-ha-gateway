@@ -91,6 +91,11 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
   known chip with a warning (`firmware/gateway/patches/esp_hosted_any_cp.patch`).
 - In access point plus station mode the radio has one channel: when the station joins a network
   on another channel, the phone on the setup access point drops and has to join again.
+- DNS servers follow the interface with the default route (`CONFIG_ESP_NETIF_SET_DNS_PER_DEFAULT_NETIF`):
+  without it the DHCP answer of the Wi-Fi in standby replaced the LAN's servers in lwIP's one list,
+  and name lookups failed for a moment while the uplink came up.
+- A radio package staged for radio B's chip (an upload) is used by radio B before radio A starts:
+  radio A may fetch its own package into the same PSRAM buffer.
 - ESP-Hosted is not started at boot (`CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n`) and never
   restarts the gateway on a transport failure (`..._RESTART_ON_FAILURE=n`); its task stacks and
   buffers go to PSRAM.
