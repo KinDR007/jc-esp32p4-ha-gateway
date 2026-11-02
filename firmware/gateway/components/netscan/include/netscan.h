@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "c6_flasher.h"
 #include "cJSON.h"
 #include "esp_err.h"
 
@@ -13,7 +14,8 @@ extern "C" {
 /*
  * Radio surroundings (System > Network surroundings).
  *   quick: IEEE 802.15.4 only, done by the running Thread role through OpenThread (no outage)
- *   full:  Wi-Fi and 802.15.4 by the C6 scanner image, run at boot before the role starts
+ *   full:  Wi-Fi and 802.15.4 by the scanner image of radio A or B, run at boot before the roles start
+ *          (radio B, an ESP32-C5, also sees 5 GHz Wi-Fi)
  * The last result is kept in NVS.
  */
 
@@ -24,11 +26,11 @@ typedef esp_err_t (*netscan_quick_fn)(cJSON *result, char *err, size_t err_len);
 void netscan_init(void);
 /* The Thread roles provide the quick scan. */
 void netscan_set_quick(netscan_quick_fn fn);
-/* A full scan was requested before this restart (the request is consumed). */
-bool netscan_full_pending(void);
-/* Flashes the scanner image to the C6, collects its results and stores them. The caller then
+/* Radio of a full scan requested before this restart, -1 for none (the request is consumed). */
+int netscan_full_pending(void);
+/* Flashes the scanner image to the radio, collects its results and stores them. The caller then
  * starts the role, which flashes the role image back. */
-void netscan_run_full(void);
+void netscan_run_full(c6_radio_t radio);
 
 #ifdef __cplusplus
 }

@@ -70,19 +70,41 @@ static void hex(char *out, const uint8_t *p, size_t n, bool reverse)
 
 /* ---------------------------------------------------------------- Wi-Fi */
 
-static const char *auth_name(wifi_auth_mode_t a)
+/* The Wi-Fi library reports an authentication mode only for the key managements it was built with
+ * (sdkconfig.defaults: WPA3 SAE and enterprise on), so an AP whose only AKM is unknown comes back as
+ * open; its cipher still shows that it is protected. */
+static const char *auth_name(const wifi_ap_record_t *a)
 {
-    switch (a) {
-    case WIFI_AUTH_OPEN: return "open";
+    switch (a->authmode) {
+    case WIFI_AUTH_OPEN: return a->pairwise_cipher == WIFI_CIPHER_TYPE_NONE ? "open" : "other";
     case WIFI_AUTH_WEP: return "wep";
     case WIFI_AUTH_WPA_PSK: return "wpa";
     case WIFI_AUTH_WPA2_PSK: return "wpa2";
     case WIFI_AUTH_WPA_WPA2_PSK: return "wpa/wpa2";
+    case WIFI_AUTH_WPA_ENTERPRISE: return "wpa-ent";
     case WIFI_AUTH_WPA2_ENTERPRISE: return "wpa2-ent";
-    case WIFI_AUTH_WPA3_PSK: return "wpa3";
+    case WIFI_AUTH_WPA3_PSK:
+    case WIFI_AUTH_WPA3_EXT_PSK:
+    case WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE: return "wpa3";
     case WIFI_AUTH_WPA2_WPA3_PSK: return "wpa2/wpa3";
+    case WIFI_AUTH_WPA3_ENTERPRISE: return "wpa3-ent";
+    case WIFI_AUTH_WPA2_WPA3_ENTERPRISE: return "wpa2/wpa3-ent";
+    case WIFI_AUTH_WPA3_ENT_192: return "wpa3-ent-192";
+    case WIFI_AUTH_WAPI_PSK: return "wapi";
     case WIFI_AUTH_OWE: return "owe";
+    case WIFI_AUTH_DPP: return "dpp";
     default: return "other";
+    }
+}
+
+static int bandwidth_mhz(const wifi_ap_record_t *a)
+{
+    switch (a->bandwidth) {
+    case WIFI_BW_HT40: return 40;
+    case WIFI_BW80: return 80;
+    case WIFI_BW160:
+    case WIFI_BW80_BW80: return 160;
+    default: return 20;
     }
 }
 
@@ -94,6 +116,9 @@ static void scan_wifi(void)
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
+#if SOC_WIFI_SUPPORT_5G
+    esp_wifi_set_band_mode(WIFI_BAND_MODE_AUTO); /* the C5 scans 2.4 and 5 GHz */
+#endif
 
     wifi_scan_config_t scan = {
         .show_hidden = true,
@@ -114,15 +139,26 @@ static void scan_wifi(void)
         }
         for (int i = 0; i < n; i++) {
             const wifi_ap_record_t *a = &aps[i];
-            char ssid[100], bssid[13];
+            char ssid[100], bssid[13], phy[16] = "";
             json_str(ssid, sizeof(ssid), a->ssid, sizeof(a->ssid));
             hex(bssid, a->bssid, 6, false);
-            printf("@NW {\"ssid\":\"%s\",\"bssid\":\"%s\",\"ch\":%u,\"ch2\":\"%s\",\"rssi\":%d,\"auth\":\"%s\","
-                   "\"phy\":\"%s%s%s%s\"}\n",
+            /* "b/g/n/ax", the way the standards are usually listed */
+            const struct {
+                bool on;
+                const char *name;
+            } modes[] = {{a->phy_11a, "a"}, {a->phy_11b, "b"}, {a->phy_11g, "g"}, {a->phy_11n, "n"},
+                         {a->phy_11ac, "ac"}, {a->phy_11ax, "ax"}};
+            for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); m++) {
+                if (modes[m].on) {
+                    strlcat(phy, phy[0] ? "/" : "", sizeof(phy));
+                    strlcat(phy, modes[m].name, sizeof(phy));
+                }
+            }
+            printf("@NW {\"ssid\":\"%s\",\"bssid\":\"%s\",\"ch\":%u,\"ch2\":\"%s\",\"bw\":%d,\"rssi\":%d,"
+                   "\"auth\":\"%s\",\"phy\":\"%s\"}\n",
                    ssid, bssid, a->primary,
                    a->second == WIFI_SECOND_CHAN_ABOVE ? "above" : a->second == WIFI_SECOND_CHAN_BELOW ? "below" : "none",
-                   a->rssi, auth_name(a->authmode), a->phy_11b ? "b" : "", a->phy_11g ? "g" : "", a->phy_11n ? "n" : "",
-                   a->phy_11ax ? "ax" : "");
+                   bandwidth_mhz(a), a->rssi, auth_name(a), phy);
         }
         free(aps);
     }

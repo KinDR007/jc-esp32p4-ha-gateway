@@ -14,6 +14,13 @@
   `/api/status` that of radio B and its bundle under `role.b`. Radio B also gets its firmware list,
   tooltips, Reflash radio B now (`POST /api/c6/reflash?radio=b`) and a flash backup while it has no
   role (`GET /api/c6/backup?radio=b`); the role switch points to that backup for both radios.
+- Radio surroundings: the full scan runs on radio A or B; radio B (ESP32-C5) also sees 5 GHz
+  Wi-Fi. The Wi-Fi table shows band, channel width up to 160 MHz and the standards as `b/g/n/ax`.
+- Fix: the full scan showed WPA3 networks as open: the scanner firmware was built without WPA3
+  SAE, so the Wi-Fi library did not recognise their key management (scanner 1.1.0, new radio
+  packages). A network reported open with a cipher is shown as protected.
+- Fix: a full scan that first had to install a new slots layout on the radio (over a minute) ran
+  out of time before the scanner started.
 - Fix: a C6 backup requested while the C6 was being flashed kept the upload lock, so later uploads
   and backups answered busy until a restart.
 

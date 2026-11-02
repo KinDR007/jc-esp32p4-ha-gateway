@@ -97,10 +97,15 @@ network.
 
 - **Quick** (Thread roles, no outage): OpenThread energy scan, active scan (beacons, also Zigbee
   PANs) and Thread discovery on channels 11–26, about 13 s with the radio off its channel.
-- **Full** (any role, about a minute without the role): the gateway restarts, flashes the
-  `scanner` image (`firmware/c6/scanner`) to the C6, which scans Wi-Fi (two passes) and every
-  802.15.4 channel (energy, beacon request with Zigbee/Thread payload parsing, PANs in traffic),
-  then flashes the role image back; Zigbee network data is kept by the usual snapshot.
+- **Full** (any role, about a minute without the roles): the gateway restarts, flashes the
+  `scanner` image (`firmware/c6/scanner`) to the chosen radio, which scans Wi-Fi (two passes) and
+  every 802.15.4 channel (energy, beacon request with Zigbee/Thread payload parsing, PANs in
+  traffic), then flashes the role image back; Zigbee network data is kept by the usual snapshot.
+  Radio A (C6) sees 2.4 GHz Wi-Fi, radio B (XIAO ESP32-C5) also 5 GHz; `POST /api/net/scan`
+  `{"mode": "full", "radio": "b"}`. Each access point carries its band, channel width (`bw`,
+  20/40/80/160 MHz), security and standards (`a/n/ac/ax`). The scanner is built with WPA3 SAE:
+  scanner 1.0 lacked it and reported WPA3 networks as open (fixed in 1.1). Only 2.4 GHz networks
+  count for the 802.15.4 ratings.
 
 The last result is stored in NVS with its time (SNTP). Ratings are computed in the web UI: Wi-Fi
 overlap (a 20 MHz channel covers about four 802.15.4 channels), measured noise and networks

@@ -19,7 +19,7 @@
 static const char *TAG = "netscan";
 
 #define KEY_RESULT "netscan"     /* blob, last result as JSON */
-#define KEY_REQUEST "netscan_req" /* u8, full scan on the next boot */
+#define KEY_REQUEST "netscan_req" /* u8, full scan on the next boot: 1 radio A, 2 radio B */
 #define RESULT_MAX (24 * 1024)
 #define SCANNER_BUNDLE "scanner"
 #define FULL_TIMEOUT_US (90 * 1000000LL)
@@ -83,13 +83,14 @@ static void set_state(const char *state)
 
 /* ---------------------------------------------------------------- full scan (boot) */
 
-bool netscan_full_pending(void)
+int netscan_full_pending(void)
 {
-    if (!gw_config_get_u8(KEY_REQUEST, 0)) {
-        return false;
+    uint8_t req = gw_config_get_u8(KEY_REQUEST, 0);
+    if (!req) {
+        return -1;
     }
     gw_config_erase(KEY_REQUEST);
-    return true;
+    return req == 2 ? C6_RADIO_B : C6_RADIO_A;
 }
 
 static void add_error(cJSON *res, const char *msg)
@@ -102,30 +103,31 @@ static void add_error(cJSON *res, const char *msg)
     ESP_LOGW(TAG, "%s", msg);
 }
 
-static esp_err_t flash_scanner(cJSON *res)
+static esp_err_t flash_scanner(c6_radio_t radio, cJSON *res)
 {
+    const gw_radio_keys_t *keys = gw_radio_keys(radio);
     c6fw_entry_t entry;
     char current[16] = "";
-    if (c6fw_find(C6_RADIO_A, SCANNER_BUNDLE, &entry) != ESP_OK) {
-        add_error(res, "the C6 firmware bundle has no scanner image, upload a current c6fw.bin");
+    if (c6fw_find(radio, SCANNER_BUNDLE, &entry) != ESP_OK || !c6_flash_ready(radio, &entry)) {
+        add_error(res, "no scanner firmware for the radio on the gateway: online update or upload of the radio package");
         return ESP_ERR_NOT_FOUND;
     }
-    if (!gw_config_get_str(GW_KEY_C6_BUNDLE, current, sizeof(current)) && !gw_config_get_u8(GW_KEY_C6_ADOPTED, 0)) {
-        add_error(res, "the C6 still runs its factory firmware: back it up first (System, Maintenance)");
+    if (!gw_config_get_str(keys->bundle, current, sizeof(current)) && !gw_config_get_u8(keys->adopted, 0)) {
+        add_error(res, "the radio still runs its factory firmware: back it up first (Radios, Status and maintenance)");
         return ESP_ERR_INVALID_STATE;
     }
     /* Zigbee network data of the current bundle is saved by the flasher and restored with the role. */
     gw_flash_lock();
-    esp_err_t err = c6_flash_bundle(C6_RADIO_A, &entry, current);
+    esp_err_t err = c6_flash_bundle(radio, &entry, current);
     gw_flash_unlock();
     if (err != ESP_OK) {
-        /* unknown C6 content: make the role flash its image again */
-        gw_config_set_str(GW_KEY_C6_BUNDLE, "");
-        add_error(res, c6_progress(C6_RADIO_A)->last_error[0] ? c6_progress(C6_RADIO_A)->last_error : "flashing the scanner failed");
+        /* unknown radio content: make the role flash its image again */
+        gw_config_set_str(keys->bundle, "");
+        add_error(res, c6_progress(radio)->last_error[0] ? c6_progress(radio)->last_error : "flashing the scanner failed");
         return err;
     }
-    gw_config_set_str(GW_KEY_C6_BUNDLE, entry.name);
-    gw_config_set_blob(GW_KEY_C6_SHA, entry.sha256, sizeof(entry.sha256));
+    gw_config_set_str(keys->bundle, entry.name);
+    gw_config_set_blob(keys->sha, entry.sha256, sizeof(entry.sha256));
     return ESP_OK;
 }
 
@@ -175,17 +177,18 @@ static void collect_line(cJSON *res, const char *line)
     }
 }
 
-void netscan_run_full(void)
+void netscan_run_full(c6_radio_t radio)
 {
     int64_t started = esp_timer_get_time();
     cJSON *res = cJSON_CreateObject();
     for (const char *a = "wifi\0channels\0beacons\0pans\0"; *a; a += strlen(a) + 1) {
         cJSON_AddArrayToObject(res, a);
     }
+    cJSON_AddStringToObject(res, "radio", radio == C6_RADIO_B ? "b" : "a");
     set_state("full");
-    ESP_LOGI(TAG, "full scan: flashing the scanner image");
-    if (flash_scanner(res) == ESP_OK) {
-        const c6_radio_pins_t *pins = c6_radio_pins(C6_RADIO_A);
+    ESP_LOGI(TAG, "full scan on radio %c: flashing the scanner image", 'A' + radio);
+    if (flash_scanner(radio, res) == ESP_OK) {
+        const c6_radio_pins_t *pins = c6_radio_pins(radio);
         const uart_port_t port = pins->uart_port;
         uart_config_t cfg = {
             .baud_rate = CONFIG_GW_C6_UART_BAUD,
@@ -199,13 +202,15 @@ void netscan_run_full(void)
         if (line && uart_driver_install(port, 8192, 0, 0, NULL, 0) == ESP_OK) {
             uart_param_config(port, &cfg);
             uart_set_pin(port, pins->tx, pins->rx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-            c6_reset(C6_RADIO_A); /* from the start: the flasher already let it run */
+            c6_reset(radio); /* from the start: the flasher already let it run */
             vTaskDelay(pdMS_TO_TICKS(200));
             uart_flush_input(port);
+            /* from the scanner start: installing a new slots layout before takes over a minute */
+            int64_t listening = esp_timer_get_time();
             size_t len = 0;
             bool done = false;
             uint8_t c;
-            while (!done && esp_timer_get_time() - started < FULL_TIMEOUT_US) {
+            while (!done && esp_timer_get_time() - listening < FULL_TIMEOUT_US) {
                 if (uart_read_bytes(port, &c, 1, pdMS_TO_TICKS(200)) != 1) {
                     continue;
                 }
@@ -226,7 +231,7 @@ void netscan_run_full(void)
             }
             uart_driver_delete(port);
         } else {
-            add_error(res, "UART to the C6 unavailable");
+            add_error(res, "UART to the radio unavailable");
         }
         free(line);
     }
@@ -284,11 +289,18 @@ static esp_err_t scan_post(httpd_req_t *req)
     if (!body) {
         return ESP_OK;
     }
-    const char *mode = GW_JSON_STR(body, "mode");
+    const char *mode = GW_JSON_STR(body, "mode"), *which = GW_JSON_STR(body, "radio");
     bool quick = mode && strcmp(mode, "quick") == 0, full = mode && strcmp(mode, "full") == 0;
+    bool radio_b = which && strcmp(which, "b") == 0, bad_radio = which && !radio_b && strcmp(which, "a") != 0;
     cJSON_Delete(body);
     if (!quick && !full) {
         return gw_http_send_error(req, 400, "mode must be quick or full");
+    }
+    if (bad_radio) {
+        return gw_http_send_error(req, 400, "radio: a or b");
+    }
+    if (full && radio_b && !c6fw_radio_chip(C6_RADIO_B)) {
+        return gw_http_send_error(req, 409, "radio B not detected yet: Radios, Status and maintenance, Test wiring");
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
     bool busy = strcmp(s_state, "idle") != 0;
@@ -310,7 +322,7 @@ static esp_err_t scan_post(httpd_req_t *req)
         }
         cJSON_AddBoolToObject(json, "started", true);
     } else {
-        gw_config_set_u8(KEY_REQUEST, 1);
+        gw_config_set_u8(KEY_REQUEST, radio_b ? 2 : 1);
         cJSON_AddBoolToObject(json, "restarting", true);
         gw_restart_later(800);
     }

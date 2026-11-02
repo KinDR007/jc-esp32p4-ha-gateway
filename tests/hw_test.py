@@ -944,10 +944,25 @@ def tc20_netscan():
     bssids = [a['bssid'] for a in f['wifi']]
     check(len(bssids) == len(set(bssids)), f'full: {len(bssids)} Wi-Fi access points, one entry each')
     check(any(p['ch'] == t['channel'] for p in f['pans']), 'full: own Thread PAN seen in traffic')
+    auths = {a['auth'] for a in f['wifi']}
+    check(f.get('radio') == 'a' and all(a.get('bw') for a in f['wifi']) and 'other' not in auths,
+          f'full: radio A, channel width and known security for every access point ({", ".join(sorted(auths))})')
     s = wait_restart('thread_br')
     check(s['c6']['bundle'] == 'ot_rcp' and not s['role']['maintenance'], 'role firmware back on the C6')
     t2 = wait_thread_running()
     check(t2['network_name'] == t['network_name'], 'Thread network unchanged after the scan')
+
+    b = http('GET', '/api/radios')[1][1]
+    if b.get('chip') != 'ESP32-C5':
+        return
+    code, r = http('POST', '/api/net/scan', {'mode': 'full', 'radio': 'b'})
+    check(code == 200 and r.get('restarting'), 'full scan on radio B requested')
+    time.sleep(10)
+    f = wait_until('full scan on radio B', lambda: (lambda x: x if x and x.get('radio') == 'b' else None)(finished('full', None)), 300, 5)
+    check(len(f['channels']) == 16 and not f.get('errors'), f'radio B: scanner {f.get("scanner")}, 16 channels, {f["duration_ms"]} ms')
+    check(any(a['ch'] > 14 for a in f['wifi']), f'radio B: 5 GHz access points ({sum(a["ch"] > 14 for a in f["wifi"])} of {len(f["wifi"])})')
+    wait_restart('thread_br')
+    check(http('GET', '/api/radios')[1][1]['role'] == b['role'], f'radio B back in its role {b["role"]}')
 
 
 def tc21_thread_topology():

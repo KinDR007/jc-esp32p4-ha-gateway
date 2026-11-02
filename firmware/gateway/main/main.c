@@ -614,12 +614,13 @@ void app_main(void)
     if (boot_loop) {
         gw_set_maintenance("repeated crashes during start, role %s not started", gw_role_name(st->desired));
     } else {
-        if (netscan_full_pending()) {
-            /* the scanner image runs on the C6 first; apply_role flashes the role image back */
+        int scan_radio = netscan_full_pending();
+        if (scan_radio >= 0) {
+            /* the scanner image runs on the radio first; apply_role flashes the role image back */
             if (gw_eth_wait_ip(pdMS_TO_TICKS(15000))) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
             }
-            netscan_run_full();
+            netscan_run_full(scan_radio);
         }
         apply_role(st->desired);
         apply_role_b(st->desired_b);

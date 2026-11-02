@@ -429,8 +429,8 @@ const CS = {
   'Noise': 'Šum', 'Wi-Fi overlap': 'Překryv s Wi-Fi', 'Networks': 'Sítě', 'Devices': 'Zařízení',
   'Best signal': 'Nejsilnější signál', 'Open': 'Otevřená', 'SSID': 'SSID', 'BSSID': 'BSSID', 'Width': 'Šířka', 'Signal': 'Signál',
   'Standard': 'Standard', 'Run a full scan?': 'Spustit úplný sken?', 'Full scan: the gateway restarts': 'Úplný sken: brána se restartuje',
-  'The gateway restarts, the C6 runs the scanner firmware and then the role firmware again. The active role is off for about a minute.':
-    'Brána se restartuje, C6 spustí skenovací firmware a pak znovu firmware role. Aktivní role bude asi minutu mimo provoz.', 'CPU load': 'Zatížení CPU', 'Tasks': 'Úlohy', 'Flash': 'Flash', 'Base MAC': 'Základní MAC',
+  'The gateway restarts, the radio runs the scanner firmware and then the role firmware again. The roles are off for about a minute.':
+    'Brána se restartuje, rádio spustí skenovací firmware a pak znovu firmware role. Role budou asi minutu mimo provoz.', 'Band': 'Pásmo', 'CPU load': 'Zatížení CPU', 'Tasks': 'Úlohy', 'Flash': 'Flash', 'Base MAC': 'Základní MAC',
   'Internal used': 'Interní RAM využito', 'Largest block': 'Největší blok', 'PSRAM used': 'PSRAM využito', 'NVS': 'NVS', 'App slot': 'Slot aplikace',
   'ELF SHA-256': 'ELF SHA-256', 'C6 MAC': 'MAC C6', 'C6 memory': 'Paměť C6', 'C6 uptime': 'Doba běhu C6', 'C6 last reset': 'Poslední reset C6',
   'not reported by this C6 firmware': 'tento firmware C6 ji nehlásí', 'C6 chip revision': 'Revize čipu C6', 'C6 flash': 'Flash C6', 'Flashes': 'Počet flashování',
@@ -1102,7 +1102,7 @@ const TIPS = {
   'Matter node': ['Node ID in the Matter Server; Home Assistant shows it in the device info of the Matter integration.', 'ID uzlu v Matter Serveru; Home Assistant ho ukazuje v informacích o zařízení integrace Matter.'],
   // network surroundings
   'Quick scan': ['Energy scan, beacon request and Thread discovery on channels 11–26 through the running Thread role. Only in Thread roles.', 'Měření energie, dotaz na beacony a hledání Thread sítí na kanálech 11–26 přes běžící roli Thread. Jen v rolích Thread.'],
-  'Full scan': ['Restarts into a C6 scanner firmware: Wi-Fi access points, 802.15.4 beacons, PANs seen in traffic and noise. The role is off for about a minute; Zigbee network data is kept.', 'Restart do skenovacího firmwaru C6: přístupové body Wi-Fi, beacony 802.15.4, PAN viditelné v provozu a šum. Role je asi minutu mimo provoz; data Zigbee sítě zůstanou.'],
+  'Full scan': ['Restarts into a scanner firmware on the chosen radio: Wi-Fi access points (radio B also 5 GHz), 802.15.4 beacons, PANs seen in traffic and noise. The roles are off for about a minute; Zigbee network data is kept.', 'Restart do skenovacího firmwaru na zvoleném rádiu: přístupové body Wi-Fi (rádio B i 5 GHz), beacony 802.15.4, PAN viditelné v provozu a šum. Role jsou asi minutu mimo provoz; data Zigbee sítě zůstanou.'],
   'Noise': ['Strongest energy measured on the channel (energy detect). Below -90 dBm is quiet, above -75 dBm means strong interference or traffic.', 'Nejsilnější energie naměřená na kanálu (energy detect). Pod -90 dBm je ticho, nad -75 dBm silné rušení nebo provoz.'],
   'Wi-Fi overlap': ['Combined signal of the Wi-Fi networks whose band covers this channel. A 20 MHz Wi-Fi channel covers about four 802.15.4 channels.', 'Součet signálu Wi-Fi sítí, jejichž pásmo zasahuje tento kanál. Kanál Wi-Fi 20 MHz pokryje zhruba čtyři kanály 802.15.4.'],
   'Networks': ['Thread and Zigbee networks found on the channel; ★ marks yours.', 'Sítě Thread a Zigbee nalezené na kanálu; ★ označuje vaše.'],
@@ -1111,7 +1111,7 @@ const TIPS = {
   'Open': ['The network accepts new devices right now (permit join / joining allowed).', 'Síť právě přijímá nová zařízení (permit join / připojování povoleno).'],
   'Wi-Fi channel': ['2.4 GHz Wi-Fi channel (1–13); with the width it gives the overlap with 802.15.4 channels.', 'Kanál Wi-Fi 2,4 GHz (1–13); spolu se šířkou určuje překryv s kanály 802.15.4.'],
   'Network type': ['Thread or Zigbee, recognised from the beacon; other or 802.15.4 when it cannot be told.', 'Thread nebo Zigbee podle beaconu; jiná nebo 802.15.4, když to nejde rozlišit.'],
-  'Width': ['40 MHz Wi-Fi covers twice the band of 20 MHz and disturbs more 802.15.4 channels.', 'Wi-Fi 40 MHz zabírá dvojnásobné pásmo než 20 MHz a ruší víc kanálů 802.15.4.'],
+  'Width': ['40 MHz Wi-Fi covers twice the band of 20 MHz and disturbs more 802.15.4 channels. 5 GHz networks (80, 160 MHz) do not disturb 802.15.4.', 'Wi-Fi 40 MHz zabírá dvojnásobné pásmo než 20 MHz a ruší víc kanálů 802.15.4. Sítě 5 GHz (80, 160 MHz) 802.15.4 neruší.'],
   // roles
   'role:thread_br': ['Thread network with its own border router: Matter-over-Thread devices reach Home Assistant through it.', 'Thread síť s vlastním border routerem: zařízení Matter-over-Thread jsou přes něj dostupná z Home Assistant.'],
   'role:thread_router': ['Extra router for an existing Thread network to improve range; no connection to the LAN.', 'Další router pro existující Thread síť, zlepší dosah; bez propojení s LAN.'],
@@ -3145,6 +3145,11 @@ const L = (en, cs) => lang === 'cs' ? cs : en;
 const f154 = ch => 2405 + 5 * (ch - 11);
 const fWifi = ch => ch === 14 ? 2484 : 2407 + 5 * ch;
 const dbmSum = list => list.length ? 10 * Math.log10(list.reduce((a, v) => a + 10 ** (v / 10), 0)) : null;
+/* 2.4 GHz access points: only they share the band with 802.15.4 (radio B also reports 5 GHz) */
+const wifi24 = last => (last.wifi || []).filter(ap => ap.ch <= 14);
+/* channel width: "bw" of scanner 1.1, older results only tell 20 or 40 MHz */
+const apWidth = ap => ap.bw || (ap.ch2 === 'none' ? 20 : 40);
+const SECURITY = { open: ['open', 'otevřená'], other: ['protected (unknown type)', 'chráněná (neznámý typ)'] };
 function apSpan(ap) {
   const wide = ap.ch2 === 'above' || ap.ch2 === 'below';
   const center = fWifi(ap.ch) + (ap.ch2 === 'above' ? 10 : ap.ch2 === 'below' ? -10 : 0);
@@ -3189,7 +3194,7 @@ function nsOwn(nets) {
 }
 
 function nsChannels(last, nets) {
-  const wifi = last.wifi || [];
+  const wifi = wifi24(last);
   return Array.from({ length: 16 }, (_, i) => {
     const ch = 11 + i, c = (last.channels || []).find(x => x.ch === ch) || {};
     const aps = wifi.filter(ap => apOverlaps(ap, ch));
@@ -3213,7 +3218,7 @@ function nsSpectrum(chs, last) {
   const W = 860, H = 230, x = f => 40 + (f - 2400) / 85 * (W - 60), y = rssi => 150 - (Math.min(-30, Math.max(-100, rssi)) + 100) / 70 * 130;
   let svg = `<svg class="spectrum" viewBox="0 0 ${W} ${H}" role="img" aria-label="2.4 GHz spectrum">`;
   for (const db of [-40, -60, -80, -100]) svg += `<line class="grid-line" x1="40" x2="${W - 20}" y1="${y(db)}" y2="${y(db)}"/><text x="4" y="${y(db) + 4}">${db}</text>`;
-  const aps = [...(last.wifi || [])].sort((a, b) => a.rssi - b.rssi);
+  const aps = wifi24(last).sort((a, b) => a.rssi - b.rssi);
   for (const ap of aps) {
     const [a, b] = apSpan(ap), top = y(ap.rssi);
     svg += `<path class="ap ${ap.rssi > -65 ? 'strong' : ''}" d="M${x(a)},150 C${x(a + 4)},${top} ${x(b - 4)},${top} ${x(b)},150 Z"><title>${esc(ap.ssid || L('hidden', 'skrytá'))} · ch ${ap.ch} · ${ap.rssi} dBm</title></path>`;
@@ -3244,7 +3249,7 @@ function nsRecommend(chs, nets, last) {
   const thread = best(chs.filter(c => c.ch <= 25)).slice(0, 3);
   const zigbee = best(chs.filter(c => [11, 15, 20, 25].includes(c.ch)))[0];
   const own = nets.filter(n => n.own || n.type === 'zigbee');
-  const wifi = last.wifi || [];
+  const wifi = wifi24(last);
   let wifiReco = '';
   if (wifi.length) {
     const ownCh = own.map(n => n.ch);
@@ -3273,10 +3278,12 @@ function nsRecommend(chs, nets, last) {
 
 views['radios/scan'] = () => `<div class="grid">
   <div class="card">${h3('radar', 'Scan')}
-    <p class="muted">Quick: Thread and Zigbee networks and channel noise through the running Thread role, without an outage (the radio leaves its channel for about 15 s).
-    Full: also Wi-Fi; the C6 runs a scanner firmware, the role is off for about a minute.</p>
+    <p class="muted">${L('Quick: Thread and Zigbee networks and channel noise through the running Thread role, without an outage (the radio leaves its channel for about 15 s). Full: also Wi-Fi; the chosen radio runs a scanner firmware, the roles are off for about a minute. Radio B (ESP32-C5) also sees 5 GHz Wi-Fi.',
+      'Rychlý: sítě Thread a Zigbee a šum kanálů přes běžící roli Thread, bez výpadku (rádio opustí svůj kanál asi na 15 s). Úplný: navíc Wi-Fi; zvolené rádio spustí firmware skeneru, role jsou asi minutu vypnuté. Rádio B (ESP32-C5) vidí i Wi-Fi 5 GHz.')}</p>
     <div class="row"><button class="btn primary" id="ns-quick" ${isThread() ? '' : 'disabled'}>${ic('radar')}Quick scan</button>${tip('Quick scan')}
-      <button class="btn" id="ns-full">${ic('access-point-network')}Full scan with Wi-Fi</button>${tip('Full scan')}</div>
+      <button class="btn" id="ns-full">${ic('access-point-network')}Full scan with Wi-Fi</button>${tip('Full scan')}
+      ${status.role?.b?.chip ? `<select id="ns-radio" aria-label="${L('Radio of the full scan', 'Rádio úplného skenu')}"><option value="a">${L('radio A', 'rádio A')} (${L('2.4 GHz', '2,4 GHz')})</option>
+        <option value="b" selected>${L('radio B', 'rádio B')} (${L('2.4 and 5 GHz', '2,4 a 5 GHz')})</option></select>` : ''}</div>
     <div id="ns-state" class="muted" style="margin-top:10px"></div></div>
   <div class="card">${h3('check', 'Recommendation')}<div id="ns-reco" class="muted">No scan yet.</div></div>
   <div class="card wide">${h3('waveform', '2.4 GHz spectrum')}<div id="ns-spectrum" class="muted">No scan yet.</div></div>
@@ -3297,7 +3304,7 @@ async function loadNetscan() {
   const last = d.last;
   const when = last && last.at ? new Date(last.at * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '';
   $('#ns-state').innerHTML = busy ? pill('warn', L('scanning…', 'skenuji…'))
-    : last ? `${L('Last scan', 'Poslední sken')}: ${esc(when)} · ${last.mode === 'full' ? L('full', 'úplný') : L('quick', 'rychlý')} · ${(last.duration_ms / 1000).toFixed(0)} s${(last.errors || []).map(e => `<div class="warn-text">${esc(e)}</div>`).join('')}`
+    : last ? `${L('Last scan', 'Poslední sken')}: ${esc(when)} · ${last.mode === 'full' ? L('full', 'úplný') : L('quick', 'rychlý')}${last.radio ? ` · ${L('radio', 'rádio')} ${esc(last.radio.toUpperCase())}` : ''} · ${(last.duration_ms / 1000).toFixed(0)} s${(last.errors || []).map(e => `<div class="warn-text">${esc(e)}</div>`).join('')}`
     : L('No scan yet.', 'Zatím bez skenu.');
   if (busy && !nsTimer) nsTimer = setInterval(loadNetscan, 2000);
   if (!busy && nsTimer) { clearInterval(nsTimer); nsTimer = null; }
@@ -3325,11 +3332,13 @@ async function loadNetscan() {
   /* one row per BSSID (results stored before the gateway merged them carry duplicates) */
   const wifi = [...new Map([...(last.wifi || [])].sort((a, b) => a.rssi - b.rssi).map(a => [a.bssid, a])).values()].sort((a, b) => b.rssi - a.rssi);
   $('#ns-wifi').innerHTML = !last.wifi ? `<p class="muted">${L('Only the full scan sees Wi-Fi.', 'Wi-Fi vidí jen úplný sken.')}</p>`
-    : `<table><tr>${['SSID', 'BSSID', ['Channel', 'Wi-Fi channel'], 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${wifi.map(a => `<tr>
+    : `<table><tr>${['SSID', 'BSSID', 'Band', ['Channel', 'Wi-Fi channel'], 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${wifi.map(a => `<tr>
     <td data-notr>${a.ssid ? esc(a.ssid) : `<span class="muted">${L('hidden', 'skrytá')}</span>`}</td><td><code>${esc(a.bssid.match(/../g).join(':'))}</code></td>
-    <td>${a.ch}</td><td>${a.ch2 === 'none' ? '20 MHz' : '40 MHz'}</td>
+    <td>${a.ch > 14 ? '5 GHz' : L('2.4 GHz', '2,4 GHz')}</td><td>${a.ch}</td><td>${apWidth(a)} MHz</td>
     <td>${meter(Math.max(0, Math.min(100, (a.rssi + 100) * 1.6)), 101, 101).replace(/\d+ %/, a.rssi + ' dBm')}</td>
-    <td>${esc(a.auth)}</td><td>802.11${esc(a.phy)}</td></tr>`).join('')}</table>`;
+    <td data-notr>${SECURITY[a.auth] ? `<span class="${a.auth === 'open' ? 'warn-text' : ''}">${L(...SECURITY[a.auth])}</span>` : esc(a.auth.toUpperCase())}</td>
+    <td data-notr>802.11${esc(a.phy)}</td></tr>`).join('')}</table>
+    ${last.wifi.some(a => a.auth === 'open') && !last.wifi.some(a => a.bw) ? `<p class="muted">${L('Scans before scanner 1.1 show WPA3 networks as open: run a new full scan.', 'Skeny před skenerem 1.1 ukazují sítě WPA3 jako otevřené: spusťte nový úplný sken.')}</p>` : ''}`;
 }
 
 views['ha/matter'] = () => `<div class="grid"><div class="card">${h3('home-assistant', 'Home Assistant and Matter')}
@@ -4057,8 +4066,8 @@ document.addEventListener('click', async e => {
       toast(L('Quick scan running (about 15 s)', 'Rychlý sken běží (asi 15 s)'));
       loadNetscan();
     } else if (t.id === 'ns-full') {
-      if (!await confirmDialog('Run a full scan?', 'The gateway restarts, the C6 runs the scanner firmware and then the role firmware again. The active role is off for about a minute.')) return;
-      await api('/api/net/scan', { json: { mode: 'full' } });
+      if (!await confirmDialog('Run a full scan?', 'The gateway restarts, the radio runs the scanner firmware and then the role firmware again. The roles are off for about a minute.')) return;
+      await api('/api/net/scan', { json: { mode: 'full', radio: $('#ns-radio')?.value || 'a' } });
       toast('Full scan: the gateway restarts');
       waitForRestart();
     } else if (t.id === 'cd-get') {
