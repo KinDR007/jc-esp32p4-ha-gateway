@@ -1215,6 +1215,18 @@ const temp = s => s.temperature_c === undefined ? '' : `${s.temperature_c} °C` 
 const cpuLoad = hw => (hw?.cpu_load || []).map((l, i) => `<div class="row">core ${i} ${meter(l)}</div>`).join('');
 /* radio temperature with min/max since the gateway start and the age of a stale report */
 const telTemp = t => `${t.temp_c} °C` + (t.temp_max_c !== undefined ? ` <span class="muted">(min ${t.temp_min_c}, max ${t.temp_max_c})</span>` : '') + (t.age_s > 90 ? ` <span class="warn-text">(${t.age_s} s old)</span>` : '');
+/* radio B rows shared by the overview and Radios › Status and maintenance: its telemetry and the chip data
+ * read at its last flashing ('-': no tooltip, the MAC and Flash ones describe the P4) */
+function radioBRows(bundle, c = {}, t) {
+  return [
+    [L('Running', 'Běží'), bundle ? `<span data-notr>${esc(t?.fw || bundle)}</span>${t?.ver ? ` <span class="muted">${esc(t.ver)}</span>` : ''}` : ''],
+    ['MAC', c.mac ? esc(c.mac) : `<span class="muted">${L('read at the next flashing', 'načte se při příštím flashování')}</span>`, '-'],
+    [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : t?.rev !== undefined ? rev(t.rev) : ''],
+    ['Flash', c.flash_size ? fmtBytes(c.flash_size) : '', '-'], [L('Flashes', 'Počet flashování'), c.flashes || ''],
+    [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : ''],
+    [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : ''],
+    [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : ''], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '']];
+}
 /* C6 rows shared by the overview and Radios › Status and maintenance */
 function c6Rows(s, full) {
   const c = s.c6, chip = c.chip || {}, rs = s.role_status || {}, tel = c.telemetry;
@@ -1572,9 +1584,7 @@ views.overview = () => {
       [L('Role', 'Role'), `<b>${esc(ROLES[r.b.active]?.name || L('off', 'vypnuto'))}</b>`],
       [L('Selected', 'Vybráno'), esc(ROLES[r.b.desired]?.name || r.b.desired)],
       [L('State', 'Stav'), r.b.maintenance ? `<span class="bad-text">${esc(r.b.maintenance)}</span>` : r.b.wired === false ? `<span class="bad-text">${L('not found on JP1', 'na JP1 nenalezeno')}</span>` : ''],
-      [L('Firmware', 'Firmware'), r.b.telemetry ? esc(`${r.b.telemetry.fw} ${r.b.telemetry.ver}`) : ''],
-      [L('Temperature', 'Teplota'), r.b.telemetry?.temp_c !== undefined ? r.b.telemetry.temp_c + ' °C' : ''],
-      [L('Details', 'Podrobnosti'), `<a href="#radios/status">${L('Radios › Status and maintenance', 'Rádia › Stav a údržba')}</a>`]])}</div>` : ''}
+      ...radioBRows(r.b.bundle, r.b.chip_info, r.b.telemetry)])}</div>` : ''}
   </div>`;
 };
 
@@ -1914,17 +1924,8 @@ async function loadRadios() {
     const head = [[L('Chip', 'Čip'), esc(x.chip || '')], [L('Role', 'Role'), esc(role)], [L('State', 'Stav'), x.maintenance ? `<span class="bad-text">${esc(x.maintenance)}</span>` : ''],
       [L('Package', 'Balík'), x.package_id ? `<code>${esc(x.package_id)}</code>` : '']];
     /* radio A: the full C6 details (former System › Information card) */
-    const c = x.chip_info || {};
-    /* radio B: the same details as radio A, from its telemetry and the chip data read at its last flashing
-     * ('-': no tooltip, the MAC and Flash ones describe the P4) */
-    const rows = b ? [...head, [L('Running', 'Běží'), x.bundle ? `<span data-notr>${esc(t?.fw || x.bundle)}</span>${t?.ver ? ` <span class="muted">${esc(t.ver)}</span>` : ''}` : ''],
-      [L('Wiring', 'Zapojení'), esc(x.wiring || '')],
-      ['MAC', c.mac ? esc(c.mac) : `<span class="muted">${L('read at the next flashing', 'načte se při příštím flashování')}</span>`, '-'],
-      [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : t?.rev !== undefined ? rev(t.rev) : ''],
-      ['Flash', c.flash_size ? fmtBytes(c.flash_size) : '', '-'], [L('Flashes', 'Počet flashování'), c.flashes || ''],
-      [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : ''],
-      [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : ''],
-      [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : ''], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '']] : [...head, ...c6Rows(status, true)];
+    const rows = b ? [...head, [L('Wiring', 'Zapojení'), esc(x.wiring || '')], ...radioBRows(x.bundle, x.chip_info, t)]
+      : [...head, ...c6Rows(status, true)];
     return `<div class="card">${h3(b ? 'chip' : 'developer-board', b ? L('Radio B (external, JP1)', 'Rádio B (externí, JP1)') : L('Radio A (C6 of the board)', 'Rádio A (C6 na desce)'))}${dl([...rows,
       [L('Flashing', 'Flashování'), x.busy ? `${x.percent} % ${esc(x.stage)}` : ''], [L('Last error', 'Poslední chyba'), esc(x.error || '')]])}
       <div class="row" style="margin-top:8px">

@@ -296,6 +296,10 @@ static esp_err_t status_get(httpd_req_t *req)
         cJSON_AddBoolToObject(role_b, "wired", st->b_wired);
         cJSON_AddStringToObject(role_b, "chip", st->b_chip);
     }
+    char bundle_b[16] = "";
+    gw_config_get_str(gw_radio_keys(1)->bundle, bundle_b, sizeof(bundle_b));
+    cJSON_AddStringToObject(role_b, "bundle", bundle_b);
+    cJSON_AddItemToObject(role_b, "chip_info", gw_api_chip_json(1));
     cJSON *tel_b = gw_c6_telemetry(1);
     if (tel_b) {
         cJSON_AddItemToObject(role_b, "telemetry", tel_b);
