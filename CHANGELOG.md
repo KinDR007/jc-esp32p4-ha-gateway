@@ -11,6 +11,10 @@
 - Web UI: the (i) tooltips use the box of the header tags (title, text, table); the PSRAM tooltip
   lists the use by part (radio package buffer, sound model, audio buffers, log, other), from the
   new `heap.psram_heap` and `heap.psram_parts` of `/api/status`.
+- Web UI: the overview starts with a diagram LAN, main board ESP32-P4, radio A (internal C6) and
+  radio B (external, JP1) with the network each radio serves; the cards follow the hardware (main
+  board, LAN, radio A, radio B), each radio card says what it runs. Without radio B the card says
+  what it would add.
 - UI tests: `--token` (or `P4GW_TOKEN`) signs in with an API token, for users with 2FA.
 
 ## v1.9 (2026-11-02)
