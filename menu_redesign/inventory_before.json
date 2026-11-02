@@ -1,0 +1,1549 @@
+{
+ "nav": "Přehled\nRole\nThread\nZigbee\nZvuk\nHome Assistant\nSystém\nclaude správce\nRestartovat",
+ "pages": [
+  {
+   "route": "overview",
+   "actual": "overview",
+   "cards": [
+    {
+     "title": "ROLE",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "SÍŤ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ESP32-P4",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "RÁDIO A: ESP32-C6",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "RÁDIO B: ESP32-C5",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": [
+      "Systém › Rádia -> #system/radios"
+     ]
+    }
+   ]
+  },
+  {
+   "route": "role",
+   "actual": "role",
+   "cards": [
+    {
+     "title": "RÁDIO A: C6 NA DESCE",
+     "sub": [
+      "Thread",
+      "Thread border router",
+      "Thread router",
+      "Zigbee",
+      "Zigbee koordinátor",
+      "Zigbee router",
+      "ESPHome",
+      "ESPHome BLE proxy"
+     ],
+     "buttons": [
+      "Běží",
+      "Přepnout",
+      "Přepnout",
+      "Přepnout",
+      "Přepnout"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "RÁDIO B: EXTERNÍ ESP32-C5",
+     "sub": [
+      "Thread",
+      "Thread border router",
+      "Thread router",
+      "Zigbee",
+      "Zigbee koordinátor",
+      "Zigbee router",
+      "ESPHome",
+      "ESPHome BLE proxy"
+     ],
+     "buttons": [
+      "Přepnout",
+      "Přepnout",
+      "Přepnout",
+      "Běží",
+      "Přepnout",
+      "Vypnout rádio B"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "thread/info",
+   "actual": "thread/info",
+   "cards": [
+    {
+     "title": "THREAD",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "BORDER ROUTING",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "thread/topology",
+   "actual": "thread/topology",
+   "cards": [
+    {
+     "title": "MAPA SÍTĚ",
+     "sub": [],
+     "buttons": [
+      "Obnovit mapu"
+     ],
+     "fields": [],
+     "links": [
+      "změnit v Systém › Nastavení -> #system/settings"
+     ]
+    },
+    {
+     "title": "ZAŘÍZENÍ V SÍTI",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "SOUSEDÉ (9)",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ROUTERY (11)",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "thread/diag",
+   "actual": "thread/diag",
+   "cards": [
+    {
+     "title": "RÁDIOVÝ KOPROCESOR (RCP)",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ČÍTAČE MAC",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "OPENTHREAD CLI",
+     "sub": [],
+     "buttons": [
+      "state",
+      "dataset active",
+      "neighbor table",
+      "router table",
+      "child table",
+      "netdata show",
+      "srp server host",
+      "srp server service",
+      "br omrprefix",
+      "nat64 state",
+      "counters mac",
+      "rcp version",
+      "Spustit"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "thread/settings",
+   "actual": "thread/settings",
+   "cards": [
+    {
+     "title": "DATASET SÍTĚ",
+     "sub": [],
+     "buttons": [
+      "Zobrazit TLV a klíč",
+      "Kopírovat TLV",
+      "Použít dataset"
+     ],
+     "fields": [
+      "Použít dataset (hex TLV z Home Assistant, připojí se do té sítě)"
+     ],
+     "links": []
+    },
+    {
+     "title": "VYSÍLACÍ VÝKON",
+     "sub": [],
+     "buttons": [
+      "Nastavit"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "zigbee/info",
+   "actual": "zigbee/info",
+   "cards": [
+    {
+     "title": "ZIGBEE ROUTER",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ČLENSTVÍ V SÍTI",
+     "sub": [],
+     "buttons": [
+      "Připojit do sítě (steer)",
+      "Povolit připojení 180 s",
+      "Obnovit",
+      "Identifikovat",
+      "Opustit síť",
+      "Tovární reset"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "VYSÍLACÍ VÝKON",
+     "sub": [],
+     "buttons": [
+      "Nastavit"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "zigbee/diag",
+   "actual": "zigbee/diag",
+   "cards": [
+    {
+     "title": "ZIGBEE ROUTER",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "zigbee/backups",
+   "actual": "zigbee/backups",
+   "cards": [
+    {
+     "title": "ZÁLOHY ZIGBEE SÍTÍ",
+     "sub": [],
+     "buttons": [
+      "Stáhnout",
+      "Stáhnout",
+      "Stáhnout",
+      "Stáhnout",
+      "Zálohovat teď"
+     ],
+     "fields": [
+      "Automatická záloha"
+     ],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "zigbee/network",
+   "actual": "zigbee/network",
+   "cards": [
+    {
+     "title": "ZIGBEE2MQTT",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "POVOLIT PŘIPOJENÍ",
+     "sub": [],
+     "buttons": [
+      "Povolit připojení 254 s",
+      "Zavřít"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "MAPA SÍTĚ",
+     "sub": [],
+     "buttons": [
+      "Vyžádat novou mapu"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ZIGBEE ZAŘÍZENÍ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "sound/live",
+   "actual": "sound/live",
+   "cards": [
+    {
+     "title": "MIKROFON",
+     "sub": [],
+     "buttons": [
+      "Nahrát posledních 5 s"
+     ],
+     "fields": [
+      "Zesílení 30 dB"
+     ],
+     "links": []
+    },
+    {
+     "title": "HLUČNOST",
+     "sub": [],
+     "buttons": [
+      "Kalibrovat",
+      "Výchozí"
+     ],
+     "fields": [
+      "Hlukoměr ukazuje, dB(A)"
+     ],
+     "links": []
+    },
+    {
+     "title": "ROZPOZNÁVÁNÍ ZVUKŮ (YAMNET)",
+     "sub": [],
+     "buttons": [
+      "Nahrát model"
+     ],
+     "fields": [
+      "Spouštět jen nad -65 dBFS"
+     ],
+     "links": []
+    },
+    {
+     "title": "PRÁVĚ SLYŠÍM",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "sound/events",
+   "actual": "sound/events",
+   "cards": [
+    {
+     "title": "UDÁLOSTI POSÍLANÉ DO HOME ASSISTANT",
+     "sub": [],
+     "buttons": [
+      "Použít předvolbu",
+      "Přidat událost",
+      "Exportovat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat",
+      "Upravit",
+      "Automatizace HA",
+      "Smazat"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "sound/log",
+   "actual": "sound/log",
+   "cards": [
+    {
+     "title": "LOG DETEKCÍ",
+     "sub": [],
+     "buttons": [
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost",
+      "Ignorovat zvuk",
+      "Vytvořit událost"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "sound/classes",
+   "actual": "sound/classes",
+   "cards": [
+    {
+     "title": "VŠECHNY ZVUKY (521)",
+     "sub": [
+      "Lidské zvuky 67 vše žádné",
+      "Zvířata 65 vše žádné",
+      "Hudba 145 vše žádné",
+      "Přírodní zvuky 17 vše žádné",
+      "Zvuky věcí 166 vše žádné",
+      "Zvuky nejasného původu 40 vše žádné",
+      "Kanál, prostředí a pozadí 21 vše žádné"
+     ],
+     "buttons": [
+      "Uložit výběr",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné",
+      "vše",
+      "žádné"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "sound/learn",
+   "actual": "sound/learn",
+   "cards": [
+    {
+     "title": "NAHRÁVÁNÍ",
+     "sub": [],
+     "buttons": [
+      "Nahrát vzorek (4 s)",
+      "Nahrát pozadí (5 s)",
+      "Nahrát jako vzorek",
+      "Nahrát jako pozadí",
+      "Test nahrávky"
+     ],
+     "fields": [
+      "Název zvuku (ID)",
+      "Typ"
+     ],
+     "links": []
+    },
+    {
+     "title": "POZADÍ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "NAUČENÉ ZVUKY",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "ha/guide",
+   "actual": "ha/guide",
+   "cards": [
+    {
+     "title": "INTEGRACE P4 GATEWAY",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "THREAD BORDER ROUTER → HOME ASSISTANT",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "ha/mqtt",
+   "actual": "ha/mqtt",
+   "cards": [
+    {
+     "title": "MQTT (VOLITELNÉ)",
+     "sub": [
+      "Pokročilé"
+     ],
+     "buttons": [
+      "Uložit"
+     ],
+     "fields": [
+      "URI brokeru",
+      "Uživatel",
+      "Heslo (nastavené, prázdné = ponechat)",
+      "Certifikát serveru",
+      "Certifikát CA (PEM)"
+     ],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "ha/esphome",
+   "actual": "ha/esphome",
+   "cards": [
+    {
+     "title": "ESPHOME BLE PROXY NA RÁDIU",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "WI-FI RÁDIA ESPHOME",
+     "sub": [],
+     "buttons": [
+      "Uložit"
+     ],
+     "fields": [
+      "SSID",
+      "Heslo"
+     ],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/info",
+   "actual": "system/info",
+   "cards": [
+    {
+     "title": "SLOTY FIRMWARU",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "ESP32-P4",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "PAMĚŤ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "FIRMWARE",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "RÁDIO ESP32-C6",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/lan",
+   "actual": "system/lan",
+   "cards": [
+    {
+     "title": "NASTAVENÍ LAN",
+     "sub": [],
+     "buttons": [
+      "Použít"
+     ],
+     "fields": [
+      "Adresace",
+      "IPv4",
+      "Maska",
+      "Výchozí brána",
+      "DNS server",
+      "Záložní DNS server",
+      "Rychlost a duplex linky"
+     ],
+     "links": []
+    },
+    {
+     "title": "AKTUÁLNÍ STAV",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "PROVOZ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/radios",
+   "actual": "system/radios",
+   "cards": [
+    {
+     "title": "RÁDIO A (C6 NA DESCE)",
+     "sub": [],
+     "buttons": [
+      "Zapomenout síť Thread"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "RÁDIO B (EXTERNÍ, JP1)",
+     "sub": [],
+     "buttons": [
+      "Otestovat zapojení",
+      "Zapomenout síť Thread"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/firmware/online",
+   "actual": "system/firmware/online",
+   "cards": [
+    {
+     "title": "ONLINE AKTUALIZACE",
+     "sub": [
+      "Firmwary v balíku C6"
+     ],
+     "buttons": [
+      "Zkontrolovat",
+      "Instalovat",
+      "Instalovat"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "VYDÁNÍ PRO TUTO BRÁNU",
+     "sub": [
+      "v1.8.1\nnejnovější\n2026-10-31\nC6\n17f91938\nBrána\nC6",
+      "v1.7\n2026-10-30\nC6\n99d65c6e\nBrána\nC6",
+      "v1.6\n2026-10-30\nC6\n0cc0a7ad\nBrána\nC6"
+     ],
+     "buttons": [
+      "Brána",
+      "C6",
+      "Brána",
+      "C6",
+      "Brána",
+      "C6"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/firmware/manual",
+   "actual": "system/firmware/manual",
+   "cards": [
+    {
+     "title": "RUČNÍ AKTUALIZACE",
+     "sub": [
+      "Firmware brány",
+      "Balík firmwaru C6"
+     ],
+     "buttons": [
+      "Nahrát",
+      "Nahrát"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/firmware/settings",
+   "actual": "system/firmware/settings",
+   "cards": [
+    {
+     "title": "NASTAVENÍ AKTUALIZACÍ",
+     "sub": [],
+     "buttons": [
+      "Uložit",
+      "GitHub Releases"
+     ],
+     "fields": [
+      "Manifest URL"
+     ],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/diag",
+   "actual": "system/diag",
+   "cards": [
+    {
+     "title": "PING",
+     "sub": [],
+     "buttons": [
+      "Ping"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "DIAGNOSTIKA",
+     "sub": [],
+     "buttons": [
+      "Stav JSON",
+      "Thread JSON",
+      "Zigbee JSON",
+      "Stáhnout core dump",
+      "Smazat core dump",
+      "Log před posledním restartem"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "LOG",
+     "sub": [],
+     "buttons": [
+      "Pozastavit",
+      "Vymazat",
+      "Stáhnout"
+     ],
+     "fields": [],
+     "links": [
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "ESP_RADIO_SPINEL -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #",
+      "OPENTHREAD -> #"
+     ]
+    }
+   ]
+  },
+  {
+   "route": "system/netscan",
+   "actual": "system/netscan",
+   "cards": [
+    {
+     "title": "SKEN",
+     "sub": [],
+     "buttons": [
+      "Rychlý sken",
+      "Úplný sken s Wi-Fi"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "DOPORUČENÍ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "SPEKTRUM 2,4 GHZ",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "KANÁLY IEEE 802.15.4",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "SÍTĚ THREAD A ZIGBEE",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "SÍTĚ WI-FI",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/settings",
+   "actual": "system/settings",
+   "cards": [
+    {
+     "title": "HOME ASSISTANT A MATTER",
+     "sub": [],
+     "buttons": [
+      "Uložit",
+      "Vyzkoušet"
+     ],
+     "fields": [
+      "Matter Server (WebSocket)"
+     ],
+     "links": []
+    },
+    {
+     "title": "NASTAVENÍ",
+     "sub": [],
+     "buttons": [
+      "Uložit"
+     ],
+     "fields": [
+      "Název (projeví se po restartu)"
+     ],
+     "links": [
+      "Systém › Správa uživatelů -> #system/users/list"
+     ]
+    },
+    {
+     "title": "ZÁLOHA NASTAVENÍ",
+     "sub": [],
+     "buttons": [
+      "Exportovat"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/maint",
+   "actual": "system/maint",
+   "cards": [
+    {
+     "title": "ÚDRŽBA",
+     "sub": [],
+     "buttons": [
+      "Restartovat",
+      "Přeflashovat C6 teď",
+      "Záloha flash C6"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/notify",
+   "actual": "system/notify",
+   "cards": [
+    {
+     "title": "TELEGRAM BOT",
+     "sub": [],
+     "buttons": [
+      "Uložit"
+     ],
+     "fields": [
+      "Token bota",
+      "Časové pásmo (tiché hodiny)"
+     ],
+     "links": []
+    },
+    {
+     "title": "HOME ASSISTANT",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/users/list",
+   "actual": "system/users/list",
+   "cards": [
+    {
+     "title": "UŽIVATELÉ",
+     "sub": [],
+     "buttons": [
+      "Nový uživatel",
+      "Upravit",
+      "Upravit",
+      "Upravit",
+      "Upravit",
+      "Upravit"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/users/roles",
+   "actual": "system/users/roles",
+   "cards": [
+    {
+     "title": "ROLE A OPRÁVNĚNÍ",
+     "sub": [],
+     "buttons": [
+      "Uložit",
+      "Výchozí"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/users/tokens",
+   "actual": "system/users/tokens",
+   "cards": [
+    {
+     "title": "API TOKENY",
+     "sub": [],
+     "buttons": [
+      "Nový token",
+      "Zneplatnit",
+      "Zneplatnit"
+     ],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/users/requests",
+   "actual": "system/users/requests",
+   "cards": [
+    {
+     "title": "ŽÁDOSTI O RESET HESLA",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "system/users/policy",
+   "actual": "system/users/policy",
+   "cards": [
+    {
+     "title": "ZABEZPEČENÍ PŘIHLÁŠENÍ",
+     "sub": [],
+     "buttons": [
+      "Uložit"
+     ],
+     "fields": [
+      "Odhlášení po nečinnosti (hodiny)",
+      "„Zůstat přihlášen“ platí (dny, 0 = nenabízet)",
+      "Minimální délka hesla",
+      "Neúspěšná přihlášení do zamčení účtu",
+      "Doba zamčení (minuty)"
+     ],
+     "links": []
+    }
+   ]
+  },
+  {
+   "route": "profile",
+   "actual": "profile",
+   "cards": [
+    {
+     "title": "ÚČET",
+     "sub": [],
+     "buttons": [
+      "Změnit heslo",
+      "Odhlásit ostatní relace"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "DVOUFÁZOVÉ PŘIHLÁŠENÍ",
+     "sub": [],
+     "buttons": [
+      "Nastavit"
+     ],
+     "fields": [],
+     "links": []
+    },
+    {
+     "title": "TELEGRAM A NOTIFIKACE",
+     "sub": [],
+     "buttons": [],
+     "fields": [],
+     "links": []
+    }
+   ]
+  }
+ ]
+}
