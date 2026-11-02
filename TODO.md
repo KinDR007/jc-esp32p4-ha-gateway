@@ -90,9 +90,10 @@
 
 ## Wi-Fi uplink přes rádio ([docs/wifi-uplink.md](docs/wifi-uplink.md))
 - [x] W0 spike: host esp-hosted 3.0.10 přes UART se sestaví, +145 kB flash, +4,6 kB statické RAM
-- [ ] W1 firmware rádia `wifi_uplink` (ESP-Hosted 3.0.x, UART, jen Wi-Fi) pro C6 a C5, velikost vs. sloty
+- [x] W1 firmware rádia `wifi_uplink` (ESP-Hosted 3.0.10, UART, Wi-Fi STA+AP) pro C6 a C5, v balících s vlastním rozložením
 - [ ] W2 role na P4: host na pinech rádia, nastavení Wi-Fi, priorita tras, stav v /api/status
-- [ ] W3 role v UI (A i B, nejvýš jeden uplink), Telegram, přehled
+- [ ] W3 role v UI (výchozí Wi-Fi na rádiu A, prohození A/B), Telegram, přehled
+- [ ] W3b přístupový bod s captive portálem pro nastavení bez LAN
 - [ ] W4 záložní přepnutí LAN ↔ Wi-Fi s hysterezí, páteř Thread
 - [ ] W5 testovací matice (TC, UI, HA) a dokumentace
 

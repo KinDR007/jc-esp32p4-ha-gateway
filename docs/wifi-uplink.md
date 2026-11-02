@@ -4,7 +4,17 @@ Goal: a radio (internal C6 = radio A, external XIAO ESP32-C5 = radio B) gives th
 connection to the home network, for a place without Ethernet or as a fallback when the LAN link is
 down. A new radio role `wifi_uplink`, next to Thread, Zigbee and ESPHome.
 
-Status: analysis and spike (2026-11-02). Nothing of it is in the firmware yet.
+Status: W1 done (radio firmware built and packed), W2 next (2026-11-02).
+
+## Decisions (2026-11-02)
+
+- Without LAN and without a working Wi-Fi setting the radio opens an access point with a captive
+  portal: the setup page for the Wi-Fi of the gateway.
+- In Wi-Fi mode one radio carries the Wi-Fi, the other one takes a role. By default the internal
+  radio A is the Wi-Fi and radio B (external) is free for a role; the user can swap them.
+- Wi-Fi gets the same settings and statistics as the LAN: DHCP or static IPv4, traffic counters
+  and throughput per service.
+- Implementation order: radio B (C5) first, then radio A (same firmware, other pins).
 
 ## How
 
@@ -57,9 +67,10 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
 | Phase | Content | Done when |
 |---|---|---|
 | W0 spike | host build footprint (above) | done |
-| W1 co-processor | `wifi_uplink` bundle: ESP-Hosted 3.0.x slave, UART on the radio's UART pins (C6: GPIO16/17, C5: GPIO11/12, UART1 through the GPIO matrix, console off), Wi-Fi only, for C6 and C5; in the radio packages | both images built, sizes known, slots decided |
-| W2 host | `role_wifi` on the P4: ESP-Hosted host on the pins of the radio that has the role, Wi-Fi settings (SSID, password secret, band preference), station netif, route priority, status in `/api/status` (`wifi`: state, SSID, RSSI, channel, band, IP, link speed of the transport) | the gateway gets an IP over radio B, web UI reachable over Wi-Fi |
+| W1 co-processor | `wifi_uplink` bundle: ESP-Hosted 3.0.10 co-processor (example `wifi/apsta`, station and access point), UART1 on the radio's UART0 pads (C6 GPIO16/17, C5 GPIO11/12, console off), 921600 Bd, no Bluetooth, optimized for size; in both radio packages with its own whole-flash layout like ESPHome | done: C6 926 kB, C5 965 kB (too large for the 768 kB slots, so a switch to or from the uplink rewrites the slots layout, ~70 s); packed 550 kB, c6fw.bin 2.8 MB, c5fw.bin 2.9 MB of 4 MB; 7 of 8 package entries used |
+| W2 host | `role_wifi` on the P4 (`espressif/esp_hosted` 3.0.10, same version as the co-processor): ESP-Hosted host on the pins of the radio that has the role, Wi-Fi settings (SSID, password secret, band preference), station netif, route priority, status in `/api/status` (`wifi`: state, SSID, RSSI, channel, band, IP, link speed of the transport) | the gateway gets an IP over radio B, web UI reachable over Wi-Fi |
 | W3 roles | the role in Radios › Roles for A and B (at most one uplink), conflicts (radio A uplink → no Thread/Zigbee unless radio B runs it), Telegram `/role`, the overview diagram shows the uplink | every allowed combination switches |
+| W3b portal | access point on the uplink radio when no LAN and no working Wi-Fi: DHCP server and DNS redirect on the P4, the setup page (Wi-Fi networks from a scan, password, DHCP/static); WPA2 with a password shown in the UI and printed in the docs, or open for a limited time after start (decide in W3b) | a gateway without LAN is set up from a phone |
 | W4 fallback | backbone choice at start, failover with hysteresis (LAN down > 60 s → Wi-Fi; LAN back > 5 min → Ethernet at the next quiet moment or immediately when Thread BR is off), notifications | pulling the LAN cable keeps the gateway reachable |
 | W5 tests and docs | test matrix below in `tests/hw_test.py` (TC), `tests/ui/ui_test.mjs` (UI), HA integration over Wi-Fi; docs/hardware, installation, CHANGELOG | matrix green on the board |
 

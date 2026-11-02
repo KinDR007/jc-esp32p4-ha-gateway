@@ -14,6 +14,10 @@ grep -v '^#' deps.lock | while read -r name url commit _; do
         git -C "$dir" fetch -q origin "$commit" 2>/dev/null || git -C "$dir" fetch -q origin
         git -C "$dir" checkout -q "$commit"
     fi
+    # esp-hosted-mcu builds protobuf-c from a submodule
+    if [ -f "$dir/.gitmodules" ]; then
+        git -C "$dir" submodule update -q --init --recursive
+    fi
     if [ -n "$(git -C "$dir" status --porcelain)" ]; then
         echo "warning: $dir has local changes" >&2
     fi
