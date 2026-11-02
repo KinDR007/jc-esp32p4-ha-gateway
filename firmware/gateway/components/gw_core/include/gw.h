@@ -245,6 +245,8 @@ esp_err_t gw_update_install(const char *version);
 /* Downloads the C6 package of a listed release (NULL or "": the offered one) into PSRAM, checks it,
  * stores it and restarts (the C6 is updated at start). */
 esp_err_t gw_update_install_c6(const char *version);
+/* The C5 package of radio B (ESP_ERR_NOT_SUPPORTED when radio B is no C5). */
+esp_err_t gw_update_install_c5(const char *version);
 /* The c6fw partition changed (upload in the web UI): compare it with the offered package again. */
 void gw_update_c6_changed(void);
 /* Start-up: the C6 needs firmwares the gateway does not hold; downloads the package of the manifest

@@ -5,6 +5,9 @@
 - Fix: after the manifest URL was changed, the offer of the old URL stayed installable when the
   check of the new one failed. A changed URL now drops the old offer first; a failed check of the
   same URL still keeps it (server down).
+- Online update: the C5 package of radio B is listed like the C6 one (installed and offered
+  package, firmwares in it) and can be installed (`{"target": "c5"}`); a release row has a C5
+  button when `releases.json` names the package of the release (from the next release on).
 - UI tests: `--token` (or `P4GW_TOKEN`) signs in with an API token, for users with 2FA.
 
 ## v1.9 (2026-11-02)

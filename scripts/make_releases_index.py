@@ -3,7 +3,7 @@
 the flash layouts it runs on, newest first. Published with each release next to manifest.json; the
 gateway reads it from the same place and offers the releases that run on its layout (rollback).
 
-    {"releases": [{"version", "tag", "date", "manifest", "url", "layouts", "c6", "notes"}]}
+    {"releases": [{"version", "tag", "date", "manifest", "url", "layouts", "c6", "c5", "notes"}]}
 
 The release being published is taken from dist/manifest.json (not public yet).
 
@@ -46,6 +46,7 @@ def entry(tag: str, date: str, manifest_url: str, m: dict):
         "url": m.get("release_url", ""),
         "layouts": m["layouts"],
         "c6": m.get("c6fw", {}).get("sha256", "")[:8],
+        "c5": m.get("c5fw", {}).get("sha256", "")[:8],
         "notes": notes,  # the manifest keeps at most 1000 characters
     }
 

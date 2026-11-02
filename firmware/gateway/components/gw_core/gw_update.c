@@ -62,12 +62,16 @@ static struct {
         uint8_t notified[32]; /* sha256 of the package last announced */
         char installed_id[9]; /* first bytes of the sha256 of the package last flashed, "" when none */
     } c6;
-    /* C5 package (external radio B, docs/dual-radio.md): downloaded when radio B needs it */
+    /* C5 package (external radio B, docs/dual-radio.md): downloaded when radio B needs it or on
+     * request, flashed into radio B at the next start */
     struct {
         bool offered;
         char url[URL_MAX];
         uint8_t sha256[32];
         uint32_t size;
+        cJSON *bundles; /* {name: version} */
+        bool install_requested;
+        bool installing;
         int percent;
     } c5;
     char source[URL_MAX]; /* manifest URL the offer and the release list came from */
@@ -203,10 +207,13 @@ static void c5_offer(const char *manifest_url, const cJSON *c5)
     uint8_t sha[32];
     s_up.c5.offered = c5 && GW_JSON_STR(c5, "url") && unhex32(GW_JSON_STR(c5, "sha256"), sha) && cJSON_IsNumber(size) &&
                       size->valueint > 0 && cJSON_IsNumber(fmt) && fmt->valueint == C6FW_FORMAT_VERSION;
+    cJSON_Delete(s_up.c5.bundles);
+    s_up.c5.bundles = NULL;
     if (s_up.c5.offered) {
         resolve_url(manifest_url, GW_JSON_STR(c5, "url"), s_up.c5.url, sizeof(s_up.c5.url));
         memcpy(s_up.c5.sha256, sha, 32);
         s_up.c5.size = size->valueint;
+        s_up.c5.bundles = cJSON_Duplicate(cJSON_GetObjectItem(c5, "bundles"), true);
     }
 }
 
@@ -300,6 +307,7 @@ static esp_err_t check_manifest(const char *url, bool latest)
         /* nothing of a release that failed stays offered */
         s_up.latest[0] = s_up.build[0] = '\0';
         c6_offer(NULL, NULL, false);
+        c5_offer(NULL, NULL);
     }
     cJSON_Delete(m);
     free(body);
@@ -565,6 +573,24 @@ static esp_err_t install_c6(void)
     return err;
 }
 
+static esp_err_t install_c5(void)
+{
+    char url[URL_MAX];
+    uint8_t want[32];
+    uint32_t size;
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    strlcpy(url, s_up.c5.url, sizeof(url));
+    memcpy(want, s_up.c5.sha256, 32);
+    size = s_up.c5.size;
+    xSemaphoreGive(s_up.lock);
+    esp_err_t err = download_package(url, want, size, C6FW_CHIP_C5, &s_up.c5.percent);
+    if (err == ESP_OK) {
+        ESP_LOGW(TAG, "C5 package stored (%lu bytes), radio B is updated after the restart", (unsigned long)size);
+        gw_notify("system", GW_NOTIFY_INFO, "C5 radio firmware downloaded; the gateway restarts and updates radio B");
+    }
+    return err;
+}
+
 esp_err_t gw_update_fetch_c6(void)
 {
     /* the start-up sequence asks before the update task checked: check here */
@@ -623,7 +649,36 @@ static void update_task(void *arg)
     /* after start-up (network, clock, MQTT), or at once when someone asks for a check */
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(30 * 1000));
     while (true) {
-        if (s_up.c6.install_requested) {
+        if (s_up.c5.install_requested) {
+            s_up.c5.install_requested = false;
+            esp_err_t err = ESP_ERR_INVALID_STATE;
+            if (gw_upload_begin()) {
+                s_up.c5.installing = true;
+                s_up.c5.percent = 0;
+                s_up.error[0] = '\0';
+                err = s_up.want[0] ? select_release(s_up.want) : ESP_OK;
+                if (err == ESP_OK && !s_up.c5.offered) {
+                    set_error("%s", "no C5 package this gateway reads in the release");
+                    err = ESP_ERR_NOT_FOUND;
+                }
+                if (err == ESP_OK) {
+                    err = install_c5();
+                }
+                gw_upload_end();
+            } else {
+                set_error("%s", "another upload or C6 flash is running");
+            }
+            s_up.c5.installing = false;
+            s_up.c5.percent = err == ESP_OK ? 100 : 0;
+            if (err == ESP_OK) {
+                gw_restart_later_full(2000, false);
+                vTaskDelete(NULL);
+            }
+            if (s_up.want[0]) {
+                s_up.want[0] = '\0';
+                restore_offer();
+            }
+        } else if (s_up.c6.install_requested) {
             s_up.c6.install_requested = false;
             esp_err_t err = ESP_ERR_INVALID_STATE;
             if (gw_upload_begin()) {
@@ -705,11 +760,11 @@ static esp_err_t check_post(httpd_req_t *req)
     return gw_http_send_json(req, gw_update_status());
 }
 
-/* {"target": "c6"} installs the C6 package, else the gateway firmware; {"version": "v1.6"} of the
- * listed releases, else of the offered one */
+/* {"target": "c6"} installs the C6 package, "c5" the package of radio B, else the gateway firmware;
+ * {"version": "v1.6"} of the listed releases, else of the offered one */
 static esp_err_t install_post(httpd_req_t *req)
 {
-    bool c6 = false;
+    bool c6 = false, c5 = false;
     char version[32] = "";
     if (req->content_len) {
         cJSON *body = gw_http_read_json(req);
@@ -718,10 +773,14 @@ static esp_err_t install_post(httpd_req_t *req)
         }
         const char *target = GW_JSON_STR(body, "target");
         c6 = target && strcmp(target, "c6") == 0;
+        c5 = target && strcmp(target, "c5") == 0;
         strlcpy(version, GW_JSON_STR(body, "version") ? GW_JSON_STR(body, "version") : "", sizeof(version));
         cJSON_Delete(body);
     }
-    esp_err_t err = c6 ? gw_update_install_c6(version) : gw_update_install(version);
+    esp_err_t err = c5 ? gw_update_install_c5(version) : c6 ? gw_update_install_c6(version) : gw_update_install(version);
+    if (err == ESP_ERR_NOT_SUPPORTED) {
+        return gw_http_send_error(req, 409, "radio B is not an ESP32-C5");
+    }
     if (err == ESP_ERR_NOT_FOUND) {
         return gw_http_send_error(req, 409, version[0] ? "release not offered for this gateway" : "no update offered, check first");
     }
@@ -749,7 +808,8 @@ void gw_update_check_soon(void)
 
 static bool busy(void)
 {
-    return s_up.installing || s_up.c6.installing || s_up.install_requested || s_up.c6.install_requested;
+    return s_up.installing || s_up.c6.installing || s_up.c5.installing || s_up.install_requested ||
+           s_up.c6.install_requested || s_up.c5.install_requested;
 }
 
 /* version of the listed releases, NULL or "" = the offered one */
@@ -774,6 +834,20 @@ esp_err_t gw_update_install_c6(const char *version)
         return err;
     }
     s_up.c6.install_requested = true;
+    xTaskNotifyGive(s_up.task);
+    return ESP_OK;
+}
+
+esp_err_t gw_update_install_c5(const char *version)
+{
+    if (c6fw_radio_chip(C6_RADIO_B) != C6FW_CHIP_C5) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    esp_err_t err = request(version, s_up.c5.offered);
+    if (err != ESP_OK) {
+        return err;
+    }
+    s_up.c5.install_requested = true;
     xTaskNotifyGive(s_up.task);
     return ESP_OK;
 }
@@ -846,6 +920,10 @@ static cJSON *state_json(void)
         snprintf(c5_installed, sizeof(c5_installed), "%02x%02x%02x%02x", c5_have[0], c5_have[1], c5_have[2], c5_have[3]);
     }
     cJSON_AddStringToObject(c5, "installed_id", c5_installed);
+    cJSON_AddBoolToObject(c5, "available", s_up.c5.offered && c6fw_radio_chip(C6_RADIO_B) == C6FW_CHIP_C5 &&
+                                               strcmp(c5_installed, c5_offered) != 0);
+    cJSON_AddBoolToObject(c5, "in_progress", s_up.c5.installing);
+    cJSON_AddNumberToObject(c5, "percent", s_up.c5.percent);
     xSemaphoreGive(s_up.lock);
     return j;
 }
@@ -872,14 +950,20 @@ cJSON *gw_update_status(void)
     if (s_up.c6.bundles) {
         cJSON_AddItemToObject(c6, "offered_versions", cJSON_Duplicate(s_up.c6.bundles, true));
     }
-    cJSON *inst = cJSON_AddObjectToObject(c6, "installed_versions");
-    c6fw_dir_t dir;
-    if (c6fw_read_dir(C6_RADIO_A, &dir) == ESP_OK) {
-        for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
-            char name[17], version[33];
-            strlcpy(name, dir.entries[i].name, sizeof(name));
-            strlcpy(version, dir.entries[i].version, sizeof(version));
-            cJSON_AddStringToObject(inst, name, version);
+    cJSON *c5 = cJSON_GetObjectItem(j, "c5");
+    if (s_up.c5.bundles) {
+        cJSON_AddItemToObject(c5, "offered_versions", cJSON_Duplicate(s_up.c5.bundles, true));
+    }
+    for (int radio = C6_RADIO_A; radio <= C6_RADIO_B; radio++) {
+        cJSON *inst = cJSON_AddObjectToObject(radio == C6_RADIO_A ? c6 : c5, "installed_versions");
+        c6fw_dir_t dir;
+        if (c6fw_read_dir(radio, &dir) == ESP_OK) {
+            for (uint32_t i = 0; i < dir.count && i < C6FW_MAX_ENTRIES; i++) {
+                char name[17], version[33];
+                strlcpy(name, dir.entries[i].name, sizeof(name));
+                strlcpy(version, dir.entries[i].version, sizeof(version));
+                cJSON_AddStringToObject(inst, name, version);
+            }
         }
     }
     xSemaphoreGive(s_up.lock);

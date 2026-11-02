@@ -2408,13 +2408,16 @@ views['system/firmware/manual'] = () => {
 const GITHUB_MANIFEST = 'https://github.com/KinDR007/jc-esp32p4-ha-gateway/releases/latest/download/manifest.json';
 /* Installed and offered gateway firmware and C6 package of the configured manifest. */
 function updateCard() {
-  const u = status.update || {}, c6 = u.c6 || {}, busy = u.in_progress || c6.in_progress;
+  const u = status.update || {}, c6 = u.c6 || {}, c5 = u.c5 || {}, busy = u.in_progress || c6.in_progress || c5.in_progress;
   const bar = p => `<div class="progress" style="margin-top:4px"><div style="width:${p}%"></div></div>`;
-  const names = [...new Set([...Object.keys(c6.installed_versions || {}), ...Object.keys(c6.offered_versions || {})])];
-  const c6rows = names.map(n => {
-    const a = c6.installed_versions?.[n] || '–', b = c6.offered_versions?.[n];
+  const fwRows = pkg => [...new Set([...Object.keys(pkg.installed_versions || {}), ...Object.keys(pkg.offered_versions || {})])].map(n => {
+    const a = pkg.installed_versions?.[n] || '–', b = pkg.offered_versions?.[n];
     return `<tr><td>${esc(n)}</td><td>${esc(a)}</td><td class="${b && b !== a ? 'warn-text' : 'muted'}">${b ? esc(b) : ''}</td></tr>`;
   }).join('');
+  const fwTable = (pkg, title, open) => `<details style="margin-top:10px" ${open ? 'open' : ''}><summary>${title}</summary>
+      <div class="table-wrap"><table data-notr><thead><tr><th style="width:30%">${L('Firmware', 'Firmware')}</th><th style="width:35%">${L('Installed', 'Nainstalováno')}</th><th>${L('Offered', 'Nabízeno')}</th></tr></thead><tbody>${fwRows(pkg)}</tbody></table></div></details>`;
+  // radio B package: only for a gateway with an ESP32-C5 as radio B (docs/dual-radio.md)
+  const hasC5 = c5.offered && (c5.installed_id || c5.available);
   const state = !u.url ? `<p class="muted">${L('Off: no manifest URL', 'Vypnuto: není nastavená adresa manifestu')} (${L('set it in Update settings below', 'nastavte ji v Nastavení aktualizací níže')}).</p>`
     : u.error ? `<p>${pill('bad', L('error', 'chyba'))} ${esc(u.error)}</p>`
     : !u.checked ? `<p class="muted">${L('Not checked yet.', 'Zatím nezkontrolováno.')}</p>`
@@ -2429,9 +2432,13 @@ function updateCard() {
       <td>${c6.offered ? `<code>${esc(c6.offered_id)}</code> <span class="muted">${fmtBytes(c6.size)}</span>` : '–'}</td>
       <td>${!c6.offered ? `<span class="muted">${L('not offered', 'nenabízeno')}</span>` : c6.available ? pill('warn', L('new package', 'nový balík')) : upToDate}${c6.in_progress ? bar(c6.percent) : ''}</td>
       <td style="text-align:right"><button class="btn primary" id="upd-install-c6" ${c6.available && !busy ? '' : 'disabled'}>${ic('download')}${L('Install', 'Instalovat')}</button></td></tr>
+    ${hasC5 ? `<tr><td><span class="row" style="gap:6px">${ic('chip')}${L('C5 radio package (radio B)', 'Balík rádia C5 (rádio B)')}</span></td><td><code>${esc(c5.installed_id || '–')}</code></td>
+      <td><code>${esc(c5.offered_id)}</code> <span class="muted">${fmtBytes(c5.size)}</span></td>
+      <td>${c5.available ? pill('warn', L('new package', 'nový balík')) : upToDate}${c5.in_progress ? bar(c5.percent) : ''}</td>
+      <td style="text-align:right"><button class="btn primary" id="upd-install-c5" ${c5.available && !busy ? '' : 'disabled'}>${ic('download')}${L('Install', 'Instalovat')}</button></td></tr>` : ''}
     </tbody></table></div>
-    <details style="margin-top:10px" ${c6.available ? 'open' : ''}><summary>${L('Firmwares in the C6 package', 'Firmwary v balíku C6')}</summary>
-      <div class="table-wrap"><table data-notr><thead><tr><th style="width:30%">${L('Firmware', 'Firmware')}</th><th style="width:35%">${L('Installed', 'Nainstalováno')}</th><th>${L('Offered', 'Nabízeno')}</th></tr></thead><tbody>${c6rows}</tbody></table></div></details>
+    ${fwTable(c6, L('Firmwares in the C6 package', 'Firmwary v balíku C6'), c6.available)}
+    ${hasC5 ? fwTable(c5, L('Firmwares in the C5 package (radio B)', 'Firmwary v balíku C5 (rádio B)'), c5.available) : ''}
     ${u.release_summary && !(u.releases || []).length ? `<h4 style="margin:14px 0 6px">${L('Release notes', 'Poznámky k vydání')}</h4><div class="rel-body" data-notr>${mdLite(u.release_summary)}</div>` : ''}
     <p class="muted" style="margin-bottom:0">${L('Install the gateway first: a C6 package of a newer format is offered only to the gateway that reads it.', 'Nejdřív instalujte bránu: balík C6 novějšího formátu se nabídne až bráně, která ho umí přečíst.')}</p>` : '';
   return `<div class="card wide">${h3('cloud-download-outline', 'Online update')}<div class="row" style="margin-bottom:6px"><div id="upd-state" style="flex:1">${state}</div>
@@ -2469,18 +2476,21 @@ function mdLite(text) {
  * installing an older one is a rollback, the installed one can be written again (reflash). The
  * offered release is open while it is newer. */
 function releasesCard() {
-  const u = status.update || {}, rel = u.releases || [], c6 = u.c6 || {}, busy = u.in_progress || c6.in_progress;
+  const u = status.update || {}, rel = u.releases || [], c6 = u.c6 || {}, c5 = u.c5 || {}, busy = u.in_progress || c6.in_progress || c5.in_progress;
   if (!u.url || !rel.length) return '';
+  const radioB = c5.offered && (c5.installed_id || c5.available);
   const items = rel.map(r => {
     const installed = r.version === u.installed_version, offered = r.version === u.latest_version;
-    const c6here = r.c6 && r.c6 === c6.installed_id;
+    const c6here = r.c6 && r.c6 === c6.installed_id, c5here = r.c5 && r.c5 === c5.installed_id;
     const notes = offered && u.release_summary ? u.release_summary : r.notes;
     return `<details class="rel" ${offered && u.available ? 'open' : ''}><summary>
       <span class="rel-ver"><b>${esc(r.version)}</b>${installed ? pill('ok', L('installed', 'nainstalováno')) : offered && u.available ? pill('warn', L('newest', 'nejnovější')) : ''}</span>
       <span class="muted">${esc(r.date || '')}</span>
-      <span class="rel-ver">${r.c6 ? `<span class="muted">C6</span> <code>${esc(r.c6)}</code>${c6here ? pill('ok', L('installed', 'nainstalováno')) : ''}` : ''}</span>
+      <span class="rel-ver">${r.c6 ? `<span class="muted">C6</span> <code>${esc(r.c6)}</code>${c6here ? pill('ok', L('installed', 'nainstalováno')) : ''}` : ''}
+        ${radioB && r.c5 ? `<span class="muted">C5</span> <code>${esc(r.c5)}</code>${c5here ? pill('ok', L('installed', 'nainstalováno')) : ''}` : ''}</span>
       <span class="rel-btns"><button class="btn" data-rel-gw="${esc(r.version)}" ${busy ? 'disabled' : ''}>${installed ? `${ic('refresh')}${L('Reflash', 'Přeflashovat')}` : `${ic('download')}${L('Gateway', 'Brána')}`}</button>
-      <button class="btn" data-rel-c6="${esc(r.version)}" ${busy || !r.c6 || c6here ? 'disabled' : ''}>${ic('chip')}C6</button></span></summary>
+      <button class="btn" data-rel-c6="${esc(r.version)}" ${busy || !r.c6 || c6here ? 'disabled' : ''}>${ic('chip')}C6</button>
+      ${radioB ? `<button class="btn" data-rel-c5="${esc(r.version)}" ${busy || !r.c5 || c5here ? 'disabled' : ''}>${ic('chip')}C5</button>` : ''}</span></summary>
       <div class="rel-body" data-notr>${notes ? mdLite(notes) : `<p class="muted">${L('No release notes.', 'Bez poznámek k vydání.')}</p>`}
         ${offered && u.build ? `<p class="muted">${L('Build', 'Sestavení')}: ${esc(u.build)}</p>` : ''}
         ${r.url ? `<p><a href="${esc(r.url)}" target="_blank" rel="noopener">${L('Release on GitHub', 'Vydání na GitHubu')}</a></p>` : ''}</div></details>`;
@@ -2488,19 +2498,20 @@ function releasesCard() {
   return `<div class="card wide">${h3('backup-restore', L('Releases for this gateway', 'Vydání pro tuto bránu'))}<p class="muted" style="margin-top:0">${L('Older releases that run on this board can be installed again (rollback); the installed one can be written again.', 'Starší vydání, která na této desce běží, jde znovu nainstalovat (návrat zpět); nainstalované jde zapsat znovu.')}${tip('Releases')}</p><div>${items}</div></div>`;
 }
 
-async function installC6(version) {
-  const c6 = status.update.c6;
-  if (!await confirmDialog(L('Install the C6 package?', 'Instalovat balík C6?'), L(`The gateway downloads the package${version ? ' of ' + version : ` (${fmtBytes(c6.size)})`} into RAM, checks it, stores it and restarts; then it writes the new firmware into the C6 radio (about 2 minutes). Thread or Zigbee is down meanwhile.`,
-    `Brána stáhne balík${version ? ' z vydání ' + version : ` (${fmtBytes(c6.size)})`} do RAM, ověří ho, uloží a restartuje se; pak zapíše nový firmware do rádia C6 (asi 2 minuty). Thread nebo Zigbee mezitím neběží.`))) return;
-  await api('/api/update/install', { json: version ? { target: 'c6', version } : { target: 'c6' } });
+/* target c6: radio A, c5: radio B */
+async function installC6(version, target = 'c6') {
+  const pkg = status.update[target], chip = target.toUpperCase();
+  if (!await confirmDialog(L(`Install the ${chip} package?`, `Instalovat balík ${chip}?`), L(`The gateway downloads the package${version ? ' of ' + version : ` (${fmtBytes(pkg.size)})`} into RAM, checks it, stores it and restarts; then it writes the new firmware into the ${chip} radio (about 2 minutes). Its network is down meanwhile.`,
+    `Brána stáhne balík${version ? ' z vydání ' + version : ` (${fmtBytes(pkg.size)})`} do RAM, ověří ho, uloží a restartuje se; pak zapíše nový firmware do rádia ${chip} (asi 2 minuty). Jeho síť mezitím neběží.`))) return;
+  await api('/api/update/install', { json: version ? { target, version } : { target } });
   for (let i = 0; i < 300; i++) {
     await new Promise(r => setTimeout(r, 1000));
     let s;
     try { s = (await api('/api/status', { timeout: 1500 })).update; } catch (e) { break; /* restarting */ }
     status.update = s;
     if (route().startsWith('system/firmware')) render(true);
-    if (!s.c6.in_progress && s.error) { toast('Error: ' + s.error); return; }
-    if (!s.c6.in_progress && s.c6.percent === 100) break;
+    if (!s[target].in_progress && s.error) { toast('Error: ' + s.error); return; }
+    if (!s[target].in_progress && s[target].percent === 100) break;
   }
   waitForRestart();
 }
@@ -4195,12 +4206,17 @@ document.addEventListener('click', async e => {
       await installUpdate();
     } else if (t.id === 'upd-install-c6') {
       await installC6();
+    } else if (t.id === 'upd-install-c5') {
+      await installC6(undefined, 'c5');
     } else if (t.dataset.relGw) {
       e.preventDefault(); // the button sits in the summary of an expandable row
       await installUpdate(t.dataset.relGw);
     } else if (t.dataset.relC6) {
       e.preventDefault();
       await installC6(t.dataset.relC6);
+    } else if (t.dataset.relC5) {
+      e.preventDefault();
+      await installC6(t.dataset.relC5, 'c5');
     } else if (t.id === 'upd-github') {
       $('#upd-url').value = GITHUB_MANIFEST;
       toast(L('Save to use it. The repository must be public for the gateway to download releases.', 'Uložte pro použití. Repozitář musí být veřejný, aby brána mohla vydání stahovat.'));
