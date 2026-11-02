@@ -87,3 +87,12 @@
 - [x] Nové balíky c6fw/c5fw (skener 1.1.0) ve vydání v1.9
 - [ ] Zálohu flash rádia B přes UI vyzkoušet naostro (rádio B bez role, 8 MB)
 - [ ] Sledovat: `/api/status` jednou vrátil neplatný řídicí znak v JSON (kolem 1 min po startu při nahrávání balíku C5), nereprodukováno
+
+## Wi-Fi uplink přes rádio ([docs/wifi-uplink.md](docs/wifi-uplink.md))
+- [x] W0 spike: host esp-hosted 3.0.10 přes UART se sestaví, +145 kB flash, +4,6 kB statické RAM
+- [ ] W1 firmware rádia `wifi_uplink` (ESP-Hosted 3.0.x, UART, jen Wi-Fi) pro C6 a C5, velikost vs. sloty
+- [ ] W2 role na P4: host na pinech rádia, nastavení Wi-Fi, priorita tras, stav v /api/status
+- [ ] W3 role v UI (A i B, nejvýš jeden uplink), Telegram, přehled
+- [ ] W4 záložní přepnutí LAN ↔ Wi-Fi s hysterezí, páteř Thread
+- [ ] W5 testovací matice (TC, UI, HA) a dokumentace
+
