@@ -288,7 +288,7 @@ def tc08_thread_router():
 
 def tc09_esphome_radio():
     """ESPHome Bluetooth proxy as the role of a radio (radio B when present, else A): the ESPHome bundle is
-    flashed, the device answers over Improv; with Wi-Fi set (Home Assistant > ESPHome) it joins and
+    flashed, the device answers over Improv; with Wi-Fi set (ESPHome page) it joins and
     reports its URL. The radio's role comes back afterwards."""
     b = (http('GET', '/api/radios')[1] or [{}, {}])[1]
     radio = 'b' if b.get('wired') else 'a'

@@ -102,7 +102,10 @@ custom_components/p4gw Home Assistant integration (HACS), tests in tests/ha_inte
 ## Web UI and API
 
 Port 80, single page embedded in the firmware with a left menu (sections and sub pages, deep links
-`#section/page`), in Czech or English with a light, dark or system
+`#section/page`): Overview, Radios (roles, status and maintenance, radio surroundings), Thread,
+Zigbee, ESPHome, Sound, Home Assistant (integration, MQTT, Matter) and System (information, LAN,
+firmware, maintenance and backup, diagnostics, notifications, users); why it is arranged this way:
+[menu_redesign/](menu_redesign/README.md), in Czech or English with a light, dark or system
 theme (switches in the header, remembered by the browser). Sign-in once an account exists (users, roles, 2FA and API tokens: [docs/users.md](docs/users.md)). Main endpoints: `/api/status`, `/api/role`, `/api/logs`, `/api/logs/previous` (each line starts with unix ms or `+<ms since boot>`), `/api/ota/{gateway,c6fw}`, `/api/radios` (and `/api/radios/b/{probe,flash,console}`, `/api/radios/thread/forget`), `/api/esphome/wifi`,
 `/api/c6/{backup,reflash,zigbee-snapshot}` (GET download, POST back up now), `/api/thread/{status,dataset,cli}`,
 `/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/net/{lan,lan/confirm,traffic}`, `/api/reboot` (`{"full": true}` resets the C6 too), `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/update/{check,install}`, `/api/tools/ping`, `/api/coredump`, `/api/ws` (WebSocket push for the Home Assistant integration).

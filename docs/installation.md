@@ -71,8 +71,8 @@ factory image. To replace the model on a running board: turn sound off, restart,
 2. Wire the JP1 jumpers ([hardware.md](hardware.md)).
 3. `scripts/flash_p4.sh /dev/cu.wchusbserial*` (resets NVS).
 4. Open `http://p4gw-xxxxxx.local/`. The gateway is in maintenance mode.
-5. **System → Back up C6 flash** (about 3.5 min) and keep the file.
-6. **System → Settings**: password. **Role**: choose the role.
+5. **Radios › Status and maintenance › Back up C6 flash** (about 3.5 min) and keep the file.
+6. **System › User management**: an admin account. **Radios › Roles**: choose the role of each radio.
 
 The gateway never overwrites a C6 it has not flashed itself until a backup is done or skipped
 explicitly.
@@ -146,7 +146,7 @@ Run the build locally the same way:
 
 ## Role switching
 
-Web UI (Role, both radios), Home Assistant (*Role* and *Radio B role* selects), MQTT
+Web UI (Radios › Roles, both radios), Home Assistant (*Role* and *Radio B role* selects), MQTT
 (`p4gw/<host>/role/set`, radio A), Telegram (`/role <role>`, `/role b <role>`), API
 `POST /api/role {"role": ..., "radio": "a" | "b"}` (radio B also `none`). At most one Thread network,
 one Zigbee network and one ESPHome proxy. Typical times measured on the board: a slot switch 13–20 s,
@@ -176,7 +176,7 @@ them.
 | Bad gateway image | automatic rollback; otherwise `scripts/flash_p4.sh` |
 | Repeated crashes | after several crashes in a row the role is not started, UI stays reachable; download the core dump |
 | Repeated crashes, cause unknown | **System → Diagnostics → Log before the last restart** (last 16 KiB of the previous run, gone after a power cut) |
-| New board, erased NVS | **System → Settings → Settings backup**: export (with passwords if wanted) beforehand, import on the new board. Zigbee network data is not part of it: it lives on the C6 and in the old board's `c6data` (downloadable under Zigbee › Network backups, not restorable on another board yet) |
+| New board, erased NVS | **System › Maintenance and backup › Settings backup**: export (with passwords if wanted) beforehand, import on the new board. Zigbee network data is not part of it: it lives on the C6 and in the old board's `c6data` (downloadable under Zigbee › Network backups, not restorable on another board yet) |
 | Restore factory C6 | write the full C6 backup with esptool over a USB-UART on JP1 20/22, IO9 (pin 24) to GND; the factory app can also be extracted from the P4 factory backup (embedded `network_adapter` image at 0x5f0000 of the tested board) |
 | Static LAN address that does not work | not confirmed: it reverts after 120 s by itself; confirmed: the gateway is still reachable over IPv6 as `<host>.local`, or import a settings backup without the `lan` key |
 | Restore factory P4 | `esptool --chip esp32p4 write-flash 0 backups/p4_backup.bin` |

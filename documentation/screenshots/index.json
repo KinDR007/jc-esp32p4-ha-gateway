@@ -24,19 +24,6 @@
    }
   ]
  },
- "role": {
-  "page": "role",
-  "cards": [
-   {
-    "title": "RADIO A: C6 OF THE BOARD",
-    "file": "role__1"
-   },
-   {
-    "title": "RADIO B: EXTERNAL ESP32-C5",
-    "file": "role__2"
-   }
-  ]
- },
  "thread/info": {
   "page": "thread_info",
   "cards": [
@@ -209,19 +196,6 @@
    }
   ]
  },
- "ha/esphome": {
-  "page": "ha_esphome",
-  "cards": [
-   {
-    "title": "ESPHOME BLE PROXY ON A RADIO",
-    "file": "ha_esphome__1"
-   },
-   {
-    "title": "WI-FI OF THE ESPHOME RADIO",
-    "file": "ha_esphome__2"
-   }
-  ]
- },
  "system/info": {
   "page": "system_info",
   "cards": [
@@ -240,10 +214,6 @@
    {
     "title": "FIRMWARE",
     "file": "system_info__4"
-   },
-   {
-    "title": "ESP32-C6 RADIO",
-    "file": "system_info__5"
    }
   ]
  },
@@ -259,8 +229,12 @@
     "file": "system_lan__2"
    },
    {
-    "title": "TRAFFIC",
+    "title": "DEVICE NAME",
     "file": "system_lan__3"
+   },
+   {
+    "title": "TRAFFIC",
+    "file": "system_lan__4"
    }
   ]
  },
@@ -281,58 +255,16 @@
    }
   ]
  },
- "system/netscan": {
-  "page": "system_netscan",
-  "cards": [
-   {
-    "title": "SCAN",
-    "file": "system_netscan__1"
-   },
-   {
-    "title": "RECOMMENDATION",
-    "file": "system_netscan__2"
-   },
-   {
-    "title": "2.4 GHZ SPECTRUM",
-    "file": "system_netscan__3"
-   },
-   {
-    "title": "IEEE 802.15.4 CHANNELS",
-    "file": "system_netscan__4"
-   },
-   {
-    "title": "THREAD AND ZIGBEE NETWORKS",
-    "file": "system_netscan__5"
-   },
-   {
-    "title": "WI-FI NETWORKS",
-    "file": "system_netscan__6"
-   }
-  ]
- },
- "system/settings": {
-  "page": "system_settings",
-  "cards": [
-   {
-    "title": "HOME ASSISTANT AND MATTER",
-    "file": "system_settings__1"
-   },
-   {
-    "title": "SETTINGS",
-    "file": "system_settings__2"
-   },
-   {
-    "title": "SETTINGS BACKUP",
-    "file": "system_settings__3"
-   }
-  ]
- },
  "system/maint": {
   "page": "system_maint",
   "cards": [
    {
     "title": "MAINTENANCE",
     "file": "system_maint__1"
+   },
+   {
+    "title": "SETTINGS BACKUP",
+    "file": "system_maint__2"
    }
   ]
  },
@@ -432,15 +364,6 @@
    }
   ]
  },
- "role__zigbee": {
-  "page": "role__zigbee",
-  "cards": [
-   {
-    "title": "SELECT ROLE",
-    "file": "role__zigbee__1"
-   }
-  ]
- },
  "zigbee/info__zigbee": {
   "page": "zigbee_info__zigbee",
   "cards": [
@@ -460,15 +383,6 @@
    {
     "title": "C6 LINK",
     "file": "zigbee_diag__zigbee__2"
-   }
-  ]
- },
- "zigbee/backups__zigbee": {
-  "page": "zigbee_backups__zigbee",
-  "cards": [
-   {
-    "title": "ZIGBEE NETWORK BACKUPS",
-    "file": "zigbee_backups__zigbee__1"
    }
   ]
  },
@@ -563,6 +477,10 @@
    {
     "title": "RELEASES FOR THIS GATEWAY",
     "file": "system_firmware_online__2"
+   },
+   {
+    "title": "UPDATE SETTINGS",
+    "file": "system_firmware_online__3"
    }
   ]
  },
@@ -575,25 +493,89 @@
    }
   ]
  },
- "system/firmware/settings": {
-  "page": "system_firmware_settings",
+ "radios/roles": {
+  "page": "radios_roles",
   "cards": [
    {
-    "title": "UPDATE SETTINGS",
-    "file": "system_firmware_settings__1"
+    "title": "RADIO A: C6 OF THE BOARD",
+    "file": "radios_roles__1"
+   },
+   {
+    "title": "RADIO B: EXTERNAL ESP32-C5",
+    "file": "radios_roles__2"
    }
   ]
  },
- "system/radios": {
-  "page": "system_radios",
+ "radios/status": {
+  "page": "radios_status",
   "cards": [
    {
     "title": "RADIO A (C6 OF THE BOARD)",
-    "file": "system_radios__1"
+    "file": "radios_status__1"
    },
    {
     "title": "RADIO B (EXTERNAL, JP1)",
-    "file": "system_radios__2"
+    "file": "radios_status__2"
+   }
+  ]
+ },
+ "radios/scan": {
+  "page": "radios_scan",
+  "cards": [
+   {
+    "title": "SCAN",
+    "file": "radios_scan__1"
+   },
+   {
+    "title": "RECOMMENDATION",
+    "file": "radios_scan__2"
+   },
+   {
+    "title": "2.4 GHZ SPECTRUM",
+    "file": "radios_scan__3"
+   },
+   {
+    "title": "IEEE 802.15.4 CHANNELS",
+    "file": "radios_scan__4"
+   },
+   {
+    "title": "THREAD AND ZIGBEE NETWORKS",
+    "file": "radios_scan__5"
+   },
+   {
+    "title": "WI-FI NETWORKS",
+    "file": "radios_scan__6"
+   }
+  ]
+ },
+ "zigbee/backups": {
+  "page": "zigbee_backups",
+  "cards": [
+   {
+    "title": "ZIGBEE NETWORK BACKUPS",
+    "file": "zigbee_backups__1"
+   }
+  ]
+ },
+ "esphome": {
+  "page": "esphome",
+  "cards": [
+   {
+    "title": "ESPHOME BLE PROXY ON A RADIO",
+    "file": "esphome__1"
+   },
+   {
+    "title": "WI-FI OF THE ESPHOME RADIO",
+    "file": "esphome__2"
+   }
+  ]
+ },
+ "ha/matter": {
+  "page": "ha_matter",
+  "cards": [
+   {
+    "title": "HOME ASSISTANT AND MATTER",
+    "file": "ha_matter__1"
    }
   ]
  }

@@ -134,7 +134,7 @@ INSTALL = T(
     <li>Wire the three JP1 jumpers (above).</li>
     <li>Flash the gateway: <code>scripts/flash_p4.sh /dev/cu.wchusbserial*</code> (the firmware comes from <code>scripts/build_all.sh</code> into <code>dist/</code>).</li>
     <li>Open <code>http://p4gw-xxxxxx.local/</code> (the name ends with the last digits of the MAC). The gateway starts in maintenance mode.</li>
-    <li><b>System › Maintenance › Back up C6 flash</b> (about 3.5 min) and keep the file: it is the only copy of the factory C6 firmware.</li>
+    <li><b>Radios › Status and maintenance › Back up C6 flash</b> (about 3.5 min) and keep the file: it is the only copy of the factory C6 firmware.</li>
     <li><b>System › User management › Users › New user</b>: the first account is the admin. From then on the gateway asks for sign-in.</li>
     <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol>
     <p class="note"><b>Flash layout v3</b> (from v1.6): the P4 keeps only the small C6 bundles; the large C6 firmwares come from the release package, which the gateway downloads when the C6 needs them (or an upload of <code>c6fw.bin</code>). Boards with the older layout move once over USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (settings, Thread network, users and recordings stay).</p>""",
@@ -143,7 +143,7 @@ INSTALL = T(
     <li>Zapojte tři propojky JP1 (viz výše).</li>
     <li>Nahrajte bránu: <code>scripts/flash_p4.sh /dev/cu.wchusbserial*</code> (firmware vytvoří <code>scripts/build_all.sh</code> do <code>dist/</code>).</li>
     <li>Otevřete <code>http://p4gw-xxxxxx.local/</code> (název končí posledními číslicemi MAC). Brána naběhne v režimu údržby.</li>
-    <li><b>Systém › Údržba › Zálohovat flash C6</b> (asi 3,5 min) a soubor si uschovejte: je to jediná kopie továrního firmwaru C6.</li>
+    <li><b>Rádia › Stav a údržba › Záloha flash C6</b> (asi 3,5 min) a soubor si uschovejte: je to jediná kopie továrního firmwaru C6.</li>
     <li><b>Systém › Správa uživatelů › Uživatelé › Nový uživatel</b>: první účet je správce. Od té chvíle brána vyžaduje přihlášení.</li>
     <li><b>Role</b>: zvolte roli. Role Zigbee nahrají firmware do C6 (asi 25 s), role Thread trvají asi 15 s.</li></ol>
     <p class="note"><b>Rozložení flash v3</b> (od v1.6): P4 drží jen malé balíky C6; velké firmwary C6 pocházejí z balíku vydání, který brána stáhne, když je C6 potřebuje (nebo nahrání <code>c6fw.bin</code>). Desky se starším rozložením se jednorázově převedou přes USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (nastavení, síť Thread, uživatelé i nahrávky zůstanou).</p>""")
@@ -153,7 +153,7 @@ UI_BASICS = T(
     details. From the left: LAN, the active role, its client (Zigbee2MQTT or Home Assistant over the OTBR REST API), the
     P4 Gateway integration (HA), MQTT and internet; on the right the uptime of the gateway with the Zigbee2MQTT session or
     the C6 uptime, and the gateway clock.</p>
-    <p><b>Menu</b> on the left: sections and their pages; pages of a role that is not active are greyed out. At the bottom:
+    <p><b>Menu</b> on the left: sections and their pages; Thread, Zigbee and ESPHome are greyed out while no radio runs their network, and pages that need it do not open. At the bottom:
     language (flags), theme (system, light, dark), the signed-in user (My account, sign-out) and <b>Restart</b>, which
     after a confirmation resets the C6 radio and right after it the P4.</p>
     <p>A page the account may only read shows a note and its buttons that change something are disabled. Hidden pages are
@@ -162,7 +162,7 @@ UI_BASICS = T(
     zobrazí podrobnosti. Zleva: LAN, aktivní role, její klient (Zigbee2MQTT nebo Home Assistant přes OTBR REST API),
     integrace P4 Gateway (HA), MQTT a internet; vpravo doba běhu brány s relací Zigbee2MQTT nebo dobou běhu C6 a hodiny
     brány.</p>
-    <p><b>Menu</b> vlevo: sekce a jejich stránky; stránky neaktivní role jsou šedé. Dole: jazyk (vlajky), vzhled (podle
+    <p><b>Menu</b> vlevo: sekce a jejich stránky; Thread, Zigbee a ESPHome jsou šedé, dokud jejich síť neprovozuje žádné rádio, a stránky, které bez ní nefungují, nejdou otevřít. Dole: jazyk (vlajky), vzhled (podle
     systému, světlý, tmavý), přihlášený uživatel (Můj účet, odhlášení) a <b>Restartovat</b>, které po potvrzení
     restartuje rádio C6 a hned po něm P4.</p>
     <p>Stránka, kterou účet smí jen číst, má upozornění a tlačítka, která něco mění, jsou vypnutá. Skryté stránky v menu
@@ -176,9 +176,9 @@ PAGES = [
       "NETWORK": T("Ethernet link, IPv4 and IPv6 addresses, hostname.", "Linka Ethernet, adresy IPv4 a IPv6, název zařízení."),
       "ESP32-P4": T("Firmware version, uptime, temperature, memory and CPU load.", "Verze firmwaru, doba běhu, teplota, paměť a zatížení CPU."),
       "RADIO A: ESP32-C6": T("Firmware of the radio, its temperature and uptime (telemetry of the role firmware).", "Firmware rádia, jeho teplota a doba běhu (telemetrie firmwaru role)."),
-      "RADIO B: ESP32-C5": T("With a radio B on JP1: its role, state, firmware and temperature; details under System › Radios.", "S rádiem B na JP1: jeho role, stav, firmware a teplota; podrobnosti v Systém › Rádia.")},
+      "RADIO B: ESP32-C5": T("With a radio B on JP1: its role, state, firmware and temperature; details under Radios › Status and maintenance.", "S rádiem B na JP1: jeho role, stav, firmware a teplota; podrobnosti v Rádia › Stav a údržba.")},
      None, ["overview"]),
-    ("role", "swap-horizontal", T("Role", "Role"),
+    ("radios/roles", "swap-horizontal", T("Radios › Roles", "Rádia › Role"),
      T("Choose what each radio does: radio A is the C6 of the board, radio B the optional XIAO ESP32-C5 on JP1. At most one Thread network, one Zigbee network and one ESPHome proxy; switching restarts the gateway, each radio keeps its own networks.",
        "Volba, co dělá které rádio: rádio A je C6 na desce, rádio B volitelné XIAO ESP32-C5 na JP1. Nejvýš jedna síť Thread, jedna Zigbee a jedna ESPHome proxy; přepnutí restartuje bránu, každé rádio si drží své sítě."),
      {"RADIO A: C6 OF THE BOARD": T("One card per role. A role the other radio already runs is disabled with the reason.",
@@ -186,12 +186,30 @@ PAGES = [
       "RADIO B: EXTERNAL ESP32-C5": T("The same for radio B, plus <b>Switch radio B off</b>. Shown when radio B answered the wiring test.",
                                       "Totéž pro rádio B a navíc <b>Vypnout rádio B</b>. Zobrazí se, když rádio B prošlo testem zapojení.")},
      T("""<ol><li>Pick the role of a radio and press <b>Switch</b>.</li><li>The gateway restarts; a dialog shows the progress (a radio is flashed when its role needs other firmware).</li>
-       <li>Set up Home Assistant as shown under Home Assistant › Guide.</li></ol>
+       <li>Set up the network on its page (Thread, Zigbee, ESPHome) and Home Assistant as shown under Home Assistant › Integration.</li></ol>
        <p>Also possible: the <i>Role</i> and <i>Radio B role</i> selects of the P4 Gateway integration, Telegram <code>/role zigbee_coordinator</code> or <code>/role b thread_br</code>, MQTT <code>p4gw/&lt;host&gt;/role/set</code> (radio A).</p>""",
        """<ol><li>Zvolte roli rádia a stiskněte <b>Přepnout</b>.</li><li>Brána se restartuje; dialog ukazuje průběh (rádio se nahraje, když role potřebuje jiný firmware).</li>
-       <li>Home Assistant nastavte podle Home Assistant › Návod.</li></ol>
+       <li>Síť nastavte na její stránce (Thread, Zigbee, ESPHome) a Home Assistant podle Home Assistant › Integrace.</li></ol>
        <p>Jinak také: výběry <i>Role</i> a <i>Role rádia B</i> v integraci P4 Gateway, Telegram <code>/role zigbee_coordinator</code> nebo <code>/role b thread_br</code>, MQTT <code>p4gw/&lt;host&gt;/role/set</code> (rádio A).</p>"""),
-     ["role"]),
+     ["radios_roles"]),
+    ("radios/status", "developer-board", T("Radios › Status and maintenance", "Rádia › Stav a údržba"),
+     T("Both radios: radio A (the C6 of the board) and radio B (the external radio on JP1, docs/dual-radio.md).",
+       "Obě rádia: rádio A (C6 na desce) a rádio B (externí rádio na JP1, docs/dual-radio.md)."),
+     {"RADIO A (C6 OF THE BOARD)": T("Chip, role, package and the C6 details (MAC, revision, flash, temperature, memory, firmwares stored for it); <b>Forget Thread network</b> (not while it runs Thread), <b>Reflash C6 now</b> (after an RCP or NCP failure) and <b>Back up C6 flash</b> (in maintenance mode, about 3.5 min).",
+                                     "Čip, role, balík a podrobnosti C6 (MAC, revize, flash, teplota, paměť, firmwary uložené pro něj); <b>Zapomenout síť Thread</b> (ne když na něm Thread běží), <b>Přeflashovat C6 teď</b> (po výpadku RCP nebo NCP) a <b>Záloha flash C6</b> (v režimu údržby, asi 3,5 min)."),
+      "RADIO B (EXTERNAL, JP1)": T("Chip, role, firmware and package, temperature and free memory, the wiring and <b>Test wiring</b> (resets the radio, only while it has no role): it names the line to check when one does not work.",
+                                   "Totéž a navíc zapojení a <b>Otestovat zapojení</b> (resetuje rádio, jen bez role): když některá linka nefunguje, řekne kterou zkontrolovat.")},
+     T("<p>Radio B: XIAO ESP32-C5 on JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), powered over its own USB-C (5 V from JP1 is too weak for its radio).</p>",
+       "<p>Rádio B: XIAO ESP32-C5 na JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), napájené přes vlastní USB-C (5 V z JP1 na jeho rádio nestačí).</p>"),
+     ["radios_status"]),
+    ("radios/scan", "radar", T("Radios › Radio surroundings", "Rádia › Rádiové okolí"),
+     T("Scan of the 2.4 GHz band to place a Thread, Zigbee or Wi-Fi network.", "Sken pásma 2,4 GHz pro umístění sítě Thread, Zigbee nebo Wi-Fi."),
+     {"SCAN": T("Quick (Thread roles, no outage, about 13 s) or full (any role, about a minute without the role).", "Rychlý (role Thread, bez výpadku, asi 13 s) nebo úplný (každá role, asi minutu bez role)."),
+      "RECOMMENDATION": T("Best channels for Thread and Zigbee.", "Nejlepší kanály pro Thread a Zigbee."),
+      "2.4 GHZ SPECTRUM": T("Wi-Fi and 802.15.4 channels together.", "Kanály Wi-Fi a 802.15.4 společně."),
+      "IEEE 802.15.4 CHANNELS": T("Energy, networks and rating per channel 11–26.", "Energie, sítě a hodnocení každého kanálu 11–26."),
+      "THREAD AND ZIGBEE NETWORKS": T("Networks found nearby.", "Sítě nalezené v okolí."),
+      "WI-FI NETWORKS": T("Access points with channel and signal (full scan).", "Přístupové body s kanálem a signálem (úplný sken).")}, None, ["radios_scan"]),
     ("thread/info", "information-outline", T("Thread › Information", "Thread › Informace"),
      T("State of the Thread network (Thread roles only).", "Stav sítě Thread (jen v rolích Thread)."),
      {"THREAD": T("Role in the network (leader, router, child), network name, channel, PAN ID, addresses.", "Role v síti (leader, router, child), název sítě, kanál, PAN ID, adresy."),
@@ -229,17 +247,6 @@ PAGES = [
       "NETWORK MEMBERSHIP": T("<b>Join network (steer)</b> after permit join in the coordinator; leave or factory reset.", "<b>Připojit do sítě (steer)</b> po permit join v koordinátoru; opuštění sítě nebo tovární reset."),
       "TRANSMIT POWER": T("Transmit power of the router.", "Vysílací výkon routeru.")},
      None, ["zigbee_info__zigbee", "zigbee_info__router"]),
-    ("zigbee/diag", "stethoscope", T("Zigbee › Diagnostics", "Zigbee › Diagnostika"),
-     T("Traffic of the bridge and the C6 link.", "Provoz mostu a linka k C6."),
-     {"TRAFFIC": T("Bytes and frames between Zigbee2MQTT and the NCP, dropped data.", "Bajty a rámce mezi Zigbee2MQTT a NCP, zahozená data."),
-      "C6 LINK": T("UART speed, errors and C6 resets; <b>Reset C6</b>.", "Rychlost UART, chyby a resety C6; <b>Reset C6</b>."),
-      "ZIGBEE ROUTER": T("Router counters and log.", "Čítače a log routeru.")},
-     None, ["zigbee_diag__zigbee", "zigbee_diag__router"]),
-    ("zigbee/backups", "backup-restore", T("Zigbee › Network backups", "Zigbee › Zálohy sítí"),
-     T("Copies of the coordinator and router network data kept in the gateway flash; made before leaving a Zigbee role and automatically (daily or weekly).",
-       "Kopie dat sítě koordinátoru a routeru uložené ve flash brány; vytváří se před opuštěním role Zigbee a automaticky (denně nebo týdně)."),
-     {"ZIGBEE NETWORK BACKUPS": T("Generation, size and time of each copy; download; <b>Back up now</b>.", "Generace, velikost a čas každé kopie; stažení; <b>Zálohovat teď</b>.")},
-     None, ["zigbee_backups__zigbee"]),
     ("zigbee/network", "graph-outline", T("Zigbee › Network and devices", "Zigbee › Síť a zařízení"),
      T("The Zigbee network seen through Zigbee2MQTT over MQTT (works in any role).", "Síť Zigbee pohledem Zigbee2MQTT přes MQTT (funguje v každé roli)."),
      {"ZIGBEE2MQTT": T("Base topic and bridge state; needs the MQTT connection of the gateway.", "Základní téma a stav mostu; potřebuje MQTT spojení brány."),
@@ -247,6 +254,26 @@ PAGES = [
       "NETWORK MAP": T("Network map from Zigbee2MQTT with link quality.", "Mapa sítě ze Zigbee2MQTT s kvalitou linek."),
       "ZIGBEE DEVICES": T("Devices with model, power source and last seen.", "Zařízení s modelem, napájením a posledním kontaktem.")},
      None, ["zigbee_network", "zigbee_network__zigbee"]),
+    ("zigbee/backups", "backup-restore", T("Zigbee › Network backups", "Zigbee › Zálohy sítí"),
+     T("Copies of the coordinator and router network data kept in the gateway flash; made before leaving a Zigbee role and automatically (daily or weekly).",
+       "Kopie dat sítě koordinátoru a routeru uložené ve flash brány; vytváří se před opuštěním role Zigbee a automaticky (denně nebo týdně)."),
+     {"ZIGBEE NETWORK BACKUPS": T("Radio, generation, size and time of each copy; download; <b>Back up now</b> (while a radio runs Zigbee). The page opens in any role.", "Rádio, generace, velikost a čas každé kopie; stažení; <b>Zálohovat teď</b> (když některé rádio běží jako Zigbee). Stránka je otevřená v každé roli.")},
+     None, ["zigbee_backups"]),
+    ("zigbee/diag", "stethoscope", T("Zigbee › Diagnostics", "Zigbee › Diagnostika"),
+     T("Traffic of the bridge and the C6 link.", "Provoz mostu a linka k C6."),
+     {"TRAFFIC": T("Bytes and frames between Zigbee2MQTT and the NCP, dropped data.", "Bajty a rámce mezi Zigbee2MQTT a NCP, zahozená data."),
+      "C6 LINK": T("UART speed, errors and C6 resets; <b>Reset C6</b>.", "Rychlost UART, chyby a resety C6; <b>Reset C6</b>."),
+      "ZIGBEE ROUTER": T("Router counters and log.", "Čítače a log routeru.")},
+     None, ["zigbee_diag__zigbee", "zigbee_diag__router"]),
+    ("esphome", "bluetooth", T("ESPHome", "ESPHome"),
+     T("The ESPHome Bluetooth proxy as the role of a radio: it runs on the radio itself over Wi-Fi while the gateway keeps working with the other radio. Greyed in the menu while no radio runs it; the Wi-Fi can be set beforehand.",
+       "ESPHome Bluetooth proxy jako role rádia: běží přímo na rádiu přes Wi-Fi a brána dál pracuje s druhým rádiem. V menu je šedě, dokud ho žádné rádio neprovozuje; Wi-Fi jde nastavit předem."),
+     {"ESPHOME BLE PROXY ON A RADIO": T("The steps: Wi-Fi, role, adoption in Home Assistant.", "Postup: Wi-Fi, role, převzetí v Home Assistant."),
+      "WI-FI OF THE ESPHOME RADIO": T("SSID and password the gateway sets over Improv on the radio's UART when the role starts (the password is a secret setting), and the state of the ESPHome radio: Improv state, device, URL.",
+                                      "SSID a heslo, které brána nastaví přes Improv po UART rádia při startu role (heslo je tajné nastavení), a stav rádia ESPHome: stav Improv, zařízení, URL.")},
+     T("<p>The image comes from the release and holds no secret: no access point, Home Assistant sets the API encryption key when it adopts the device.</p>",
+       "<p>Obraz je z vydání a neobsahuje žádné tajemství: žádný přístupový bod, šifrovací klíč API nastaví Home Assistant při převzetí zařízení.</p>"),
+     ["esphome"]),
     ("sound/live", "ear-hearing", T("Sound › Live", "Zvuk › Živě"),
      T("Microphone, noise level and the recognition model.", "Mikrofon, hlučnost a model rozpoznávání."),
      {"MICROPHONE": T("On or off, gain, level gate (the model runs only above it), live level, a 5 s recording.", "Zapnutí, zesílení, prahová úroveň (model běží jen nad ní), živá hladina, nahrávka 5 s."),
@@ -280,7 +307,7 @@ PAGES = [
      {"RECORD": T("Record 0.96 s samples of the sound, or upload a WAV.", "Nahrání vzorků 0,96 s zvuku nebo nahrání WAV."),
       "BACKGROUND": T("Record the normal background; the suggested threshold lies between it and the samples.", "Nahrání běžného pozadí; navržený práh leží mezi ním a vzorky."),
       "LEARNED SOUNDS": T("Profiles with samples, threshold and test.", "Profily se vzorky, prahem a testem.")}, None, ["sound_learn"]),
-    ("ha/guide", "book-open-variant", T("Home Assistant › Guide", "Home Assistant › Návod"),
+    ("ha/guide", "book-open-variant", T("Home Assistant › Integration", "Home Assistant › Integrace"),
      T("Steps for Home Assistant with the current address of the gateway; one-click buttons for the integration.",
        "Postup pro Home Assistant se současnou adresou brány; tlačítka na jedno kliknutí pro integraci."),
      {"P4 GATEWAY INTEGRATION": T("Open the HACS repository, add the integration (My Home Assistant buttons).", "Otevřít repozitář HACS, přidat integraci (tlačítka My Home Assistant)."),
@@ -296,36 +323,21 @@ PAGES = [
        """<p>Když používáte integraci P4 Gateway, vypněte zde <b>Home Assistant discovery</b>, jinak bude každá entita dvakrát.
        MQTT je dál potřeba pro Zigbee › Síť a zařízení (témata Zigbee2MQTT).</p>"""),
      ["ha_mqtt"]),
-    ("ha/esphome", "bluetooth", T("Home Assistant › ESPHome", "Home Assistant › ESPHome"),
-     T("The ESPHome Bluetooth proxy as the role of a radio: it runs on the radio itself over Wi-Fi while the gateway keeps working with the other radio.",
-       "ESPHome Bluetooth proxy jako role rádia: běží přímo na rádiu přes Wi-Fi a brána dál pracuje s druhým rádiem."),
-     {"ESPHOME BLE PROXY ON A RADIO": T("The steps: Wi-Fi, role, adoption in Home Assistant.", "Postup: Wi-Fi, role, převzetí v Home Assistant."),
-      "WI-FI OF THE ESPHOME RADIO": T("SSID and password the gateway sets over Improv on the radio's UART when the role starts (the password is a secret setting), and the state of the ESPHome radio: Improv state, device, URL.",
-                                      "SSID a heslo, které brána nastaví přes Improv po UART rádia při startu role (heslo je tajné nastavení), a stav rádia ESPHome: stav Improv, zařízení, URL.")},
-     T("<p>The image comes from the release and holds no secret: no access point, Home Assistant sets the API encryption key when it adopts the device.</p>",
-       "<p>Obraz je z vydání a neobsahuje žádné tajemství: žádný přístupový bod, šifrovací klíč API nastaví Home Assistant při převzetí zařízení.</p>"),
-     ["ha_esphome"]),
+    ("ha/matter", "matter", T("Home Assistant › Matter", "Home Assistant › Matter"),
+     T("Home Assistant found in the network and the Matter Server that names the devices in the Thread map.", "Home Assistant nalezený v síti a Matter Server, který pojmenuje zařízení v mapě Thread."),
+     {"HOME ASSISTANT AND MATTER": T("Home Assistant found over mDNS; Matter Server URL for device names in the Thread map.", "Home Assistant nalezený přes mDNS; URL Matter Serveru pro názvy zařízení v mapě Thread.")},
+     None, ["ha_matter"]),
     ("system/info", "information-outline", T("System › Information", "Systém › Informace"),
      T("Hardware and firmware details.", "Podrobnosti o hardwaru a firmwaru."),
      {"FIRMWARE SLOTS": T("Gateway A/B, ESPHome: version, state, which runs and which boots.", "Brána A/B, ESPHome: verze, stav, který běží a který startuje."),
       "ESP32-P4": T("Chip revision, CPU, temperature, flash and PSRAM.", "Revize čipu, CPU, teplota, flash a PSRAM."),
       "MEMORY": T("Internal RAM and PSRAM, minimum since start, NVS.", "Interní RAM a PSRAM, minimum od startu, NVS."),
-      "FIRMWARE": T("Version, build, ESP-IDF, reset reason.", "Verze, sestavení, ESP-IDF, důvod resetu."),
-      "ESP32-C6 RADIO": T("MAC, revision, flash, bundles stored for the C6.", "MAC, revize, flash, balíky firmwaru uložené pro C6.")}, None, ["system_info"]),
-    ("system/radios", "chip", T("System › Radios", "Systém › Rádia"),
-     T("Both radios: radio A (the C6 of the board) and radio B (the external radio on JP1, docs/dual-radio.md).",
-       "Obě rádia: rádio A (C6 na desce) a rádio B (externí rádio na JP1, docs/dual-radio.md)."),
-     {"RADIO A (C6 OF THE BOARD)": T("Chip, role, firmware and package, temperature and free memory, Zigbee network backups of this radio, <b>Forget Thread network</b> (not while it runs Thread).",
-                                     "Čip, role, firmware a balík, teplota a volná paměť, zálohy sítí Zigbee tohoto rádia, <b>Zapomenout síť Thread</b> (ne když na něm Thread běží)."),
-      "RADIO B (EXTERNAL, JP1)": T("The same, plus the wiring and <b>Test wiring</b> (resets the radio, only while it has no role): it names the line to check when one does not work.",
-                                   "Totéž a navíc zapojení a <b>Otestovat zapojení</b> (resetuje rádio, jen bez role): když některá linka nefunguje, řekne kterou zkontrolovat.")},
-     T("<p>Radio B: XIAO ESP32-C5 on JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), powered over its own USB-C (5 V from JP1 is too weak for its radio).</p>",
-       "<p>Rádio B: XIAO ESP32-C5 na JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), napájené přes vlastní USB-C (5 V z JP1 na jeho rádio nestačí).</p>"),
-     ["system_radios"]),
+      "FIRMWARE": T("Version, build, ESP-IDF, reset reason.", "Verze, sestavení, ESP-IDF, důvod resetu.")}, None, ["system_info"]),
     ("system/lan", "ethernet", T("System › LAN", "Systém › LAN"),
      T("Ethernet settings and traffic.", "Nastavení a provoz Ethernetu."),
      {"LAN SETTINGS": T("DHCP or a static address with netmask, gateway and DNS; link speed and duplex.", "DHCP nebo statická adresa s maskou, bránou a DNS; rychlost a duplex linky."),
       "CURRENT STATE": T("What is in effect now.", "Co právě platí."),
+      "DEVICE NAME": T("Hostname (applies after a restart); the gateway answers as &lt;name&gt;.local.", "Název zařízení (platí po restartu); brána odpovídá jako &lt;název&gt;.local."),
       "TRAFFIC": T("RX/TX rate, totals since start and the split per service (web UI, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, Thread routed).",
                    "Rychlost RX/TX, součty od startu a rozpad podle služeb (web UI, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, směrovaný Thread).")},
      T("""<ol><li>Choose <b>Static</b>, fill in the address, netmask, gateway and DNS, press <b>Apply</b>.</li>
@@ -339,6 +351,8 @@ PAGES = [
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",
                          "Nainstalovaná a nabízená verze firmwaru brány a <b>balíku C6</b> se stavem a tlačítkem <b>Instalovat</b>; <b>Zkontrolovat</b> přečte manifest hned. <i>Firmwary v balíku C6</i> ukazuje každý firmware C6 nainstalovaný a nabízený."),
+      "UPDATE SETTINGS": T("Manifest URL: <b>GitHub Releases</b> fills in the address of the latest release (the default), your own web server works too; saved empty turns the online update off. Checked every 6 hours, nothing is installed without a request.",
+                           "URL manifestu: <b>GitHub Releases</b> doplní adresu posledního vydání (výchozí), funguje i vlastní webový server; uloženo prázdné online aktualizaci vypne. Kontroluje se každých 6 hodin, bez vyžádání se nic neinstaluje."),
       "RELEASES FOR THIS GATEWAY": T("Releases that run on the flash layout of the board, one expandable row each with its notes, build and link: <b>Gateway</b> and <b>C6</b> install that release (an older one is a rollback), <b>Reflash</b> writes the installed one again.",
                                      "Vydání, která běží na layoutu flash desky, každé jako rozbalovací řádek s poznámkami, sestavením a odkazem: <b>Brána</b> a <b>C6</b> nainstalují dané vydání (starší je návrat zpět), <b>Přeflashovat</b> zapíše nainstalované znovu.")},
      T("""<ol><li><b>Install</b> the gateway first when both are newer: a C6 package of a newer format is offered only to a gateway that reads it.</li>
@@ -356,35 +370,15 @@ PAGES = [
                          "<code>p4gw.bin</code> (zapíše se do druhého slotu, potvrdí se po 60 s, jinak se vrátí předchozí) a balík rádia, <code>c6fw.bin</code> nebo <code>c5fw.bin</code> (rádio jeho čipu dostane nový firmware při dalším startu; také když o něj brána žádá).")},
      T("<p>The files come from a GitHub release or from <code>scripts/build_all.sh</code>.</p>", "<p>Soubory jsou ve vydání na GitHubu nebo z <code>scripts/build_all.sh</code>.</p>"),
      ["system_firmware_manual"]),
-    ("system/firmware/settings", "tune-variant", T("System › Firmware › Settings", "Systém › Firmware › Nastavení"),
-     T("Where the online update looks.", "Kde online aktualizace hledá."),
-     {"UPDATE SETTINGS": T("Manifest URL: <b>GitHub Releases</b> fills in the address of the latest release (the default), your own web server works too; saved empty turns the online update off. Checked every 6 hours, nothing is installed without a request.",
-                           "URL manifestu: <b>GitHub Releases</b> doplní adresu posledního vydání (výchozí), funguje i vlastní webový server; uloženo prázdné online aktualizaci vypne. Kontroluje se každých 6 hodin, bez vyžádání se nic neinstaluje.")},
-     T("<p>Own server: <code>scripts/make_update_manifest.py</code> writes <code>manifest.json</code> next to <code>p4gw.bin</code> and <code>c6fw.bin</code> (docs/installation.md).</p>",
-       "<p>Vlastní server: <code>scripts/make_update_manifest.py</code> zapíše <code>manifest.json</code> vedle <code>p4gw.bin</code> a <code>c6fw.bin</code> (docs/installation.md).</p>"),
-     ["system_firmware_settings"]),
+    ("system/maint", "wrench-outline", T("System › Maintenance and backup", "Systém › Údržba a záloha"),
+     T("Restart and the settings backup; maintenance of the radios is under Radios › Status and maintenance.", "Restart a záloha nastavení; údržba rádií je v Rádia › Stav a údržba."),
+     {"MAINTENANCE": T("<b>Restart</b> (radio A, then the P4).", "<b>Restartovat</b> (rádio A, pak P4)."),
+      "SETTINGS BACKUP": T("Export and import of all settings; passwords, accounts and tokens only when chosen.", "Export a import všech nastavení; hesla, účty a tokeny jen na vyžádání.")}, None, ["system_maint"]),
     ("system/diag", "stethoscope", T("System › Diagnostics", "Systém › Diagnostika"),
      T("Tools when something does not work.", "Nástroje, když něco nefunguje."),
      {"PING": T("Ping a host from the gateway.", "Ping na hostitele z brány."),
       "DIAGNOSTICS": T("Core dump after a crash (download, erase), log before the last restart.", "Core dump po pádu (stažení, smazání), log před posledním restartem."),
       "LOG": T("Live log with filters by source, level and tag; save to a file.", "Živý log s filtry podle zdroje, úrovně a tagu; uložení do souboru.")}, None, ["system_diag"]),
-    ("system/netscan", "radar", T("System › Network surroundings", "Systém › Síťové okolí"),
-     T("Scan of the 2.4 GHz band to place a Thread, Zigbee or Wi-Fi network.", "Sken pásma 2,4 GHz pro umístění sítě Thread, Zigbee nebo Wi-Fi."),
-     {"SCAN": T("Quick (Thread roles, no outage, about 13 s) or full (any role, about a minute without the role).", "Rychlý (role Thread, bez výpadku, asi 13 s) nebo úplný (každá role, asi minutu bez role)."),
-      "RECOMMENDATION": T("Best channels for Thread and Zigbee.", "Nejlepší kanály pro Thread a Zigbee."),
-      "2.4 GHZ SPECTRUM": T("Wi-Fi and 802.15.4 channels together.", "Kanály Wi-Fi a 802.15.4 společně."),
-      "IEEE 802.15.4 CHANNELS": T("Energy, networks and rating per channel 11–26.", "Energie, sítě a hodnocení každého kanálu 11–26."),
-      "THREAD AND ZIGBEE NETWORKS": T("Networks found nearby.", "Sítě nalezené v okolí."),
-      "WI-FI NETWORKS": T("Access points with channel and signal (full scan).", "Přístupové body s kanálem a signálem (úplný sken).")}, None, ["system_netscan"]),
-    ("system/settings", "cog-outline", T("System › Settings", "Systém › Nastavení"),
-     T("Hostname, Matter Server and the settings backup.", "Název zařízení, Matter Server a záloha nastavení."),
-     {"HOME ASSISTANT AND MATTER": T("Home Assistant found over mDNS; Matter Server URL for device names in the Thread map.", "Home Assistant nalezený přes mDNS; URL Matter Serveru pro názvy zařízení v mapě Thread."),
-      "SETTINGS": T("Hostname (applies after a restart). Accounts and passwords are in User management.", "Název zařízení (platí po restartu). Účty a hesla jsou ve Správě uživatelů."),
-      "SETTINGS BACKUP": T("Export and import of all settings; passwords, accounts and tokens only when chosen.", "Export a import všech nastavení; hesla, účty a tokeny jen na vyžádání.")}, None, ["system_settings"]),
-    ("system/maint", "wrench-outline", T("System › Maintenance", "Systém › Údržba"),
-     T("Restart, C6 reflash and backup.", "Restart, přeflashování a záloha C6."),
-     {"MAINTENANCE": T("<b>Restart</b> (P4), <b>Reflash C6 now</b> (after an RCP or NCP failure), <b>Back up C6 flash</b> (in maintenance mode, about 3.5 min).",
-                       "<b>Restartovat</b> (P4), <b>Přeflashovat C6</b> (po výpadku RCP nebo NCP), <b>Zálohovat flash C6</b> (v režimu údržby, asi 3,5 min).")}, None, ["system_maint"]),
     ("system/notify", "bell-cog-outline", T("System › Notifications", "Systém › Notifikace"),
      T("The Telegram bot (admins) and where Home Assistant notifications are set.", "Telegram bot (správci) a kde se nastavují notifikace pro Home Assistant."),
      {"TELEGRAM BOT": T("Token from @BotFather, on/off, time zone for quiet hours; state and paired users.", "Token od @BotFather, zapnutí, časové pásmo pro tiché hodiny; stav a spárovaní uživatelé."),
@@ -489,7 +483,7 @@ TELEGRAM = T(
     <tr><td><code>/events</code></td><td>last detections</td><td>Sound › Detection log, read</td><td>–</td></tr>
     <tr><td><code>/update</code></td><td>gateway and C6 versions, build, release notes</td><td>System › Firmware, read</td><td>–</td></tr>
     <tr><td><code>/install</code>, <code>/install c6</code></td><td>install the gateway firmware or the C6 package</td><td>System › Firmware, edit</td><td>yes</td></tr>
-    <tr><td><code>/restart</code></td><td>restart C6 and P4</td><td>System › Maintenance, edit</td><td>yes</td></tr>
+    <tr><td><code>/restart</code></td><td>restart C6 and P4</td><td>Radios › Status and maintenance, edit</td><td>yes</td></tr>
     <tr><td><code>/identify</code></td><td>blink the identify icon</td><td>Overview, edit</td><td>yes</td></tr>
     <tr><td><code>/role &lt;name&gt;</code></td><td>switch the role</td><td>Role, edit</td><td>yes</td></tr>
     <tr><td><code>/sound on|off</code></td><td>sound recognition</td><td>Sound › Live, edit</td><td>yes</td></tr>
@@ -505,7 +499,7 @@ TELEGRAM = T(
     <tr><td><code>/events</code></td><td>poslední detekce</td><td>Zvuk › Log detekcí, číst</td><td>–</td></tr>
     <tr><td><code>/update</code></td><td>verze brány a C6, sestavení, poznámky k vydání</td><td>Systém › Firmware, číst</td><td>–</td></tr>
     <tr><td><code>/install</code>, <code>/install c6</code></td><td>instalace firmwaru brány nebo balíku C6</td><td>Systém › Firmware, upravovat</td><td>ano</td></tr>
-    <tr><td><code>/restart</code></td><td>restart C6 a P4</td><td>Systém › Údržba, upravovat</td><td>ano</td></tr>
+    <tr><td><code>/restart</code></td><td>restart C6 a P4</td><td>Rádia › Stav a údržba, upravovat</td><td>ano</td></tr>
     <tr><td><code>/identify</code></td><td>rozblikání ikony identifikace</td><td>Přehled, upravovat</td><td>ano</td></tr>
     <tr><td><code>/role &lt;název&gt;</code></td><td>přepnutí role</td><td>Role, upravovat</td><td>ano</td></tr>
     <tr><td><code>/sound on|off</code></td><td>rozpoznávání zvuků</td><td>Zvuk › Živě, upravovat</td><td>ano</td></tr>
@@ -516,23 +510,23 @@ TELEGRAM = T(
 RECOVERY = T(
     """<table><thead><tr><th>Situation</th><th>What to do</th></tr></thead><tbody>
     <tr><td>Role does not start</td><td>The UI shows maintenance with the reason; choose another role or fix it and restart.</td></tr>
-    <tr><td>C6 does not answer</td><td>Check the JP1 jumpers, System › Maintenance › Reflash C6 now.</td></tr>
+    <tr><td>C6 does not answer</td><td>Check the JP1 jumpers, Radios › Status and maintenance › Reflash C6 now.</td></tr>
     <tr><td>Bad gateway update</td><td>Automatic rollback to the previous slot; otherwise <code>scripts/flash_p4.sh</code>.</td></tr>
     <tr><td>Crashes</td><td>System › Diagnostics: core dump and the log before the last restart.</td></tr>
     <tr><td>Static address that does not work</td><td>Not confirmed: back after 120 s by itself. Confirmed: <code>http://&lt;host&gt;.local/</code> over IPv6, or import a settings backup.</td></tr>
     <tr><td>Forgotten password</td><td>Forgot password on the sign-in page; an admin sets a temporary one.</td></tr>
     <tr><td>Lost phone with the authenticator</td><td>A recovery code instead of the app code, or an admin turns off 2FA (Users › Edit).</td></tr>
-    <tr><td>New board</td><td>System › Settings › Settings backup: export (with passwords) and import on the new board.</td></tr>
+    <tr><td>New board</td><td>System › Maintenance and backup › Settings backup: export (with passwords) and import on the new board.</td></tr>
     <tr><td>Maintenance: "the C6 firmware package is not on the gateway"</td><td>The C6 needs its large firmwares (first start, C6 update, reflash, ESPHome) and the package is neither in RAM nor downloadable: connect the gateway to the internet, or upload <code>c6fw.bin</code> of the release under System › Firmware and restart.</td></tr></tbody></table>""",
     """<table><thead><tr><th>Situace</th><th>Co dělat</th></tr></thead><tbody>
     <tr><td>Role nenaběhne</td><td>UI ukáže režim údržby s důvodem; zvolte jinou roli nebo příčinu odstraňte a restartujte.</td></tr>
-    <tr><td>C6 neodpovídá</td><td>Zkontrolujte propojky JP1, Systém › Údržba › Přeflashovat C6.</td></tr>
+    <tr><td>C6 neodpovídá</td><td>Zkontrolujte propojky JP1, Rádia › Stav a údržba › Přeflashovat C6 teď.</td></tr>
     <tr><td>Vadná aktualizace brány</td><td>Automatický návrat do předchozího slotu; jinak <code>scripts/flash_p4.sh</code>.</td></tr>
     <tr><td>Pády</td><td>Systém › Diagnostika: core dump a log před posledním restartem.</td></tr>
     <tr><td>Nefunkční statická adresa</td><td>Nepotvrzená: po 120 s se vrátí sama. Potvrzená: <code>http://&lt;host&gt;.local/</code> přes IPv6, nebo import zálohy nastavení.</td></tr>
     <tr><td>Zapomenuté heslo</td><td>Zapomenuté heslo na přihlašovací stránce; správce nastaví dočasné.</td></tr>
     <tr><td>Ztracený telefon s Authenticatorem</td><td>Záložní kód místo kódu z aplikace, nebo správce vypne 2FA (Uživatelé › Upravit).</td></tr>
-    <tr><td>Nová deska</td><td>Systém › Nastavení › Záloha nastavení: export (s hesly) a import na nové desce.</td></tr>
+    <tr><td>Nová deska</td><td>Systém › Údržba a záloha › Záloha nastavení: export (s hesly) a import na nové desce.</td></tr>
     <tr><td>Údržba: „the C6 firmware package is not on the gateway“</td><td>C6 potřebuje velké firmwary (první start, aktualizace C6, přeflashování, ESPHome) a balík není v RAM ani ke stažení: připojte bránu k internetu, nebo v Systém › Firmware nahrajte <code>c6fw.bin</code> z vydání a restartujte.</td></tr></tbody></table>""")
 
 LABELS = {

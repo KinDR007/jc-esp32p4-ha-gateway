@@ -65,7 +65,7 @@ A role of a radio (A or B, [dual-radio.md](dual-radio.md)): the radio runs the E
 proxy of the release (`firmware/esphome/radio_proxy`) on its own over Wi-Fi, the gateway keeps
 working with the other radio.
 
-1. Gateway UI, Home Assistant › ESPHome: enter the Wi-Fi (SSID, password) and save.
+1. Gateway UI, ESPHome page: enter the Wi-Fi (SSID, password) and save.
 2. Role: pick *ESPHome BLE proxy* for a radio. The gateway flashes ESPHome from the release into it
    and sets the Wi-Fi over Improv on the radio's UART; the page shows the Improv state and the URL.
 3. HA discovers the device (ESPHome integration, `p4gw-ble-proxy-xxxxxx`) and sets its API
@@ -87,7 +87,7 @@ Install (once), one click each:
    add-on). HACS installs only from a public repository.
 2. **Add integration** starts the setup (or use the discovered gateway, below).
 
-The web UI shows the same buttons under Home Assistant › Guide.
+The web UI shows the same buttons under Home Assistant › Integration.
 
 The gateway announces itself over mDNS (`_p4gw._tcp`, TXT `mac`, `version`),
 so it appears under Settings › Devices › **Discovered**; or add it by hand (Add integration ›
@@ -161,7 +161,7 @@ messages.
 
 
 Firmware update entity (`update.<host>_firmware`): installed and offered gateway version from the
-online update manifest (System › Firmware › Settings), *Install* downloads it into the other
+online update manifest (System › Firmware › Online update › Update settings), *Install* downloads it into the other
 gateway slot and restarts. Without a manifest URL it always shows the installed version.
 An older release that runs on the board (attribute `available_versions`) is installed with
 `update.install` and `version: v1.6` (rollback); the *C6 radio firmware* entity takes the package id
@@ -209,7 +209,7 @@ python3 tools/matter_watch.py --url ws://homeassistant.local:5580/ws --node 39 \
 Thread › Topology shows the mesh. To see which device is which, the map reads the Matter Server
 add-on over its WebSocket (port 5580, has to be exposed in the add-on: Configuration → Network).
 Without a setting the gateway uses the Home Assistant host it finds over mDNS
-(`ws://<HA IP>:5580/ws`); System › Settings shows the instance found, lets you set another address
+(`ws://<HA IP>:5580/ws`); Home Assistant › Matter shows the instance found, lets you set another address
 and test the connection. The browser reads the nodes from it and matches them with
 the map by Thread MAC or IPv6 address; Home Assistant shows the same node ID in the device info of
 the Matter integration. Devices that are not Matter (other border routers) show what they report

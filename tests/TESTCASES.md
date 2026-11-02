@@ -35,7 +35,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC06 | Zachování Zigbee sítě | koordinátor → Thread BR → koordinátor | při odchodu se uloží snapshot `zigbee_ncp`, Thread síť je beze změny, při návratu `restored 0x…` |
 | TC07 | Zigbee router | přepnutí na `zigbee_router` | C6 = `zigbee_router`, stavové řádky `@ZR` přichází do 40 s, příkazy se přijímají, snapshot koordinátora zůstává |
 | TC08 | Thread router | přepnutí na `thread_router`, vložení datasetu z TC04 | bez datasetu čeká, po vložení se připojí (child/router/leader) |
-| TC09 | ESPHome na rádiu | role `esphome` na rádiu B (bez něj na A) přes `/api/role` | rádio dostane bundle `esphome`, odpoví přes Improv (zařízení); s Wi-Fi v Home Assistant › ESPHome se připojí a hlásí URL, bez ní „not provisioned“; role rádia zpět |
+| TC09 | ESPHome na rádiu | role `esphome` na rádiu B (bez něj na A) přes `/api/role` | rádio dostane bundle `esphome`, odpoví přes Improv (zařízení); s Wi-Fi ze stránky ESPHome se připojí a hlásí URL, bez ní „not provisioned“; role rádia zpět |
 | TC10 | OTA gateway | upload `dist/p4gw.bin` | zápis do neaktivního slotu, start v `pending_verify`, po 60 s `valid`; gateway image do slotu ESPHome odmítnut |
 | TC11 | Přihlášení účtem | staré heslo přes `/api/settings`, účet správce, přístup bez/se/se špatným heslem (Basic), smazání | staré heslo 400; 401 / 200 / 401; po smazání účtu otevřená brána |
 | TC12 | Neplatné uploady | nesmysl do c6fw a gateway, pak platný c6fw | 400, uložené image nepoškozené, 4 balíky zpět |
@@ -107,20 +107,20 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI12 | Zigbee › Síť a zařízení (je-li Zigbee2MQTT) | instance, všechna zařízení v tabulce, detail po najetí, mapa s uzly, je-li uložená |
 | UI13 | Zigbee router: vysílací výkon a Identify | pole ukazuje výkon routeru a při psaní ho obnova stránky nepřepíše, nastavená hodnota se vrátí ve stavu routeru, Identify rozbliká ikonu v hlavičce a po 10 s zmizí, řádek brány má tlačítka výkonu a Identify |
 | UI14 | Thread › Topologie (je-li role Thread) | najetí na router v mapě ukáže detail v levém horním rohu mapy a zvýrazní jeho linky, po odjetí zvýraznění zmizí; legenda nezakrývá uzly ani detail; seznam zařízení bublinu nezobrazuje (UI12 totéž pro Zigbee) |
-| UI16 | menu podle role | stránky neaktivní role jsou v menu zavřené, odkaz na ně otevře stránku, která funguje; sekce je zavřená jen když nefunguje žádná její stránka |
+| UI16 | menu podle role | stránky sítě, kterou neprovozuje žádné rádio (Thread, Zigbee, ESPHome), jsou v menu zavřené nebo sekce zešedne, odkaz na ně otevře stránku, která funguje; sekce je zavřená jen když nefunguje žádná její stránka |
 | UI17 | mapa sítě: zoom a rozložení | kolečko a +/− přibližují, − nejdál na celou mapu, domeček vrátí výchozí pohled, L rozmístí uzly podle signálu (pamatuje si to) a zpět na kruh, legenda nezakrývá uzly |
 | UI18 | teplota C6 | na Přehledu má teplota C6 stejně jako P4 rozsah (min, max), pokud ji firmware C6 hlásí |
 | UI19 | log před restartem | Systém › Diagnostika: tlačítko stáhne log předchozího běhu (`*-previous.log`) |
-| UI20 | záloha nastavení | export stáhne JSON bez hesel, cizí soubor skončí chybou, potvrzení importu uvádí původ a zrušení nic nemění |
-| UI21 | zálohy Zigbee | mimo roli Zigbee je stránka zavřená; v roli Zigbee se výběr automatické zálohy uloží a funguje Zálohovat teď |
+| UI20 | záloha nastavení (Systém › Údržba a záloha) | export stáhne JSON bez hesel, cizí soubor skončí chybou, potvrzení importu uvádí původ a zrušení nic nemění |
+| UI21 | zálohy Zigbee | stránka je otevřená v každé roli (tabulka uvádí rádio zálohy); výběr automatické zálohy se uloží; Zálohovat teď jen když některé rádio běží jako Zigbee |
 | UI22 | online aktualizace | uložení URL, zobrazení chyby kontroly, Instalovat zakázáno bez nabídky, vymazání URL |
 | UI23 | naučené zvuky | stránka se načte, cizí soubor skončí chybou, test nahrávky ukáže skóre |
 | UI24 | MQTT | volby TLS jen pro mqtts:// a wss://, pole certifikátu jen pro vlastní CA, pokročilé volby |
 | UI25 | log | každý řádek začíná místním časem prohlížeče; úroveň, zdroj, tag (i kliknutím) a hledání (text se zvýrazněním, /regex/) filtrují |
 | UI15 | nápovědy (i) | žádný klíč nápovědy není v TIPS dvakrát; tabulky zařízení Thread a Zigbee a údaje instance Zigbee2MQTT mají vlastní nápovědy, ne texty jiných tabulek se stejným názvem sloupce |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; modální okno zamkne stránku, ukáže fázi, procenta a odhad zbývajícího času, Escape ho nezavře; po skončení vše zmizí |
-| UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Nastavení najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |
-| UI09 | Systém › Síťové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |
+| UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Home Assistant › Matter najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |
+| UI09 | Rádia › Rádiové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |
 | UI08 | navigace a vysvětlivky | podsekce Thread v menu, ikony mají SVG, odkaz `#system/diag` po reloadu, starý `#tools` vede na Systém › Diagnostika, ⓘ u Teploty ukáže vysvětlení, na mobilu výsuvné menu (otevře se ☰, zavře výběrem) |
 | UI07 | vzhled světlý / tmavý / systém | `data-theme` a barva pozadí se mění, volba přežije reload, „systém“ sleduje nastavení OS |
 

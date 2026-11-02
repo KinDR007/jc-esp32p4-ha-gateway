@@ -74,3 +74,8 @@
       nemaže) se vrátil do sítě ve všech ~12 přepnutích 2026-10-29; hlídá TC23.
 - [ ] Ověřit HA cestu k "active dataset TLVs" v aktuální verzi HA (text v UI)
 - [ ] Role ESPHome na layoutu v3: návrat potřebuje balík C6 (stažení); ověřit celou cestu tam a zpět
+- [x] Deadlock kontroly aktualizací a MQTT (zaseknutí brány po přepnutí rádia B), oprava 0b13d95, ověřeno 4 přepnutími
+- [x] Přepracované menu webového UI (menu_redesign/): sekce Rádia a ESPHome, rozpuštěné Systém › Nastavení, zálohy Zigbee per rádio; testy přes proxy jen pro čtení
+- [ ] Nové menu nahrát na bránu (vydání) a projít UI testy s heslem přímo na bráně (UI21–UI23 zapisují)
+- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI18 (rádio B bez min/max teploty), UI25 (formát logu) neodpovídají současnému UI
+- [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu

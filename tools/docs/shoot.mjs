@@ -4,18 +4,19 @@ import { fileURLToPath } from 'node:url';
  *   P4GW_URL=http://<gateway> P4GW_USER=<admin> P4GW_PASS=<password> PHASE=thread \
  *   node <browser-automation skill>/browser.mjs $P4GW_URL --script tools/docs/shoot.mjs
  * PHASE: thread (all pages, tooltips, dialogs; Thread border router role), zigbee (Zigbee coordinator role),
- * router (Zigbee router role), firmware (the System › Firmware pages only); P4GW_ROUTES="a/b c" shoots only those pages. The account must be an admin without two-factor sign-in.
+ * router (Zigbee router role), firmware (the System › Firmware pages only); P4GW_ROUTES="a/b c" shoots only those pages. The account must be an admin without two-factor sign-in;
+ * without P4GW_USER the page must already be signed in (menu_redesign/tools/ui_proxy.py adds an API token).
  * Then python3 tools/docs/build_docs.py. */
 const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
-  thread: [['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/backups', 'zigbee/network',
-    'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'sound/learn', 'ha/guide', 'ha/mqtt', 'ha/esphome', 'system/info',
-    'system/lan', 'system/radios', 'system/firmware/online', 'system/firmware/manual', 'system/firmware/settings', 'system/diag', 'system/netscan', 'system/settings', 'system/maint', 'system/notify',
+  thread: [['overview', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
+    'zigbee/network', 'zigbee/backups', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'sound/learn', 'ha/guide', 'ha/mqtt',
+    'ha/matter', 'system/info', 'system/lan', 'system/firmware/online', 'system/firmware/manual', 'system/maint', 'system/diag', 'system/notify',
     'system/users/list', 'system/users/roles', 'system/users/tokens', 'system/users/requests', 'system/users/policy', 'profile'], '', true],
-  zigbee: [['overview', 'role', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'zigbee/network', 'ha/guide'], '__zigbee', false],
+  zigbee: [['overview', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'zigbee/network', 'ha/guide'], '__zigbee', false],
   router: [['overview', 'zigbee/info', 'zigbee/diag'], '__router', false],
-  firmware: [['system/firmware/online', 'system/firmware/manual', 'system/firmware/settings'], '', false],
+  firmware: [['system/firmware/online', 'system/firmware/manual'], '', false],
 };
 const [PHASE_ROUTES, SUFFIX, EXTRAS] = PHASES[process.env.PHASE || 'thread'];
 /* P4GW_ROUTES="ha/guide system/info": only these pages of the phase (no tooltips or dialogs) */
@@ -29,17 +30,19 @@ export default async function run(page) {
   await page.evaluate(() => { localStorage.setItem('theme', 'dark'); localStorage.setItem('lang', 'en'); localStorage.removeItem('tab'); });
   await page.goto(BASE + '/#overview');
   await page.reload();
-  await page.waitForSelector('#lg-user', { timeout: 30000 });
-  await page.waitForTimeout(800);
-  if (ALL) await shot(page, 'login');
-  await page.fill('#lg-user', process.env.P4GW_USER);
-  await page.fill('#lg-pass', process.env.P4GW_PASS);
-  await page.click('#login button[type=submit]');
+  if (process.env.P4GW_USER) {
+    await page.waitForSelector('#lg-user', { timeout: 30000 });
+    await page.waitForTimeout(800);
+    if (ALL) await shot(page, 'login');
+    await page.fill('#lg-user', process.env.P4GW_USER);
+    await page.fill('#lg-pass', process.env.P4GW_PASS);
+    await page.click('#login button[type=submit]');
+  }
   await page.waitForSelector('#side-user a', { timeout: 30000 });
   await page.waitForTimeout(4000);
   for (const r of ROUTES) {
     await page.evaluate(rt => { location.hash = rt; }, r);
-    await page.waitForTimeout(/topology|network|netscan/.test(r) ? 8000 : r.includes('lan') ? 9000 : 4000);
+    await page.waitForTimeout(/topology|network|scan/.test(r) ? 8000 : r.includes('lan') ? 9000 : 4000);
     const actual = await page.evaluate(() => location.hash.slice(1));
     if (actual !== r) { done.push(`${r} -> ${actual}`); continue; }
     await page.mouse.move(1430, 890);

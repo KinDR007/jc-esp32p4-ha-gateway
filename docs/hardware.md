@@ -92,7 +92,7 @@ in that role appear in the P4 log as `c6:` lines.
 
 ## Network surroundings scan
 
-System › Network surroundings rates the 2.4 GHz band for placing a new Thread, Zigbee or Wi-Fi
+Radios › Radio surroundings rates the 2.4 GHz band for placing a new Thread, Zigbee or Wi-Fi
 network.
 
 - **Quick** (Thread roles, no outage): OpenThread energy scan, active scan (beacons, also Zigbee

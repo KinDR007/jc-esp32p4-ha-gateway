@@ -53,9 +53,9 @@ if (args.password) {
 
 const toastText = () => page.textContent('#toast');
 // every page of the left menu (section/sub page)
-const ROUTES = ['overview', 'role', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings', 'zigbee/info', 'zigbee/diag',
-  'zigbee/backups', 'zigbee/network', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'ha/guide', 'ha/mqtt', 'ha/esphome',
-  'system/info', 'system/firmware', 'system/diag', 'system/netscan', 'system/settings', 'system/maint'];
+const ROUTES = ['overview', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
+  'zigbee/info', 'zigbee/network', 'zigbee/backups', 'zigbee/diag', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes',
+  'ha/guide', 'ha/mqtt', 'ha/matter', 'system/info', 'system/lan', 'system/firmware', 'system/maint', 'system/diag'];
 // false when the menu has the page closed (it needs a role that is not active)
 const tab = async route => {
   const [sec] = route.split('/');
@@ -70,9 +70,9 @@ const tab = async route => {
   await page.waitForTimeout(600);
   return true;
 };
-// pages that open only in their role
-const needsRole = route => /^thread\//.test(route) ? !status.role.active.startsWith('thread')
-  : /^zigbee\/(info|diag|backups)$/.test(route) ? !status.role.active.startsWith('zigbee') : false;
+// pages that open only while a radio runs their network (radio A or B)
+const runs = proto => [status.role.active, status.role.b?.active || 'none'].some(r => r.startsWith(proto));
+const needsRole = route => /^thread\//.test(route) ? !runs('thread') : /^zigbee\/(info|diag)$/.test(route) ? !runs('zigbee') : false;
 
 await page.goto(base);
 await page.waitForSelector('.card', { timeout: 20000 });
@@ -89,7 +89,7 @@ await test('UI01', 'every tab renders without script errors or error toasts', as
     check(!needsRole(id), `${id}: open in the menu`);
     await page.waitForTimeout(1200);
     const t = await toastText();
-    check(!t.startsWith('Error') && await page.evaluate(r => location.hash === '#' + r, id), `${id}: opened, no error toast${t ? ` (${t})` : ''}`);
+    check(!t.startsWith('Error') && await page.evaluate(r => location.hash.startsWith('#' + r), id), `${id}: opened, no error toast${t ? ` (${t})` : ''}`);
   }
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
@@ -182,9 +182,9 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
     }
   }
   // every menu item and sub page has a Czech label (names of standards stay as they are)
-  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware'];
+  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter'];
   const english = [];
-  for (const sec of ['overview', 'role', 'thread', 'zigbee', 'sound', 'ha', 'system']) {
+  for (const sec of ['overview', 'radios', 'thread', 'zigbee', 'esphome', 'sound', 'ha', 'system']) {
     await page.click(`#side a[data-route="${sec}"]`);
     await page.waitForTimeout(300);
     for (const [route, text] of await page.$$eval('#side a', a => a.map(x => [x.dataset.route, x.textContent.trim()]))) {
@@ -251,9 +251,9 @@ await test('UI08', 'Navigation: left menu with sub pages, deep links, mobile dra
   await page.click('#menu-btn');
   await page.waitForTimeout(400);
   check(await x() > 100, 'menu button opens the drawer');
-  await page.click('#side a[data-route="role"]');
+  await page.click('#side a[data-route="radios"]');
   await page.waitForTimeout(600);
-  check(await x() <= 0 && await page.evaluate(() => location.hash) === '#role', 'choosing a page closes the drawer');
+  check(await x() <= 0 && await page.evaluate(() => location.hash) === '#radios/roles', 'choosing a page closes the drawer');
   await page.setViewportSize({ width: 1280, height: 720 });
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
@@ -264,7 +264,7 @@ await test('UI09', 'Network surroundings: the last scan shows channels, spectrum
     console.log('  skipped: no scan stored on the gateway');
     return;
   }
-  await tab('system/netscan');
+  await tab('radios/scan');
   await page.waitForSelector('#ns-channels table', { timeout: 20000 });
   check(await page.$$eval('#ns-channels tr', r => r.length) === 17, 'all 16 channels (11-26) rated');
   check(await page.$$eval('#ns-spectrum svg rect', r => r.length) === 16, 'spectrum shows the 16 channels');
@@ -285,7 +285,7 @@ await test('UI10', 'Home Assistant: header shows who uses the gateway, settings 
   const peer = await page.$eval('#hdr-peer', e => ({ hidden: e.classList.contains('hidden'), text: e.innerText, title: e.title }));
   const expect = ['thread_br', 'zigbee_coordinator'].includes(s.role.active);
   check(peer.hidden === !expect, `header user pill ${expect ? 'shown' : 'hidden'} for ${s.role.active} (${peer.text}${peer.title ? ': ' + peer.title : ''})`);
-  await tab('system/settings');
+  await tab('ha/matter');
   await page.waitForFunction(() => !/Looking|Hledám/.test(document.querySelector('#ha-found')?.textContent || 'x'), null, { timeout: 15000 });
   const found = await page.$$('[data-ha-ip]');
   console.log(`  ${found.length} Home Assistant instance(s) found over mDNS`);
@@ -528,7 +528,7 @@ await test('UI19', 'Diagnostics: the log before the last restart downloads', asy
 });
 
 await test('UI20', 'Settings backup: export downloads the settings, a foreign file and a cancelled import change nothing', async () => {
-  await tab('system/settings');
+  await tab('system/maint');
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#set-export')]);
   const file = JSON.parse(readFileSync(await dl.path(), 'utf8'));
   check(file.format === 'p4gw-settings' && !file.secrets && file.keys.role && !file.keys.password, `export without passwords, ${Object.keys(file.keys).length} keys`);
@@ -543,13 +543,7 @@ await test('UI20', 'Settings backup: export downloads the settings, a foreign fi
   check(text.includes(file.hostname) && !(await page.$('#busy-dlg[open]')), `confirmation names the source, cancel keeps the gateway running`);
 });
 
-await test('UI21', 'Zigbee backups: the automatic interval is stored, Back up now only in a Zigbee role', async () => {
-  if (await needsRole('zigbee/backups')) {
-    await page.goto(base + '#zigbee/backups');
-    await page.waitForTimeout(800);
-    check(await page.evaluate(() => location.hash) !== '#zigbee/backups', 'outside a Zigbee role the page is closed and its link leads elsewhere');
-    return;
-  }
+await test('UI21', 'Zigbee backups: open in any role, the automatic interval is stored, Back up now only in a Zigbee role', async () => {
   await page.goto(base + '#zigbee/backups');
   await page.waitForSelector('#zb-snap-days');
   const days = () => page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.c6.snapshot_days));
@@ -560,8 +554,8 @@ await test('UI21', 'Zigbee backups: the automatic interval is stored, Back up no
   await page.selectOption('#zb-snap-days', String(was));
   await page.waitForTimeout(800);
   check(await days() === was, `restored to ${was}`);
-  const role = await page.evaluate(() => fetch('/api/status').then(r => r.json()).then(s => s.role.active));
-  check(await page.isDisabled('#zb-snap-now') === !role.startsWith('zigbee'), `Back up now ${role.startsWith('zigbee') ? 'enabled' : 'disabled'} in ${role}`);
+  const zb = runs('zigbee');
+  check(await page.isDisabled('#zb-snap-now') === !zb, `Back up now ${zb ? 'enabled' : 'disabled'} (${status.role.active}, radio B ${status.role.b?.active || 'none'})`);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

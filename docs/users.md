@@ -23,6 +23,12 @@ and permissions). A user can have own levels for single pages (Users › Edit �
 hidden page disappears from the menu, a read page shows a note and its buttons that change something
 are disabled.
 
+A level belongs to a permission area, named after the pages that use it: *Radios › Status and
+maintenance, System › Maintenance and backup* share one area, and *Home Assistant › Matter, device
+name, settings backup* is the area of the device name (System › LAN) and the settings backup
+(System › Maintenance and backup) too. A card of another area on a page is hidden or read only by
+that area's level.
+
 The server enforces the levels: each API URI belongs to a page (`AUTH_MAP` in `gw_auth.c`), `GET`
 needs read, other methods edit. Requests that reveal keys or recordings need edit even when they
 only read: `GET /api/thread/dataset`, `/api/c6/zigbee-snapshot`, `/api/settings/export`,

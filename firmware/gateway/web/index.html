@@ -412,6 +412,8 @@ let me = null;
  * English. Long formatted guides (Home Assistant tab) have their own Czech templates.
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
+  'Roles': 'Role', 'Status and maintenance': 'Stav a údržba', 'Radio surroundings': 'Rádiové okolí', 'Integration': 'Integrace',
+  'Maintenance and backup': 'Údržba a záloha',
   'Notifications': 'Notifikace', 'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
   'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
   'Overview': 'Přehled', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Zigbee2MQTT': 'Zigbee2MQTT',
@@ -463,7 +465,7 @@ const CS = {
   'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.': 'Rozšiřuje existující Thread síť (bez border routingu). Potřebuje dataset sítě z Home Assistant.',
   'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.': 'Síťový koprocesor ZBOSS přes TCP pro Zigbee2MQTT (adapter zboss). Data sítě se při přepínání zachovají.',
   'Standalone Zigbee router (range extender) that joins your existing Zigbee network.': 'Samostatný Zigbee router (zesilovač dosahu), který se připojí do vaší Zigbee sítě.',
-  'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (Home Assistant › ESPHome), Home Assistant adopts the device.': 'Rádio běží jako ESPHome Bluetooth proxy samostatně přes Wi-Fi; brána mu nastaví Wi-Fi (Home Assistant › ESPHome), Home Assistant zařízení převezme.',
+  'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (ESPHome page), Home Assistant adopts the device.': 'Rádio běží jako ESPHome Bluetooth proxy samostatně přes Wi-Fi; brána mu nastaví Wi-Fi (stránka ESPHome), Home Assistant zařízení převezme.',
   'Upload an ESPHome image under System first.': 'Nejdřív nahrajte ESPHome image v záložce Systém.',
   'No C6 backup yet': 'Chybí záloha C6',
   'This role overwrites the factory firmware of the C6, which cannot be downloaded again. Cancel and use System → Back up C6 flash first (needs the JP1 jumpers), or continue without a backup.':
@@ -699,7 +701,7 @@ const ROLES = {
   thread_router: { icon: 'thread', name: 'Thread router', group: 'Thread', desc: 'Extends an existing Thread network (no border routing). Needs the network dataset from Home Assistant.' },
   zigbee_coordinator: { icon: 'zigbee', name: 'Zigbee coordinator', group: 'Zigbee', desc: 'ZBOSS network co-processor over TCP for Zigbee2MQTT (adapter zboss). Network data is kept when switching.' },
   zigbee_router: { icon: 'zigbee', name: 'Zigbee router', group: 'Zigbee', desc: 'Standalone Zigbee router (range extender) that joins your existing Zigbee network.' },
-  esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'ESPHome', desc: 'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (Home Assistant › ESPHome), Home Assistant adopts the device.' },
+  esphome: { icon: 'bluetooth', name: 'ESPHome BLE proxy', group: 'ESPHome', desc: 'The radio runs the ESPHome Bluetooth proxy on its own over Wi-Fi; the gateway sets the Wi-Fi (ESPHome page), Home Assistant adopts the device.' },
 };
 
 async function api(path, opts = {}) {
@@ -1211,7 +1213,7 @@ const meter = (pct, warn = 70, bad = 90) => `<span class="meter"><span class="pr
 const used = (free, total) => total ? 100 - free / total * 100 : 0;
 const temp = s => s.temperature_c === undefined ? '' : `${s.temperature_c} °C` + (s.hw?.temp_max_c !== undefined ? ` <span class="muted">(min ${s.hw.temp_min_c}, max ${s.hw.temp_max_c})</span>` : '');
 const cpuLoad = hw => (hw?.cpu_load || []).map((l, i) => `<div class="row">core ${i} ${meter(l)}</div>`).join('');
-/* C6 rows shared by the overview and System › Information */
+/* C6 rows shared by the overview and Radios › Status and maintenance */
 function c6Rows(s, full) {
   const c = s.c6, chip = c.chip || {}, rs = s.role_status || {}, tel = c.telemetry;
   const img = (c.images || []).find(i => i.name === c.bundle);
@@ -1240,28 +1242,28 @@ let status = null;
  * bookmarked and the back button works. Sub pages of the current section are listed in the menu. */
 const NAV = [
   { id: 'overview', label: 'Overview', icon: 'view-dashboard-outline' },
-  { id: 'role', label: 'Role', icon: 'swap-horizontal' },
+  { id: 'radios', label: 'Radios', icon: 'chip', subs: [
+    { id: 'roles', label: 'Roles', icon: 'swap-horizontal' }, { id: 'status', label: 'Status and maintenance', icon: 'developer-board' },
+    { id: 'scan', label: 'Radio surroundings', icon: 'radar' }] },
   { id: 'thread', label: 'Thread', icon: 'thread', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline', role: true }, { id: 'topology', label: 'Topology', icon: 'graph-outline', role: true },
     { id: 'diag', label: 'Diagnostics', icon: 'stethoscope', role: true }, { id: 'settings', label: 'Settings', icon: 'cog-outline', role: true }] },
   { id: 'zigbee', label: 'Zigbee', icon: 'zigbee', subs: [
-    { id: 'info', label: 'Information', icon: 'information-outline', role: true }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope', role: true },
-    { id: 'backups', label: 'Network backups', icon: 'backup-restore', role: true }, { id: 'network', label: 'Network and devices', icon: 'graph-outline' }] },
+    { id: 'info', label: 'Information', icon: 'information-outline', role: true }, { id: 'network', label: 'Network and devices', icon: 'graph-outline' },
+    { id: 'backups', label: 'Network backups', icon: 'backup-restore' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope', role: true }] },
+  { id: 'esphome', label: 'ESPHome', icon: 'bluetooth' },
   { id: 'sound', label: 'Sound', icon: 'waveform', subs: [
     { id: 'live', label: 'Live', icon: 'ear-hearing' }, { id: 'events', label: 'Events', icon: 'bell-ring-outline' },
     { id: 'log', label: 'Detection log', icon: 'history' }, { id: 'classes', label: 'Sound selection', icon: 'playlist-check' },
     { id: 'learn', label: 'Learned sounds', icon: 'school-outline' }] },
   { id: 'ha', label: 'Home Assistant', icon: 'home-assistant', subs: [
-    { id: 'guide', label: 'Guide', icon: 'book-open-variant' }, { id: 'mqtt', label: 'MQTT', icon: 'transit-connection-variant' },
-    { id: 'esphome', label: 'ESPHome', icon: 'bluetooth' }] },
+    { id: 'guide', label: 'Integration', icon: 'book-open-variant' }, { id: 'mqtt', label: 'MQTT', icon: 'transit-connection-variant' },
+    { id: 'matter', label: 'Matter', icon: 'matter' }] },
   { id: 'system', label: 'System', icon: 'developer-board', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
-    { id: 'radios', label: 'Radios', icon: 'chip' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
-      { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' },
-      { id: 'settings', label: 'Settings', icon: 'tune-variant' }] },
-    { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' }, { id: 'netscan', label: 'Network surroundings', icon: 'radar' },
-    { id: 'settings', label: 'Settings', icon: 'cog-outline' }, { id: 'maint', label: 'Maintenance', icon: 'wrench-outline' },
+      { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
+    { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
     { id: 'notify', label: 'Notifications', icon: 'bell-cog-outline', admin: true },
     { id: 'users', label: 'User management', icon: 'account-group-outline', admin: true, subs: [
       { id: 'list', label: 'Users', icon: 'account-multiple-outline' }, { id: 'roles', label: 'Roles and permissions', icon: 'shield-account-outline' },
@@ -1270,7 +1272,12 @@ const NAV = [
   { id: 'profile', label: 'My account', icon: 'account-circle-outline', hidden: true },
 ];
 /* routes of the previous single-level tabs */
-const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbee/info', sound: 'sound/live', ha: 'ha/guide', system: 'system/info' };
+const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbee/info', sound: 'sound/live', ha: 'ha/guide', system: 'system/info',
+  /* before the menu rework (menu_redesign/) */
+  role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
+  'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
+/* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
+const PERM = { 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -1283,7 +1290,7 @@ function parseRoute(route) {
   return [sec.id, x.subs ? `${x.id}/${(x.subs.find(y => y.id === s2) || x.subs[0]).id}` : x.id];
 }
 function route() { return sub ? `${tab}/${sub}` : tab; }
-function sectionActive(id) { return id === 'thread' ? isThread() : id === 'zigbee' ? isZigbee() : true; }
+function sectionActive(id) { return id === 'thread' ? isThread() : id === 'zigbee' ? isZigbee() : id === 'esphome' ? protoRadio('esphome') >= 0 : true; }
 /* pages marked role: true open only in their role; Zigbee2MQTT over MQTT and network backups work in any role */
 function pageEnabled(sec, s) {
   const p = NAV.find(n => n.id === sec)?.subs?.find(x => x.id === (s || '').split('/')[0]);
@@ -1295,9 +1302,18 @@ function perm(page) {
   if (!me || me.open || me.role === 'admin') return 2;
   if (page.startsWith('system/users') || page === 'system/notify') return 0;
   /* rights are per page; its subpages (System › Firmware › …) share them */
-  return me.levels?.[page.split('/').slice(0, 2).join('/')] ?? 2;
+  const key = page.split('/').slice(0, 2).join('/');
+  return me.levels?.[PERM[key] || key] ?? 2;
 }
 const needsRole = id => L(`Only with the ${id === 'thread' ? 'Thread' : 'Zigbee'} role active`, `Jen při aktivní roli ${id === 'thread' ? 'Thread' : 'Zigbee'}`);
+/* cards of another permission area on a page (data-perm): hidden without the right, read only with read */
+function applyCardPerms(root) {
+  root.querySelectorAll('[data-perm]').forEach(c => {
+    const lv = perm(c.dataset.perm);
+    if (lv === 0) c.remove();
+    else if (lv === 1) c.querySelectorAll('button, input, select').forEach(x => { x.disabled = true; });
+  });
+}
 
 let navRole = null;
 function renderNav() {
@@ -1557,13 +1573,13 @@ views.overview = () => {
       [L('State', 'Stav'), r.b.maintenance ? `<span class="bad-text">${esc(r.b.maintenance)}</span>` : r.b.wired === false ? `<span class="bad-text">${L('not found on JP1', 'na JP1 nenalezeno')}</span>` : ''],
       [L('Firmware', 'Firmware'), r.b.telemetry ? esc(`${r.b.telemetry.fw} ${r.b.telemetry.ver}`) : ''],
       [L('Temperature', 'Teplota'), r.b.telemetry?.temp_c !== undefined ? r.b.telemetry.temp_c + ' °C' : ''],
-      [L('Details', 'Podrobnosti'), `<a href="#system/radios">${L('System › Radios', 'Systém › Rádia')}</a>`]])}</div>` : ''}
+      [L('Details', 'Podrobnosti'), `<a href="#radios/status">${L('Radios › Status and maintenance', 'Rádia › Stav a údržba')}</a>`]])}</div>` : ''}
   </div>`;
 };
 
 /* Roles of both radios (docs/dual-radio.md): radio A is the C6 of the board, radio B the external one
  * on JP1. At most one Thread and one Zigbee network and one ESPHome proxy; a switch restarts the gateway. */
-views.role = () => {
+views['radios/roles'] = () => {
   const r = status.role, b = r.b || {};
   const kind = id => ROLES[id]?.group;
   const section = (radio, active, desired, other) => {
@@ -1589,7 +1605,7 @@ views.role = () => {
     ${section('a', activeRole(), r.desired, b.desired)}</div>
     ${showB ? `<div class="card" style="margin-top:16px">${h3('chip', L('Radio B: external', 'Rádio B: externí') + (b.chip ? ' ' + esc(b.chip) : ''))}
       ${section('b', b.active, b.desired, r.desired)}${offB}</div>`
-    : `<div class="card muted" style="margin-top:16px">${L('No radio B found on JP1 (System › Radios).', 'Na JP1 nebylo nalezeno rádio B (Systém › Rádia).')}</div>`}`;
+    : `<div class="card muted" style="margin-top:16px">${L('No radio B found on JP1: wiring and its test under Status and maintenance.', 'Na JP1 nebylo nalezeno rádio B: zapojení a jeho test ve Stavu a údržbě.')}</div>`}`;
 };
 
 const notThread = () => `<div class="card"><p class="muted">Thread is not the active role.</p></div>`;
@@ -1598,7 +1614,7 @@ views['thread/info'] = () => isThread() ? `<div id="thread-status"><div class="c
 views['thread/topology'] = () => isThread() ? `<div class="card">${h3('graph-outline', 'Network map')}
     <div class="row"><button class="btn" id="topo-refresh">${ic('restart')}Refresh map</button><span id="topo-state" class="muted"></span></div>
     <div class="row" style="margin-top:8px"><span class="muted">${ic('matter')}Matter Server${tip('Matter Server')}</span><span id="matter-state" class="muted"></span>
-      <a href="#system/settings" class="muted">${L('change in System › Settings', 'změnit v Systém › Nastavení')}</a></div>
+      <a href="#ha/matter" class="muted">${L('change in Home Assistant › Matter', 'změnit v Home Assistant › Matter')}</a></div>
     <div id="topo-map" class="muted" style="margin-top:10px">Loading…</div></div>
   <div class="card" style="margin-top:16px">${h3('lan-connect', 'Devices in the network')}<div class="table-wrap" id="topo-devices"><p class="muted">Loading…</p></div></div>
   <div id="thread-status" style="margin-top:16px"><div class="card muted">Loading…</div></div>` : notThread();
@@ -1756,9 +1772,9 @@ function snapshotCard() {
   const snaps = status.c6.snapshots || [], days = status.c6.snapshot_days ?? 7, zb = isZigbee();
   return `<div class="card">${h3('backup-restore', 'Zigbee network backups')}
     <p class="muted">Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.</p>
-    ${snaps.length ? `<table><tr>${[['Firmware', 'Snapshot firmware'], 'Size', ['Generation', 'Snapshot generation'], 'Saved'].map(th).join('')}<th></th></tr>${snaps.map(s =>
-      `<tr><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td>${s.saved ? new Date(s.saved * 1000).toLocaleString() : '—'}</td>
-      <td><button class="btn" data-snap="${esc(s.bundle)}">${ic('download')}Download</button></td></tr>`).join('')}</table>`
+    ${snaps.length ? `<table><tr>${[L('Radio', 'Rádio'), ['Firmware', 'Snapshot firmware'], 'Size', ['Generation', 'Snapshot generation'], 'Saved'].map(th).join('')}<th></th></tr>${snaps.map(s =>
+      `<tr><td>${(s.radio || 'a').toUpperCase()}</td><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td>${s.saved ? new Date(s.saved * 1000).toLocaleString() : '—'}</td>
+      <td><button class="btn" data-snap="${esc(s.bundle)}" data-snap-radio="${s.radio || 'a'}">${ic('download')}Download</button></td></tr>`).join('')}</table>`
       : '<p class="muted">No snapshot yet.</p>'}
     <div class="row" style="margin-top:12px"><label class="field" style="margin:0"><span>Automatic backup${tip('Automatic Zigbee backup')}</span>
       <select id="zb-snap-days">${[[0, 'off'], [1, 'daily'], [7, 'weekly']].map(([v, l]) => `<option value="${v}" ${v === days ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
@@ -1794,10 +1810,10 @@ advanced:
     <li>Tady: <b>Zigbee → Připojit do sítě (steer)</b>. Router zkouší steering každých 30 s, dokud se nepřipojí.</li>
     <li>Objeví se jako router / zesilovač dosahu. Přesun do jiné sítě: <b>Opustit síť</b> a znovu steer.</li></ol>`,
   esphome: `<h3>ESPHome BLE proxy</h3><p>Tato stránka není dostupná, když běží ESPHome.</p>`,
-  none: `<h3>Údržba</h3><p>Neběží žádná role. Vyberte ji v záložce <b>Role</b>.</p>`,
+  none: `<h3>Údržba</h3><p>Neběží žádná role. Vyberte ji v <b>Rádia › Role</b>.</p>`,
   ble: `<h3>ESPHome BLE proxy na rádiu</h3><ol class="steps">
     <li>Zadejte Wi-Fi vpravo a uložte.</li>
-    <li>V <b>Role</b> zvolte u rádia A nebo B <b>ESPHome BLE proxy</b>. Brána do rádia nahraje ESPHome z vydání a nastaví mu Wi-Fi.</li>
+    <li>V <b>Rádia › Role</b> zvolte u rádia A nebo B <b>ESPHome BLE proxy</b>. Brána do rádia nahraje ESPHome z vydání a nastaví mu Wi-Fi.</li>
     <li>HA zařízení najde (integrace <i>ESPHome</i>) a při převzetí mu samo nastaví šifrovací klíč API.</li>
     <li>Druhé rádio může současně dělat Thread nebo Zigbee.</li></ol>`,
 });
@@ -1832,10 +1848,10 @@ advanced:
       <li>Here: <b>Zigbee → Join network (steer)</b>. The router retries steering every 30 s until it joins.</li>
       <li>It appears as a router / range extender. To move it to another network: <b>Leave network</b>, then steer again.</li></ol>`,
     esphome: `<h3>ESPHome BLE proxy</h3><p>This page is not available while ESPHome runs.</p>`,
-    none: `<h3>Maintenance</h3><p>No role is running. Pick one under <b>Role</b>.</p>`,
+    none: `<h3>Maintenance</h3><p>No role is running. Pick one under <b>Radios › Roles</b>.</p>`,
     ble: `<h3>ESPHome BLE proxy on a radio</h3><ol class="steps">
     <li>Enter the Wi-Fi on the right and save.</li>
-    <li>Under <b>Role</b> pick <b>ESPHome BLE proxy</b> for radio A or B. The gateway flashes ESPHome from the release into the radio and sets its Wi-Fi.</li>
+    <li>Under <b>Radios › Roles</b> pick <b>ESPHome BLE proxy</b> for radio A or B. The gateway flashes ESPHome from the release into the radio and sets its Wi-Fi.</li>
     <li>HA discovers the device (<i>ESPHome</i> integration) and sets its API encryption key when it adopts it.</li>
     <li>The other radio can run Thread or Zigbee at the same time.</li></ol>`,
   };
@@ -1863,7 +1879,7 @@ function haIntegration() {
 }
 views['ha/guide'] = () => `<div class="card guide" data-notr>${haIntegration()}</div>
   <div class="card guide" data-notr>${haSteps()[threadRole() || zigbeeRole() || activeRole()] || haSteps().none}</div>`;
-views['ha/esphome'] = () => `<div class="grid">
+views.esphome = () => `<div class="grid">
   <div class="card guide" data-notr>${haSteps().ble}</div>
   <div class="card">${h3('access-point-network', L('Wi-Fi of the ESPHome radio', 'Wi-Fi rádia ESPHome'))}
     <p class="muted">${L('The radio with the ESPHome role joins this network; the gateway sets it over the radio\'s UART (Improv) when the role starts. The password stays on the gateway (exported only in a backup with passwords).',
@@ -1875,42 +1891,44 @@ views['ha/esphome'] = () => `<div class="grid">
 
 async function loadEsphomeWifi() {
   const w = await api('/api/esphome/wifi').catch(() => null);
-  if (!w || route() !== 'ha/esphome') return;
+  if (!w || route() !== 'esphome') return;
   if (!$('#esw-ssid').value) $('#esw-ssid').value = w.ssid || '';
   $('#esw-pass').placeholder = w.password_set ? L('(unchanged)', '(beze změny)') : '';
   const radio = status.role.active === 'esphome' ? 'A' : status.role.b?.active === 'esphome' ? 'B' : '';
   const rs = radio === 'A' ? status.role_status : radio === 'B' ? status.role_status_b : null;
   $('#esphome-radio').innerHTML = radio ? dl([[L('Radio', 'Rádio'), radio], ['Improv', esc(rs?.improv || '')], [L('Device', 'Zařízení'), esc(rs?.device || '')],
     ['URL', esc(rs?.url || '')], [L('Last step', 'Poslední krok'), esc(rs?.note || '')]])
-    : `<p class="muted">${L('No radio runs ESPHome: pick the ESPHome role of a radio under Role.', 'Žádné rádio nemá roli ESPHome: zvolte ji v Role.')}</p>`;
+    : `<p class="muted">${L('No radio runs ESPHome yet: the Wi-Fi can be set beforehand, the role is picked under Radios › Roles.', 'Zatím žádné rádio nemá roli ESPHome: Wi-Fi jde nastavit předem, roli zvolíte v Rádia › Role.')}</p>`;
 }
 
-/* System › Radios (docs/dual-radio.md): both radios, wiring test, Thread network and Zigbee backups per radio */
-views['system/radios'] = () => `<div class="grid" id="radios"><div class="card muted">${L('Loading…', 'Načítám…')}</div></div>`;
+/* Radios › Status and maintenance (docs/dual-radio.md): both radios, wiring test, forgetting a Thread network,
+ * reflash and flash backup of radio A */
+views['radios/status'] = () => maintenanceBanner() + `<div class="grid" id="radios"><div class="card muted">${L('Loading…', 'Načítám…')}</div></div>`;
 async function loadRadios() {
   const list = await api('/api/radios').catch(err => { toast('Error: ' + err.message); return null; });
-  if (!list || route() !== 'system/radios') return;
-  const snaps = status.c6?.snapshots || [];
+  if (!list || route() !== 'radios/status') return;
   const card = x => {
     const b = x.radio === 'b', t = x.telemetry || (b ? null : status.c6?.telemetry);
     const role = ROLES[x.role]?.name || L('none', 'žádná');
-    const mySnaps = snaps.filter(n => (n.radio || 'a') === x.radio).map(n =>
-      `<a href="/api/c6/zigbee-snapshot?bundle=${n.bundle}&radio=${x.radio}" download>${esc(n.bundle)} ${n.saved ? new Date(n.saved * 1000).toLocaleString() : ''}</a>`).join('<br>');
-    return `<div class="card">${h3(b ? 'chip' : 'developer-board', b ? L('Radio B (external, JP1)', 'Rádio B (externí, JP1)') : L('Radio A (C6 of the board)', 'Rádio A (C6 na desce)'))}${dl([
-      [L('Chip', 'Čip'), esc(x.chip || '')], [L('Role', 'Role'), esc(role)], [L('State', 'Stav'), x.maintenance ? `<span class="bad-text">${esc(x.maintenance)}</span>` : ''],
-      [L('Firmware', 'Firmware'), esc(x.bundle || '')], [L('Package', 'Balík'), x.package_id ? `<code>${esc(x.package_id)}</code>` : ''],
-      [L('Wiring', 'Zapojení'), b ? esc(x.wiring || '') : ''],
+    const head = [[L('Chip', 'Čip'), esc(x.chip || '')], [L('Role', 'Role'), esc(role)], [L('State', 'Stav'), x.maintenance ? `<span class="bad-text">${esc(x.maintenance)}</span>` : ''],
+      [L('Package', 'Balík'), x.package_id ? `<code>${esc(x.package_id)}</code>` : '']];
+    /* radio A: the full C6 details (former System › Information card) */
+    const rows = b ? [...head, [L('Firmware', 'Firmware'), esc(x.bundle || '')], [L('Wiring', 'Zapojení'), esc(x.wiring || '')],
       [L('Temperature', 'Teplota'), t?.temp_c !== undefined ? t.temp_c + ' °C' : ''],
-      [L('Free memory', 'Volná paměť'), t?.heap_free ? fmtBytes(t.heap_free) : ''],
-      [L('Flashing', 'Flashování'), x.busy ? `${x.percent} % ${esc(x.stage)}` : ''], [L('Last error', 'Poslední chyba'), esc(x.error || '')],
-      [L('Zigbee backups', 'Zálohy Zigbee'), mySnaps]])}
+      [L('Free memory', 'Volná paměť'), t?.heap_free ? fmtBytes(t.heap_free) : '']] : [...head, ...c6Rows(status, true)];
+    return `<div class="card">${h3(b ? 'chip' : 'developer-board', b ? L('Radio B (external, JP1)', 'Rádio B (externí, JP1)') : L('Radio A (C6 of the board)', 'Rádio A (C6 na desce)'))}${dl([...rows,
+      [L('Flashing', 'Flashování'), x.busy ? `${x.percent} % ${esc(x.stage)}` : ''], [L('Last error', 'Poslední chyba'), esc(x.error || '')]])}
       <div class="row" style="margin-top:8px">
         ${b ? `<button class="btn" data-radio-probe ${x.role !== 'none' ? 'disabled' : ''}>${ic('radar')}${L('Test wiring', 'Otestovat zapojení')}</button>` : ''}
         <button class="btn" data-thread-forget="${x.radio}" ${x.role === 'thread_br' || x.role === 'thread_router' ? 'disabled' : ''}>${ic('delete-outline')}${L('Forget Thread network', 'Zapomenout síť Thread')}</button>
-      </div></div>`;
+      </div>
+      ${b ? '' : `<div class="row"><button class="btn danger" id="sys-reflash">${ic('chip')}${L('Reflash C6 now', 'Přeflashovat C6 teď')}</button>${tip('Reflash C6 now')}
+        <button class="btn" id="c6-backup" ${activeRole() === 'none' ? '' : 'disabled'}>${ic('backup-restore')}${L('Back up C6 flash', 'Záloha flash C6')}</button>${tip('Back up C6 flash')}</div>
+      <p class="muted">${L('Reflash rewrites the C6 with the image of the current role on the next start (use after an RCP or NCP failure). The C6 backup reads its whole flash over JP1 (about 2 minutes) and works only in maintenance mode. Keep the first backup: it is the only copy of the factory esp-hosted firmware.',
+        'Přeflashování přepíše C6 obrazem aktuální role při příštím startu (po selhání RCP nebo NCP). Záloha C6 přečte celou jeho flash přes JP1 (asi 2 minuty) a jde jen v režimu údržby. První zálohu si nechte: je to jediná kopie továrního firmwaru esp-hosted.')}</p>`}</div>`;
   };
-  $('#radios').innerHTML = list.map(card).join('') + `<p class="muted" style="grid-column:1/-1">${L('Radio B: XIAO ESP32-C5 on JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), powered over its own USB-C. Roles under Role.',
-    'Rádio B: XIAO ESP32-C5 na JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), napájené přes vlastní USB-C. Role v záložce Role.')}</p>`;
+  $('#radios').innerHTML = list.map(card).join('') + `<p class="muted" style="grid-column:1/-1">${L('Radio B: XIAO ESP32-C5 on JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), powered over its own USB-C.',
+    'Rádio B: XIAO ESP32-C5 na JP1 (GPIO32 TX, GPIO33 RX, GPIO46 reset, GPIO47 boot, GND), napájené přes vlastní USB-C.')}</p>`;
 }
 views['ha/mqtt'] = () => `<div class="card">${h3('transit-connection-variant', 'MQTT (optional)')}
     <p class="muted">Publishes the gateway to Home Assistant via MQTT discovery: role, status and diagnostics as entities, a role select and a restart button. Needs the MQTT integration and a broker (e.g. the Mosquitto add-on).</p>
@@ -2333,12 +2351,10 @@ views['system/info'] = () => {
     <div class="card">${h3('package-variant', 'Firmware')}${dl([
       ['Firmware', esc(s.version)], ['Built', esc(`${s.built} ${s.built_time || ''}`), 'Build date'], ['ESP-IDF', esc(s.idf)],
       ['App slot', esc(hw.app_slot)], ['ELF SHA-256', hw.elf_sha256 ? `<code>${esc(hw.elf_sha256)}</code>` : '']])}</div>
-    <div class="card">${h3('chip', 'ESP32-C6 radio')}${dl(c6Rows(s, true))}</div>
   </div>`;
 };
 
-views['system/firmware/online'] = () => maintenanceBanner() + `<div class="grid">${updateCard()}${releasesCard()}</div>`;
-views['system/firmware/settings'] = () => `<div class="grid">${updateSettingsCard()}</div>`;
+views['system/firmware/online'] = () => maintenanceBanner() + `<div class="grid">${updateCard()}${releasesCard()}${updateSettingsCard()}</div>`;
 views['system/firmware/manual'] = () => {
   const upload = (id, title, hint) => `<div><h4 style="margin:0 0 6px;display:flex;align-items:center;gap:6px">${title}</h4><p class="muted">${hint}</p>
     <div class="row"><input type="file" id="${id}-file"><button class="btn primary" data-upload="${id}">${ic('upload')}Upload</button></div>
@@ -2362,7 +2378,7 @@ function updateCard() {
     const a = c6.installed_versions?.[n] || '–', b = c6.offered_versions?.[n];
     return `<tr><td>${esc(n)}</td><td>${esc(a)}</td><td class="${b && b !== a ? 'warn-text' : 'muted'}">${b ? esc(b) : ''}</td></tr>`;
   }).join('');
-  const state = !u.url ? `<p class="muted">${L('Off: no manifest URL', 'Vypnuto: není nastavená adresa manifestu')} (<a href="#system/firmware/settings">${L('Settings', 'Nastavení')}</a>).</p>`
+  const state = !u.url ? `<p class="muted">${L('Off: no manifest URL', 'Vypnuto: není nastavená adresa manifestu')} (${L('set it in Update settings below', 'nastavte ji v Nastavení aktualizací níže')}).</p>`
     : u.error ? `<p>${pill('bad', L('error', 'chyba'))} ${esc(u.error)}</p>`
     : !u.checked ? `<p class="muted">${L('Not checked yet.', 'Zatím nezkontrolováno.')}</p>`
     : `<p class="muted">${L('Checked', 'Zkontrolováno')} ${new Date(u.checked * 1000).toLocaleString()}</p>`;
@@ -3227,7 +3243,7 @@ function nsRecommend(chs, nets, last) {
     ${wifiReco}${ownRows}</div>`;
 }
 
-views['system/netscan'] = () => `<div class="grid">
+views['radios/scan'] = () => `<div class="grid">
   <div class="card">${h3('radar', 'Scan')}
     <p class="muted">Quick: Thread and Zigbee networks and channel noise through the running Thread role, without an outage (the radio leaves its channel for about 15 s).
     Full: also Wi-Fi; the C6 runs a scanner firmware, the role is off for about a minute.</p>
@@ -3243,7 +3259,7 @@ views['system/netscan'] = () => `<div class="grid">
 
 let nsTimer = null;
 async function loadNetscan() {
-  if (route() !== 'system/netscan') { clearInterval(nsTimer); nsTimer = null; return; }
+  if (route() !== 'radios/scan') { clearInterval(nsTimer); nsTimer = null; return; }
   let d;
   try { d = await api('/api/net/scan'); } catch (e) { return; }
   if (!$('#ns-state')) return;
@@ -3288,26 +3304,21 @@ async function loadNetscan() {
     <td>${esc(a.auth)}</td><td>802.11${esc(a.phy)}</td></tr>`).join('')}</table>`;
 }
 
-views['system/settings'] = () => `<div class="grid"><div class="card">${h3('home-assistant', 'Home Assistant and Matter')}
+views['ha/matter'] = () => `<div class="grid"><div class="card">${h3('home-assistant', 'Home Assistant and Matter')}
     <div id="ha-found" class="muted">${L('Looking for Home Assistant…', 'Hledám Home Assistant…')}</div>
     <label class="field" style="margin-top:12px"><span>${ic('matter')}Matter Server (WebSocket)${tip('Matter Server')}</span>
       <input type="text" id="matter-url" value="${esc(status.matter_url || '')}" placeholder="ws://homeassistant.local:5580/ws"></label>
     <div class="row"><button class="btn primary" id="matter-save">${ic('check')}Save</button><button class="btn" id="matter-test">${ic('play')}Test</button>
       <span id="matter-test-out" class="muted"></span></div>
-    <p class="muted">${L('Empty: the map uses the Matter Server add-on on the Home Assistant host found in the network.', 'Prázdné: mapa použije doplněk Matter Server na hostiteli Home Assistant nalezeném v síti.')}</p></div>
-  <div class="card">${h3('cog-outline', 'Settings')}
-    <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
-    <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button></div>
-    <p class="muted">${L('Accounts and passwords:', 'Účty a hesla:')} <a href="#system/users/list">${L('System › User management', 'Systém › Správa uživatelů')}</a></p></div>
-  <div class="card">${h3('backup-restore', 'Settings backup')}
-    <div class="row"><button class="btn" id="set-export">${ic('download')}Export</button>
-      <label><input type="checkbox" id="set-secrets"> Include passwords</label></div>
-    <div class="row"><label class="btn">${ic('upload')}Import<input type="file" id="set-import" accept=".json" hidden></label>${tip('Settings backup')}</div>
-    <p class="muted">${L('The file holds the Thread network keys: keep it private. Import restarts the gateway.', 'Soubor obsahuje klíče sítě Thread: uchovejte ho v soukromí. Import bránu restartuje.')}</p></div></div>`;
+    <p class="muted">${L('Empty: the map uses the Matter Server add-on on the Home Assistant host found in the network.', 'Prázdné: mapa použije doplněk Matter Server na hostiteli Home Assistant nalezeném v síti.')}</p></div></div>`;
 
 views['system/lan'] = () => `<div class="grid"><div class="card">${h3('ethernet', L('LAN settings', 'Nastavení LAN'))}
     <div id="lan-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>
   <div class="card">${h3('information-outline', L('Current state', 'Aktuální stav'))}<div id="lan-state"></div></div>
+  <div class="card" data-perm="system/settings">${h3('cog-outline', L('Device name', 'Název zařízení'))}
+    <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
+    <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button></div>
+    <p class="muted">${L('The gateway is reachable as', 'Brána je dostupná jako')} <code>${esc(status.hostname)}.local</code>.</p></div>
   <div class="card wide">${h3('swap-horizontal', L('Traffic', 'Provoz'))}<div id="traffic-box" class="muted">${L('Loading…', 'Načítám…')}</div></div></div>`;
 
 const LAN_FIELDS = [['ip', 'IPv4'], ['mask', ['Netmask', 'Maska']], ['gw', ['Gateway', 'Výchozí brána']], ['dns1', ['DNS server', 'DNS server']], ['dns2', ['Backup DNS server', 'Záložní DNS server']]];
@@ -3412,9 +3423,15 @@ const LEVELS = () => [L('Hidden', 'Skryto'), L('Read', 'Číst'), L('Edit', 'Upr
 const fmtTime = t => t ? new Date(t * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '–';
 /* label of a permission page: "Thread › Settings" */
 function pageLabel(page) {
-  const [t, s1] = page.split('/'), sec = NAV.find(n => n.id === t), x = sec?.subs?.find(y => y.id === s1);
-  const tr = v => (lang === 'cs' && CS[v]) || v;
-  return sec ? tr(sec.label) + (x ? ' › ' + tr(x.label) : '') : page;
+  const tr = v => (lang === 'cs' && CS[v]) || v, out = [];
+  for (const n of NAV.filter(x => !x.hidden)) {
+    for (const x of n.subs || [n]) {
+      const r = n.subs ? `${n.id}/${x.id}` : n.id;
+      if ((PERM[r] || r) === page) out.push(tr(n.label) + (n.subs ? ' › ' + tr(x.label) : ''));
+    }
+  }
+  const extra = { 'system/settings': L('device name, settings backup', 'název zařízení, záloha nastavení') }[page];
+  return [...out, ...(extra ? [extra] : [])].join(', ') || page;
 }
 function genPassword() {
   const a = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(14));
@@ -3770,11 +3787,13 @@ document.addEventListener('click', async e => {
 
 views['system/maint'] = () => maintenanceBanner() + `<div class="grid"><div class="card">${h3('wrench-outline', 'Maintenance')}
     <div class="row"><button class="btn" id="sys-reboot">${ic('restart')}Restart</button>${tip('Restart')}</div>
-    <div class="row"><button class="btn danger" id="sys-reflash">${ic('chip')}Reflash C6 now</button>${tip('Reflash C6 now')}</div>
-    <div class="row"><button class="btn" id="c6-backup" ${activeRole() === 'none' ? '' : 'disabled'}>${ic('backup-restore')}Back up C6 flash</button>${tip('Back up C6 flash')}</div>
-    <p class="muted">Reflash rewrites the C6 with the image of the current role on the next start (use after an RCP or NCP failure).
-    The C6 backup reads its whole flash over JP1 (about 2 minutes) and works only in maintenance mode. Keep the first backup:
-    it is the only copy of the factory esp-hosted firmware.</p></div></div>`;
+    <p class="muted">${L('Radio maintenance (reflash, C6 flash backup, wiring test) is under Radios › Status and maintenance.',
+      'Údržba rádií (přeflashování, záloha flash C6, test zapojení) je v Rádia › Stav a údržba.')}</p></div>
+  <div class="card" data-perm="system/settings">${h3('backup-restore', 'Settings backup')}
+    <div class="row"><button class="btn" id="set-export">${ic('download')}Export</button>
+      <label><input type="checkbox" id="set-secrets"> Include passwords</label></div>
+    <div class="row"><label class="btn">${ic('upload')}Import<input type="file" id="set-import" accept=".json" hidden></label>${tip('Settings backup')}</div>
+    <p class="muted">${L('The file holds the Thread network keys: keep it private. Import restarts the gateway.', 'Soubor obsahuje klíče sítě Thread: uchovejte ho v soukromí. Import bránu restartuje.')}</p></div></div>`;
 
 /* ---------------- actions ---------------- */
 
@@ -3792,9 +3811,9 @@ document.addEventListener('click', async e => {
       } catch (err) {
         if (err.message !== 'c6_backup_required' && err.message !== 'radio_b_backup_required') throw err;
         if (!await confirmDialog(L('No backup of the factory firmware yet', 'Zatím bez zálohy továrního firmwaru'),
-          L('This role overwrites the factory firmware of the radio, which cannot be downloaded again. Cancel and back it up first (System › Maintenance for radio A, over its USB-C for radio B), or continue without a backup.',
-            'Role přepíše tovární firmware rádia, který už nejde znovu stáhnout. Zrušte a nejdřív ho zazálohujte (Systém › Údržba pro rádio A, přes jeho USB-C pro rádio B), nebo pokračujte bez zálohy.'))) {
-          if (radio === 'a') go('system/maint');
+          L('This role overwrites the factory firmware of the radio, which cannot be downloaded again. Cancel and back it up first (Radios › Status and maintenance for radio A, over its USB-C for radio B), or continue without a backup.',
+            'Role přepíše tovární firmware rádia, který už nejde znovu stáhnout. Zrušte a nejdřív ho zazálohujte (Rádia › Stav a údržba pro rádio A, přes jeho USB-C pro rádio B), nebo pokračujte bez zálohy.'))) {
+          if (radio === 'a') go('radios/status');
           return;
         }
         await api('/api/role', { json: { role: t.dataset.role, radio, skip_backup: true } });
@@ -3856,7 +3875,7 @@ document.addEventListener('click', async e => {
       await api('/api/zigbee/command', { json: { cmd } });
       toast('Sent ' + cmd);
     } else if (t.dataset.snap) {
-      download('/api/c6/zigbee-snapshot?bundle=' + encodeURIComponent(t.dataset.snap), t.dataset.snap + '_nvram.bin');
+      download(`/api/c6/zigbee-snapshot?bundle=${encodeURIComponent(t.dataset.snap)}&radio=${t.dataset.snapRadio}`, `${t.dataset.snap}_${t.dataset.snapRadio}_nvram.bin`);
     } else if (t.id === 'mq-save') {
       const body = { uri: $('#mq-uri').value.trim(), user: $('#mq-user').value, prefix: $('#mq-prefix').value.trim(), enabled: $('#mq-en').checked,
         tls: $('#mq-tls').value, ca: $('#mq-ca').value.trim(), skip_cn_check: $('#mq-nocn').checked, client_id: $('#mq-cid').value.trim(),
@@ -4381,7 +4400,7 @@ document.addEventListener('input', e => {
 /* ---------------- loop ---------------- */
 
 /* pages without form input, redrawn on every status poll */
-const PASSIVE = ['overview', 'role', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'system/info'];
+const PASSIVE = ['overview', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'system/info'];
 
 function pageTitle() {
   const [s1, s2] = (sub || '').split('/');
@@ -4407,19 +4426,20 @@ function render(full) {
     if (full) renderNav();
     main.innerHTML = pageTitle() + views[route()]();
     if (perm(route()) === 1) main.querySelectorAll('button.primary, button.danger').forEach(b => { b.disabled = true; });
+    applyCardPerms(main);
     if (tab === 'thread') { loadThread(); if (sub === 'settings') { loadDataset(false); loadThreadTxPower(); } if (sub === 'topology') loadTopology(); }
     if (route() === 'ha/mqtt') loadMqtt();
     if (route() === 'system/diag') renderLog();
-    if (route() === 'system/netscan') loadNetscan();
+    if (route() === 'radios/scan') loadNetscan();
     if (route() === 'system/lan') {
       loadLan();
       renderLanState();
       loadTraffic();
       if (!trafficTimer) trafficTimer = setInterval(loadTraffic, 2000);
     }
-    if (route() === 'system/settings') loadHaFound();
-    if (route() === 'system/radios') loadRadios();
-    if (route() === 'ha/esphome') loadEsphomeWifi();
+    if (route() === 'ha/matter') loadHaFound();
+    if (route() === 'radios/status') loadRadios();
+    if (route() === 'esphome') loadEsphomeWifi();
     if (route().startsWith('system/users/')) loadUsersPage();
     if (route() === 'profile') loadProfile();
     if (route() === 'system/notify') loadNotifyAdmin();

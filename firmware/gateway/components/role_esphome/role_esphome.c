@@ -152,7 +152,7 @@ static void esphome_task(void *arg)
     } else if (s_esp.state == STATE_PROVISIONED) {
         strlcpy(s_esp.note, "on Wi-Fi", sizeof(s_esp.note));
     } else if (!ssid[0]) {
-        strlcpy(s_esp.note, "Wi-Fi not set: Home Assistant > ESPHome", sizeof(s_esp.note));
+        strlcpy(s_esp.note, "Wi-Fi not set: ESPHome page of the web UI", sizeof(s_esp.note));
     } else {
         uint8_t req[2 + 32 + 64];
         size_t sl = strlen(ssid), pl = strlen(pass);
