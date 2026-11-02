@@ -189,9 +189,9 @@ cJSON *gw_c6_telemetry(int radio)
     return NULL;
 }
 
-static cJSON *c6_chip_json(void)
+cJSON *gw_api_chip_json(int radio)
 {
-    const c6_chip_t *c = c6_chip_info(C6_RADIO_A);
+    const c6_chip_t *c = c6_chip_info(radio);
     cJSON *j = cJSON_CreateObject();
     if (c->known) {
         char buf[18];
@@ -328,7 +328,7 @@ static esp_err_t status_get(httpd_req_t *req)
     }
     free(dir);
     const c6_progress_t *p = c6_progress(C6_RADIO_A);
-    cJSON_AddItemToObject(c6, "chip", c6_chip_json());
+    cJSON_AddItemToObject(c6, "chip", gw_api_chip_json(C6_RADIO_A));
     cJSON *tel = gw_c6_telemetry(0);
     if (tel) {
         cJSON_AddItemToObject(c6, "telemetry", tel);

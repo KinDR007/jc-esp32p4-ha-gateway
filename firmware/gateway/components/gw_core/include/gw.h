@@ -205,6 +205,8 @@ esp_err_t gw_api_role_switch(const char *name, bool skip_backup, char *err, size
 /* The same for a radio (c6_radio_t: 0 = A, 1 = B; radio B also takes "none"). */
 esp_err_t gw_api_role_switch_radio(int radio, const char *name, bool skip_backup, char *err, size_t err_len);
 bool gw_api_temperature(float *celsius);
+/* Chip data of a radio read at its last flashing (MAC, revision, flash size) and its flash count. */
+cJSON *gw_api_chip_json(int radio);
 
 /*
  * Runtime telemetry of the C6 (one JSON object from firmware/c6/common/p4gw_telemetry), delivered by the

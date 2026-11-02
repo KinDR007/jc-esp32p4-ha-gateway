@@ -423,6 +423,7 @@ static esp_err_t radios_get(httpd_req_t *req)
         cJSON_AddNumberToObject(j, "percent", p->percent);
         cJSON_AddStringToObject(j, "stage", p->stage);
         cJSON_AddStringToObject(j, "error", r == C6_RADIO_B && s_flash_b.error[0] ? s_flash_b.error : p->last_error);
+        cJSON_AddItemToObject(j, "chip_info", gw_api_chip_json(r));
         cJSON_AddItemToArray(arr, j);
     }
     cJSON *b = cJSON_GetArrayItem(arr, 1);

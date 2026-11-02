@@ -1213,6 +1213,8 @@ const meter = (pct, warn = 70, bad = 90) => `<span class="meter"><span class="pr
 const used = (free, total) => total ? 100 - free / total * 100 : 0;
 const temp = s => s.temperature_c === undefined ? '' : `${s.temperature_c} °C` + (s.hw?.temp_max_c !== undefined ? ` <span class="muted">(min ${s.hw.temp_min_c}, max ${s.hw.temp_max_c})</span>` : '');
 const cpuLoad = hw => (hw?.cpu_load || []).map((l, i) => `<div class="row">core ${i} ${meter(l)}</div>`).join('');
+/* radio temperature with min/max since the gateway start and the age of a stale report */
+const telTemp = t => `${t.temp_c} °C` + (t.temp_max_c !== undefined ? ` <span class="muted">(min ${t.temp_min_c}, max ${t.temp_max_c})</span>` : '') + (t.age_s > 90 ? ` <span class="warn-text">(${t.age_s} s old)</span>` : '');
 /* C6 rows shared by the overview and Radios › Status and maintenance */
 function c6Rows(s, full) {
   const c = s.c6, chip = c.chip || {}, rs = s.role_status || {}, tel = c.telemetry;
@@ -1226,8 +1228,7 @@ function c6Rows(s, full) {
     ['C6 MAC', chip.mac ? esc(chip.mac) : '<span class="muted">read at the next C6 flashing</span>'],
     ['C6 chip revision', chip.mac ? rev(chip.revision) : tel?.rev !== undefined ? rev(tel.rev) : ''],
     ['C6 flash', chip.flash_size ? fmtBytes(chip.flash_size) : ''], ['Flashes', chip.flashes || ''],
-    ['Temperature', tel?.temp_c != null ? `${tel.temp_c} °C` + (tel.temp_max_c !== undefined ? ` <span class="muted">(min ${tel.temp_min_c}, max ${tel.temp_max_c})</span>` : '') + (tel.age_s > 90 ? ` <span class="warn-text">(${tel.age_s} s old)</span>` : '')
-      : '<span class="muted">not reported by this C6 firmware</span>', 'C6 temperature'],
+    ['Temperature', tel?.temp_c != null ? telTemp(tel) : '<span class="muted">not reported by this C6 firmware</span>', 'C6 temperature'],
     ['C6 memory', tel ? `${fmtBytes(tel.heap_free)} free, min ${fmtBytes(tel.heap_min)}` : ''],
     ['C6 uptime', tel ? fmtUptime(tel.uptime_s) : ''], ['C6 last reset', tel ? esc(tel.reset) : ''],
     ...(full ? [['Images', (c.images || []).map(i => `<span data-notr>${esc(i.name)}</span> <span class="muted">${esc(i.version)}</span>`).join('<br>') || '<span class="bad-text">none, upload c6fw.bin</span>']] : []),
@@ -1913,9 +1914,17 @@ async function loadRadios() {
     const head = [[L('Chip', 'Čip'), esc(x.chip || '')], [L('Role', 'Role'), esc(role)], [L('State', 'Stav'), x.maintenance ? `<span class="bad-text">${esc(x.maintenance)}</span>` : ''],
       [L('Package', 'Balík'), x.package_id ? `<code>${esc(x.package_id)}</code>` : '']];
     /* radio A: the full C6 details (former System › Information card) */
-    const rows = b ? [...head, [L('Firmware', 'Firmware'), esc(x.bundle || '')], [L('Wiring', 'Zapojení'), esc(x.wiring || '')],
-      [L('Temperature', 'Teplota'), t?.temp_c !== undefined ? t.temp_c + ' °C' : ''],
-      [L('Free memory', 'Volná paměť'), t?.heap_free ? fmtBytes(t.heap_free) : '']] : [...head, ...c6Rows(status, true)];
+    const c = x.chip_info || {};
+    /* radio B: the same details as radio A, from its telemetry and the chip data read at its last flashing
+     * ('-': no tooltip, the MAC and Flash ones describe the P4) */
+    const rows = b ? [...head, [L('Running', 'Běží'), x.bundle ? `<span data-notr>${esc(t?.fw || x.bundle)}</span>${t?.ver ? ` <span class="muted">${esc(t.ver)}</span>` : ''}` : ''],
+      [L('Wiring', 'Zapojení'), esc(x.wiring || '')],
+      ['MAC', c.mac ? esc(c.mac) : `<span class="muted">${L('read at the next flashing', 'načte se při příštím flashování')}</span>`, '-'],
+      [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : t?.rev !== undefined ? rev(t.rev) : ''],
+      ['Flash', c.flash_size ? fmtBytes(c.flash_size) : '', '-'], [L('Flashes', 'Počet flashování'), c.flashes || ''],
+      [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : ''],
+      [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : ''],
+      [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : ''], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '']] : [...head, ...c6Rows(status, true)];
     return `<div class="card">${h3(b ? 'chip' : 'developer-board', b ? L('Radio B (external, JP1)', 'Rádio B (externí, JP1)') : L('Radio A (C6 of the board)', 'Rádio A (C6 na desce)'))}${dl([...rows,
       [L('Flashing', 'Flashování'), x.busy ? `${x.percent} % ${esc(x.stage)}` : ''], [L('Last error', 'Poslední chyba'), esc(x.error || '')]])}
       <div class="row" style="margin-top:8px">

@@ -8,6 +8,9 @@
 - Web UI: the menu is arranged by task (menu_redesign/): Radios (roles, status and maintenance,
   radio surroundings), ESPHome as its own section, System › Settings split to the pages it belongs
   to; Zigbee backups show their radio and download the right one.
+- Web UI: Radios › Status and maintenance shows the same details for radio B as for radio A (firmware
+  version, MAC, chip revision, flash size, flash count, temperature min/max, memory, uptime, last
+  reset); `/api/radios` carries the chip data of each radio as `chip_info`.
 
 - Fix: the gateway could hang (web UI and API stop answering, the radios keep running) when an
   update check ended while MQTT was connecting, typically right after a role switch of radio B that
