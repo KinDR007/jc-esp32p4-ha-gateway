@@ -120,7 +120,7 @@ node tests/ui/ui_test.mjs --host <ip> --html firmware/gateway/web/index.html
 | UI15 | nápovědy (i) | žádný klíč nápovědy není v TIPS dvakrát; tabulky zařízení Thread a Zigbee a údaje instance Zigbee2MQTT mají vlastní nápovědy, ne texty jiných tabulek se stejným názvem sloupce |
 | UI11 | průběh flashování C6 (podvržený stav) | štítek „Flashování C6 · 46 %“ v hlavičce i mimo Přehled, fáze v bublině, pruh pod hlavičkou, žádný banner; modální okno zamkne stránku, ukáže fázi, procenta a odhad zbývajícího času, Escape ho nezavře; po skončení vše zmizí |
 | UI10 | štítek v hlavičce a karta Home Assistant a Matter | v roli Thread BR / Zigbee koordinátor je štítek uživatele brány, jinak skrytý; Home Assistant › Matter najde HA přes mDNS, „Použít“ vyplní ws://IP:5580/ws, test Matter Serveru odpoví |
-| UI09 | Rádia › Rádiové okolí (je-li uložen sken) | 16 hodnocených kanálů, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID, rychlý sken jen v roli Thread |
+| UI09 | Rádia › Rádiové okolí (je-li uložen sken) | 16 hodnocených kanálů v zónách pod Wi-Fi 1/6/11 a v mezerách, spektrum, doporučení, Wi-Fi tabulka po jednom řádku na BSSID s AP seskupenými podle BSSID, spektrum 5 GHz jen se sítěmi 5 GHz, rychlý sken jen v roli Thread |
 | UI08 | navigace a vysvětlivky | podsekce Thread v menu, ikony mají SVG, odkaz `#system/diag` po reloadu, starý `#tools` vede na Systém › Diagnostika, ⓘ u Teploty ukáže vysvětlení, na mobilu výsuvné menu (otevře se ☰, zavře výběrem) |
 | UI07 | vzhled světlý / tmavý / systém | `data-theme` a barva pozadí se mění, volba přežije reload, „systém“ sleduje nastavení OS |
 

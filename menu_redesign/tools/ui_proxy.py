@@ -34,11 +34,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     body = json.dumps(w).encode()
                 elif self.path.startswith('/api/net/scan'):
                     d = json.loads(body)
-                    names = {}
-                    for i, ap in enumerate((d.get('last') or {}).get('wifi') or []):
+                    names, vendors = {}, {}
+                    for ap in (d.get('last') or {}).get('wifi') or []:
                         if ap.get('ssid'):
                             ap['ssid'] = names.setdefault(ap['ssid'], f'WiFi-{len(names) + 1}')
-                        ap['bssid'] = f'02000000{i:04x}'
+                        # bytes 2-4 replaced per device, first and last bytes kept: the UI groups the
+                        # BSSIDs of one access point by them (apGroups), the address stays unknown
+                        b = ap['bssid']
+                        fake = vendors.setdefault(b[2:6] + b[7], f'{0xa0 + len(vendors):02x}00{len(vendors) % 16:x}')
+                        ap['bssid'] = b[:2] + fake[:4] + fake[4] + b[7] + b[8:]
                     body = json.dumps(d).encode()
                 self.reply(r.status, r.headers.get('Content-Type', 'application/octet-stream'), body)
         except urllib.error.HTTPError as e:

@@ -16,6 +16,10 @@
   role (`GET /api/c6/backup?radio=b`); the role switch points to that backup for both radios.
 - Radio surroundings: the full scan runs on radio A or B; radio B (ESP32-C5) also sees 5 GHz
   Wi-Fi. The Wi-Fi table shows band, channel width up to 160 MHz and the standards as `b/g/n/ax`.
+- Radio surroundings: the Wi-Fi table groups the networks of one access point; the 2.4 GHz
+  spectrum shows Wi-Fi, the Wi-Fi channels, MHz and 802.15.4 in lanes on one axis with the Thread
+  and Zigbee networks found; the channel table is split by Wi-Fi 1/6/11 and the gaps between; a
+  5 GHz spectrum (U-NII bands, DFS) after a radio B scan.
 - Fix: the full scan showed WPA3 networks as open: the scanner firmware was built without WPA3
   SAE, so the Wi-Fi library did not recognise their key management (scanner 1.1.0, new radio
   packages). A network reported open with a cipher is shown as protected.

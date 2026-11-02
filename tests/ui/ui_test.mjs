@@ -266,13 +266,18 @@ await test('UI09', 'Network surroundings: the last scan shows channels, spectrum
   }
   await tab('radios/scan');
   await page.waitForSelector('#ns-channels table', { timeout: 20000 });
-  check(await page.$$eval('#ns-channels tr', r => r.length) === 17, 'all 16 channels (11-26) rated');
-  check(await page.$$eval('#ns-spectrum svg rect', r => r.length) === 16, 'spectrum shows the 16 channels');
+  check(await page.$$eval('#ns-channels tr:not(.ns-sep)', r => r.length) === 17, 'all 16 channels (11-26) rated');
+  check(await page.$$eval('#ns-channels tr.ns-sep', r => r.length) === 6, 'channels separated by the Wi-Fi 1/6/11 zones and gaps');
+  check(await page.$$eval('#ns-spectrum svg rect[class^="ch-"]', r => r.length) === 16, 'spectrum shows the 16 channels');
   check(/\d/.test(await page.textContent('#ns-reco')), `recommendation shown (${(await page.textContent('#ns-reco')).replace(/\s+/g, ' ').slice(0, 60)}…)`);
   if (d.last.wifi) {
-    const rows = await page.$$eval('#ns-wifi tr', r => r.length - 1);
+    const rows = await page.$$eval('#ns-wifi tr:not(.ns-ap)', r => r.length - 1);
     const unique = new Set(d.last.wifi.map(a => a.bssid)).size;
     check(rows === unique, `Wi-Fi table: one row per BSSID (${rows})`);
+    const groups = await page.$$eval('#ns-wifi tr.ns-ap', r => r.length), members = await page.$$eval('#ns-wifi tr.ns-member', r => r.length);
+    check(groups === 0 ? members === 0 : members >= 2 * groups, `access points with several networks grouped (${groups}, ${members} networks)`);
+    const has5 = d.last.wifi.some(a => a.ch > 14);
+    check(await page.isHidden('#ns-5g') === !has5, `5 GHz spectrum ${has5 ? 'shown' : 'hidden'} (${has5 ? 'radio B scan' : 'no 5 GHz networks'})`);
   }
   check(await page.isDisabled('#ns-quick') === !d.quick_available, 'quick scan offered only when the role can run it');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);

@@ -79,7 +79,7 @@
 - [x] Nové menu nahráno na bránu (v1.8.1-4, USB, pak 3× OTA upload z UI bez watchdogu)
 - [ ] Projít UI testy s heslem přímo na bráně (UI21–UI23 zapisují); vydání s novým menu
 - [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
-- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI18 (rádio B bez min/max teploty), UI25 (formát logu) neodpovídají současnému UI
+- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI25 (formát logu) neodpovídají současnému UI
 - [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu
 - [x] Rádio B v UI se stejnými údaji a akcemi jako rádio A (přehled, Stav a údržba: přeflashování, záloha flash, firmwary)
 - [x] Úplný sken na rádiu A i B (C5: 5 GHz, šířka, standardy), oprava WPA3 hlášené jako otevřená (skener 1.1.0); TC20 prošel

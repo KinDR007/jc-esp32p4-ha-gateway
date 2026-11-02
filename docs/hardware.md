@@ -107,6 +107,14 @@ network.
   scanner 1.0 lacked it and reported WPA3 networks as open (fixed in 1.1). Only 2.4 GHz networks
   count for the 802.15.4 ratings.
 
+The page shows the 2.4 GHz spectrum in lanes on one frequency axis: Wi-Fi access points over the
+non-overlapping Wi-Fi channels 1/6/11/13, the Wi-Fi channel ruler, MHz and the 802.15.4 channels
+with the Thread (T) and Zigbee (Z) networks found on them. The channel table groups the 802.15.4
+channels by the Wi-Fi channel they lie under (11-14 under 1, 16-19 under 6, 21-24 under 11) and the
+gaps (15, 20, 25-26) and lists the Wi-Fi channels covering each. A radio B scan adds a 5 GHz
+spectrum over the U-NII bands (DFS shaded). The Wi-Fi table groups the BSSIDs of one access point
+(several SSIDs, 2.4 and 5 GHz): same bytes 2-3 and low nibble of byte 4, last two bytes within 8.
+
 The last result is stored in NVS with its time (SNTP). Ratings are computed in the web UI: Wi-Fi
 overlap (a 20 MHz channel covers about four 802.15.4 channels), measured noise and networks
 already on the channel. The C6 bundle with the scanner uses 2.04 of 2.10 MB of the `c6fw`

@@ -267,6 +267,15 @@ td.zact .btn { padding: 4px 6px; margin: 1px 0; }
 .spectrum .grid-line { stroke: var(--border); }
 .spectrum .ch-good { fill: var(--ok); } .spectrum .ch-ok { fill: var(--warn); } .spectrum .ch-bad { fill: var(--bad); }
 .spectrum .own { stroke: var(--text); stroke-width: 2; }
+.spectrum .lane { fill: var(--panel-2); }
+.spectrum .wband { fill: var(--accent); fill-opacity: .06; stroke: var(--accent); stroke-opacity: .35; stroke-dasharray: 3 3; }
+.spectrum .guide { stroke: var(--muted); stroke-opacity: .25; stroke-dasharray: 2 3; }
+.spectrum .dfs { fill: var(--warn); fill-opacity: .08; }
+.spectrum text.strong { fill: var(--text); font-weight: 600; }
+.spectrum .net-thread { fill: var(--accent); } .spectrum .net-zigbee { fill: var(--warn); }
+tr.ns-sep td { background: var(--panel-2); color: var(--muted); font-size: 12px; padding-top: 6px; padding-bottom: 6px; }
+tr.ns-ap td { background: var(--panel-2); }
+tr.ns-member td:first-child { padding-left: 22px; }
 .reco { display: grid; gap: 10px; }
 .reco > div { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
 .reco b.big { font-size: 18px; }
@@ -3151,10 +3160,36 @@ const wifi24 = last => (last.wifi || []).filter(ap => ap.ch <= 14);
 const apWidth = ap => ap.bw || (ap.ch2 === 'none' ? 20 : 40);
 const SECURITY = { open: ['open', 'otevřená'], other: ['protected (unknown type)', 'chráněná (neznámý typ)'] };
 function apSpan(ap) {
-  const wide = ap.ch2 === 'above' || ap.ch2 === 'below';
-  const center = fWifi(ap.ch) + (ap.ch2 === 'above' ? 10 : ap.ch2 === 'below' ? -10 : 0);
+  const wide = apWidth(ap) >= 40;
+  const center = fWifi(ap.ch) + (!wide ? 0 : ap.ch2 === 'above' ? 10 : ap.ch2 === 'below' ? -10 : 0);
   return [center - (wide ? 20 : 10), center + (wide ? 20 : 10)];
 }
+/* 5 GHz: the channel block of the AP's width (40/80/160 MHz blocks start at fixed channels) */
+const f5 = ch => 5000 + 5 * ch;
+const BLOCKS5 = { 40: [36, 44, 52, 60, 100, 108, 116, 124, 132, 140, 149, 157, 165, 173], 80: [36, 52, 100, 116, 132, 149, 165], 160: [36, 100, 149] };
+function apSpan5(ap) {
+  const w = apWidth(ap), base = (BLOCKS5[w] || []).filter(b => b <= ap.ch).pop();
+  const center = base === undefined ? f5(ap.ch) : f5(base) + (w - 20) / 2;
+  return [center - w / 2, center + w / 2];
+}
+/* BSSIDs of one access point: its virtual networks differ in the first byte (locally administered
+ * addresses), some vendors also in the upper nibble of the fourth; the 2.4 and 5 GHz radios in the
+ * last bytes by a few. Same AP: bytes 2-3 and the low nibble of byte 4 equal, last two bytes within 8. */
+function apGroups(list) {
+  const b = list.map(a => a.bssid.match(/../g).map(x => parseInt(x, 16)));
+  const same = (p, q) => p[1] === q[1] && p[2] === q[2] && (p[3] & 15) === (q[3] & 15) && Math.abs((p[4] << 8 | p[5]) - (q[4] << 8 | q[5])) <= 8;
+  const parent = list.map((_, i) => i), root = i => parent[i] === i ? i : (parent[i] = root(parent[i]));
+  for (let i = 0; i < list.length; i++) for (let j = 0; j < i; j++) if (same(b[i], b[j])) parent[root(i)] = root(j);
+  const groups = new Map();
+  list.forEach((a, i) => { const r = root(i); groups.set(r, [...(groups.get(r) || []), a]); });
+  return [...groups.values()].map(g => g.sort((x, y) => (x.ch > 14) - (y.ch > 14) || y.rssi - x.rssi))
+    .sort((x, y) => Math.max(...y.map(a => a.rssi)) - Math.max(...x.map(a => a.rssi)));
+}
+/* 802.15.4 channels by the non-overlapping Wi-Fi channels 1, 6, 11 (22 MHz each) and the gaps between */
+const ZONES = [[11, 14, ['under Wi-Fi 1', 'pod Wi-Fi 1']], [15, 15, ['gap Wi-Fi 1/6', 'mezera Wi-Fi 1/6']], [16, 19, ['under Wi-Fi 6', 'pod Wi-Fi 6']],
+  [20, 20, ['gap Wi-Fi 6/11', 'mezera Wi-Fi 6/11']], [21, 24, ['under Wi-Fi 11', 'pod Wi-Fi 11']], [25, 26, ['above Wi-Fi 11 (Wi-Fi 12/13 in Europe)', 'nad Wi-Fi 11 (v Evropě Wi-Fi 12/13)']]];
+/* Wi-Fi channels 1-13 whose 22 MHz cover an 802.15.4 channel */
+const wifiOver = ch => Array.from({ length: 13 }, (_, i) => i + 1).filter(w => Math.abs(fWifi(w) - f154(ch)) < 12);
 const apOverlaps = (ap, ch) => { const [a, b] = apSpan(ap); return f154(ch) + 1 > a && f154(ch) - 1 < b; };
 
 function nsNetworks(last) {
@@ -3214,14 +3249,22 @@ function nsChannels(last, nets) {
 const RATING = { good: ['ok', 'good', 'dobrý'], ok: ['warn', 'usable', 'použitelný'], bad: ['bad', 'poor', 'špatný'] };
 const ratingPill = r => pill(RATING[r][0], L(RATING[r][1], RATING[r][2]));
 
-function nsSpectrum(chs, last) {
-  const W = 860, H = 230, x = f => 40 + (f - 2400) / 85 * (W - 60), y = rssi => 150 - (Math.min(-30, Math.max(-100, rssi)) + 100) / 70 * 130;
-  let svg = `<svg class="spectrum" viewBox="0 0 ${W} ${H}" role="img" aria-label="2.4 GHz spectrum">`;
-  for (const db of [-40, -60, -80, -100]) svg += `<line class="grid-line" x1="40" x2="${W - 20}" y1="${y(db)}" y2="${y(db)}"/><text x="4" y="${y(db) + 4}">${db}</text>`;
+/* 2.4 GHz in lanes on one frequency axis: Wi-Fi access points (arcs, height = signal) over the
+ * non-overlapping Wi-Fi channels 1/6/11/13, the Wi-Fi channel ruler, MHz, then the 802.15.4 channels
+ * coloured by rating with the Thread and Zigbee networks found on them. Guides show the overlap. */
+function nsSpectrum(chs, last, nets) {
+  const W = 900, H = 300, X0 = 74, base = 160, x = f => X0 + (f - 2400) / 85 * (W - X0 - 16), y = rssi => base - (Math.min(-30, Math.max(-100, rssi)) + 100) / 70 * 140;
+  let svg = `<svg class="spectrum" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('2.4 GHz spectrum', 'Spektrum 2,4 GHz')}">`;
+  for (const db of [-40, -60, -80, -100]) svg += `<line class="grid-line" x1="${X0}" x2="${W - 16}" y1="${y(db)}" y2="${y(db)}"/><text x="${X0 - 6}" y="${y(db) + 4}" text-anchor="end">${db} dBm</text>`;
+  for (const w of [1, 6, 11, 13]) {
+    svg += `<rect class="wband" x="${x(fWifi(w) - 11)}" y="${y(-32)}" width="${x(fWifi(w) + 11) - x(fWifi(w) - 11)}" height="${base - y(-32)}"/>
+      <text x="${x(fWifi(w))}" y="${y(-32) + 12}" text-anchor="middle">Wi-Fi ${w}</text>`;
+  }
+  for (const c of chs) svg += `<line class="guide" x1="${x(c.mhz)}" x2="${x(c.mhz)}" y1="${y(-32)}" y2="236"/>`;
   const aps = wifi24(last).sort((a, b) => a.rssi - b.rssi);
   for (const ap of aps) {
     const [a, b] = apSpan(ap), top = y(ap.rssi);
-    svg += `<path class="ap ${ap.rssi > -65 ? 'strong' : ''}" d="M${x(a)},150 C${x(a + 4)},${top} ${x(b - 4)},${top} ${x(b)},150 Z"><title>${esc(ap.ssid || L('hidden', 'skrytá'))} · ch ${ap.ch} · ${ap.rssi} dBm</title></path>`;
+    svg += `<path class="ap ${ap.rssi > -65 ? 'strong' : ''}" d="M${x(a)},${base} C${x(a + 4)},${top} ${x(b - 4)},${top} ${x(b)},${base} Z"><title>${esc(ap.ssid || L('hidden', 'skrytá'))} · ch ${ap.ch} · ${apWidth(ap)} MHz · ${ap.rssi} dBm</title></path>`;
   }
   /* one label per Wi-Fi channel: its SSIDs, strongest first */
   const byCh = new Map();
@@ -3233,14 +3276,55 @@ function nsSpectrum(chs, last) {
   }
   for (const [ch, e] of byCh) {
     const text = e.names.slice(0, 3).join(', ') + (e.names.length > 3 ? ' +' + (e.names.length - 3) : '');
-    svg += `<text x="${x(fWifi(ch))}" y="${y(e.rssi) - 5}" text-anchor="middle" style="fill:var(--text)">${esc(text)}</text>`;
+    svg += `<text x="${x(fWifi(ch))}" y="${Math.max(y(-32) + 28, y(e.rssi) - 5)}" text-anchor="middle" style="fill:var(--text)">${esc(text)}</text>`;
   }
+  /* lanes: Wi-Fi channels, MHz, 802.15.4 */
+  svg += `<rect class="lane" x="${X0}" y="${base + 4}" width="${W - X0 - 16}" height="20" rx="4"/><text x="${X0 - 6}" y="${base + 18}" text-anchor="end">Wi-Fi</text>`;
+  for (let w = 1; w <= 13; w++) svg += `<text x="${x(fWifi(w))}" y="${base + 18}" text-anchor="middle" class="${[1, 6, 11].includes(w) ? 'strong' : ''}">${w}</text>`;
+  svg += `<text x="${X0 - 6}" y="${base + 40}" text-anchor="end">MHz</text>`;
+  for (let f = 2410; f <= 2480; f += 10) svg += `<text x="${x(f)}" y="${base + 40}" text-anchor="middle">${f}</text>`;
+  svg += `<text x="${X0 - 6}" y="${base + 66}" text-anchor="end">802.15.4</text>`;
   for (const c of chs) {
-    const cx = x(c.mhz);
-    svg += `<rect class="ch-${c.rating} ${c.nets.some(n => n.own) ? 'own' : ''}" x="${cx - 9}" y="160" width="18" height="26" rx="4"><title>${L('channel', 'kanál')} ${c.ch}: ${c.score}/100</title></rect>
-      <text x="${cx}" y="205" text-anchor="middle">${c.ch}</text>`;
+    const cx = x(c.mhz), here = nets.filter(n => n.ch === c.ch);
+    svg += `<rect class="ch-${c.rating} ${here.some(n => n.own) ? 'own' : ''}" x="${cx - 10}" y="${base + 50}" width="20" height="26" rx="4"><title>${L('channel', 'kanál')} ${c.ch} (${c.mhz} MHz): ${c.score}/100</title></rect>
+      <text x="${cx}" y="${base + 90}" text-anchor="middle" class="${[15, 20, 25].includes(c.ch) ? 'strong' : ''}">${c.ch}</text>`;
+    here.forEach((n, k) => {
+      const t = n.type === 'zigbee' ? 'Z' : n.type === 'thread' ? 'T' : '·';
+      svg += `<circle class="net-${n.type}" cx="${cx}" cy="${base + 104 + k * 14}" r="6"><title>${n.type === 'zigbee' ? 'Zigbee' : n.type === 'thread' ? 'Thread' : '802.15.4'} ${esc(n.name || n.pan)}${n.own ? ' ★' : ''}</title></circle>
+        <text x="${cx}" y="${base + 108 + k * 14}" text-anchor="middle" style="fill:var(--accent-text);font-size:9px">${t}</text>`;
+    });
   }
-  for (const w of [1, 6, 11, 13]) svg += `<text x="${x(fWifi(w))}" y="225" text-anchor="middle">Wi-Fi ${w}</text>`;
+  return svg + '</svg>';
+}
+
+/* 5 GHz (radio B): access points over the U-NII bands, DFS bands shaded; 802.15.4 is not here */
+function nsSpectrum5(last) {
+  const aps = (last.wifi || []).filter(a => a.ch > 14).sort((a, b) => a.rssi - b.rssi);
+  if (!aps.length) return '';
+  const W = 900, H = 230, X0 = 74, F0 = 5150, F1 = 5895, base = 160, x = f => X0 + (f - F0) / (F1 - F0) * (W - X0 - 16), y = rssi => base - (Math.min(-30, Math.max(-100, rssi)) + 100) / 70 * 130;
+  let svg = `<svg class="spectrum" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('5 GHz spectrum', 'Spektrum 5 GHz')}">`;
+  for (const [a, b, name, dfs] of [[5150, 5250, 'U-NII-1', 0], [5250, 5350, 'U-NII-2A (DFS)', 1], [5470, 5725, 'U-NII-2C (DFS)', 1], [5725, 5850, 'U-NII-3', 0]]) {
+    svg += `<rect class="${dfs ? 'dfs' : 'wband'}" x="${x(a)}" y="20" width="${x(b) - x(a)}" height="${base - 20}"/><text x="${(x(a) + x(b)) / 2}" y="32" text-anchor="middle">${name}</text>`;
+  }
+  for (const db of [-40, -60, -80, -100]) svg += `<line class="grid-line" x1="${X0}" x2="${W - 16}" y1="${y(db)}" y2="${y(db)}"/><text x="${X0 - 6}" y="${y(db) + 4}" text-anchor="end">${db} dBm</text>`;
+  for (const ap of aps) {
+    const [a, b] = apSpan5(ap), top = y(ap.rssi), k = Math.min(8, (b - a) / 5);
+    svg += `<path class="ap ${ap.rssi > -65 ? 'strong' : ''}" d="M${x(a)},${base} C${x(a + k)},${top} ${x(b - k)},${top} ${x(b)},${base} Z"><title>${esc(ap.ssid || L('hidden', 'skrytá'))} · ch ${ap.ch} · ${apWidth(ap)} MHz · ${ap.rssi} dBm</title></path>`;
+  }
+  const byBlock = new Map();
+  for (const ap of [...aps].reverse()) {
+    if (!ap.ssid || ap.rssi < -80) continue;
+    const [a, b] = apSpan5(ap), key = (a + b) / 2, e = byBlock.get(key) || { rssi: ap.rssi, names: [] };
+    if (!e.names.includes(ap.ssid)) e.names.push(ap.ssid);
+    byBlock.set(key, e);
+  }
+  for (const [f, e] of byBlock) svg += `<text x="${x(f)}" y="${Math.max(48, y(e.rssi) - 5)}" text-anchor="middle" style="fill:var(--text)">${esc(e.names.slice(0, 2).join(', ') + (e.names.length > 2 ? ' +' + (e.names.length - 2) : ''))}</text>`;
+  svg += `<rect class="lane" x="${X0}" y="${base + 4}" width="${W - X0 - 16}" height="20" rx="4"/><text x="${X0 - 6}" y="${base + 18}" text-anchor="end">${L('channel', 'kanál')}</text>`;
+  for (const ch of [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165]) {
+    svg += `<text x="${x(f5(ch))}" y="${base + 18}" text-anchor="middle" class="${aps.some(a => a.ch === ch) ? 'strong' : ''}" style="font-size:10px">${ch}</text>`;
+  }
+  svg += `<text x="${X0 - 6}" y="${base + 40}" text-anchor="end">MHz</text>`;
+  for (let f = 5200; f <= 5850; f += 100) svg += `<text x="${x(f)}" y="${base + 40}" text-anchor="middle">${f}</text>`;
   return svg + '</svg>';
 }
 
@@ -3287,6 +3371,7 @@ views['radios/scan'] = () => `<div class="grid">
     <div id="ns-state" class="muted" style="margin-top:10px"></div></div>
   <div class="card">${h3('check', 'Recommendation')}<div id="ns-reco" class="muted">No scan yet.</div></div>
   <div class="card wide">${h3('waveform', '2.4 GHz spectrum')}<div id="ns-spectrum" class="muted">No scan yet.</div></div>
+  <div class="card wide hidden" id="ns-5g">${h3('waveform', L('5 GHz spectrum', 'Spektrum 5 GHz'))}<div id="ns-spectrum5"></div></div>
   <div class="card wide">${h3('counter', 'IEEE 802.15.4 channels')}<div class="table-wrap" id="ns-channels"></div></div>
   <div class="card wide">${h3('lan-connect', 'Thread and Zigbee networks')}<div class="table-wrap" id="ns-nets"></div></div>
   <div class="card wide">${h3('access-point-network', 'Wi-Fi networks')}<div class="table-wrap" id="ns-wifi"></div></div>
@@ -3316,14 +3401,22 @@ async function loadNetscan() {
   $('#ns-reco').classList.remove('muted');
   $('#ns-reco').innerHTML = nsRecommend(chs, nets, last);
   $('#ns-spectrum').classList.remove('muted');
-  $('#ns-spectrum').innerHTML = last.wifi ? nsSpectrum(chs, last) + `<p class="muted">${L('Wi-Fi networks as arcs (height = signal), 802.15.4 channels below coloured by rating, your networks outlined.', 'Wi-Fi sítě jako oblouky (výška = signál), pod nimi kanály 802.15.4 barevně podle hodnocení, vaše sítě orámované.')}</p>`
-    : nsSpectrum(chs, last) + `<p class="muted">${L('Quick scan: no Wi-Fi data, run a full scan for it.', 'Rychlý sken: bez Wi-Fi, pro ni spusťte úplný sken.')}</p>`;
-  $('#ns-channels').innerHTML = `<table><tr>${['Channel', 'MHz', 'Noise', 'Wi-Fi overlap', 'Networks', 'Score'].map(th).join('')}</tr>${chs.map(c => `<tr>
-    <td><b>${c.ch}</b></td><td>${c.mhz}</td>
+  $('#ns-spectrum').innerHTML = nsSpectrum(chs, last, nets) + (last.wifi ? `<p class="muted">${L('Wi-Fi access points as arcs (height = signal) over the non-overlapping Wi-Fi channels 1, 6, 11 and 13 (dashed, 22 MHz). Below on the same frequency axis the 802.15.4 channels coloured by rating, your network outlined, with the networks found on them: T Thread, Z Zigbee. Dotted guides show which Wi-Fi covers which 802.15.4 channel; 15, 20 and 25 lie in the gaps.',
+      'Přístupové body Wi-Fi jako oblouky (výška = signál) nad nepřekrývajícími se kanály Wi-Fi 1, 6, 11 a 13 (čárkovaně, 22 MHz). Pod nimi na stejné frekvenční ose kanály 802.15.4 barevně podle hodnocení, vaše síť orámovaná, se sítěmi nalezenými na nich: T Thread, Z Zigbee. Tečkovaná vodítka ukazují, která Wi-Fi překrývá který kanál 802.15.4; 15, 20 a 25 leží v mezerách.')}</p>`
+    : `<p class="muted">${L('Quick scan: no Wi-Fi data, run a full scan for it.', 'Rychlý sken: bez Wi-Fi, pro ni spusťte úplný sken.')}</p>`);
+  const s5 = nsSpectrum5(last);
+  $('#ns-5g').classList.toggle('hidden', !s5);
+  $('#ns-spectrum5').innerHTML = s5 && s5 + `<p class="muted">${L('5 GHz access points of radio B over the U-NII bands, width as reported (20 to 160 MHz). DFS bands (shaded) need radar detection. 5 GHz does not disturb Thread or Zigbee.',
+    'Přístupové body 5 GHz z rádia B nad pásmy U-NII, šířka podle hlášení (20 až 160 MHz). Pásma DFS (podbarvená) vyžadují detekci radaru. 5 GHz neruší Thread ani Zigbee.')}</p>`;
+  $('#ns-channels').innerHTML = `<table><tr>${['Channel', 'MHz', L('Wi-Fi channels', 'Kanály Wi-Fi'), 'Noise', 'Wi-Fi overlap', 'Networks', 'Score'].map(th).join('')}</tr>${chs.map(c => {
+    const z = ZONES.find(([a]) => a === c.ch);
+    return `${z ? `<tr class="ns-sep"><td colspan="7">${L(...z[2])} · ${f154(z[0]) - 1}–${f154(z[1]) + 1} MHz</td></tr>` : ''}<tr>
+    <td><b>${c.ch}</b></td><td>${c.mhz}</td><td>${wifiOver(c.ch).map(w => c.aps.some(a => a.ch === w) ? `<b>${w}</b>` : `<span class="muted">${w}</span>`).join(', ')}</td>
     <td>${c.noise !== null ? c.noise + ' dBm' : '—'}${c.noiseAvg !== undefined ? ` <span class="muted">(${L('avg', 'prům.')} ${c.noiseAvg})</span>` : ''}</td>
     <td>${c.wifiDbm !== null ? `${c.wifiDbm.toFixed(0)} dBm <span class="muted">${c.aps.length}× ${[...new Set(c.aps.filter(a => a.ssid).sort((a, b) => b.rssi - a.rssi).map(a => esc(a.ssid)))].slice(0, 2).join(', ')}</span>` : last.wifi ? '—' : '<span class="muted">?</span>'}</td>
     <td>${c.nets.map(n => `${n.type === 'zigbee' ? 'Zigbee' : n.type === 'thread' ? 'Thread' : '802.15.4'}${n.own ? ' ★' : ''}`).join(', ') || '—'}</td>
-    <td>${ratingPill(c.rating)} <span class="muted">${c.score}</span></td></tr>`).join('')}</table>`;
+    <td>${ratingPill(c.rating)} <span class="muted">${c.score}</span></td></tr>`;
+  }).join('')}</table><p class="muted">${L('Wi-Fi channels: those whose 22 MHz cover the channel, bold where an access point was found.', 'Kanály Wi-Fi: ty, jejichž 22 MHz kanál pokrývá, tučně kde byl nalezen přístupový bod.')}</p>`;
   $('#ns-nets').innerHTML = nets.length ? `<table><tr>${[['Type', 'Network type'], 'Name', 'PAN ID', 'Ext PAN ID', 'Channel', 'Devices', 'Best signal', 'Open'].map(th).join('')}</tr>${nets.map(n => `<tr>
     <td>${n.type === 'zigbee' ? 'Zigbee' : n.type === 'thread' ? 'Thread' : n.type === 'other' ? L('other', 'jiná') : '802.15.4'}${n.own ? ' ' + pill('ok', L('yours', 'vaše')) : ''}</td>
     <td data-notr>${esc(n.name || '')}</td><td><code>${esc(n.pan)}</code></td><td>${n.epid ? `<code>${esc(n.epid)}</code>` : ''}</td>
@@ -3331,13 +3424,21 @@ async function loadNetscan() {
     : `<p class="muted">${L('No 802.15.4 network found.', 'Žádná síť 802.15.4 nenalezena.')}</p>`;
   /* one row per BSSID (results stored before the gateway merged them carry duplicates) */
   const wifi = [...new Map([...(last.wifi || [])].sort((a, b) => a.rssi - b.rssi).map(a => [a.bssid, a])).values()].sort((a, b) => b.rssi - a.rssi);
+  const groups = apGroups(wifi), multi = groups.filter(g => g.length > 1).length;
+  const apHead = g => {
+    const bands = [...new Set(g.map(a => a.ch > 14 ? '5 GHz' : L('2.4 GHz', '2,4 GHz')))].join(' + ');
+    const names = [...new Set(g.map(a => a.ssid).filter(Boolean))];
+    return `<tr class="ns-ap"><td colspan="8">${ic('access-point-network')} <b>${L('Access point', 'Přístupový bod')}</b> · ${L(`${g.length} networks`, `${g.length} ${g.length < 5 ? 'sítě' : 'sítí'}`)} · ${bands}
+      · <span data-notr>${names.map(esc).join(', ')}</span>${g.length > names.length ? ` <span class="muted">+ ${L('hidden', 'skrytá')}</span>` : ''}</td></tr>`;
+  };
   $('#ns-wifi').innerHTML = !last.wifi ? `<p class="muted">${L('Only the full scan sees Wi-Fi.', 'Wi-Fi vidí jen úplný sken.')}</p>`
-    : `<table><tr>${['SSID', 'BSSID', 'Band', ['Channel', 'Wi-Fi channel'], 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${wifi.map(a => `<tr>
+    : `<table><tr>${['SSID', 'BSSID', 'Band', ['Channel', 'Wi-Fi channel'], 'Width', 'Signal', 'Security', 'Standard'].map(th).join('')}</tr>${groups.map(g => (g.length > 1 ? apHead(g) : '') + g.map(a => `<tr class="${g.length > 1 ? 'ns-member' : ''}">
     <td data-notr>${a.ssid ? esc(a.ssid) : `<span class="muted">${L('hidden', 'skrytá')}</span>`}</td><td><code>${esc(a.bssid.match(/../g).join(':'))}</code></td>
     <td>${a.ch > 14 ? '5 GHz' : L('2.4 GHz', '2,4 GHz')}</td><td>${a.ch}</td><td>${apWidth(a)} MHz</td>
     <td>${meter(Math.max(0, Math.min(100, (a.rssi + 100) * 1.6)), 101, 101).replace(/\d+ %/, a.rssi + ' dBm')}</td>
     <td data-notr>${SECURITY[a.auth] ? `<span class="${a.auth === 'open' ? 'warn-text' : ''}">${L(...SECURITY[a.auth])}</span>` : esc(a.auth.toUpperCase())}</td>
-    <td data-notr>802.11${esc(a.phy)}</td></tr>`).join('')}</table>
+    <td data-notr>802.11${esc(a.phy)}</td></tr>`).join('')).join('')}</table>
+    ${multi ? `<p class="muted">${L(`${multi} access point${multi > 1 ? 's send' : ' sends'} several networks (one radio, several SSIDs, or 2.4 and 5 GHz): grouped by their BSSIDs, which differ only in the first byte or by a few in the last.`, `${multi} ${multi === 1 ? 'přístupový bod vysílá' : multi < 5 ? 'přístupové body vysílají' : 'přístupových bodů vysílá'} víc sítí (jedno rádio s více SSID nebo 2,4 a 5 GHz): seskupeno podle BSSID, která se liší jen prvním bajtem nebo o pár v posledním.`)}</p>` : ''}
     ${last.wifi.some(a => a.auth === 'open') && !last.wifi.some(a => a.bw) ? `<p class="muted">${L('Scans before scanner 1.1 show WPA3 networks as open: run a new full scan.', 'Skeny před skenerem 1.1 ukazují sítě WPA3 jako otevřené: spusťte nový úplný sken.')}</p>` : ''}`;
 }
 
