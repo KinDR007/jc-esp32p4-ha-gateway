@@ -144,7 +144,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [ ] F5.3 Test shody dokumentace s endpointy
 
 **F6 Zvuk**
-- [ ] F6.1 Audio ring 10 s → 20 s jen při změřeném přínosu
+- [x] F6.1 Audio ring 10 s ponechán: čte ho inference (zpoždění ≤ 1 s + okno 0,96 s), učení (0,975 s) a `/api/sound/clip` (≤ 9 s); 20 s by přineslo jen delší ruční klip, žádné funkci nepomůže (+320 kB PSRAM). Smysl by dávalo až s nahráváním zvuku k události (např. příloha v Telegramu)
 
 **F7 Uzavření**
 - [ ] F7.1 Úplná regrese (soak jen na pokyn)
