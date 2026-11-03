@@ -12,11 +12,12 @@
 static float s_window[MEL_WINDOW];
 static float s_cos[FFT_N / 2], s_sin[FFT_N / 2];
 static unsigned short s_bitrev[FFT_N];
-/* Sparse mel matrix: each band covers a contiguous bin range. */
+/* Sparse mel matrix: each band covers a contiguous bin range, its weights start at offset in s_weights.
+ * Neighbouring triangles overlap, so a bin has at most two bands. */
 static struct {
-    int first, count;
-    float weights[FFT_BINS];
+    short first, count, offset;
 } s_bands[MEL_BANDS];
+static float s_weights[2 * FFT_BINS];
 
 static double hz_to_mel(double hz)
 {
@@ -41,12 +42,14 @@ int mel_init(void)
     }
     /* Same construction as tf.signal.linear_to_mel_weight_matrix: bin 0 (DC) gets no weight. */
     double lo = hz_to_mel(MEL_MIN_HZ), hi = hz_to_mel(MEL_MAX_HZ);
+    int used = 0;
     for (int m = 0; m < MEL_BANDS; m++) {
         double left = lo + (hi - lo) * m / (MEL_BANDS + 1);
         double center = lo + (hi - lo) * (m + 1) / (MEL_BANDS + 1);
         double right = lo + (hi - lo) * (m + 2) / (MEL_BANDS + 1);
         s_bands[m].first = -1;
         s_bands[m].count = 0;
+        s_bands[m].offset = used;
         for (int k = 1; k < FFT_BINS; k++) {
             double mel = hz_to_mel((double)k * (MEL_SAMPLE_RATE / 2.0) / (FFT_BINS - 1));
             double w = fmin((mel - left) / (center - left), (right - mel) / (right - center));
@@ -56,9 +59,13 @@ int mel_init(void)
             if (s_bands[m].first < 0) {
                 s_bands[m].first = k;
             }
-            s_bands[m].weights[k - s_bands[m].first] = (float)w;
+            if (used + k - s_bands[m].first >= 2 * FFT_BINS) {
+                return -1;
+            }
+            s_weights[used + k - s_bands[m].first] = (float)w;
             s_bands[m].count = k - s_bands[m].first + 1;
         }
+        used += s_bands[m].count;
     }
     return 0;
 }
@@ -94,7 +101,7 @@ void mel_frame(const float *samples, float *out)
     for (int m = 0; m < MEL_BANDS; m++) {
         float acc = 0.0f;
         for (int i = 0; i < s_bands[m].count; i++) {
-            acc += mag[s_bands[m].first + i] * s_bands[m].weights[i];
+            acc += mag[s_bands[m].first + i] * s_weights[s_bands[m].offset + i];
         }
         out[m] = logf(acc + LOG_OFFSET);
     }

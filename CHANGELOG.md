@@ -7,6 +7,8 @@
   `scripts/migrate_layout_v4.sh <port>` (settings, Thread network, users, Zigbee snapshots, model and
   sounds stay; `--rollback <stamp>` goes back). `update.layout` reports 4; releases for layout 3 are
   still offered on v4, a manifest names only layout 4 when `p4gw.bin` is larger than 3 MB.
+- Sound: the mel filter bank keeps only the used weights (66 kB -> 2.4 kB of internal RAM, same
+  output bit for bit).
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.

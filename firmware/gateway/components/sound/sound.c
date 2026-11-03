@@ -440,7 +440,7 @@ static esp_err_t start(void)
     gw_psram_note("sound_audio", RING * sizeof(int16_t) + 2 * MEL_PATCH_FRAMES * MEL_BANDS * sizeof(float) +
                                      LEARN_AUDIO * sizeof(int16_t));
     s.floor_db = 0;
-    mel_init();
+    ESP_RETURN_ON_FALSE(mel_init() == 0, ESP_ERR_INVALID_SIZE, TAG, "mel matrix");
     ESP_RETURN_ON_ERROR(audio_open(), TAG, "audio");
     ESP_RETURN_ON_FALSE(xTaskCreatePinnedToCore(capture_task, "snd_cap", 4096, NULL, CAPTURE_PRIO, NULL, CORE) == pdPASS,
                         ESP_ERR_NO_MEM, TAG, "capture task");
