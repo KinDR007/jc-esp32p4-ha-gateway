@@ -794,6 +794,133 @@ def tc47_i2c_sensors():
         check(code == 200 and len(r['sensors']) == len(keep), 'configuration of before restored')
 
 
+def tc48_modbus():
+    """Modbus over TCP against the simulator of this computer (tools/modbus/sim_tcp.py, started by the test):
+    every value of four templates as the simulator encodes them, writes of each kind with read back, refused
+    writes, a manual request, the address search, a user template, an unreachable device going offline,
+    configuration checks; with --mqtt-broker also the discovery of a device as its own device. The
+    configuration of before comes back."""
+    import subprocess
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    port = 1502
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    units = {1: 'eastron_sdm630', 2: 'peacefair_pzem016', 3: 'chint_dtsu666', 4: 'peacefair_pzem017'}
+    sim = subprocess.Popen([sys.executable, sim_py, '--port', str(port)] + [f'{t}:{u}' for u, t in units.items()],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    code, before = http('GET', '/api/modbus')
+    check(code == 200 and before['bus']['uart'] == 3 and before['bus']['tx'] == 26 and before['bus']['rx'] == 27, 'RS485 on UART3, GPIO26/27')
+    keep = {'bus': {k: before['bus'][k] for k in ('baud', 'parity', 'stop', 'timeout_ms')},
+            'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+    tpl_id = 'tc48_meter'
+    try:
+        templates = {t['id']: t for t in http('GET', '/api/modbus/templates')[1]['templates']}
+        check(all(t in templates and templates[t]['builtin'] for t in units.values()) and len(templates) >= 13,
+              f'{len(templates)} templates, the four of the test built in')
+        for bad, why in (({'devices': [{'template': 'nope'}]}, 'unknown template'),
+                         ({'devices': [{'template': 'eastron_sdm630', 'transport': 'tcp'}]}, 'TCP without host'),
+                         ({'devices': [{'template': 'eastron_sdm630', 'slave': 248}]}, 'slave 248'),
+                         ({'bus': {'baud': 1234}}, 'baud 1234'), ({'devices': [{'template': 'eastron_sdm630', 'expose': 'x'}]}, 'expose x')):
+            check(http('PUT', '/api/modbus', bad)[0] == 400, f'refused: {why}')
+        devs = [{'name': f'TC48 {t}', 'template': t, 'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': u, 'poll_s': 3,
+                 'expose': 'both' if u == 2 else 'integration'} for u, t in units.items()]
+        devs.append({'name': 'TC48 nobody', 'template': 'eastron_sdm120', 'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': 9, 'poll_s': 2})
+        code, r = http('PUT', '/api/modbus', {'devices': devs})
+        check(code == 200 and len(r['devices']) == 5 and r['devices'][0]['name'] == devs[0]['name'], 'five devices configured')
+        ids = {d['slave']: d['id'] for d in r['devices']}
+
+        def values():
+            return {d['slave']: d for d in http('GET', '/api/modbus')[1]['devices']}
+
+        def close(a, b):
+            return a == b or (isinstance(a, (int, float)) and not isinstance(a, bool) and isinstance(b, (int, float))
+                              and abs(a - b) <= 1e-6 + abs(b) * 1e-6 + 0.011)
+
+        for u, t in units.items():
+            exp = json.loads(subprocess.run([sys.executable, sim_py, '--expect', t], capture_output=True, text=True).stdout)
+            d = wait_until(f'values of {t}', lambda: (lambda d: d if len(d['values']) >= len(exp) else None)(values()[u]), 30, 2)
+            bad = {k: (v, d['values'].get(k)) for k, v in exp.items() if not close(d['values'].get(k), v)}
+            check(not bad and d['state'] == 'ok', f'{t}: all {len(exp)} values as encoded' + (f', different {bad}' if bad else ''))
+        dev2, dev4 = ids[2], ids[4]
+        for body, want in (({'device': dev2, 'key': 'alarm_threshold', 'value': 2500}, ('alarm_threshold', 2500)),
+                           ({'device': dev4, 'key': 'shunt', 'value': '200 A'}, ('shunt', '200 A')),
+                           ({'device': dev4, 'key': 'high_voltage_threshold', 'value': 48.5}, ('high_voltage_threshold', 48.5))):
+            check(http('POST', '/api/modbus/write', body)[0] == 200, f'write {body["key"]} = {body["value"]}')
+            u = 2 if body['device'] == dev2 else 4
+            wait_until(f'{want[0]} read back', lambda: values()[u]['values'].get(want[0]) == want[1], 15, 1)
+        check(http('POST', '/api/modbus/write', {'device': dev4, 'key': 'reset_energy'})[0] == 200, 'button with the device function 0x42')
+        for body, why in (({'device': dev2, 'key': 'voltage', 'value': 1}, 'input register'), ({'device': dev2, 'key': 'alarm_threshold', 'value': 99999}, 'above max'),
+                          ({'device': dev4, 'key': 'shunt', 'value': '7 A'}, 'not an option'), ({'device': 'zz', 'key': 'x', 'value': 1}, 'unknown device')):
+            check(http('POST', '/api/modbus/write', body)[0] == 400, f'write refused: {why}')
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': 2, 'fc': 4, 'addr': 0, 'count': 3})
+        check(code == 200 and r['ok'] and len(r['registers']) == 3, f'manual read: {r.get("registers")}')
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': 2, 'fc': 4, 'addr': 0x500, 'count': 1})
+        check(code == 200 and not r['ok'] and r['result'] == 2, f'manual read of a missing register: {r.get("error")}')
+        check(http('POST', '/api/modbus/probe', {'transport': 'tcp', 'host': my_ip, 'port': port, 'from': 1, 'to': 6})[0] == 200, 'search started')
+        r = wait_until('search done', lambda: (lambda p: p if not p['running'] else None)(http('GET', '/api/modbus/probe')[1]), 60, 2)
+        check(sorted(f['slave'] for f in r['found']) == [1, 2, 3, 4], f'search found units {[f["slave"] for f in r["found"]]}')
+        d9 = wait_until('the unreachable device offline', lambda: (lambda d: d if d['state'] == 'offline' else None)(values()[9]), 40, 2)
+        check(not d9['values'] and d9['error'], f'offline, no values, error "{d9["error"]}"')
+
+        # a user template: a copy of the PZEM-016 one with its own id
+        tpl = http('GET', '/api/modbus/template?id=peacefair_pzem016')[1]
+        tpl.update(id=tpl_id, manufacturer='Test', model='TC48 meter')
+        check(http('PUT', '/api/modbus/template', dict(tpl, id='eastron_sdm630'))[0] == 409, 'id of a built-in template refused')
+        check(http('PUT', '/api/modbus/template', dict(tpl, entities=[]))[0] == 400, 'template without entities refused')
+        code, r = http('PUT', '/api/modbus/template', tpl)
+        check(code == 200 and not r['builtin'] and r['id'] == tpl_id, 'user template stored')
+        devs2 = [{'id': d['id'], **{k: d[k] for k in ('name', 'template', 'transport', 'host', 'port', 'slave', 'poll_s', 'expose')}}
+                 for d in http('GET', '/api/modbus')[1]['devices']]
+        devs2.append({'name': 'TC48 user template', 'template': tpl_id, 'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': 2, 'poll_s': 3})
+        check(http('PUT', '/api/modbus', {'devices': devs2})[0] == 200, 'device with the user template')
+        exp = json.loads(subprocess.run([sys.executable, sim_py, '--expect', 'peacefair_pzem016'], capture_output=True, text=True).stdout)
+        d = wait_until('values with the user template', lambda: (lambda d: d if d.get('values') else None)(
+            next(x for x in http('GET', '/api/modbus')[1]['devices'] if x['template'] == tpl_id)), 20, 2)
+        check(close(d['values'].get('voltage'), exp['voltage']), f'user template reads: voltage {d["values"].get("voltage")}')
+        check(http('DELETE', f'/api/modbus/template?id={tpl_id}')[0] == 409, 'template in use not deleted')
+        check(http('DELETE', '/api/modbus/template?id=eastron_sdm630')[0] == 409, 'built-in template not deleted')
+
+        if ARGS.mqtt_broker:
+            host, mport = ARGS.mqtt_broker.rsplit(':', 1)
+            code, backup = http('GET', '/api/settings/export?secrets=1')
+            name = status()['hostname']
+            try:
+                http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{mport}', 'user': '', 'password': '', 'tls': 'bundle', 'base': '',
+                                           'prefix': 'homeassistant', 'discovery': True, 'enabled': True,
+                                           'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors', 'modbus']})
+                wait_until('MQTT connected', lambda: http('GET', '/api/mqtt')[1]['connected'], 25, 1)
+                time.sleep(3)
+                out = subprocess.run(['mosquitto_sub', '-h', host, '-p', mport, '-t', f'homeassistant/+/{name}/+/config', '-v', '-W', '3'],
+                                     capture_output=True, text=True).stdout.strip().splitlines()
+                cfgs = {line.split(' ', 1)[0].split('/')[3]: json.loads(line.split(' ', 1)[1]) for line in out
+                        if ' ' in line and line.split(' ', 1)[1] and line.split('/')[3].startswith(f'mb_{dev2}_')}
+                voltage, thr, reset = (cfgs.get(f'mb_{dev2}_{k}', {}) for k in ('voltage', 'alarm_threshold', 'reset_energy'))
+                check(voltage.get('device', {}).get('via_device') == name and voltage['device']['model'] == 'PZEM-016 / PZEM-014',
+                      f'{len(cfgs)} entities of the PZEM as its own device via the gateway')
+                check(thr.get('min') == 1 and thr.get('command_topic', '').endswith(f'modbus/{dev2}/alarm_threshold/set') and reset.get('payload_press') == 'PRESS',
+                      'number with limits and command topic, button')
+                base = http('GET', '/api/mqtt')[1]['base_topic']
+                subprocess.run(['mosquitto_pub', '-h', host, '-p', mport, '-t', f'{base}/modbus/{dev2}/alarm_threshold/set', '-m', '1234'])
+                wait_until('MQTT write read back', lambda: next(d for d in http('GET', '/api/modbus')[1]['devices']
+                                                                if d['id'] == dev2)['values'].get('alarm_threshold') == 1234, 15, 1)
+                check(True, 'write over MQTT read back')
+            finally:
+                http('POST', '/api/settings/import', backup)
+                wait_restart(status()['role']['desired'])
+    finally:
+        http('PUT', '/api/modbus', keep)
+        http('DELETE', f'/api/modbus/template?id={tpl_id}')
+        sim.terminate()
+        writes = [l for l in (sim.communicate(timeout=5)[0] or '').splitlines() if l.startswith(('write', 'function'))]
+        log(f'simulator saw {len(writes)} writes')
+    code, r = http('GET', '/api/modbus')
+    check(code == 200 and len(r['devices']) == len(keep['devices']) and tpl_id not in [t['id'] for t in http('GET', '/api/modbus/templates')[1]['templates']],
+          'configuration of before restored, test template deleted')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -2041,7 +2168,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2068,7 +2195,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

@@ -1081,6 +1081,8 @@ static esp_err_t template_put(httpd_req_t *req)
     }
     char *text = cJSON_PrintUnformatted(body);
     cJSON_Delete(body);
+    char id[32];
+    strcpy(id, t.id);
     xSemaphoreTake(s_lock, portMAX_DELAY);
     tpl_t *old = (tpl_t *)find_tpl(t.id);
     int slot = old ? old->slot : -1;
@@ -1147,7 +1149,15 @@ static esp_err_t template_put(httpd_req_t *req)
         xTaskNotifyGive(s_task);
     }
     gw_mqtt_rediscover();
-    return template_get(req) == ESP_OK ? ESP_OK : ESP_FAIL;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const tpl_t *saved = find_tpl(id);
+    cJSON *j = saved ? mb_template_json(&saved->t) : NULL;
+    if (j) {
+        cJSON_AddBoolToObject(j, "builtin", false);
+        cJSON_AddNumberToObject(j, "rev", saved->rev);
+    }
+    xSemaphoreGive(s_lock);
+    return j ? gw_http_send_json(req, j) : gw_http_send_error(req, 500, "stored but not loaded");
 }
 
 static esp_err_t template_delete(httpd_req_t *req)
