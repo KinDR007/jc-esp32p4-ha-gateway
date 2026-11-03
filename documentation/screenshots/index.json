@@ -3,23 +3,23 @@
   "page": "overview",
   "cards": [
    {
-    "title": "ROLE",
+    "title": "",
     "file": "overview__1"
    },
    {
-    "title": "NETWORK",
+    "title": "MAIN BOARD: ESP32-P4",
     "file": "overview__2"
    },
    {
-    "title": "ESP32-P4",
+    "title": "LAN: ETHERNET OF THE P4",
     "file": "overview__3"
    },
    {
-    "title": "RADIO A: ESP32-C6",
+    "title": "RADIO A: ESP32-C6 · INTERNAL",
     "file": "overview__4"
    },
    {
-    "title": "RADIO B: ESP32-C5",
+    "title": "RADIO B: ESP32-C5 · EXTERNAL, JP1",
     "file": "overview__5"
    }
   ]
@@ -49,7 +49,7 @@
     "file": "thread_topology__2"
    },
    {
-    "title": "NEIGHBORS (7)",
+    "title": "NEIGHBORS (8)",
     "file": "thread_topology__3"
    },
    {
@@ -200,20 +200,24 @@
   "page": "system_info",
   "cards": [
    {
-    "title": "FIRMWARE SLOTS",
+    "title": "",
     "file": "system_info__1"
    },
    {
-    "title": "ESP32-P4",
+    "title": "FIRMWARE SLOTS",
     "file": "system_info__2"
    },
    {
-    "title": "MEMORY",
+    "title": "ESP32-P4",
     "file": "system_info__3"
    },
    {
-    "title": "FIRMWARE",
+    "title": "MEMORY",
     "file": "system_info__4"
+   },
+   {
+    "title": "FIRMWARE",
+    "file": "system_info__5"
    }
   ]
  },
@@ -347,20 +351,24 @@
   "page": "overview__zigbee",
   "cards": [
    {
-    "title": "ROLE",
+    "title": "",
     "file": "overview__zigbee__1"
    },
    {
-    "title": "NETWORK",
+    "title": "MAIN BOARD: ESP32-P4",
     "file": "overview__zigbee__2"
    },
    {
-    "title": "ESP32-P4",
+    "title": "LAN: ETHERNET OF THE P4",
     "file": "overview__zigbee__3"
    },
    {
-    "title": "ESP32-C6 RADIO",
+    "title": "RADIO A: ESP32-C6 · INTERNAL",
     "file": "overview__zigbee__4"
+   },
+   {
+    "title": "RADIO B: ESP32-C5 · EXTERNAL, JP1",
+    "file": "overview__zigbee__5"
    }
   ]
  },
@@ -415,7 +423,7 @@
     "file": "ha_guide__zigbee__1"
    },
    {
-    "title": "ZIGBEE COORDINATOR → ZIGBEE2MQTT (RECOMMENDED)",
+    "title": "THREAD BORDER ROUTER → HOME ASSISTANT",
     "file": "ha_guide__zigbee__2"
    }
   ]
@@ -497,12 +505,8 @@
   "page": "radios_roles",
   "cards": [
    {
-    "title": "RADIO A: C6 OF THE BOARD",
+    "title": "ROLES OF THE RADIOS",
     "file": "radios_roles__1"
-   },
-   {
-    "title": "RADIO B: EXTERNAL ESP32-C5",
-    "file": "radios_roles__2"
    }
   ]
  },
@@ -535,16 +539,20 @@
     "file": "radios_scan__3"
    },
    {
-    "title": "IEEE 802.15.4 CHANNELS",
+    "title": "5 GHZ SPECTRUM",
     "file": "radios_scan__4"
    },
    {
-    "title": "THREAD AND ZIGBEE NETWORKS",
+    "title": "IEEE 802.15.4 CHANNELS",
     "file": "radios_scan__5"
    },
    {
-    "title": "WI-FI NETWORKS",
+    "title": "THREAD AND ZIGBEE NETWORKS",
     "file": "radios_scan__6"
+   },
+   {
+    "title": "WI-FI NETWORKS",
+    "file": "radios_scan__7"
    }
   ]
  },
@@ -576,6 +584,67 @@
    {
     "title": "HOME ASSISTANT AND MATTER",
     "file": "ha_matter__1"
+   }
+  ]
+ },
+ "flows": {
+  "page": "flows",
+  "cards": [
+   {
+    "title": "DATA FLOWS",
+    "file": "flows__1"
+   },
+   {
+    "title": "EVERY FLOW",
+    "file": "flows__2"
+   }
+  ]
+ },
+ "system/wifi": {
+  "page": "system_wifi",
+  "cards": [
+   {
+    "title": "WI-FI SETTINGS",
+    "file": "system_wifi__1"
+   },
+   {
+    "title": "CURRENT STATE",
+    "file": "system_wifi__2"
+   },
+   {
+    "title": "TRAFFIC OVER WI-FI",
+    "file": "system_wifi__3"
+   }
+  ]
+ },
+ "system/api": {
+  "page": "system_api",
+  "cards": [
+   {
+    "title": "GETTING STARTED",
+    "file": "system_api__1"
+   },
+   {
+    "title": "ENDPOINTS (103)",
+    "file": "system_api__2"
+   }
+  ]
+ },
+ "radios/roles__zigbee": {
+  "page": "radios_roles__zigbee",
+  "cards": [
+   {
+    "title": "ROLES OF THE RADIOS",
+    "file": "radios_roles__zigbee__1"
+   }
+  ]
+ },
+ "zigbee/backups__zigbee": {
+  "page": "zigbee_backups__zigbee",
+  "cards": [
+   {
+    "title": "ZIGBEE NETWORK BACKUPS",
+    "file": "zigbee_backups__zigbee__1"
    }
   ]
  }

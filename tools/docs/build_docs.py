@@ -173,20 +173,25 @@ UI_BASICS = T(
 # Pages of the web UI: route -> (title, intro, {card title: description}, howto)
 PAGES = [
     ("overview", "view-dashboard-outline", T("Overview", "Přehled"),
-     T("The state of the gateway at a glance.", "Stav brány na první pohled."),
-     {"ROLE": T("Active role, its state and the client using it.", "Aktivní role, její stav a klient, který ji používá."),
-      "NETWORK": T("Ethernet link, IPv4 and IPv6 addresses, hostname.", "Linka Ethernet, adresy IPv4 a IPv6, název zařízení."),
-      "ESP32-P4": T("Firmware version, uptime, temperature, memory and CPU load.", "Verze firmwaru, doba běhu, teplota, paměť a zatížení CPU."),
-      "RADIO A: ESP32-C6": T("Firmware of the radio, its temperature and uptime (telemetry of the role firmware).", "Firmware rádia, jeho teplota a doba běhu (telemetrie firmwaru role)."),
-      "RADIO B: ESP32-C5": T("With a radio B on JP1: its role, state, firmware and temperature; details under Radios › Status and maintenance.", "S rádiem B na JP1: jeho role, stav, firmware a teplota; podrobnosti v Rádia › Stav a údržba.")},
+     T("The state of the gateway at a glance. The diagram on top shows LAN, the main board, both radios and the network each radio serves; every node opens its page and shows its details on hover (chip, firmware, memory, network, traffic).",
+       "Stav brány na první pohled. Diagram nahoře ukazuje LAN, hlavní desku, obě rádia a síť, kterou které rádio obsluhuje; každý uzel otevře svou stránku a po najetí ukáže podrobnosti (čip, firmware, paměť, síť, provoz)."),
+     {"MAIN BOARD: ESP32-P4": T("Firmware version, uptime, last reset, temperature, CPU load per core, internal RAM and PSRAM.", "Verze firmwaru, doba běhu, poslední reset, teplota, zatížení jader, interní RAM a PSRAM."),
+      "LAN: ETHERNET OF THE P4": T("Ethernet link, IPv4 and IPv6 addresses, MAC, hostname.", "Linka Ethernet, adresy IPv4 a IPv6, MAC, název zařízení."),
+      "RADIO A: ESP32-C6 · INTERNAL": T("Role and its network, the firmware of the radio, its MAC, temperature, memory and uptime (telemetry of the role firmware).", "Role a její síť, firmware rádia, jeho MAC, teplota, paměť a doba běhu (telemetrie firmwaru role)."),
+      "RADIO B: ESP32-C5 · EXTERNAL, JP1": T("With a radio B on JP1: the same for it; details under Radios › Status and maintenance.", "S rádiem B na JP1: totéž pro něj; podrobnosti v Rádia › Stav a údržba.")},
      None, ["overview"]),
+    ("flows", "sitemap-outline", T("Data flows", "Toky dat"),
+     T("Where the data of each network and service goes and who receives it: sources (Thread, Zigbee and Bluetooth devices, the microphone), the services of the gateway and the consumers (Home Assistant, Zigbee2MQTT, MQTT broker, Telegram, web UI and API).",
+       "Kam tečou data každé sítě a služby a kdo je odebírá: zdroje (zařízení Thread, Zigbee a Bluetooth, mikrofon), služby brány a odběratelé (Home Assistant, Zigbee2MQTT, MQTT broker, Telegram, webové UI a API)."),
+     {"DATA FLOWS": T("Three columns linked by lines coloured by state (flows, waiting, off). A node opens its settings; hovering it lists every flow through it with the way (protocol, port) and the traffic.",
+                      "Tři sloupce spojené čarami barevně podle stavu (teče, čeká, vypnuto). Uzel otevře své nastavení; po najetí vypíše všechny toky, které jím vedou, s cestou (protokol, port) a provozem."),
+      "EVERY FLOW": T("The same as a table: from, to, way, state, traffic since start and now, a link to the settings.", "Totéž jako tabulka: odkud, kam, cesta, stav, provoz od startu a nyní, odkaz na nastavení.")},
+     None, ["flows"]),
     ("radios/roles", "swap-horizontal", T("Radios › Roles", "Rádia › Role"),
      T("Choose what each radio does: radio A is the C6 of the board, radio B the optional XIAO ESP32-C5 on JP1. At most one Thread network, one Zigbee network and one ESPHome proxy; switching restarts the gateway, each radio keeps its own networks.",
        "Volba, co dělá které rádio: rádio A je C6 na desce, rádio B volitelné XIAO ESP32-C5 na JP1. Nejvýš jedna síť Thread, jedna Zigbee a jedna ESPHome proxy; přepnutí restartuje bránu, každé rádio si drží své sítě."),
-     {"RADIO A: C6 OF THE BOARD": T("One card per role. A role the other radio already runs is disabled with the reason.",
-                                    "Karta pro každou roli. Role, kterou už běží druhé rádio, je zakázaná s důvodem."),
-      "RADIO B: EXTERNAL ESP32-C5": T("The same for radio B, plus <b>Switch radio B off</b>. Shown when radio B answered the wiring test.",
-                                      "Totéž pro rádio B a navíc <b>Vypnout rádio B</b>. Zobrazí se, když rádio B prošlo testem zapojení.")},
+     {"ROLES OF THE RADIOS": T("A row per role and a column per radio: <i>active</i>, <i>selected</i> (switch pending), <i>on radio B/A</i> (the other radio runs that network) or <b>Switch</b>; the last row switches radio B off. The switch above the table shows the same as a list or as tiles (remembered in the browser).",
+                               "Řádek pro každou roli a sloupec pro každé rádio: <i>aktivní</i>, <i>vybráno</i> (čeká na přepnutí), <i>na rádiu B/A</i> (tu síť provozuje druhé rádio) nebo <b>Přepnout</b>; poslední řádek vypíná rádio B. Přepínač nad tabulkou ukáže totéž jako seznam nebo dlaždice (pamatuje si ho prohlížeč).")},
      T("""<ol><li>Pick the role of a radio and press <b>Switch</b>.</li><li>The gateway restarts; a dialog shows the progress (a radio is flashed when its role needs other firmware).</li>
        <li>Set up the network on its page (Thread, Zigbee, ESPHome) and Home Assistant as shown under Home Assistant › Integration.</li></ol>
        <p>Also possible: the <i>Role</i> and <i>Radio B role</i> selects of the P4 Gateway integration, Telegram <code>/role zigbee_coordinator</code> or <code>/role b thread_br</code>, MQTT <code>p4gw/&lt;host&gt;/role/set</code> (radio A).</p>""",
@@ -209,6 +214,7 @@ PAGES = [
      {"SCAN": T("Quick (Thread roles, no outage, about 13 s) or full (any role, about a minute without the role).", "Rychlý (role Thread, bez výpadku, asi 13 s) nebo úplný (každá role, asi minutu bez role)."),
       "RECOMMENDATION": T("Best channels for Thread and Zigbee.", "Nejlepší kanály pro Thread a Zigbee."),
       "2.4 GHZ SPECTRUM": T("Wi-Fi and 802.15.4 channels together.", "Kanály Wi-Fi a 802.15.4 společně."),
+      "5 GHZ SPECTRUM": T("Wi-Fi networks in the 5 GHz band (full scan on an ESP32-C5).", "Sítě Wi-Fi v pásmu 5 GHz (úplný sken na ESP32-C5)."),
       "IEEE 802.15.4 CHANNELS": T("Energy, networks and rating per channel 11–26.", "Energie, sítě a hodnocení každého kanálu 11–26."),
       "THREAD AND ZIGBEE NETWORKS": T("Networks found nearby.", "Sítě nalezené v okolí."),
       "WI-FI NETWORKS": T("Access points with channel and signal (full scan).", "Přístupové body s kanálem a signálem (úplný sken).")}, None, ["radios_scan"]),
@@ -349,6 +355,13 @@ PAGES = [
        <li>Stránka se otevře na nové adrese; do 120 s potvrďte lištu nahoře. Bez potvrzení se vrátí předchozí nastavení samo.</li>
        <li>Zigbee2MQTT používá adresu: změňte ji i tam. Integrace P4 Gateway novou adresu najde přes mDNS.</li></ol>"""),
      ["system_lan"]),
+    ("system/wifi", "wifi", T("System › Wi-Fi", "Systém › Wi-Fi"),
+     T("The Wi-Fi uplink: a radio with the role Wi-Fi uplink connects the gateway to the home Wi-Fi, as its only connection or as a backup of the LAN.",
+       "Wi-Fi uplink: rádio s rolí Wi-Fi uplink připojí bránu do domácí Wi-Fi, jako jediné připojení nebo jako zálohu LAN."),
+     {"WI-FI SETTINGS": T("Network (with a scan), password, DHCP or a static address.", "Síť (s vyhledáním), heslo, DHCP nebo statická adresa."),
+      "CURRENT STATE": T("Which radio runs the uplink, its address, signal and whether it carries the traffic.", "Které rádio uplink provozuje, jeho adresa, signál a zda nese provoz."),
+      "TRAFFIC OVER WI-FI": T("Rates and totals per service, like System › LAN.", "Rychlosti a součty po službách, jako Systém › LAN.")},
+     None, ["system_wifi"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",
@@ -381,6 +394,14 @@ PAGES = [
      {"PING": T("Ping a host from the gateway.", "Ping na hostitele z brány."),
       "DIAGNOSTICS": T("Core dump after a crash (download, erase), log before the last restart.", "Core dump po pádu (stažení, smazání), log před posledním restartem."),
       "LOG": T("Live log with filters by source, level and tag; save to a file.", "Živý log s filtry podle zdroje, úrovně a tagu; uložení do souboru.")}, None, ["system_diag"]),
+    ("system/api", "api", T("System › API", "Systém › API"),
+     T("The HTTP API of the gateway (the same description as the HTTP API chapter, served by the gateway at <code>/api/help</code>).",
+       "HTTP API brány (stejný popis jako kapitola HTTP API, brána ho vydává na <code>/api/help</code>)."),
+     {"GETTING STARTED": T("From the token to the first call: where to create a token, a field that fills it into the examples (kept only in that browser tab), the address of this gateway.",
+                           "Od tokenu k prvnímu volání: kde token vytvořit, pole, které ho doplní do příkladů (zůstane jen v té záložce prohlížeče), adresa této brány."),
+      "ENDPOINTS": T("Every endpoint with its permission, parameters, body, response, errors and effects, and examples for curl, Python and a Home Assistant <code>rest_command</code> built for this gateway; <b>Try it</b> runs a GET request at once.",
+                     "Každý endpoint s oprávněním, parametry, tělem, odpovědí, chybami a účinky a s příklady pro curl, Python a <code>rest_command</code> Home Assistant pro tuto bránu; <b>Vyzkoušet</b> rovnou provede GET požadavek.")},
+     None, ["system_api"]),
     ("system/notify", "bell-cog-outline", T("System › Notifications", "Systém › Notifikace"),
      T("The Telegram bot (admins) and where Home Assistant notifications are set.", "Telegram bot (správci) a kde se nastavují notifikace pro Home Assistant."),
      {"TELEGRAM BOT": T("Token from @BotFather, on/off, time zone for quiet hours; state and paired users.", "Token od @BotFather, zapnutí, časové pásmo pro tiché hodiny; stav a spárovaní uživatelé."),
@@ -539,8 +560,8 @@ LABELS = {
     "howto": T("How to", "Postup"), "full": T("Whole page", "Celá stránka"), "shots": T("Screenshots", "Snímky obrazovky"),
     "zigbee_shot": T("in the Zigbee coordinator role", "v roli Zigbee koordinátor"), "router_shot": T("in the Zigbee router role", "v roli Zigbee router"),
     "dialogs": T("Dialogs", "Dialogy"), "api": T("HTTP API", "HTTP API"),
-    "foot": T("Screenshots: firmware v1.4, dark theme, English. The board, network names and addresses are those of the test setup.",
-              "Snímky: firmware v1.4, tmavý vzhled, angličtina. Deska, názvy sítí a adresy jsou z testovací instalace."),
+    "foot": T("Screenshots: firmware v1.10, dark theme, English (Zigbee router pages: older firmware). The board, network names and addresses are those of the test setup.",
+              "Snímky: firmware v1.10, tmavý vzhled, angličtina (stránky Zigbee routeru: starší firmware). Deska, názvy sítí a adresy jsou z testovací instalace."),
 }
 
 SECTION_ICONS = {"overview": "view-dashboard-outline", "role": "swap-horizontal", "thread": "thread", "zigbee": "zigbee", "sound": "waveform",
@@ -636,9 +657,10 @@ def build(lang: str) -> str:
     nav += f'<a href="#pages">{ic("view-dashboard-outline")}<span>{L("pages")}</span></a><div class="subs">{page_nav}</div>'
     nav += "".join(f'<a href="#{i}">{ic(icn)}<span>{t}</span></a>' for i, icn, t in
                    [("ha", "home-assistant", L("ha")), ("tg", "send", L("tg")), ("api", "api", L("api")), ("recovery", "wrench-outline", L("recovery"))])
-    tips = "".join(img(f, f) for f in ("tip_lan", "tip_role", "tip_peer", "tip_ha", "tip_internet", "tip_uptime"))
+    tips = "".join(img(f, f) for f in ("tip_lan", "tip_role", "tip_peer", "tip_ha", "tip_mqtt", "tip_internet", "tip_uptime"))
     dialogs = "".join(f'<figure>{img(f, f)}<figcaption>{c[lang]}</figcaption></figure>' for f, c in [
-        ("login", T("Sign-in", "Přihlášení")), ("dialog_restart", T("Restart", "Restart")), ("dialog_new_user", T("New user", "Nový uživatel")),
+        ("login", T("Sign-in", "Přihlášení")), ("dialog_wizard", T("Setup wizard (opens by itself without a user account, later from System › Information)", "Průvodce nastavením (sám bez uživatelského účtu, později ze Systém › Informace)")),
+        ("dialog_restart", T("Restart", "Restart")), ("dialog_new_user", T("New user", "Nový uživatel")),
         ("dialog_edit_user", T("Edit user with own permissions", "Úprava uživatele s vlastními oprávněními")),
         ("dialog_totp", T("Two-factor sign-in setup", "Nastavení dvoufázového přihlášení")),
         ("dialog_telegram_pair", T("Telegram pairing", "Párování Telegramu"))])

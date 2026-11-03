@@ -82,7 +82,8 @@
 - [x] Vydání v1.9 s novým menu
 - [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
 - [x] UI testy UI06/UI07 přepsány na přepínače `#seg-lang`/`#seg-theme` (2026-11-03), UI25 prošel
-- [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu
+- [x] Snímky dokumentace přefoceny na v1.10 (fáze thread a zigbee, nové stránky Toky dat, Wi-Fi, API, průvodce, tooltip MQTT), 2026-11-03
+- [ ] Snímky fáze `router` (Zigbee router rádia A) až router bude znovu v síti; dialogy 2FA a párování Telegramu jen s přihlášeným uživatelem (ne API tokenem)
 - [x] Rádio B v UI se stejnými údaji a akcemi jako rádio A (přehled, Stav a údržba: přeflashování, záloha flash, firmwary)
 - [x] Úplný sken na rádiu A i B (C5: 5 GHz, šířka, standardy), oprava WPA3 hlášené jako otevřená (skener 1.1.0); TC20 prošel
 - [x] Nové balíky c6fw/c5fw (skener 1.1.0) ve vydání v1.9

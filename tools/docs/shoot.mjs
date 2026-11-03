@@ -10,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
-  thread: [['overview', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
+  thread: [['overview', 'flows', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
     'zigbee/network', 'zigbee/backups', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'sound/learn', 'ha/guide', 'ha/mqtt',
-    'ha/matter', 'system/info', 'system/lan', 'system/firmware/online', 'system/firmware/manual', 'system/maint', 'system/diag', 'system/notify',
+    'ha/matter', 'system/info', 'system/lan', 'system/wifi', 'system/firmware/online', 'system/firmware/manual', 'system/maint', 'system/diag', 'system/api', 'system/notify',
     'system/users/list', 'system/users/roles', 'system/users/tokens', 'system/users/requests', 'system/users/policy', 'profile'], '', true],
   zigbee: [['overview', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'zigbee/network', 'ha/guide'], '__zigbee', false],
   router: [['overview', 'zigbee/info', 'zigbee/diag'], '__router', false],
@@ -73,7 +73,7 @@ export default async function run(page) {
   if (ALL) {
     await page.evaluate(() => { location.hash = 'overview'; });
     await page.waitForTimeout(3000);
-    for (const [id, name] of [['#hdr-eth', 'tip_lan'], ['#hdr-role', 'tip_role'], ['#hdr-peer', 'tip_peer'], ['#hdr-ha', 'tip_ha'], ['#hdr-inet', 'tip_internet'], ['#hdr-uptime', 'tip_uptime']]) {
+    for (const [id, name] of [['#hdr-eth', 'tip_lan'], ['#hdr-role', 'tip_role'], ['#hdr-peer', 'tip_peer'], ['#hdr-ha', 'tip_ha'], ['#hdr-mqtt', 'tip_mqtt'], ['#hdr-inet', 'tip_internet'], ['#hdr-uptime', 'tip_uptime']]) {
       if (!await page.$(id) || !(await page.$eval(id, e => e.offsetParent !== null))) continue;
       await page.hover(id);
       await page.waitForTimeout(400);
@@ -81,6 +81,14 @@ export default async function run(page) {
       await page.mouse.move(700, 700);
       await page.waitForTimeout(200);
     }
+    /* the setup wizard at its roles step (closed again: it stays closed in this browser only) */
+    await page.evaluate(() => { location.hash = 'system/info'; });
+    await page.waitForSelector('#main [data-wiz=start]', { timeout: 10000 });
+    await page.click('#main [data-wiz=start]');
+    await page.click('#wiz [data-wiz-step=roles]');
+    await page.waitForTimeout(2500);
+    await shot(page, 'dialog_wizard');
+    await page.click('#wiz [data-wiz=close]');
     await page.click('#side-reboot');
     await page.waitForTimeout(500);
     await shot(page, 'dialog_restart');
@@ -99,20 +107,24 @@ export default async function run(page) {
     await shot(page, 'dialog_edit_user');
     await page.click('#fd-cancel');
     await page.evaluate(() => { location.hash = 'profile'; });
-    await page.waitForSelector('#totp-on', { timeout: 10000 });
-    await page.waitForTimeout(2500);
-    await page.click('#totp-on');
-    await page.waitForSelector('#form-dlg .qr svg', { timeout: 10000 });
-    await page.waitForTimeout(400);
-    await shot(page, 'dialog_totp');
-    await page.click('#fd-cancel');
-    await page.waitForTimeout(1000);
-    if (await page.$('#tg-pair')) {
-      await page.click('#tg-pair');
-      await page.waitForTimeout(1500);
-      await shot(page, 'dialog_telegram_pair');
-      await page.click('#form-dlg button[type=submit]');
-    }
+    /* two-factor setup and Telegram pairing need a signed-in user (an API token cannot start them):
+     * the previous screenshots stay */
+    try {
+      await page.waitForSelector('#totp-on', { timeout: 10000 });
+      await page.waitForTimeout(2500);
+      await page.click('#totp-on');
+      await page.waitForSelector('#form-dlg .qr svg', { timeout: 10000 });
+      await page.waitForTimeout(400);
+      await shot(page, 'dialog_totp');
+      await page.click('#fd-cancel');
+      await page.waitForTimeout(1000);
+      if (await page.$('#tg-pair')) {
+        await page.click('#tg-pair');
+        await page.waitForTimeout(1500);
+        await shot(page, 'dialog_telegram_pair');
+        await page.click('#form-dlg button[type=submit]');
+      }
+    } catch (e) { done.push('profile dialogs skipped: ' + e.message.split('\n')[0]); }
   }
   writeFileSync(OUT + 'index.json', JSON.stringify(meta, null, 1));
   return done;
