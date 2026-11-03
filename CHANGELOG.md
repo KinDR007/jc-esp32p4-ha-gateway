@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- API reference: the response of `/api/thread/topology` (router, child and vendor fields, time limits)
+  and the meaning of the Telegram levels (0 off, 1 critical, 2 warnings and critical, 3 all; quiet hours
+  critical only) checked against the code.
+- Documentation: Zigbee router screenshots of v1.10.
+
 ## v1.10.1 (2026-11-03)
 
 Summary: fix of the C6 update offered again after its install; documentation with v1.10 screenshots.

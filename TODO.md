@@ -38,6 +38,7 @@
 - [x] Dvě rádia F6: ESPHome BLE proxy jako role rádia (C6/C5), Wi-Fi přes Improv, ESPHome na P4 zrušeno
 - [ ] ESPHome na rádiu: připojení k Wi-Fi a převzetí v HA ověřit s Wi-Fi uživatele (TC09 s nastavenou Wi-Fi)
 - [x] Dvě rádia F7–F8: UI (Role, Rádia, ESPHome, hlavička, přehled, menu dle rádia), HA 1.4.0, Telegram, dokumentace
+- [x] api.json ověřeno podle kódu: odpověď /api/thread/topology (pole routerů, dětí, vendor/model/sw, časové limity), úrovně Telegramu (0 vypnuto, 1 kritické, 2 varování+, 3 vše, tiché hodiny jen kritické)
 - [x] Zigbee router rádia A znovu v síti Zigbee2MQTT (PAN 0x1a62, kanál 11; párování otevřeno přes `/api/zigbee/net/request`, 2026-11-03); TC23 a TC26 prošly (TC26: text zprávy o záloze opraven)
 - [x] Vydání v1.8.1 (dvě rádia; tag v1.8 bez vydání, CI chyba ESPHome)
 - [ ] Nasazení HA integrace 1.4.0; HW testy (Wi-Fi ESPHome, TC38, router) příště; soak až na pokyn
@@ -151,7 +152,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 **F7 Uzavření**
 - [x] F7.1 Regrese 2026-11-03 ([report](tests/results/2026-11-03/report.md)): vše prošlo kromě očekávaných TC01–03 (čistá deska) a známého TC26 (router bez sítě); opraveny testy TC09, TC30, TC39, UI22. Soak jen na pokyn
 - [x] F7.2 Dokumentace a CHANGELOG aktualizované (api.md, airtag.md, c6-slots, installation, home-assistant, GitHub Pages)
-- [x] F7.3 Vydání v1.10 a v1.10.1 (oprava nabídky balíku C6) na GitHubu, CI zelené; deska na v1.10.1 z online aktualizace, balíky C6/C5 z vydání, TC13 s balíkem z vydání prošel. K ověření v api.json: odpověď /api/thread/topology, úrovně témat /api/auth/telegram
+- [x] F7.3 Vydání v1.10 a v1.10.1 (oprava nabídky balíku C6) na GitHubu, CI zelené; deska na v1.10.1 z online aktualizace, balíky C6/C5 z vydání, TC13 s balíkem z vydání prošel.
 
 **F8 Odloženo**
 - [x] F8.1 AirTag přes BLE proxy: rešerše ([docs/airtag.md](docs/airtag.md)): anonymní detekce „Find My poblíž“ jde (jen přeposílání inzerátů, Bermuda/šablona v HA), identifikace vlastních AirTagů jen s klíči exportovanými z Macu (křehké, na Sequoia/Tahoe rozbité), automatické přidávání nelze; doporučen BLE tag s pevnou adresou / iBeacon

@@ -1098,21 +1098,47 @@ Response:
 {
   "routers": [
     {
-      "rloc16": "0x0800",
-      "ext_address": "...",
-      "children": [],
+      "rloc16": "0x0400",
+      "id": 1,
+      "ext": "6a9bc32b75bee2ef",
+      "version": 5,
+      "leader": false,
+      "br": false,
+      "this": false,
       "ip6": [
-        "fd00:db8::1"
-      ]
+        "fd35:4095:6f9e:1:bc13:e798:63d:1a2b"
+      ],
+      "links": [
+        {
+          "id": 5,
+          "lq": 3
+        }
+      ],
+      "children": [
+        {
+          "rloc16": "0x0401",
+          "lq": 3,
+          "rx_on": false,
+          "ftd": false,
+          "br": false,
+          "ip6": [
+            "fd35:4095:6f9e:1::1"
+          ]
+        }
+      ],
+      "vendor": "Nanoleaf",
+      "model": "NL67",
+      "sw": "4.1.3"
     }
   ],
-  "ms": 8200
+  "error": "ResponseTimeout",
+  "ms": 10119
 }
 ```
 
 Errors: 409 OpenThread not running, or a discovery is already running.
 
-Effects: Slow: takes seconds up to about 30 s plus child queries. If a router does not answer, the reply carries an error string and a partial map. The exact fields of each router are produced by OpenThread mesh diagnostics. Registered only while this role runs on a radio, otherwise the server answers 404.
+Effects: Slow: OpenThread mesh diagnostics with a 10 s answer timeout per router (30 s in all), then a query of the IPv6 addresses of each router's children (12 s at most each). routers[]: rloc16, router id, ext (extended address), version (Thread version, when known), leader, br (border router), this (this gateway), ip6, links (router id and link quality 1..3 to each neighbouring router), children (rloc16, lq, rx_on: always listening, ftd: full Thread device, br, ip6) and vendor, model, sw when the device reports them. error names the OpenThread error when a router did not answer (the map is then partial). Registered only while a radio runs a Thread role, otherwise 404.
 
 #### POST `/api/thread/txpower`
 
@@ -2536,7 +2562,7 @@ Response:
 
 Errors: 409 Only for signed-in users (not for tokens or an open gateway).
 
-Effects: levels per topic: 0 off up to 3 (the exact meaning of 1 and 2 is set in the bot code). allowed shows which topics the user may receive by page permission. quiet_from and quiet_to are hours 0..23, -1 none.
+Effects: levels per topic (security, system, network, sound): 0 off, 1 critical only, 2 warnings and critical, 3 all. A topic reaches a user only with the read right of its page (security: administrators, system: System › Information, network: System › LAN, sound: Sound › Detection log), shown in allowed. In the quiet hours (quiet_from to quiet_to, hours 0..23, -1 none) only critical notifications come; /mute pauses the sound topic.
 
 #### POST `/api/auth/telegram`
 
@@ -2573,7 +2599,7 @@ Response:
 
 Errors: 409 Only for signed-in users.
 
-Effects: Values outside the range (levels 0..3, quiet hours -1..23, lang cs or en) are ignored silently. Returns the new state like GET.
+Effects: Changes only the fields sent; values outside the range (levels 0..3, quiet hours -1..23, lang cs or en) are ignored. Level meaning as in GET. Returns the new state like GET.
 
 #### POST `/api/auth/telegram/pair`
 
