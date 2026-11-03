@@ -161,6 +161,14 @@ main { flex: 1; min-width: 0; max-width: 1640px; padding: 18px 24px 40px; }
 .tnode b { font-size: 14px; }
 .tnode.ok { border-left-color: var(--ok); } .tnode.warn { border-left-color: var(--warn); } .tnode.bad { border-left-color: var(--bad); }
 .tnode.off { border-style: dashed; border-left-style: solid; opacity: .75; }
+/* Data flows: three columns of nodes, the links drawn over them in an SVG */
+.flows { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 90px; }
+.flows .fcol { display: flex; flex-direction: column; gap: 10px; justify-content: center; position: relative; z-index: 1; }
+.flows .fcol > h4 { margin: 0 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.flows svg.flinks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+.flinks path { fill: none; stroke-width: 2; }
+.flinks path.ok { stroke: var(--ok); } .flinks path.warn { stroke: var(--warn); stroke-dasharray: 5 4; } .flinks path.off { stroke: var(--border); stroke-dasharray: 3 5; } .flinks path.bad { stroke: var(--bad); }
+@media (max-width: 900px) { .flows { grid-template-columns: minmax(0, 1fr); gap: 16px; } .flows svg.flinks { display: none; } }
 @media (max-width: 900px) {
   .topo-flow { grid-template-columns: minmax(0, 1fr); }
   .topo-flow > * { grid-area: auto !important; }
@@ -464,7 +472,7 @@ const CS = {
   'Maintenance and backup': 'Údržba a záloha',
   'Notifications': 'Notifikace', 'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
   'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
-  'Overview': 'Přehled', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Zigbee2MQTT': 'Zigbee2MQTT',
+  'Overview': 'Přehled', 'Data flows': 'Toky dat', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Zigbee2MQTT': 'Zigbee2MQTT',
   'Request a new map': 'Vyžádat novou mapu', 'Zigbee devices': 'Zigbee zařízení', 'Base topic': 'Základní topic', 'Coordinator': 'Koordinátor',
   'Adapter': 'Adaptér', 'Last seen': 'Naposledy viděno', 'Power': 'Napájení', 'LQI': 'LQI', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
   'Matter Server (WebSocket)': 'Matter Server (WebSocket)', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
@@ -1251,6 +1259,7 @@ const ICONS = {
   'shield-account-outline': 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,3.18L19,6.3V11.22C19,12.92 18.5,14.65 17.65,16.17C16,14.94 13.26,14.5 12,14.5C10.74,14.5 8,14.94 6.35,16.17C5.5,14.65 5,12.92 5,11.22V6.3L12,3.18M12,6A3.5,3.5 0 0,0 8.5,9.5A3.5,3.5 0 0,0 12,13A3.5,3.5 0 0,0 15.5,9.5A3.5,3.5 0 0,0 12,6M12,8A1.5,1.5 0 0,1 13.5,9.5A1.5,1.5 0 0,1 12,11A1.5,1.5 0 0,1 10.5,9.5A1.5,1.5 0 0,1 12,8M12,16.5C13.57,16.5 15.64,17.11 16.53,17.84C15.29,19.38 13.7,20.55 12,21C10.3,20.55 8.71,19.38 7.47,17.84C8.37,17.11 10.43,16.5 12,16.5Z',
   'shield-lock-outline': 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M14.8,11V9.5C14.8,8.1 13.4,7 12,7C10.6,7 9.2,8.1 9.2,9.5V11C8.6,11 8,11.6 8,12.2V15.7C8,16.4 8.6,17 9.2,17H14.7C15.4,17 16,16.4 16,15.8V12.3C16,11.6 15.4,11 14.8,11M13.5,11H10.5V9.5C10.5,8.7 11.2,8.2 12,8.2C12.8,8.2 13.5,8.7 13.5,9.5V11Z',
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
+  'sitemap-outline': 'M21 16V13C21 11.89 20.11 11 19 11H13V8H15V2H9V8H11V11H5C3.89 11 3 11.89 3 13V16H1V22H7V16H5V13H11V16H9V22H15V16H13V13H19V16H17V22H23V16H21M11 4H13V6H11V4M5 20H3V18H5V20M13 20H11V18H13V20M21 20H19V18H21V20Z',
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
   'table': 'M5,4H19A2,2 0 0,1 21,6V18A2,2 0 0,1 19,20H5A2,2 0 0,1 3,18V6A2,2 0 0,1 5,4M5,8V12H11V8H5M13,8V12H19V8H13M5,14V18H11V14H5M13,14V18H19V14H13Z',
@@ -1332,6 +1341,7 @@ let status = null;
  * bookmarked and the back button works. Sub pages of the current section are listed in the menu. */
 const NAV = [
   { id: 'overview', label: 'Overview', icon: 'view-dashboard-outline' },
+  { id: 'flows', label: 'Data flows', icon: 'sitemap-outline' },
   { id: 'radios', label: 'Radios', icon: 'chip', subs: [
     { id: 'roles', label: 'Roles', icon: 'swap-horizontal' }, { id: 'status', label: 'Status and maintenance', icon: 'developer-board' },
     { id: 'scan', label: 'Radio surroundings', icon: 'radar' }] },
@@ -1368,7 +1378,7 @@ const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbe
   role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
   'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
 /* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
-const PERM = { 'system/wifi': 'system/lan', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
+const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -1853,6 +1863,110 @@ views.overview = () => {
     ${bCard}
   </div>`;
 };
+
+/* Data flows (Overview › Data flows): where the data of each network and service goes and who takes it.
+ * Nodes: sources (networks of the radios, the microphone), the gateway's services, the consumers; links
+ * carry the protocol and the state, the table below lists every flow with its traffic and settings. */
+const flowsExtra = { sound: null, telegram: null, at: 0 };
+async function loadFlowsExtra() {
+  if (Date.now() - flowsExtra.at < 15000) return;
+  flowsExtra.at = Date.now();
+  const [snd, tg] = await Promise.all([api('/api/sound/status').catch(() => null), perm('system/notify') ? api('/api/telegram').catch(() => null) : null]);
+  Object.assign(flowsExtra, { sound: snd, telegram: tg });
+  if (route() === 'flows') render(true);
+}
+function flowModel() {
+  const s = status, r = s.role, b = r.b || {}, ln = s.links || {};
+  const radios = [['A', r.active || 'none', s.role_status || {}], ['B', b.active || 'none', s.role_status_b || {}]];
+  const on = prefix => radios.find(x => x[1].startsWith(prefix));
+  const thr = on('thread'), zb = on('zigbee'), esp = on('esphome'), wifi = on('wifi_uplink');
+  const snd = flowsExtra.sound, tg = flowsExtra.telegram;
+  const tgOn = tg?.enabled && tg.state === 'running', mqttOn = ln.mqtt === 'connected', haOn = ln.ha_clients > 0;
+  const age = thr ? haAge(thr[2]) : null;
+  const radioTxt = x => L(`radio ${x[0]}`, `rádio ${x[0]}`);
+  const N = {
+    thread_dev: thr && [L('Thread devices', 'Zařízení Thread'), radioTxt(thr), thr[2].phase === 'running' ? 'ok' : 'warn', '#thread/topology',
+      [`${esc(thr[2].network_name || '')} · ${L('channel', 'kanál')} ${thr[2].channel ?? '–'}`]],
+    zigbee_dev: zb && [L('Zigbee devices', 'Zařízení Zigbee'), radioTxt(zb), 'ok', zb[1] === 'zigbee_coordinator' ? '#zigbee/network' : '#zigbee/info', [zb[1] === 'zigbee_router' ? L('the radio routes for them', 'rádio pro ně směruje') : L('network of the coordinator', 'síť koordinátoru')]],
+    ble_dev: esp && [L('Bluetooth devices', 'Zařízení Bluetooth'), radioTxt(esp), 'ok', '#esphome', [L('advertisements, connections', 'vysílání, připojení')]],
+    mic: [L('Microphone', 'Mikrofon'), 'ES8311', snd?.running ? 'ok' : 'off', '#sound/live', [snd ? (snd.running ? `${snd.level_db?.toFixed?.(0) ?? ''} dBFS` : L('off', 'vypnuto')) : '']],
+    otbr: thr && [L('Thread border router', 'Thread border router'), radioTxt(thr), thr[2].phase === 'running' ? 'ok' : 'warn', '#thread/info', [esc(thr[1] === 'thread_br' ? 'OTBR · REST :8081' : L('Thread router (no routing to the LAN)', 'Thread router (bez směrování do LAN)'))]],
+    zb_ncp: zb && [zb[1] === 'zigbee_coordinator' ? L('Zigbee coordinator', 'Zigbee koordinátor') : L('Zigbee router', 'Zigbee router'), radioTxt(zb),
+      zb[1] === 'zigbee_coordinator' ? (zb[2].client_connected ? 'ok' : 'warn') : (zb[2].router?.joined ? 'ok' : 'warn'), '#zigbee/info',
+      [zb[1] === 'zigbee_coordinator' ? `TCP :${zb[2].tcp_port ?? 6638}` : esc(zb[2].router?.state || '')]],
+    esphome: esp && [L('ESPHome BLE proxy', 'ESPHome BLE proxy'), radioTxt(esp), esp[2].improv === 'provisioned' ? 'ok' : 'warn', '#esphome', [L('own Wi-Fi, not through the gateway', 'vlastní Wi-Fi, mimo bránu')]],
+    sound: [L('Sound recognition', 'Rozpoznávání zvuku'), 'YAMNet', snd?.running ? 'ok' : 'off', '#sound/events', [snd?.running ? L('events, noise', 'události, hluk') : L('off', 'vypnuto')]],
+    core: [L('Gateway state and control', 'Stav a řízení brány'), 'ESP32-P4', r.maintenance ? 'bad' : 'ok', '#system/info', [L('roles, telemetry, updates', 'role, telemetrie, aktualizace')]],
+    wifi: wifi && [L('Wi-Fi uplink', 'Wi-Fi uplink'), radioTxt(wifi), wifi[2].ipv4 ? 'ok' : 'warn', '#system/wifi', [wifi[2].ipv4 ? (wifi[2].default_route ? L('carries the traffic', 'nese provoz') : L('standby', 'záloha')) : esc(wifiState(wifi[2]))]],
+    ha: ['Home Assistant', 'LAN', haOn || (age !== null && age < 7 * 86400) ? 'ok' : 'off', '#ha/guide', [haOn ? L('integration connected', 'integrace připojena') : L('integration not connected', 'integrace nepřipojena')]],
+    z2m: zb?.[1] === 'zigbee_coordinator' && ['Zigbee2MQTT', 'LAN', zb[2].client_connected ? 'ok' : 'warn', '#zigbee/network', [zb[2].client_connected ? esc(zb[2].client) : L('not connected', 'nepřipojen')]],
+    mqtt: [L('MQTT broker', 'MQTT broker'), 'LAN', mqttOn ? 'ok' : ln.mqtt === 'disconnected' ? 'bad' : 'off', '#ha/mqtt', [mqttOn ? L('connected', 'připojen') : ln.mqtt === 'disconnected' ? L('not reachable', 'nedostupný') : L('off', 'vypnuto')]],
+    telegram: [L('Telegram', 'Telegram'), L('internet', 'internet'), tgOn ? 'ok' : 'off', '#system/notify', [tg ? (tgOn ? '@' + esc(tg.bot || '') : L('off', 'vypnuto')) : '']],
+    web: [L('Web UI and API', 'Webové UI a API'), 'LAN', 'ok', '#system/users/tokens', ['HTTP :80 · ' + L('tokens', 'tokeny')]],
+  };
+  /* [from, to, way, state, traffic services] */
+  const st = (ok, warn) => ok ? 'ok' : warn ? 'warn' : 'off';
+  const E = [
+    thr && ['thread_dev', 'otbr', `IEEE 802.15.4 · ${radioTxt(thr)}`, st(thr[2].phase === 'running', true)],
+    thr?.[1] === 'thread_br' && ['otbr', 'ha', L('OTBR REST :8081, Matter over IPv6', 'OTBR REST :8081, Matter přes IPv6'), st(age !== null && age < 7 * 86400, age !== null), ['otbr_rest', 'thread']],
+    zb && ['zigbee_dev', 'zb_ncp', `IEEE 802.15.4 · ${radioTxt(zb)}`, 'ok'],
+    zb?.[1] === 'zigbee_coordinator' && ['zb_ncp', 'z2m', `TCP :${zb[2].tcp_port ?? 6638} (ZBOSS)`, st(zb[2].client_connected, true), ['zigbee']],
+    zb?.[1] === 'zigbee_coordinator' && ['z2m', 'mqtt', L('Zigbee2MQTT publishes to the broker', 'Zigbee2MQTT publikuje do brokeru'), st(mqttOn && zb[2].client_connected, true)],
+    esp && ['ble_dev', 'esphome', L('BLE, active, 5 connections', 'BLE, aktivní, 5 připojení'), 'ok'],
+    esp && ['esphome', 'ha', L('Wi-Fi, ESPHome API :6053', 'Wi-Fi, ESPHome API :6053'), st(esp[2].improv === 'provisioned', true)],
+    ['mic', 'sound', 'I²S · ES8311 · 16 kHz', st(snd?.running)],
+    ['sound', 'ha', L('events over the integration push', 'události přes push integrace'), st(snd?.running && haOn)],
+    ['sound', 'mqtt', L('events, noise (base topic)', 'události, hluk (základní topic)'), st(snd?.running && mqttOn)],
+    ['sound', 'telegram', L('notifications of events', 'oznámení událostí'), st(snd?.running && tgOn)],
+    ['core', 'ha', L('integration: WebSocket /api/ws', 'integrace: WebSocket /api/ws'), st(haOn), ['web']],
+    ['core', 'mqtt', L('state, discovery (groups), commands', 'stav, discovery (skupiny), příkazy'), st(mqttOn), ['mqtt']],
+    ['core', 'telegram', L('notifications, commands', 'oznámení, příkazy'), st(tgOn), ['https']],
+    ['core', 'web', L('web UI, REST API', 'webové UI, REST API'), 'ok', ['web']],
+  ].filter(Boolean);
+  return { N, E };
+}
+views.flows = () => {
+  loadFlowsExtra();
+  const { N, E } = flowModel();
+  const name = id => N[id]?.[0] || id;
+  const traffic = svcs => svcs ? netRows('lan', svcs).map(x => x[1]).join(' · ') : '';
+  const node = id => {
+    const n = N[id];
+    if (!n) return '';
+    const ins = E.filter(e => e[1] === id), outs = E.filter(e => e[0] === id);
+    const rows = [[L('State', 'Stav'), n[4].join(', ')], ...ins.map(e => [`← ${name(e[0])}`, `${esc(e[2])}${e[4] ? '<br>' + traffic(e[4]) : ''}`]),
+      ...outs.map(e => [`→ ${name(e[1])}`, `${esc(e[2])}${e[4] ? '<br>' + traffic(e[4]) : ''}`])];
+    return topoNode(n[2], n[3], esc(n[1]), esc(n[0]), n[4], ['fl-' + id, n[0], rows]).replace('<a class="tnode', `<a data-fnode="${id}" class="tnode`);
+  };
+  const col = (title, ids) => `<div class="fcol"><h4>${title}</h4>${ids.map(node).join('')}</div>`;
+  const pillOf = c => pill(c, { ok: L('flows', 'teče'), warn: L('waiting', 'čeká'), off: L('off', 'vypnuto'), bad: L('error', 'chyba') }[c]);
+  return `<div class="card">${h3('sitemap-outline', L('Data flows', 'Toky dat'))}
+    <p class="muted" style="margin-top:0">${L('What the gateway takes in, what it does with it and who receives it. A node opens its settings; hover it for every flow through it.',
+      'Co brána přijímá, co s tím dělá a kdo to odebírá. Uzel otevře své nastavení; po najetí ukáže všechny toky, které jím vedou.')}</p>
+    <div class="flows" id="flows">${col(L('Sources', 'Zdroje'), ['thread_dev', 'zigbee_dev', 'ble_dev', 'mic'])}
+      ${col(L('Gateway', 'Brána'), ['otbr', 'zb_ncp', 'esphome', 'sound', 'core', 'wifi'])}
+      ${col(L('Consumers', 'Odběratelé'), ['ha', 'z2m', 'mqtt', 'telegram', 'web'])}<svg class="flinks" aria-hidden="true"></svg></div></div>
+    <div class="card" style="margin-top:16px">${h3('table', L('Every flow', 'Všechny toky'))}<div class="table-wrap"><table>
+      <thead><tr><th>${L('From', 'Odkud')}</th><th>${L('To', 'Kam')}</th><th>${L('Way', 'Cesta')}</th><th>${L('State', 'Stav')}</th><th>${L('Traffic (since start · now)', 'Provoz (od startu · nyní)')}</th><th></th></tr></thead><tbody>
+      ${E.map(e => `<tr><td>${esc(name(e[0]))}</td><td>${esc(name(e[1]))}</td><td>${esc(e[2])}</td><td>${pillOf(e[3])}</td><td class="muted">${traffic(e[4])}</td>
+        <td><a href="${e[1] === 'web' ? N[e[0]][3] : N[e[1]][3]}" title="${L('Settings', 'Nastavení')}" aria-label="${L('Settings', 'Nastavení')}">${ic('cog-outline')}</a></td></tr>`).join('')}
+      </tbody></table></div><p class="muted" style="font-size:12px">${L('Traffic of the LAN services since the gateway start (System › LAN shows it per service); the ESPHome proxy talks to Home Assistant over its own Wi-Fi, not through the gateway.',
+        'Provoz služeb v LAN od startu brány (Systém › LAN ho ukazuje po službách); ESPHome proxy mluví s Home Assistant přes vlastní Wi-Fi, ne přes bránu.')}</p></div>`;
+};
+/* links of the data flows page, drawn between the nodes once they are laid out */
+function drawFlows() {
+  const box = $('#flows'), svg = box?.querySelector('svg.flinks');
+  if (!svg || getComputedStyle(svg).display === 'none') return;
+  const { E } = flowModel(), o = box.getBoundingClientRect();
+  const at = id => box.querySelector(`[data-fnode="${id}"]`)?.getBoundingClientRect();
+  svg.innerHTML = E.map(e => {
+    const a = at(e[0]), b = at(e[1]);
+    if (!a || !b) return '';
+    const x1 = a.right - o.left, y1 = a.top + a.height / 2 - o.top, x2 = b.left - o.left, y2 = b.top + b.height / 2 - o.top, mx = (x1 + x2) / 2;
+    return `<path class="${e[3]}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"><title>${esc(e[2])}</title></path>`;
+  }).join('');
+}
+addEventListener('resize', () => { if (route() === 'flows') drawFlows(); });
 
 /* Roles of both radios (docs/dual-radio.md): radio A is the C6 of the board, radio B the external one
  * on JP1. At most one Thread and one Zigbee network and one ESPHome proxy; a switch restarts the gateway.
@@ -4925,7 +5039,7 @@ document.addEventListener('input', e => {
 /* ---------------- loop ---------------- */
 
 /* pages without form input, redrawn on every status poll */
-const PASSIVE = ['overview', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'system/info'];
+const PASSIVE = ['overview', 'flows', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'system/info'];
 
 function pageTitle() {
   const [s1, s2] = (sub || '').split('/');
@@ -4954,6 +5068,7 @@ function render(full) {
     applyCardPerms(main);
     if (tab === 'thread') { loadThread(); if (sub === 'settings') { loadDataset(false); loadThreadTxPower(); } if (sub === 'topology') loadTopology(); }
     if (route() === 'ha/mqtt') loadMqtt();
+    if (route() === 'flows') requestAnimationFrame(drawFlows);
     if (route() === 'system/diag') renderLog();
     if (route() === 'radios/scan') loadNetscan();
     if (route() === 'system/lan' || route() === 'system/wifi') {

@@ -36,6 +36,12 @@
 - Web UI: Radios › Roles as a table (roles × radios, default), a list (one line per role) or the
   tiles, the choice is remembered in the browser; on a phone the switch buttons show only the icon.
   Tests UI27, UI26 updated.
+- Web UI: new page Data flows: sources (Thread, Zigbee and Bluetooth devices, microphone), the
+  gateway's services (border router, Zigbee coordinator or router, ESPHome proxy, sound recognition,
+  state and control, Wi-Fi uplink) and the consumers (Home Assistant, Zigbee2MQTT, MQTT broker,
+  Telegram, web UI and API) with drawn links coloured by state, a details box per node with every
+  flow through it and its traffic, and a table of all flows with a link to their settings. Test UI28.
+- UI tests UI06 and UI07 use the language and theme switches of the side bar again.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.

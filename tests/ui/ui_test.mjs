@@ -60,7 +60,7 @@ if (args.password) {
 
 const toastText = () => page.textContent('#toast');
 // every page of the left menu (section/sub page)
-const ROUTES = ['overview', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
+const ROUTES = ['overview', 'flows', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
   'zigbee/info', 'zigbee/network', 'zigbee/backups', 'zigbee/diag', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes',
   'ha/guide', 'ha/mqtt', 'ha/matter', 'system/info', 'system/lan', 'system/firmware', 'system/maint', 'system/diag'];
 // false when the menu has the page closed (it needs a role that is not active)
@@ -163,7 +163,7 @@ await test('UI05', 'Thread: "Copy TLVs" shows the dataset (border router or rout
 });
 
 await test('UI06', 'Language: Czech translates every tab, keeps sound names, English restores the original', async () => {
-  await page.selectOption('#pref-lang', 'cs');
+  await page.click('#seg-lang button[data-lang=cs]');
   await page.waitForTimeout(800);
   check(await page.getAttribute('html', 'lang') === 'cs', 'html lang = cs');
   check((await page.textContent('#side a[data-route=overview]')).trim() === 'Přehled', 'Overview menu item reads "Přehled"');
@@ -189,21 +189,21 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
     }
   }
   // every menu item and sub page has a Czech label (names of standards stay as they are)
-  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter'];
+  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter', 'LAN', 'Wi-Fi'];
   const english = [];
   for (const sec of ['overview', 'radios', 'thread', 'zigbee', 'esphome', 'sound', 'ha', 'system']) {
     await page.click(`#side a[data-route="${sec}"]`);
     await page.waitForTimeout(300);
-    for (const [route, text] of await page.$$eval('#side a', a => a.map(x => [x.dataset.route, x.textContent.trim()]))) {
-      const en = await page.evaluate(r => { const [s, sub] = r.split('/'); const n = NAV.find(x => x.id === s); return sub ? n.subs.find(x => x.id === sub).label : n.label; }, route);
+    for (const [route, text] of await page.$$eval('#side a[data-route]', a => a.map(x => [x.dataset.route, x.textContent.trim()]))) {
+      const en = await page.evaluate(r => r.split('/').slice(1).reduce((n, id) => n.subs.find(x => x.id === id), NAV.find(x => x.id === r.split('/')[0])).label, route);
       if (text === en && !same.includes(en)) english.push(en);
     }
   }
   check(english.length === 0, `menu fully translated${english.length ? ' (missing: ' + [...new Set(english)].join(', ') + ')' : ''}`);
   await page.reload();
   await page.waitForSelector('.card', { timeout: 20000 });
-  check(await page.inputValue('#pref-lang') === 'cs', 'language kept after reload');
-  await page.selectOption('#pref-lang', 'en');
+  check(await page.$eval('#seg-lang button[data-lang=cs]', b => b.classList.contains('on')), 'language kept after reload');
+  await page.click('#seg-lang button[data-lang=en]');
   await page.waitForTimeout(800);
   check((await page.textContent('#side a[data-route=overview]')).trim() === 'Overview', 'English restores "Overview"');
   check(!/[ěščřžůť]/.test(await page.innerText('body')), 'no Czech text left on the page');
@@ -212,17 +212,17 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
 
 await test('UI07', 'Theme: light, dark and system switch the page colours and persist', async () => {
   const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  await page.selectOption('#pref-theme', 'light');
+  await page.click('#seg-theme [data-theme-set=light]');
   const light = await bg();
   check(await page.getAttribute('html', 'data-theme') === 'light', `light: data-theme=light (${light})`);
-  await page.selectOption('#pref-theme', 'dark');
+  await page.click('#seg-theme [data-theme-set=dark]');
   const dark = await bg();
   check(await page.getAttribute('html', 'data-theme') === 'dark' && dark !== light, `dark: different background (${dark})`);
   await page.reload();
   await page.waitForSelector('.card', { timeout: 20000 });
-  check(await bg() === dark && await page.inputValue('#pref-theme') === 'dark', 'dark kept after reload');
+  check(await bg() === dark && await page.$eval('#seg-theme [data-theme-set=dark]', b => b.classList.contains('on')), 'dark kept after reload');
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.selectOption('#pref-theme', 'system');
+  await page.click('#seg-theme [data-theme-set=system]');
   check(await page.getAttribute('html', 'data-theme') === null && await bg() === light, 'system + light OS: no attribute, light background');
   await page.emulateMedia({ colorScheme: 'dark' });
   check(await bg() === dark, 'system + dark OS: dark background');
@@ -714,6 +714,26 @@ await test('UI27', 'Radios › Roles: table, list and tiles show the same choice
   await page.waitForSelector('#main .role-group', { timeout: 15000 });
   check(true, 'tiles again after a reload');
   await page.click('[data-roles-view="table"]');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI28', 'Data flows: a node per active source, service and consumer, a drawn link and a table row per flow, settings links to existing pages', async () => {
+  await tab('flows');
+  await page.waitForSelector('#flows [data-fnode]');
+  await page.waitForTimeout(500);
+  const nodes = await page.$$eval('#flows [data-fnode]', x => x.map(n => n.dataset.fnode));
+  check(['mic', 'sound', 'core', 'ha', 'mqtt', 'web'].every(n => nodes.includes(n)), `fixed nodes present (${nodes.join(', ')})`);
+  const runs = r => [status.role.active, status.role.b?.active].includes(r);
+  check(nodes.includes('otbr') === [status.role.active, status.role.b?.active].some(r => r?.startsWith('thread')), 'Thread border router node only with a Thread role');
+  check(nodes.includes('esphome') === runs('esphome'), 'ESPHome node only with the ESPHome role');
+  const rows = await page.$$eval('#main table tbody tr', x => x.length), paths = await page.$$eval('#flows svg.flinks path', x => x.length);
+  check(rows > 0 && paths === rows, `${rows} flows in the table, ${paths} drawn links`);
+  const links = await page.$$eval('#main a[href^="#"]', x => [...new Set(x.map(a => a.getAttribute('href').slice(1)))]);
+  const known = await page.evaluate(() => NAV.flatMap(n => n.subs ? n.subs.flatMap(sb => sb.subs ? sb.subs.map(t => `${n.id}/${sb.id}/${t.id}`) : [`${n.id}/${sb.id}`]) : [n.id]));
+  const bad = links.filter(l => !known.includes(l));
+  check(!bad.length, `every settings link is a page of the UI${bad.length ? ': ' + bad.join(', ') : ''}`);
+  await page.hover('[data-fnode="core"]');
+  check(await page.$eval('#nodebox', b => b.style.display === 'block' && b.textContent.includes('→')), 'hovering a node lists its flows');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

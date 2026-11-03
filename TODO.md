@@ -81,7 +81,7 @@
 - [x] Projít UI testy s přihlášením přímo na bráně (UI21–UI23 zapisují): prošly, UI22 našel ponechanou nabídku staré URL (opraveno)
 - [x] Vydání v1.9 s novým menu
 - [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
-- [ ] UI testy UI06/UI07 (volba jazyka a motivu přes `#pref-lang`/`#pref-theme` už v UI není), UI25 (formát logu) neodpovídají současnému UI (UI25 na bráně 2026-11-02 prošel)
+- [x] UI testy UI06/UI07 přepsány na přepínače `#seg-lang`/`#seg-theme` (2026-11-03), UI25 prošel
 - [ ] Přefotit snímky dokumentace v rolích Zigbee koordinátor (`PHASE=zigbee`): mají ještě staré menu
 - [x] Rádio B v UI se stejnými údaji a akcemi jako rádio A (přehled, Stav a údržba: přeflashování, záloha flash, firmwary)
 - [x] Úplný sken na rádiu A i B (C5: 5 GHz, šířka, standardy), oprava WPA3 hlášené jako otevřená (skener 1.1.0); TC20 prošel
@@ -130,8 +130,8 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F3.1 Tooltipy uzlů diagramu na přehledu (LAN, P4, rádia A/B, jejich sítě)
 - [x] F3.2 Provoz v tooltipech hlavičky (od startu a aktuální rychlost po službách, `/api/net/traffic` každých 10 s; firmware už počítadla měl)
 - [x] F3.3 Rádia › Role: tabulka (výchozí), seznam, dlaždice, volba v prohlížeči; UI27
-- [ ] F3.4 Vizualizace HW flow s tooltipy a prokliky do nastavení, bez CDN
-- [ ] F3.5 UI testy, snímky dokumentace
+- [x] F3.4 Stránka Toky dat (zdroje → služby brány → odběratelé, čáry podle stavu, tooltipy s provozem, tabulka toků s odkazy na nastavení), UI28
+- [x] F3.5 UI testy UI01–UI28 na bráně prošly (UI06/UI07 opraveny na přepínače v postranním panelu); snímky dokumentace zůstávají v bodu „Přefotit snímky“
 
 **F4 Konfigurační průvodce**
 - [ ] F4.1 Návrh kroků (účet → síť → rádia a role → Thread/Zigbee/ESPHome → MQTT/HA/Telegram → zvuk → aktualizace), pokračování po restartu
