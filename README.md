@@ -38,7 +38,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 |---|---|
 | [docs/hardware.md](docs/hardware.md) | board, chip revision, **JP1 jumpers**, pinout, USB notes |
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
-| [documentation/](documentation/index.html) | user documentation in Czech and English with screenshots of every page (HTML) |
+| [documentation/](https://kindr007.github.io/jc-esp32p4-ha-gateway/) | user documentation in Czech and English with screenshots of every page (HTML, [sources](documentation/)) |
 | [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |
 | [docs/notifications.md](docs/notifications.md) | notifications, Home Assistant, Telegram bot and its commands |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
