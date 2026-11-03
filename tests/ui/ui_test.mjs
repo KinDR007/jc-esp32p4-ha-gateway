@@ -631,7 +631,7 @@ await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certific
   await page.click('[data-mqp="integration"]');
   check(await groups() === 'sound_triggers', 'preset Only what the integration lacks: sound event device triggers only');
   await page.click('[data-mqp="all"]');
-  check(await groups() === 'roles,system,update,sound,sound_events,sound_triggers,sensors', 'preset All: every group');
+  check(await groups() === 'roles,system,update,sound,sound_events,sound_triggers,sensors,modbus', 'preset All: every group');
   await page.fill('#mq-uri', uri);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
@@ -831,6 +831,69 @@ await test('UI31', 'System › Hardware: wiring (CN3), scan with the onboard cod
     check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
   } finally {
     await page.request.put(base + 'api/sensors', { data: { interval_s: before.interval_s, sensors: keep } });
+  }
+});
+
+await test('UI32', 'System › RS485: bus settings, templates, add a device from a template, rename, details, remove; a template copied, edited with a refused and a valid save, deleted; manual request; configuration restored', async () => {
+  const before = await (await page.request.get(base + 'api/modbus')).json();
+  const keep = { bus: before.bus, devices: before.devices.map(({ id, name, template, transport, slave, host, port, poll_s, expose, enabled }) => ({ id, name, template, transport, slave, host, port, poll_s, expose, enabled })) };
+  const tplId = 'ui32_copy';
+  try {
+    await tab('system/rs485');
+    await page.waitForSelector('#mb-templates tr:nth-child(2)', { timeout: 15000 });
+    const tpls = (await (await page.request.get(base + 'api/modbus/templates')).json()).templates;
+    check(await page.$$eval('#mb-templates tr', r => r.length - 1) === tpls.length, `${tpls.length} templates listed`);
+    check(await page.inputValue('#mb-baud') === String(before.bus.baud), 'bus baud rate shown');
+    await page.selectOption('#mb-add-tpl', 'eastron_sdm120');
+    check((await page.textContent('#mb-add-note')).includes('2400'), 'template note with its serial defaults');
+    await page.fill('#mb-add-name', 'UI32 měřič');
+    await page.fill('#mb-add-slave', '99');
+    await page.click('#mb-add');
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-mb-name]')].some(i => i.value === 'UI32 měřič'), null, { timeout: 8000 });
+    const dev = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.name === 'UI32 měřič');
+    check(dev && dev.template === 'eastron_sdm120' && dev.slave === 99 && dev.transport === 'rtu', 'device added from the template');
+    const row = `tr[data-mbdev="${dev.id}"]`;
+    await page.fill(`${row} [data-mb-name]`, 'UI32 přejmenovaný');
+    await page.selectOption(`${row} [data-mb-expose]`, 'mqtt');
+    await page.click('#mb-dev-save');
+    await page.waitForFunction(() => document.querySelector('#toast').textContent === 'Saved', null, { timeout: 8000 });
+    const d2 = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.id === dev.id);
+    check(d2.name === 'UI32 přejmenovaný' && d2.expose === 'mqtt', 'name with diacritics and MQTT stored');
+    await page.click(`[data-mb-open="${dev.id}"]`);
+    await page.waitForSelector(`#mb-full-${dev.id} table`);
+    check(await page.$$eval(`#mb-full-${dev.id} tr`, r => r.length) === 16, 'details list every entity of the template');
+    await page.click(`[data-mb-del="${dev.id}"]`);
+    await page.waitForSelector('#confirm[open]');
+    await page.click('#confirm button[value="yes"]');
+    await page.waitForFunction(r => !document.querySelector(r), row, { timeout: 8000 });
+    check(true, 'device removed');
+
+    await page.click('[data-mb-tpl-copy="peacefair_pzem016"]');
+    await page.waitForSelector('#mb-editor:not(.hidden)');
+    const copy = JSON.parse(await page.inputValue('#mb-editor-text'));
+    check(copy.id === 'peacefair_pzem016_copy' && copy.entities.length > 5, 'copy opens in the editor');
+    await page.fill('#mb-editor-text', JSON.stringify({ ...copy, id: tplId, entities: [{ key: 'v', name: 'V', reg: 'input', addr: 70000 }] }));
+    await page.click('#mb-editor-save');
+    await page.waitForFunction(() => /addr/.test(document.querySelector('#mb-editor-err').textContent), null, { timeout: 5000 });
+    check(true, `invalid template refused: ${await page.textContent('#mb-editor-err')}`);
+    await page.fill('#mb-editor-text', JSON.stringify({ ...copy, id: tplId }));
+    await page.click('#mb-editor-save');
+    await page.waitForSelector(`[data-mb-tpl-del="${tplId}"]`, { timeout: 8000 });
+    check(true, 'own template saved and listed');
+    await page.click(`[data-mb-tpl-del="${tplId}"]`);
+    await page.waitForSelector('#confirm[open]');
+    await page.click('#confirm button[value="yes"]');
+    await page.waitForFunction(id => !document.querySelector(`[data-mb-tpl-del="${id}"]`), tplId, { timeout: 8000 });
+    check(true, 'own template deleted');
+
+    await page.fill('#mb-raw-slave', '99');
+    await page.click('#mb-raw-send');
+    await page.waitForFunction(() => document.querySelector('#mb-raw-out').textContent.length > 0, null, { timeout: 10000 });
+    check((await page.textContent('#mb-raw-out')).includes('no answer'), `manual request to nobody: ${(await page.textContent('#mb-raw-out')).trim()}`);
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/modbus', { data: keep });
+    await page.request.delete(base + `api/modbus/template?id=${tplId}`);
   }
 });
 

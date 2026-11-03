@@ -100,6 +100,7 @@
    "state": "total_increasing"
   }
  ],
+ "notes_cs": "Jednofázový. 9600 Bd, adresa na displeji (návod uvádí 8N1 i dva stop bity: bez odpovědi zkuste 2). Dodaná energie není zdokumentovaná.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

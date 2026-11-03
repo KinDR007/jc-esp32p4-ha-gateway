@@ -207,6 +207,7 @@
    "state": "total_increasing"
   }
  ],
+ "notes_cs": "Třífázový. 9600 Bd 8N1, adresa 1. Hodnoty v jednotkách návodu (0,1 V, 0,001 A, 0,1 W) zde přepočtené. DTSU666-H (Huawei) se liší.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

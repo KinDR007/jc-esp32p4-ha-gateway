@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Modbus, System › RS485: devices on the board's RS485 port (J4, UART3) and over Modbus TCP, described
+  by JSON templates (read and write: number, switch, select, button). Built-in templates after research
+  and counter-research: Eastron SDM120, SDM230, SDM630 V2, SDM72D-M V1/V2, ORNO OR-WE-504, 514/515,
+  516/517, Hiking DDS238-2 ZN/S, Chint DTSU666, DDSU666, Peacefair PZEM-016/014, PZEM-017/003. Own
+  templates in the web UI (editor with checks, import/export), address search over addresses and baud
+  rates, manual requests with register decoding. Each device is its own device in Home Assistant via the
+  gateway, through the integration or MQTT (group `modbus`, command topics). API `/api/modbus*`,
+  Telegram `/modbus`, permission `system/rs485` ([docs/modbus.md](docs/modbus.md)).
+- MQTT: commands below the base topic for components; discovery entries may describe their own device;
+  the discovery group mask is stored under a new key (eight groups).
 - I2C sensors on connector CN3 (or JP1), System › Hardware: 24 chip families (Bosch BME/BMP, Sensirion
   SHT3x/SHT4x/SCD4x/SGP30, AHT2x, Si7021/HTU21D, HDC1080, ENS160, PMSA003I, BH1750, VEML7700, TSL25x1,
   LTR390, OPT3001, MAX44009, TMP117, MCP9808). A scan at every start and on request identifies chips by

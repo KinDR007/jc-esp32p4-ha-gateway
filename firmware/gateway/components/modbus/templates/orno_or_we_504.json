@@ -114,6 +114,7 @@
    "state": "total_increasing"
   }
  ],
+ "notes_cs": "Jednofázový. 9600 Bd 8N1, adresa 1. Registry z komunitního kódu (dokument ORNO nedostupný): ověřte hodnoty podle displeje.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

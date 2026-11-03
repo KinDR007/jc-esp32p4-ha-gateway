@@ -5,6 +5,7 @@
  "model": "SDM72D-M (V1)",
  "category": "energy_meter",
  "notes": "First version: only total power and energy (no voltages); the registers come from open source drivers (no Eastron map found).",
+ "notes_cs": "První verze: jen celkový výkon a energie (bez napětí); registry z open source ovladačů (mapa od Eastronu nenalezena).",
  "source": "https://github.com/volkszaehler/mbmd/blob/master/meters/rs485/sdm72.go",
  "serial": {
   "baud": 9600,

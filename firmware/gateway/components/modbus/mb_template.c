@@ -261,8 +261,9 @@ bool mb_template_parse(const cJSON *json, mb_template_t *out, char *err, size_t 
              (int)sizeof(t->model) - 1);
     }
     if (!copy_str(json, "category", t->category, sizeof(t->category), false) || !copy_str(json, "notes", t->notes, sizeof(t->notes), false) ||
+        !copy_str(json, "notes_cs", t->notes_cs, sizeof(t->notes_cs), false) ||
         !copy_str(json, "source", t->source, sizeof(t->source), false)) {
-        FAIL("category, notes or source too long");
+        FAIL("category, notes, notes_cs or source too long");
     }
     const cJSON *serial = cJSON_GetObjectItem(json, "serial");
     t->baud = 9600, t->parity = 'N', t->stop = 1;
@@ -377,6 +378,7 @@ cJSON *mb_template_json(const mb_template_t *t)
     cJSON_AddStringToObject(j, "model", t->model);
     add_str_if(j, "category", t->category);
     add_str_if(j, "notes", t->notes);
+    add_str_if(j, "notes_cs", t->notes_cs);
     add_str_if(j, "source", t->source);
     cJSON *serial = cJSON_AddObjectToObject(j, "serial");
     cJSON_AddNumberToObject(serial, "baud", t->baud);

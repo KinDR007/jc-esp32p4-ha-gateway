@@ -165,6 +165,7 @@
    }
   }
  ],
+ "notes_cs": "Modul DC s externím bočníkem. 9600 Bd 8N2 (dva stop bity). Nastavte bočník (rozsah proudu) podle osazeného.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

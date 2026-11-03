@@ -5,6 +5,7 @@
  "model": "SDM72D-M V2",
  "category": "energy_meter",
  "notes": "Three phase. Default 9600 Bd, 8N1, address 1. Reboots on requests in quick succession: 200 ms between frames.",
+ "notes_cs": "Třífázový. Výchozí 9600 Bd, 8N1, adresa 1. Při rychle po sobě jdoucích dotazech se restartuje: 200 ms mezi rámci.",
  "source": "https://xn--stromzhler-v5a.eu/media/pdf/93/17/d7/SDM72DM-V2.pdf",
  "serial": {
   "baud": 9600,

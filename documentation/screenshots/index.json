@@ -676,5 +676,34 @@
     "file": "system_hw__5"
    }
   ]
+ },
+ "system/rs485": {
+  "page": "system_rs485",
+  "cards": [
+   {
+    "title": "RS485 BUS",
+    "file": "system_rs485__1"
+   },
+   {
+    "title": "ADD A DEVICE",
+    "file": "system_rs485__2"
+   },
+   {
+    "title": "DEVICES",
+    "file": "system_rs485__3"
+   },
+   {
+    "title": "FIND DEVICES",
+    "file": "system_rs485__4"
+   },
+   {
+    "title": "MANUAL REQUEST",
+    "file": "system_rs485__5"
+   },
+   {
+    "title": "TEMPLATES",
+    "file": "system_rs485__6"
+   }
+  ]
  }
 }

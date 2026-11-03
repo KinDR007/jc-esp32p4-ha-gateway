@@ -137,6 +137,7 @@
    }
   }
  ],
+ "notes_cs": "Modul AC. 9600 Bd 8N1. Adresa 1-247 (holding 0x0002); jediný modul na sběrnici odpovídá i na 248 (0xF8).",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

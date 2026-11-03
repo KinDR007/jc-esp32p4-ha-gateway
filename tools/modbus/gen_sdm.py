@@ -67,6 +67,8 @@ THREE = ['voltage_l1', 'voltage_l2', 'voltage_l3', 'current_l1', 'current_l2', '
          'total_power_factor', 'frequency', 'import_energy', 'export_energy', 'total_energy', 'voltage_l1_l2', 'voltage_l2_l3',
          'voltage_l3_l1', 'neutral_current']
 
+NOTES_CS = {'eastron_sdm120': 'Jednofázový. Výchozí 2400 Bd, 8N1, adresa 1; varianta SDM120-M má od výroby 9600 Bd. Adresa a rychlost v menu elektroměru.', 'eastron_sdm230': 'Jednofázový. Výchozí 9600 Bd (návod v1.8; elektroměry s návodem v1.6 a starším 2400 Bd), 8N1, adresa 1.', 'eastron_sdm630': 'Třífázový (3P4W). Výchozí 9600 Bd, 8N1, adresa 1. Až 80 registrů v jednom dotazu.', 'eastron_sdm72d_v2': 'Třífázový. Výchozí 9600 Bd, 8N1, adresa 1. Při rychle po sobě jdoucích dotazech se restartuje: 200 ms mezi rámci.', 'eastron_sdm72d': 'První verze: jen celkový výkon a energie (bez napětí); registry z open source ovladačů (mapa od Eastronu nenalezena).'}
+
 MODELS = [
     ('eastron_sdm120', 'SDM120-Modbus', 2400, 40, SINGLE, [SERIAL],
      'Single phase. Default 2400 Bd, 8N1, address 1; the SDM120-M (the -M variant) ships with 9600 Bd. Address and baud rate on the meter\'s menu.',
@@ -102,7 +104,8 @@ for tid, model, baud, max_regs, keys, extra, notes, source in MODELS:
             e['every'] = every
         ents.append(e)
     ents.sort(key=lambda e: int(e['addr'], 16))
-    t = {'schema': 1, 'id': tid, 'manufacturer': 'Eastron', 'model': model, 'category': 'energy_meter', 'notes': notes, 'source': source,
+    t = {'schema': 1, 'id': tid, 'manufacturer': 'Eastron', 'model': model, 'category': 'energy_meter', 'notes': notes,
+         'notes_cs': NOTES_CS[tid], 'source': source,
          'serial': {'baud': baud, 'parity': 'N', 'stop': 1}, 'slave': 1, 'timeout_ms': 500,
          'gap_ms': 200 if 'sdm72' in tid else 50, 'poll_s': 10, 'max_regs': max_regs, 'max_gap': 20, 'entities': ents + extra}
     OUT.mkdir(parents=True, exist_ok=True)

@@ -1016,6 +1016,7 @@ static cJSON *tpl_summary(const tpl_t *t)
     cJSON_AddStringToObject(o, "model", t->t.model);
     cJSON_AddStringToObject(o, "category", t->t.category);
     cJSON_AddStringToObject(o, "notes", t->t.notes);
+    cJSON_AddStringToObject(o, "notes_cs", t->t.notes_cs);
     cJSON_AddBoolToObject(o, "builtin", t->t.builtin);
     cJSON_AddNumberToObject(o, "entities", t->t.nent);
     cJSON_AddNumberToObject(o, "rev", t->rev);

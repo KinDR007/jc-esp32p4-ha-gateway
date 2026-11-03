@@ -166,8 +166,10 @@ T.append({'id': 'peacefair_pzem017', 'manufacturer': 'Peacefair', 'model': 'PZEM
               {'key': 'reset_energy', 'name': 'Reset energy', 'name_cs': 'Nulovat energii', 'reg': 'none', 'category': 'config',
                'write': {'kind': 'button', 'fc': 0x42}}]})
 
+NOTES_CS = {'orno_or_we_504': 'Jednofázový. 9600 Bd 8N1, adresa 1. Registry z komunitního kódu (dokument ORNO nedostupný): ověřte hodnoty podle displeje.', 'orno_or_we_514': 'Jednofázový. 9600 Bd 8E1 (sudá parita), adresa 1. Energie tarifů T1-T4 na 0xA002-0xA008.', 'orno_or_we_516': 'Třífázový. 9600 Bd 8E1 (sudá parita), adresa 1. Výkon se čte v kW (zobrazen ve W); registry odebrané a dodané energie nejsou potvrzené a chybí.', 'hiking_dds238_2': 'Jednofázový. 9600 Bd 8N1, adresa 1. Zápis jen funkcí 16. Třífázový DTS238-7 má jinou, nezveřejněnou mapu.', 'chint_dtsu666': 'Třífázový. 9600 Bd 8N1, adresa 1. Hodnoty v jednotkách návodu (0,1 V, 0,001 A, 0,1 W) zde přepočtené. DTSU666-H (Huawei) se liší.', 'chint_ddsu666': 'Jednofázový. 9600 Bd, adresa na displeji (návod uvádí 8N1 i dva stop bity: bez odpovědi zkuste 2). Dodaná energie není zdokumentovaná.', 'peacefair_pzem016': 'Modul AC. 9600 Bd 8N1. Adresa 1-247 (holding 0x0002); jediný modul na sběrnici odpovídá i na 248 (0xF8).', 'peacefair_pzem017': 'Modul DC s externím bočníkem. 9600 Bd 8N2 (dva stop bity). Nastavte bočník (rozsah proudu) podle osazeného.'}
+
 for t in T:
-    t = {'schema': 1, **t}
+    t = {'schema': 1, **t, 'notes_cs': NOTES_CS[t['id']]}
     t.setdefault('slave', 1)
     t.setdefault('timeout_ms', 500)
     t.setdefault('gap_ms', 50)

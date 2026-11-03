@@ -5,6 +5,7 @@
  "model": "SDM630-Modbus V2",
  "category": "energy_meter",
  "notes": "Three phase (3P4W). Default 9600 Bd, 8N1, address 1. Up to 80 registers per request.",
+ "notes_cs": "Třífázový (3P4W). Výchozí 9600 Bd, 8N1, adresa 1. Až 80 registrů v jednom dotazu.",
  "source": "https://www.eastroneurope.com/images/uploads/products/protocol/SDM630_MODBUS_Protocol.pdf",
  "serial": {
   "baud": 9600,

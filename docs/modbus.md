@@ -1,0 +1,179 @@
+# Modbus (RS485 and Modbus TCP)
+
+The gateway reads and writes Modbus devices, on the board's RS485 port and over the network
+(Modbus TCP), and shows each one in Home Assistant as its own device. What to read from a device
+and how to show it is a **template** (JSON): built-in ones come with the firmware, own ones are
+added in the web UI. Web UI: System › RS485. API: [api.md](api.md#modbus-rs485-and-tcp). Code:
+`firmware/gateway/components/modbus`.
+
+## Wiring
+
+| | |
+|---|---|
+| Connector | **J4**: A and B of the bus (twisted pair); connect GND of the devices to the board's GND |
+| Transceiver | MAX485 on the board, direction switched automatically from the TX line (74LVC1G132 and a transistor), TVS diodes and 0.1 A fuses on A and B |
+| P4 | UART3, TX GPIO26, RX GPIO27 (`CONFIG_GW_RS485_*`) |
+| Bus | up to 32 devices, 120 Ω termination at both ends of a long bus, one baud rate and framing for all devices |
+
+The bus settings (baud rate, parity, stop bits, timeout) apply to all RS485 devices; a template
+shows its device's defaults and the page offers to take them. Modbus TCP devices need only host,
+port (502) and unit id.
+
+## Devices
+
+Per device: template, name (default the model, up to 32 characters), connection (RS485 address
+1-247, or TCP host, port and unit 0-255), read interval (0 = the template's), how it is shown in
+Home Assistant (integration, MQTT, both, none), enabled. Up to 16 devices.
+
+- The task reads the entities due in a poll in as few requests as the template allows (adjacent
+  registers, up to `max_regs` per request, gaps of up to `max_gap` registers). When a device
+  refuses a combined read (exception), its entities are read one by one from then on; an entity
+  the device refuses alone (illegal address or function) is left out.
+- No answer three times in a row: offline, values gone (Home Assistant: unavailable), tried again
+  every 30 s.
+- Entities with `"every": 0` (serial number, settings) are read once after the device answers, and
+  again after a write.
+- Writes come from Home Assistant (number, switch, select, button), from MQTT command topics and
+  from the page; the entity is read again right after.
+- **Find devices** tries every address (and chosen baud rates) with a read of the template's first
+  register; an exception counts as an answer. RS485 devices are not polled meanwhile.
+- **Manual request** reads or writes registers and coils of any address and shows registers as
+  u16, s16, u32 and float32 in both word orders, for writing a template.
+- Telegram: `/modbus` lists the devices with their measurements.
+
+## Home Assistant
+
+Each device is a device of its own, connected via the gateway:
+
+- **Integration** (P4 Gateway 1.6.0): entities from the template (sensor, binary sensor, number,
+  switch, select, button), values pushed on every read (WebSocket topic `modbus/<id>`), writes
+  through `/api/modbus/write`. The template is fetched once per revision.
+- **MQTT** discovery group `modbus`: the same entities, state topic `<base>/modbus/<id>`,
+  availability `<base>/modbus/<id>/availability` together with the gateway's, commands
+  `<base>/modbus/<id>/<key>/set` (number: the value, switch: `ON`/`OFF`, select: the option text,
+  button: `PRESS`).
+
+Choose integration *or* MQTT per device, both would show every entity twice.
+
+## Template format
+
+```json
+{
+  "schema": 1,
+  "id": "my_meter",
+  "manufacturer": "Acme", "model": "M1", "category": "energy_meter",
+  "notes": "Shown when adding a device.", "notes_cs": "Totéž česky.",
+  "source": "https://... (where the register map comes from)",
+  "serial": {"baud": 9600, "parity": "E", "stop": 1},
+  "slave": 1, "timeout_ms": 500, "gap_ms": 50, "poll_s": 10, "max_regs": 40, "max_gap": 0,
+  "entities": [
+    {"key": "voltage", "name": "Voltage", "name_cs": "Napětí", "reg": "input", "addr": "0x0000",
+     "type": "f32", "unit": "V", "class": "voltage", "state": "measurement", "precision": 1},
+    {"key": "power", "name": "Power", "reg": "holding", "addr": 16, "type": "s32", "order": "CDAB",
+     "scale": 0.1, "unit": "W", "class": "power", "state": "measurement"},
+    {"key": "relay", "name": "Relay", "reg": "coil", "addr": 3, "write": {"kind": "switch"}},
+    {"key": "mode", "name": "Mode", "reg": "holding", "addr": "0x0020", "map": {"0": "off", "1": "auto"},
+     "write": {"kind": "select"}, "category": "config", "every": 0},
+    {"key": "setpoint", "name": "Setpoint", "reg": "holding", "addr": "0x0021", "type": "s16", "scale": 0.1,
+     "unit": "°C", "write": {"kind": "number", "min": 5, "max": 30, "step": 0.5}},
+    {"key": "reset", "name": "Reset", "reg": "none", "write": {"kind": "button", "fc": 66}}
+  ]
+}
+```
+
+Device fields: `id` (a-z, 0-9, _; up to 31), `manufacturer`, `model` required; `serial` defaults
+9600 8N1; `slave` the usual address; `timeout_ms` (50-5000, default 500) and `gap_ms` (pause
+before each request, default 20) per request; `poll_s` (1-3600, default 10); `max_regs` registers
+per request (1-125, default 40); `max_gap` unread registers a combined read may span (default 0;
+only for devices that answer reads of undocumented registers).
+
+Entity fields:
+
+| Field | Values | Notes |
+|---|---|---|
+| `key` | a-z, 0-9, _ (up to 23) | stable: part of the Home Assistant ids |
+| `name`, `name_cs` | up to 47 characters | `name_cs` used when Home Assistant / the page runs in Czech |
+| `reg` | `coil`, `discrete`, `input`, `holding`, `none` | function 1, 2, 4, 3; `none` only for a button sending a device function |
+| `addr` | 0-65535, number or `"0x..."` | protocol address (0 based): subtract 1 from 1-based tables, 30001/40001 from the "3xxxx/4xxxx" notation |
+| `type` | `bool`, `u16`, `s16`, `u32`, `s32`, `u64`, `s64`, `f32`, `f64`, `str` | coils and discrete inputs are `bool`; `str` needs `count` (registers) |
+| `order` | `ABCD` (default), `CDAB`, `BADC`, `DCBA` | how the bytes of a 32/64-bit value come over the wire: `CDAB` low word first (evcc `…s`, ESPHome `_R`, HA `swap: word`), `BADC` bytes swapped |
+| `bit` | 0-15 | one bit of a 16-bit register (a bool) |
+| `scale`, `offset` | numbers | value = raw × scale + offset |
+| `nan` | raw value | means "no value" (e.g. ABB `0xffffffff`) |
+| `precision` | 0-6 | decimals (default 2 for floats, else 0) |
+| `unit`, `class`, `state` | Home Assistant unit, device class, state class | e.g. `kWh`, `energy`, `total_increasing` |
+| `category` | `diagnostic`, `config` | entity category |
+| `map` | `{"raw": "text"}`, up to 32 | shows a text (enum sensor), options of a select |
+| `every` | 0-255 | read every n-th poll, 0 = once |
+| `write.kind` | `number`, `switch`, `select`, `button` | only holding registers and coils can be written |
+| `write.min`, `max`, `step` | numbers | number: required limits in shown units |
+| `write.on`, `off` | raw values | switch on holding registers (default 1/0) |
+| `write.value` | raw value | button |
+| `write.fc` | 5, 6, 15, 16, or a device function | default: coil 5, one register 6, more 16; `16` for devices that take only function 16 (DDS238, Eastron); a device function (e.g. 66 = 0x42 PZEM energy reset) with `reg: none` |
+
+A template is checked when saved; the error names the entity and field. Own templates (up to 16,
+each up to 16 kB) are kept in NVS and are part of the settings backup; export and import as JSON
+files on the page. A new template is easiest as a copy of a similar built-in one.
+
+## Built-in templates
+
+All register maps were researched from the manufacturers' documents and open source drivers, and
+checked by a second, independent research (sources below). "Not confirmed" items were left out.
+
+| Template | Device | Serial default | Notes |
+|---|---|---|---|
+| `eastron_sdm120` | Eastron SDM120-Modbus | 2400 8N1, address 1 | SDM120-M: 9600; no phase angle (not in Eastron's map) |
+| `eastron_sdm230` | Eastron SDM230-Modbus | 9600 8N1 (manuals up to v1.6: 2400) | |
+| `eastron_sdm630` | Eastron SDM630-Modbus V2 | 9600 8N1 | 80 registers per request; per-phase energies, THD left out |
+| `eastron_sdm72d_v2` | Eastron SDM72D-M V2 | 9600 8N1 | 200 ms between requests (reboots on fast requests) |
+| `eastron_sdm72d` | Eastron SDM72D-M (V1) | 9600 8N1 | total power and energies only (open source drivers; no Eastron map) |
+| `orno_or_we_504` | ORNO OR-WE-504 | 9600 **8N1** | community code only: check the values against the display |
+| `orno_or_we_514` | ORNO OR-WE-514 / 515 | 9600 **8E1** | from the ORNO table (reproduced by TapHome) |
+| `orno_or_we_516` | ORNO OR-WE-516 / 517 | 9600 8E1 | power read in kW; import/export energy registers not confirmed, left out |
+| `hiking_dds238_2` | Hiking DDS238-2 ZN/S | 9600 8N1 | writes only with function 16; reactive power signed. **DTS238-7: no map found, no template** |
+| `chint_dtsu666` | Chint DTSU666 | 9600 8N1 | raw units of the manual (0.1 V, 0.001 A, 0.1 W) scaled; DTSU666-H differs |
+| `chint_ddsu666` | Chint DDSU666 | 9600, 1 or 2 stop bits | power in kW (shown in W); export energy not documented |
+| `peacefair_pzem016` | Peacefair PZEM-016 / 014 (AC) | 9600 8N1 | current, power, energy low word first; energy reset (0x42) |
+| `peacefair_pzem017` | Peacefair PZEM-017 / 003 (DC) | 9600 **8N2** | shunt range select, alarm thresholds, energy reset |
+
+The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/modbus/gen_other.py`.
+
+### Findings worth knowing
+
+- Eastron: all settings registers (address, baud, parity) are float32; reads must start at an even
+  address and read pairs; undocumented registers answer 0, not an exception. Baud code 5 is 1200
+  on SDM120/SDM72 but 115200 on SDM630 V2. The SDM230's default changed between manual versions
+  (2400 → 9600). Meter code at 0xFC02: SDM120 and SDM120-M both 0x0020, SDM72D-M V2 0x0089.
+- Word order differs between families: Eastron, Chint, ORNO, ABB big endian; Carlo Gavazzi EM340
+  and Peacefair low word first.
+- The Adafruit/evcc/mbmd/Tasmota sources sometimes disagree on parity (ORNO 516: 8E1 by three
+  sources, odd by one); the template follows the majority with a note.
+
+## Verification
+
+- `tests/unit/modbus_test.c` (CI): CRC and frames against the specification examples
+  (`01 03 00 00 00 0A C5 CD`, Eastron's `43 66 33 34` = 230.2 V and `42 70 00 00` = 60.0), every
+  word order, exceptions, the template checks, read planning; every built-in template parses and
+  its reads fit `max_regs`.
+- `tools/modbus/sim_tcp.py`: a Modbus TCP device simulator playing templates; it encodes a known
+  value per entity independently of the gateway code and answers exception 2 on undocumented
+  addresses. TC48 runs it: all values of four templates match, writes of each kind are read back,
+  the search finds the units, a user template works, an unreachable device goes offline, MQTT
+  discovery creates the device via the gateway and a write over MQTT arrives.
+- Integration tests (`tests/ha_integration`), UI32.
+- **Not yet tested on a real RS485 device**: the RS485 path ran only without a device (timeouts);
+  real meters will confirm the serial timing and the maps marked "community" above.
+
+## Sources
+
+Eastron: SDM120-MODBUS protocol V2.4, SDM230-MODBUS protocol V1.1, SDM630 Modbus protocol V1.8
+(eastroneurope.com), SDM72DM-V2 user manual V1.1, SDM630-Modbus V2 manuals V1.5/V1.6B, SDM230
+manuals v1.6/v1.8, SDM120-M manual; nmakel/sdm_modbus, reaper7/SDM_Energy_Meter, ESPHome
+`sdm_meter`, volkszaehler/mbmd, evcc templates, Tasmota energy drivers. Chint DTSU666/DDSU666 user
+manuals, lmatula/ha_chint_pm. Peacefair PZEM-014/016 and PZEM-003/017 manuals, ESPHome `pzemac`,
+`pzemdc`, mandulaj/PZEM-004T-v30. Hiking: fawno/Modbus, alphp and gabrielcolceriu gists,
+nicodupont/esphome-hiking-dds238-2-zn-s-rs485. ORNO: TapHome OR-WE-515 page, evcc `orno.yaml`,
+HARDWARIO and Grenton integration pages, apichlinski/orno-reader-domoticz, ioBroker forum.
+Template formats compared: evcc, ESPHome `modbus_controller`, Home Assistant `modbus`, Tasmota
+`modbus.json`, jollyjinx/modbus-2-mqtt-bridge. Board: schematic sheets 2, 4, 5 and 8
+([unofficial_guition_esp32p4_repo](https://github.com/p1ngb4ck/unofficial_guition_esp32p4_repo/tree/main/JC-ESP32P4-M3-Dev)).

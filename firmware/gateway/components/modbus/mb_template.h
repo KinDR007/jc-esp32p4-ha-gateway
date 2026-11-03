@@ -51,7 +51,7 @@ typedef struct {
 typedef struct {
     char id[32];
     char manufacturer[32], model[48], category[20];
-    char notes[200], source[200];
+    char notes[200], notes_cs[240], source[200];
     uint32_t baud;
     char parity;        /* 'N', 'E', 'O' */
     uint8_t stop;

@@ -99,7 +99,7 @@ admin password of older firmware keep it while the account has no 2FA; otherwise
 asks for a token, which then replaces the password.
 
 How it works: state is read from the REST API every 30 s (`/api/status`, `/api/sound/status`,
-`/api/sound/events`, `/api/sensors`); sound detections, sound event states and update progress are pushed at once
+`/api/sound/events`, `/api/sensors`, `/api/modbus`); sound detections, sound event states and update progress are pushed at once
 over a WebSocket (`/api/ws`, same password; the gateway sends there everything it publishes to
 MQTT, with or without a broker). The push connection reconnects by itself after 10 s.
 
@@ -115,6 +115,7 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 | C6 radio firmware (update) | the package of all C6 firmwares from the same manifest; versions are the first 8 hex digits of its sha256, the release summary lists the firmwares that change; install downloads it into the gateway's RAM, stores it and restarts the gateway, which then updates the C6 |
 | C5 radio firmware (update) | only with an ESP32-C5 as radio B: the C5 package of the same manifest, like the C6 one (installs with `{"target": "c5"}`). Both packages carry every radio firmware, the ESPHome Bluetooth proxy included, so a new proxy shows up in the release summary (`esphome: … → …`) |
 | `sensor.<host>_<name>_<quantity>` | one per I2C sensor set to Expose and per quantity (temperature, humidity, pressure, illuminance, CO2 ...), named after the sensor's name on the gateway (System › Hardware), attributes `chip`, `address`; sensors added later appear without a reload ([sensors.md](sensors.md)) |
+| Modbus devices | each Modbus device set to *integration* (System › RS485) is a device of its own, connected via the gateway, with the entities of its template: sensor, binary sensor, number, switch, select, button ([modbus.md](modbus.md)) |
 | Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
 | Notification (event) | every notification of the gateway: event type `info`, `warning` or `critical`, attributes `topic` (security, system, network, sound), `text`, `time`; for automations, e.g. forwarding to the phone |
 | Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |
@@ -156,7 +157,7 @@ Connection options (Home Assistant › MQTT):
 | State interval | 10–3600 s | 30 s |
 | Discovery prefix | as configured in the HA MQTT integration | `homeassistant` |
 | Home Assistant discovery | off: plain topics only, the entities are removed from HA | on |
-| Entities in Home Assistant | groups sent by discovery (`discovery_groups` of `/api/mqtt`): `roles` (role, role select, maintenance, Thread state, Zigbee host), `system` (uptime, temperature, heap, Ethernet, IP, C6 firmware, restart), `update` (firmware update), `sound` (sound level, noise), `sound_events` (event and binary sensor per sound event), `sound_triggers` (device trigger per sound event), `sensors` (exposed I2C sensors); a group left out is removed from HA, its state topics stay | all |
+| Entities in Home Assistant | groups sent by discovery (`discovery_groups` of `/api/mqtt`): `roles` (role, role select, maintenance, Thread state, Zigbee host), `system` (uptime, temperature, heap, Ethernet, IP, C6 firmware, restart), `update` (firmware update), `sound` (sound level, noise), `sound_events` (event and binary sensor per sound event), `sound_triggers` (device trigger per sound event), `sensors` (exposed I2C sensors), `modbus` (Modbus devices set to MQTT, each its own device); a group left out is removed from HA, its state topics stay | all |
 
 TLS always verifies the broker; there is no "insecure" mode (it would weaken the TLS of online
 updates as well). Connection errors name the cause, e.g. `TLS: server certificate not accepted (CA or

@@ -504,7 +504,7 @@ const CS = {
   'Maintenance and backup': 'Údržba a záloha',
   'Notifications': 'Notifikace', 'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
   'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
-  'Overview': 'Přehled', 'Data flows': 'Toky dat', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Hardware': 'Hardware', 'I2C sensors': 'I2C senzory', 'Zigbee2MQTT': 'Zigbee2MQTT',
+  'Overview': 'Přehled', 'Data flows': 'Toky dat', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Hardware': 'Hardware', 'I2C sensors': 'I2C senzory', 'Modbus devices': 'Zařízení Modbus', 'Zigbee2MQTT': 'Zigbee2MQTT',
   'Request a new map': 'Vyžádat novou mapu', 'Zigbee devices': 'Zigbee zařízení', 'Base topic': 'Základní topic', 'Coordinator': 'Koordinátor',
   'Adapter': 'Adaptér', 'Last seen': 'Naposledy viděno', 'Power': 'Napájení', 'LQI': 'LQI', 'Home Assistant and Matter': 'Home Assistant a Matter', 'Test': 'Vyzkoušet',
   'Matter Server (WebSocket)': 'Matter Server (WebSocket)', 'Devices in the network': 'Zařízení v síti', 'Device': 'Zařízení', 'Vendor': 'Výrobce',
@@ -1238,6 +1238,7 @@ const ICONS = {
   'bridge': 'M7,14V10.91C6.28,10.58 5.61,10.18 5,9.71V14H7M5,18H3V16H1V14H3V7H5V8.43C6.8,10 9.27,11 12,11C14.73,11 17.2,10 19,8.43V7H21V14H23V16H21V18H19V16H5V18M17,10.91V14H19V9.71C18.39,10.18 17.72,10.58 17,10.91M16,14V11.32C15.36,11.55 14.69,11.72 14,11.84V14H16M13,14V11.96L12,12L11,11.96V14H13M10,14V11.84C9.31,11.72 8.64,11.55 8,11.32V14H10Z',
   'cellphone-key': 'M7 1C5.9 1 5 1.9 5 3V7H7V4H17V20H7V17H5V21C5 22.1 5.9 23 7 23H17C18.1 23 19 22.1 19 21V3C19 1.9 18.1 1 17 1H7M6 9C4.3 9 3 10.3 3 12S4.3 15 6 15C7.3 15 8.4 14.2 8.8 13H11V15H13V13H15V11H8.8C8.4 9.8 7.3 9 6 9M6 11C6.6 11 7 11.4 7 12S6.6 13 6 13 5 12.6 5 12 5.4 11 6 11Z',
   'check': 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z',
+  'chevron-down': 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z',
   'chevron-left': 'M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z',
   'chevron-right': 'M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z',
   'chip': 'M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z',
@@ -1246,6 +1247,7 @@ const ICONS = {
   'cloud-download-outline': 'M6.5 20Q4.22 20 2.61 18.43 1 16.85 1 14.58 1 12.63 2.17 11.1 3.35 9.57 5.25 9.15 5.68 7.35 7.38 5.73 9.07 4.1 11 4.1 11.83 4.1 12.41 4.69 13 5.28 13 6.1V12.15L14.6 10.6L16 12L12 16L8 12L9.4 10.6L11 12.15V6.1Q9.1 6.45 8.05 7.94 7 9.43 7 11H6.5Q5.05 11 4.03 12.03 3 13.05 3 14.5 3 15.95 4.03 17 5.05 18 6.5 18H18.5Q19.55 18 20.27 17.27 21 16.55 21 15.5 21 14.45 20.27 13.73 19.55 13 18.5 13H17V11Q17 9.8 16.45 8.76 15.9 7.73 15 7V4.68Q16.85 5.55 17.93 7.26 19 9 19 11 20.73 11.2 21.86 12.5 23 13.78 23 15.5 23 17.38 21.69 18.69 20.38 20 18.5 20M12 11.05Z',
   'cog-outline': 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10M10,22C9.75,22 9.54,21.82 9.5,21.58L9.13,18.93C8.5,18.68 7.96,18.34 7.44,17.94L4.95,18.95C4.73,19.03 4.46,18.95 4.34,18.73L2.34,15.27C2.21,15.05 2.27,14.78 2.46,14.63L4.57,12.97L4.5,12L4.57,11L2.46,9.37C2.27,9.22 2.21,8.95 2.34,8.73L4.34,5.27C4.46,5.05 4.73,4.96 4.95,5.05L7.44,6.05C7.96,5.66 8.5,5.32 9.13,5.07L9.5,2.42C9.54,2.18 9.75,2 10,2H14C14.25,2 14.46,2.18 14.5,2.42L14.87,5.07C15.5,5.32 16.04,5.66 16.56,6.05L19.05,5.05C19.27,4.96 19.54,5.05 19.66,5.27L21.66,8.73C21.79,8.95 21.73,9.22 21.54,9.37L19.43,11L19.5,12L19.43,13L21.54,14.63C21.73,14.78 21.79,15.05 21.66,15.27L19.66,18.73C19.54,18.95 19.27,19.04 19.05,18.95L16.56,17.95C16.04,18.34 15.5,18.68 14.87,18.93L14.5,21.58C14.46,21.82 14.25,22 14,22H10M11.25,4L10.88,6.61C9.68,6.86 8.62,7.5 7.85,8.39L5.44,7.35L4.69,8.65L6.8,10.2C6.4,11.37 6.4,12.64 6.8,13.8L4.68,15.36L5.43,16.66L7.86,15.62C8.63,16.5 9.68,17.14 10.87,17.38L11.24,20H12.76L13.13,17.39C14.32,17.14 15.37,16.5 16.14,15.62L18.57,16.66L19.32,15.36L17.2,13.81C17.6,12.64 17.6,11.37 17.2,10.2L19.31,8.65L18.56,7.35L16.15,8.39C15.38,7.5 14.32,6.86 13.12,6.62L12.75,4H11.25Z',
   'console': 'M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L11.7,12.3C12.09,12.69 12.09,13.33 11.7,13.72L8.42,17H5.59L9.58,13Z',
+  'console-line': 'M13,19V16H21V19H13M8.5,13L2.47,7H6.71L11.67,11.95C12.25,12.54 12.25,13.5 11.67,14.07L6.74,19H2.5L8.5,13Z',
   'content-copy': 'M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z',
   'content-save-outline': 'M17 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3M19 19H5V5H16.17L19 7.83V19M12 12C10.34 12 9 13.34 9 15S10.34 18 12 18 15 16.66 15 15 13.66 12 12 12M6 6H15V10H6V6Z',
   'counter': 'M4,4H20A2,2 0 0,1 22,6V18A2,2 0 0,1 20,20H4A2,2 0 0,1 2,18V6A2,2 0 0,1 4,4M4,6V18H11V6H4M20,18V6H18.76C19,6.54 18.95,7.07 18.95,7.13C18.88,7.8 18.41,8.5 18.24,8.75L15.91,11.3L19.23,11.28L19.24,12.5L14.04,12.47L14,11.47C14,11.47 17.05,8.24 17.2,7.95C17.34,7.67 17.91,6 16.5,6C15.27,6.05 15.41,7.3 15.41,7.3L13.87,7.31C13.87,7.31 13.88,6.65 14.25,6H13V18H15.58L15.57,17.14L16.54,17.13C16.54,17.13 17.45,16.97 17.46,16.08C17.5,15.08 16.65,15.08 16.5,15.08C16.37,15.08 15.43,15.13 15.43,15.95H13.91C13.91,15.95 13.95,13.89 16.5,13.89C19.1,13.89 18.96,15.91 18.96,15.91C18.96,15.91 19,17.16 17.85,17.63L18.37,18H20M8.92,16H7.42V10.2L5.62,10.76V9.53L8.76,8.41H8.92V16Z',
@@ -1256,6 +1258,7 @@ const ICONS = {
   'ethernet': 'M7,15H9V18H11V15H13V18H15V15H17V18H19V9H15V6H9V9H5V18H7V15M4.38,3H19.63C20.94,3 22,4.06 22,5.38V19.63A2.37,2.37 0 0,1 19.63,22H4.38C3.06,22 2,20.94 2,19.63V5.38C2,4.06 3.06,3 4.38,3Z',
   'expansion-card-variant': 'M2 7H4.5V17H3V8.5H2M22 7V16H14V17H7V16H6V7M10 9H8V12H10M13 9H11V12H13M20 9H15V14H20V9Z',
   'eye-outline': 'M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5C8.24,6.5 4.83,8.64 3.18,12Z',
+  'file-document-edit-outline': 'M8,12H16V14H8V12M10,20H6V4H13V9H18V12.1L20,10.1V8L14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H10V20M8,18H12.1L13,17.1V16H8V18M20.2,13C20.3,13 20.5,13.1 20.6,13.2L21.9,14.5C22.1,14.7 22.1,15.1 21.9,15.3L20.9,16.3L18.8,14.2L19.8,13.2C19.9,13.1 20,13 20.2,13M20.2,16.9L14.1,23H12V20.9L18.1,14.8L20.2,16.9Z',
   'format-list-bulleted': 'M7,5H21V7H7V5M7,13V11H21V13H7M4,4.5A1.5,1.5 0 0,1 5.5,6A1.5,1.5 0 0,1 4,7.5A1.5,1.5 0 0,1 2.5,6A1.5,1.5 0 0,1 4,4.5M4,10.5A1.5,1.5 0 0,1 5.5,12A1.5,1.5 0 0,1 4,13.5A1.5,1.5 0 0,1 2.5,12A1.5,1.5 0 0,1 4,10.5M7,19V17H21V19H7M4,16.5A1.5,1.5 0 0,1 5.5,18A1.5,1.5 0 0,1 4,19.5A1.5,1.5 0 0,1 2.5,18A1.5,1.5 0 0,1 4,16.5Z',
   'graph-outline': 'M19.5 17C19.36 17 19.24 17 19.11 17.04L17.5 13.8C17.95 13.35 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.61 9.5 15.5 9.5 15.35 9.54L13.74 6.3C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.2 9.79 5.84 10.26 6.29L8.65 9.54C8.5 9.5 8.39 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.04 13.34 6.5 13.79L4.89 17.04C4.76 17 4.64 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.63 14.46L10.26 17.71C9.79 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.8C10.45 13.35 10.75 12.71 10.75 12C10.75 11.3 10.46 10.67 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7C12.13 7 12.26 7 12.39 6.96L14 10.21C13.54 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.13 14.46L17.76 17.71C17.29 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17M4.5 20.5C3.95 20.5 3.5 20.05 3.5 19.5S3.95 18.5 4.5 18.5 5.5 18.95 5.5 19.5 5.05 20.5 4.5 20.5M13 19.5C13 20.05 12.55 20.5 12 20.5S11 20.05 11 19.5 11.45 18.5 12 18.5 13 18.95 13 19.5M7.25 12C7.25 11.45 7.7 11 8.25 11S9.25 11.45 9.25 12 8.8 13 8.25 13 7.25 12.55 7.25 12M11 4.5C11 3.95 11.45 3.5 12 3.5S13 3.95 13 4.5 12.55 5.5 12 5.5 11 5.05 11 4.5M14.75 12C14.75 11.45 15.2 11 15.75 11S16.75 11.45 16.75 12 16.3 13 15.75 13 14.75 12.55 14.75 12M19.5 20.5C18.95 20.5 18.5 20.05 18.5 19.5S18.95 18.5 19.5 18.5 20.5 18.95 20.5 19.5 20.05 20.5 19.5 20.5Z',
   'harddisk': 'M6,2H18A2,2 0 0,1 20,4V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V4A2,2 0 0,1 6,2M12,4A6,6 0 0,0 6,10C6,13.31 8.69,16 12.1,16L11.22,13.77C10.95,13.29 11.11,12.68 11.59,12.4L12.45,11.9C12.93,11.63 13.54,11.79 13.82,12.27L15.74,14.69C17.12,13.59 18,11.9 18,10A6,6 0 0,0 12,4M12,9A1,1 0 0,1 13,10A1,1 0 0,1 12,11A1,1 0 0,1 11,10A1,1 0 0,1 12,9M7,18A1,1 0 0,0 6,19A1,1 0 0,0 7,20A1,1 0 0,0 8,19A1,1 0 0,0 7,18M12.09,13.27L14.58,19.58L17.17,18.08L12.95,12.77L12.09,13.27Z',
@@ -1281,6 +1284,7 @@ const ICONS = {
   'microphone': 'M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z',
   'minus': 'M19,13H5V11H19V13Z',
   'package-variant': 'M2,10.96C1.5,10.68 1.35,10.07 1.63,9.59L3.13,7C3.24,6.8 3.41,6.66 3.6,6.58L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.66,6.72 20.82,6.88 20.91,7.08L22.36,9.6C22.64,10.08 22.47,10.69 22,10.96L21,11.54V16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V10.96C2.7,11.13 2.32,11.14 2,10.96M12,4.15V4.15L12,10.85V10.85L17.96,7.5L12,4.15M5,15.91L11,19.29V12.58L5,9.21V15.91M19,15.91V12.69L14,15.59C13.67,15.77 13.3,15.76 13,15.6V19.29L19,15.91M13.85,13.36L20.13,9.73L19.55,8.72L13.27,12.35L13.85,13.36Z',
+  'pencil': 'M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z',
   'pencil-outline': 'M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z',
   'play': 'M8,5.14V19.14L19,12.14L8,5.14Z',
   'playlist-check': 'M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z',
@@ -1296,6 +1300,7 @@ const ICONS = {
   'router-wireless': 'M20.2,5.9L21,5.1C19.6,3.7 17.8,3 16,3C14.2,3 12.4,3.7 11,5.1L11.8,5.9C13,4.8 14.5,4.2 16,4.2C17.5,4.2 19,4.8 20.2,5.9M19.3,6.7C18.4,5.8 17.2,5.3 16,5.3C14.8,5.3 13.6,5.8 12.7,6.7L13.5,7.5C14.2,6.8 15.1,6.5 16,6.5C16.9,6.5 17.8,6.8 18.5,7.5L19.3,6.7M19,13H17V9H15V13H5A2,2 0 0,0 3,15V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V15A2,2 0 0,0 19,13M8,18H6V16H8V18M11.5,18H9.5V16H11.5V18M15,18H13V16H15V18Z',
   'school-outline': 'M12 3L1 9L5 11.18V17.18L12 21L19 17.18V11.18L21 10.09V17H23V9L12 3M18.82 9L12 12.72L5.18 9L12 5.28L18.82 9M17 16L12 18.72L7 16V12.27L12 15L17 12.27V16Z',
   'send': 'M2,21L23,12L2,3V10L17,12L2,14V21Z',
+  'serial-port': 'M7,3H17V5H19V8H16V14H8V8H5V5H7V3M17,9H19V14H17V9M11,15H13V22H11V15M5,9H7V14H5V9Z',
   'shield-account-outline': 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,3.18L19,6.3V11.22C19,12.92 18.5,14.65 17.65,16.17C16,14.94 13.26,14.5 12,14.5C10.74,14.5 8,14.94 6.35,16.17C5.5,14.65 5,12.92 5,11.22V6.3L12,3.18M12,6A3.5,3.5 0 0,0 8.5,9.5A3.5,3.5 0 0,0 12,13A3.5,3.5 0 0,0 15.5,9.5A3.5,3.5 0 0,0 12,6M12,8A1.5,1.5 0 0,1 13.5,9.5A1.5,1.5 0 0,1 12,11A1.5,1.5 0 0,1 10.5,9.5A1.5,1.5 0 0,1 12,8M12,16.5C13.57,16.5 15.64,17.11 16.53,17.84C15.29,19.38 13.7,20.55 12,21C10.3,20.55 8.71,19.38 7.47,17.84C8.37,17.11 10.43,16.5 12,16.5Z',
   'shield-lock-outline': 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M14.8,11V9.5C14.8,8.1 13.4,7 12,7C10.6,7 9.2,8.1 9.2,9.5V11C8.6,11 8,11.6 8,12.2V15.7C8,16.4 8.6,17 9.2,17H14.7C15.4,17 16,16.4 16,15.8V12.3C16,11.6 15.4,11 14.8,11M13.5,11H10.5V9.5C10.5,8.7 11.2,8.2 12,8.2C12.8,8.2 13.5,8.7 13.5,9.5V11Z',
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
@@ -1403,6 +1408,7 @@ const NAV = [
   { id: 'system', label: 'System', icon: 'developer-board', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
     { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' }, { id: 'hw', label: 'Hardware', icon: 'expansion-card-variant' },
+    { id: 'rs485', label: 'RS485', icon: 'serial-port' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
     { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
@@ -2625,7 +2631,7 @@ document.addEventListener('change', e => {
 
 /* discovery groups of /api/mqtt (gw_mqtt_group_t) */
 const MQTT_GROUPS = [['roles', 'Roles and networks'], ['system', 'System'], ['update', 'Firmware update entity'],
-  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)'], ['sound_triggers', 'Sound event device triggers'], ['sensors', 'I2C sensors']];
+  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)'], ['sound_triggers', 'Sound event device triggers'], ['sensors', 'I2C sensors'], ['modbus', 'Modbus devices']];
 async function loadMqtt() {
   const box = $('#mqtt-box');
   if (!box) return;
@@ -4405,6 +4411,339 @@ document.addEventListener('click', async e => {
   }
 });
 
+/* ---------------- System › RS485: Modbus devices (/api/modbus, docs/modbus.md) ---------------- */
+views['system/rs485'] = () => `<div class="grid">
+  <div class="card">${h3('serial-port', L('RS485 bus', 'Sběrnice RS485'))}
+    ${dl([[L('Connector', 'Konektor'), L('J4: A and B (twisted pair), GND to the devices', 'J4: A a B (kroucený pár), GND k zařízením')],
+      [L('Transceiver', 'Převodník'), L('MAX485, direction switched by the board (UART3, GPIO26/27)', 'MAX485, směr přepíná deska (UART3, GPIO26/27)')],
+      [L('Termination', 'Zakončení'), L('120 Ω at both ends of a long bus', '120 Ω na obou koncích dlouhé sběrnice')]])}
+    <div class="row" style="margin-top:8px">
+      <label class="field" style="margin:0"><span>${L('Baud rate', 'Rychlost')}</span><select id="mb-baud">${[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map(b => `<option>${b}</option>`).join('')}</select></label>
+      <label class="field" style="margin:0"><span>${L('Parity', 'Parita')}</span><select id="mb-parity"><option value="N">${L('none', 'žádná')}</option><option value="E">${L('even', 'sudá')}</option><option value="O">${L('odd', 'lichá')}</option></select></label>
+      <label class="field" style="margin:0"><span>${L('Stop bits', 'Stop bity')}</span><select id="mb-stop"><option>1</option><option>2</option></select></label>
+      <label class="field" style="margin:0"><span>${L('Timeout (ms)', 'Časový limit (ms)')}</span><input type="number" id="mb-timeout" min="50" max="5000" style="width:90px"></label>
+      <button class="btn primary" id="mb-bus-save">${ic('check')}${L('Save', 'Uložit')}</button></div>
+    <div id="mb-stats" class="muted" style="margin-top:6px"></div></div>
+  <div class="card">${h3('plus', L('Add a device', 'Přidat zařízení'))}
+    <label class="field"><span>${L('Template', 'Šablona')}</span><select id="mb-add-tpl"></select></label>
+    <div id="mb-add-note" class="muted"></div>
+    <div class="row">
+      <label class="field" style="margin:0;flex:1"><span>${L('Name', 'Jméno')}</span><input type="text" id="mb-add-name" maxlength="32"></label>
+      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-add-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option></select></label>
+      <label class="field" style="margin:0"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-add-slave" min="0" max="255" value="1" style="width:70px"></label></div>
+    <div class="row hidden" id="mb-add-tcp">
+      <label class="field" style="margin:0;flex:1"><span>${L('Host', 'Host')}</span><input type="text" id="mb-add-host" placeholder="192.168.1.50"></label>
+      <label class="field" style="margin:0"><span>${L('Port', 'Port')}</span><input type="number" id="mb-add-port" value="502" style="width:80px"></label></div>
+    <div class="row">
+      <label class="field" style="margin:0"><span>${L('Read every (s)', 'Číst každých (s)')}</span><input type="number" id="mb-add-poll" min="0" max="3600" value="0" style="width:80px" title="${L('0: as the template says', '0: podle šablony')}"></label>
+      <label class="field" style="margin:0"><span>${L('Home Assistant', 'Home Assistant')}</span><select id="mb-add-expose">${MB_EXPOSE().map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
+      <button class="btn primary" id="mb-add">${ic('plus')}${L('Add', 'Přidat')}</button></div></div>
+  <div class="card wide">${h3('lan-connect', L('Devices', 'Zařízení'))}<div class="table-wrap" id="mb-devices"><p class="muted">${L('Loading…', 'Načítám…')}</p></div></div>
+  <div class="card">${h3('magnify-scan', L('Find devices', 'Najít zařízení'))}
+    <p class="muted">${L('Tries every address (and the chosen baud rates) with a read of the template; an exception counts as an answer too. RS485 devices are not read meanwhile.', 'Zkusí každou adresu (a zvolené rychlosti) čtením podle šablony; i výjimka je odpověď. Zařízení na RS485 se mezitím nečtou.')}</p>
+    <div class="row">
+      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-pr-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option></select></label>
+      <label class="field" style="margin:0;flex:1"><span>${L('Template', 'Šablona')}</span><select id="mb-pr-tpl"></select></label></div>
+    <div class="row hidden" id="mb-pr-tcp"><label class="field" style="margin:0;flex:1"><span>Host</span><input type="text" id="mb-pr-host"></label>
+      <label class="field" style="margin:0"><span>Port</span><input type="number" id="mb-pr-port" value="502" style="width:80px"></label></div>
+    <div class="row" id="mb-pr-bauds">${[1200, 2400, 4800, 9600, 19200, 38400].map(b => `<label><input type="checkbox" data-mb-baud="${b}" ${b === 9600 ? 'checked' : ''}> ${b}</label>`).join('')}</div>
+    <div class="row"><label class="field" style="margin:0"><span>${L('From', 'Od')}</span><input type="number" id="mb-pr-from" value="1" min="0" max="255" style="width:70px"></label>
+      <label class="field" style="margin:0"><span>${L('To', 'Do')}</span><input type="number" id="mb-pr-to" value="247" min="0" max="255" style="width:70px"></label>
+      <button class="btn" id="mb-pr-start">${ic('magnify-scan')}${L('Search', 'Hledat')}</button><button class="btn hidden" id="mb-pr-stop">${L('Stop', 'Zastavit')}</button></div>
+    <div id="mb-pr-state" class="muted"></div></div>
+  <div class="card">${h3('console-line', L('Manual request', 'Ruční dotaz'))}
+    <p class="muted">${L('Reads or writes registers directly, e.g. to find a device\'s layout for a template. Values are shown in the usual encodings.', 'Čte nebo zapisuje registry přímo, např. při hledání rozložení pro šablonu. Hodnoty se ukážou v obvyklých kódováních.')}</p>
+    <div class="row"><label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-raw-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option></select></label>
+      <label class="field hidden" style="margin:0;flex:1" id="mb-raw-hostf"><span>Host</span><input type="text" id="mb-raw-host"></label>
+      <label class="field" style="margin:0"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-raw-slave" value="1" min="0" max="255" style="width:70px"></label></div>
+    <div class="row"><label class="field" style="margin:0"><span>${L('Function', 'Funkce')}</span><select id="mb-raw-fc">
+        <option value="3">03 ${L('read holding', 'čtení holding')}</option><option value="4">04 ${L('read input', 'čtení input')}</option>
+        <option value="1">01 ${L('read coils', 'čtení cívek')}</option><option value="2">02 ${L('read discrete', 'čtení diskrétních')}</option>
+        <option value="6">06 ${L('write register', 'zápis registru')}</option><option value="16">16 ${L('write registers', 'zápis registrů')}</option>
+        <option value="5">05 ${L('write coil', 'zápis cívky')}</option></select></label>
+      <label class="field" style="margin:0"><span>${L('Register', 'Registr')}</span><input type="text" id="mb-raw-addr" value="0x0000" style="width:90px"></label>
+      <label class="field" style="margin:0"><span>${L('Count / values', 'Počet / hodnoty')}</span><input type="text" id="mb-raw-n" value="2" style="width:120px" title="${L('reads: count; writes: values separated by commas', 'čtení: počet; zápis: hodnoty oddělené čárkou')}"></label>
+      <button class="btn" id="mb-raw-send">${ic('send')}${L('Send', 'Odeslat')}</button></div>
+    <div id="mb-raw-out"></div></div>
+  <div class="card wide">${h3('file-document-edit-outline', L('Templates', 'Šablony'))}
+    <p class="muted">${L('Built-in templates come with the firmware; your own are stored on the gateway (up to 16) and are part of the settings backup. Start from a copy of a similar device.', 'Vestavěné šablony jsou součástí firmwaru; vlastní se ukládají v bráně (až 16) a jsou v záloze nastavení. Začněte kopií podobného zařízení.')}</p>
+    <div class="row"><button class="btn" id="mb-tpl-new">${ic('plus')}${L('New template', 'Nová šablona')}</button>
+      <label class="btn">${ic('upload')}${L('Import', 'Importovat')}<input type="file" id="mb-tpl-import" accept=".json" hidden></label></div>
+    <div class="table-wrap" id="mb-templates"></div>
+    <div id="mb-editor" class="hidden" style="margin-top:10px"><label class="field"><span id="mb-editor-title"></span>
+      <textarea id="mb-editor-text" rows="18" spellcheck="false" style="font-family:monospace;font-size:12px" data-notr></textarea></label>
+      <div class="row"><button class="btn primary" id="mb-editor-save">${ic('check')}${L('Save template', 'Uložit šablonu')}</button><button class="btn" id="mb-editor-close">${L('Close', 'Zavřít')}</button>
+        <span id="mb-editor-err" class="warn-text"></span></div></div></div>
+</div>`;
+
+const MB_EXPOSE = () => [['integration', L('integration', 'integrace')], ['mqtt', 'MQTT'], ['both', L('integration and MQTT', 'integrace a MQTT')], ['none', L('not shown', 'nezobrazovat')]];
+let mb = null, mbTpls = [], mbTimer = null, mbOpen = new Set(), mbFull = {};
+const mbTpl = id => mbTpls.find(t => t.id === id);
+const mbConn = d => d.transport === 'tcp' ? `TCP ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
+const mbState = d => ({ ok: pill('ok', L('ok', 'v pořádku')), partial: pill('warn', L('partly', 'částečně')), offline: pill('bad', L('offline', 'nedostupné')),
+  starting: pill('warn', L('starting', 'startuje')), off: pill('', L('off', 'vypnuto')) }[d.state] || esc(d.state)) + (d.error ? `<div class="muted">${esc(d.error)}</div>` : '');
+function mbFmt(e, v) {
+  if (v === undefined) return '—';
+  if (typeof v === 'boolean') return v ? L('on', 'zap') : L('off', 'vyp');
+  if (typeof v === 'number') return `${v.toFixed(e?.precision ?? 0)}${e?.unit ? ' ' + esc(e.unit) : ''}`;
+  return esc(v);
+}
+const mbName = e => (lang === 'cs' && e.name_cs) || e.name;
+/* the template's entities, fetched once per template revision */
+async function mbTemplate(id) {
+  const t = mbTpl(id);
+  if (!mbFull[id] || mbFull[id].rev !== t?.rev) mbFull[id] = await api(`/api/modbus/template?id=${encodeURIComponent(id)}`);
+  return mbFull[id];
+}
+function mbValues(d, full) {
+  const t = mbFull[d.template];
+  if (!t) return '';
+  const ents = t.entities.filter(e => full || (!e.category && !e.write)).slice(0, full ? 999 : 4);
+  if (!full) return ents.map(e => d.values[e.key] !== undefined ? `<span title="${esc(mbName(e))}">${mbFmt(e, d.values[e.key])}</span>` : '').filter(Boolean).join(' · ') || '—';
+  const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  return `<table>${ents.map(e => {
+    const v = d.values[e.key], w = e.write?.kind;
+    let ctl = '';
+    if (w === 'number') ctl = `<input type="number" data-mb-num="${d.id}|${e.key}" step="${e.write.step || 'any'}" min="${e.write.min}" max="${e.write.max}" value="${typeof v === 'number' ? v : ''}" style="width:110px" ${ro}><button class="btn" data-mb-set="${d.id}|${e.key}" ${ro}>${L('Set', 'Nastavit')}</button>`;
+    else if (w === 'select') ctl = `<select data-mb-sel="${d.id}|${e.key}" ${ro}>${Object.values(e.map).map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+    else if (w === 'switch') ctl = `<button class="btn" data-mb-sw="${d.id}|${e.key}|ON" ${ro}>${L('On', 'Zap')}</button><button class="btn" data-mb-sw="${d.id}|${e.key}|OFF" ${ro}>${L('Off', 'Vyp')}</button>`;
+    else if (w === 'button') ctl = `<button class="btn" data-mb-press="${d.id}|${e.key}" ${ro}>${L('Run', 'Spustit')}</button>`;
+    return `<tr><td class="hw-wrap">${esc(mbName(e))}${e.category ? ` <span class="muted">${esc(e.category)}</span>` : ''}</td><td>${w === 'button' ? '' : mbFmt(e, v)}</td><td>${ctl}</td></tr>`;
+  }).join('')}</table>`;
+}
+function mbRenderDevices() {
+  if (!$('#mb-devices') || !mb) return;
+  const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  $('#mb-devices').innerHTML = mb.devices.length ? `<table class="hw-stack"><tr>${[L('Name', 'Jméno'), L('Device', 'Zařízení'), L('Connection', 'Připojení'), L('State', 'Stav'),
+    L('Values', 'Hodnoty'), 'Home Assistant', L('Enabled', 'Zapnuto'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${mb.devices.map(d => `<tr data-mbdev="${d.id}">
+      <td><input type="text" data-mb-name maxlength="32" value="${esc(d.name)}" ${ro} data-notr></td>
+      <td class="hw-wrap" data-l="${L('Device', 'Zařízení')}">${esc(d.manufacturer)} ${esc(d.model)}</td><td data-l="${L('Connection', 'Připojení')}">${mbConn(d)}</td>
+      <td class="hw-wrap" id="mb-st-${d.id}">${mbState(d)}</td><td class="hw-wrap" id="mb-v-${d.id}">${mbValues(d, false)}</td>
+      <td><select data-mb-expose ${ro}>${MB_EXPOSE().map(([v, l]) => `<option value="${v}" ${v === d.expose ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td data-l="${L('Enabled', 'Zapnuto')}"><input type="checkbox" data-mb-en ${d.enabled ? 'checked' : ''} ${ro}></td>
+      <td><button class="btn icon" data-mb-open="${d.id}" title="${L('All values and controls', 'Všechny hodnoty a ovládání')}">${ic('chevron-down')}</button>
+        <button class="btn icon" data-mb-del="${d.id}" title="${L('Remove', 'Odebrat')}" ${ro}>${ic('delete-outline')}</button></td></tr>
+      ${mbOpen.has(d.id) ? `<tr><td colspan="8" id="mb-full-${d.id}">${mbValues(d, true)}</td></tr>` : ''}`).join('')}</table>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="mb-dev-save" ${ro}>${ic('check')}${L('Save names and settings', 'Uložit jména a nastavení')}</button></div>`
+    : `<p class="muted">${L('No device yet: add one from a template, or search the bus.', 'Zatím žádné zařízení: přidejte ho ze šablony, nebo prohledejte sběrnici.')}</p>`;
+}
+function mbRefresh() {
+  for (const d of mb.devices) {
+    const st = $(`#mb-st-${d.id}`), v = $(`#mb-v-${d.id}`), full = $(`#mb-full-${d.id}`);
+    if (st) st.innerHTML = mbState(d);
+    if (v) v.innerHTML = mbValues(d, false);
+    if (full && !full.contains(document.activeElement)) full.innerHTML = mbValues(d, true);
+  }
+  const s = mb.bus.stats;
+  if ($('#mb-stats')) $('#mb-stats').textContent = L(`RS485: ${s.requests} requests, ${s.timeouts} without answer, ${s.crc_errors} damaged, ${s.exceptions} exceptions`,
+    `RS485: ${s.requests} dotazů, ${s.timeouts} bez odpovědi, ${s.crc_errors} poškozených, ${s.exceptions} výjimek`);
+}
+function mbTplOptions(sel, withNone) {
+  const groups = {};
+  for (const t of mbTpls) (groups[t.manufacturer] = groups[t.manufacturer] || []).push(t);
+  return (withNone ? `<option value="">${L('any (register 0)', 'libovolné (registr 0)')}</option>` : '') + Object.keys(groups).sort().map(m => `<optgroup label="${esc(m)}">${groups[m].map(t =>
+    `<option value="${t.id}" ${t.id === sel ? 'selected' : ''}>${esc(t.model)}${t.builtin ? '' : ' ★'}</option>`).join('')}</optgroup>`).join('');
+}
+function mbAddNote() {
+  const t = mbTpl($('#mb-add-tpl').value);
+  if (!t) return;
+  const bus = mb?.bus, match = !bus || (t.baud === bus.baud && t.serial === `8${bus.parity}${bus.stop}`);
+  $('#mb-add-note').innerHTML = `${esc((lang === 'cs' && t.notes_cs) || t.notes)}<div>${L('Default', 'Výchozí')}: ${t.baud} ${t.serial}, ${L('address', 'adresa')} ${t.slave}${$('#mb-add-tr').value === 'rtu' && !match
+    ? ` · <span class="warn-text">${L(`the bus runs ${bus.baud} 8${bus.parity}${bus.stop}`, `sběrnice běží ${bus.baud} 8${bus.parity}${bus.stop}`)}</span> <button class="btn" id="mb-bus-from-tpl">${L('Use the template\'s', 'Použít ze šablony')}</button>` : ''}</div>`;
+  if (!$('#mb-add-name').value || $('#mb-add-name').dataset.auto === '1') { $('#mb-add-name').value = t.model.slice(0, 32); $('#mb-add-name').dataset.auto = '1'; }
+}
+function mbRenderTemplates() {
+  if (!$('#mb-templates')) return;
+  const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  const used = new Set(mb?.devices.map(d => d.template));
+  $('#mb-templates').innerHTML = `<table><tr><th>${L('Device', 'Zařízení')}</th><th>ID</th><th>${L('Entities', 'Entity')}</th><th>${L('Serial', 'Sériově')}</th><th></th></tr>${mbTpls.map(t =>
+    `<tr><td class="hw-wrap"><b>${esc(t.manufacturer)}</b> ${esc(t.model)} ${t.builtin ? `<span class="muted">${L('built in', 'vestavěná')}</span>` : pill('ok', L('own', 'vlastní'))}</td>
+     <td><code>${esc(t.id)}</code></td><td>${t.entities}</td><td>${t.baud} ${t.serial}</td>
+     <td><button class="btn icon" data-mb-tpl-export="${t.id}" title="${L('Export (JSON)', 'Exportovat (JSON)')}">${ic('download')}</button>
+       <button class="btn icon" data-mb-tpl-copy="${t.id}" title="${L('Copy as a new template', 'Kopírovat jako novou šablonu')}" ${ro}>${ic('content-copy')}</button>
+       ${t.builtin ? '' : `<button class="btn icon" data-mb-tpl-edit="${t.id}" title="${L('Edit', 'Upravit')}" ${ro}>${ic('pencil')}</button>
+       <button class="btn icon" data-mb-tpl-del="${t.id}" title="${L(used.has(t.id) ? 'Used by a device' : 'Delete', used.has(t.id) ? 'Používá ho zařízení' : 'Smazat')}" ${ro || (used.has(t.id) ? 'disabled' : '')}>${ic('delete-outline')}</button>`}</td></tr>`).join('')}</table>`;
+}
+function mbEditor(title, obj) {
+  $('#mb-editor').classList.remove('hidden');
+  $('#mb-editor-title').textContent = title;
+  $('#mb-editor-text').value = JSON.stringify(obj, null, 1);
+  $('#mb-editor-err').textContent = '';
+  $('#mb-editor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function loadModbus(full = true) {
+  if (route() !== 'system/rs485') { clearInterval(mbTimer); mbTimer = null; return; }
+  try {
+    mb = await api('/api/modbus');
+    if (full || !mbTpls.length) mbTpls = (await api('/api/modbus/templates')).templates;
+    for (const id of new Set(mb.devices.map(d => d.template))) await mbTemplate(id).catch(() => {});
+  } catch (e) { if ($('#mb-devices')) $('#mb-devices').textContent = e.message; return; }
+  if (!$('#mb-devices')) return;
+  if (full) {
+    if (!$('#mb-baud').matches(':focus')) { $('#mb-baud').value = mb.bus.baud; $('#mb-parity').value = mb.bus.parity; $('#mb-stop').value = mb.bus.stop; $('#mb-timeout').value = mb.bus.timeout_ms; }
+    const keep = $('#mb-add-tpl').value;
+    $('#mb-add-tpl').innerHTML = mbTplOptions(keep || 'eastron_sdm630', false);
+    $('#mb-pr-tpl').innerHTML = mbTplOptions($('#mb-pr-tpl').value, true);
+    mbAddNote();
+    mbRenderDevices();
+    mbRenderTemplates();
+  }
+  mbRefresh();
+  if (!mbTimer) mbTimer = setInterval(() => loadModbus(false), 3000);
+  mbProbeState();
+}
+async function mbProbeState() {
+  const p = await api('/api/modbus/probe').catch(() => null);
+  if (!p || !$('#mb-pr-state')) return;
+  $('#mb-pr-start').classList.toggle('hidden', p.running);
+  $('#mb-pr-stop').classList.toggle('hidden', !p.running);
+  $('#mb-pr-state').innerHTML = (p.running ? `${pill('warn', L('searching', 'hledám'))} ${p.progress} %${p.baud ? ` · ${p.baud} Bd` : ''}` : p.progress ? L('Done.', 'Hotovo.') : '')
+    + (p.found.length ? `<table><tr><th>${L('Address', 'Adresa')}</th><th>${L('Baud rate', 'Rychlost')}</th><th></th></tr>${p.found.map(f =>
+      `<tr><td>${f.slave}</td><td>${f.baud || '—'}</td><td><button class="btn" data-mb-use="${f.slave}|${f.baud || ''}">${L('Use', 'Použít')}</button></td></tr>`).join('')}</table>` : p.progress && !p.running ? ` ${L('Nothing answered.', 'Nic neodpovědělo.')}` : '');
+}
+/* the configured devices with the edits of the table */
+function mbList() {
+  return mb.devices.map(d => {
+    const row = document.querySelector(`tr[data-mbdev="${d.id}"]`);
+    const o = { id: d.id, name: d.name, template: d.template, transport: d.transport, slave: d.slave, poll_s: d.poll_s, expose: d.expose, enabled: d.enabled };
+    if (d.transport === 'tcp') Object.assign(o, { host: d.host, port: d.port });
+    if (row) Object.assign(o, { name: row.querySelector('[data-mb-name]').value.trim(), expose: row.querySelector('[data-mb-expose]').value, enabled: row.querySelector('[data-mb-en]').checked });
+    return o;
+  });
+}
+async function mbPut(body, msg) {
+  mb = await api('/api/modbus', { method: 'PUT', json: body });
+  await loadModbus(true);
+  if (msg) toast(msg);
+}
+async function mbWrite(device, key, value) {
+  await api('/api/modbus/write', { json: value === undefined ? { device, key } : { device, key, value } });
+  toast(L('Written', 'Zapsáno'));
+  setTimeout(() => loadModbus(false), 1200);
+}
+function mbRawOut(r, fc) {
+  if (!r.ok) return `<p class="warn-text">${esc(r.error)}</p>`;
+  if (r.bits) return `<p>${r.bits.join(' ')}</p>`;
+  if (!r.registers) return `<p>${L('Written.', 'Zapsáno.')}</p>`;
+  const regs = r.registers, a0 = parseInt($('#mb-raw-addr').value) || 0;
+  const fl = (hi, lo) => { const dv = new DataView(new ArrayBuffer(4)); dv.setUint16(0, hi); dv.setUint16(2, lo); const v = dv.getFloat32(0); return isFinite(v) ? +v.toPrecision(7) : '—'; };
+  return `<table><tr><th>${L('Register', 'Registr')}</th><th>hex</th><th>u16</th><th>s16</th><th>u32 ABCD</th><th>u32 CDAB</th><th>f32 ABCD</th><th>f32 CDAB</th></tr>${regs.map((v, i) => {
+    const n = regs[i + 1];
+    return `<tr><td><code>0x${(a0 + i).toString(16).padStart(4, '0')}</code> (${a0 + i})</td><td><code>${v.toString(16).padStart(4, '0')}</code></td><td>${v}</td><td>${v > 32767 ? v - 65536 : v}</td>
+      <td>${n !== undefined ? v * 65536 + n : ''}</td><td>${n !== undefined ? n * 65536 + v : ''}</td><td>${n !== undefined ? fl(v, n) : ''}</td><td>${n !== undefined ? fl(n, v) : ''}</td></tr>`;
+  }).join('')}</table>`;
+}
+document.addEventListener('change', e => {
+  if (e.target.id === 'mb-add-tpl' || e.target.id === 'mb-add-tr') {
+    $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value !== 'tcp');
+    if (e.target.id === 'mb-add-tpl') $('#mb-add-name').dataset.auto = '1', $('#mb-add-name').value = '';
+    mbAddNote();
+  }
+  if (e.target.id === 'mb-pr-tr') { const tcp = e.target.value === 'tcp'; $('#mb-pr-tcp').classList.toggle('hidden', !tcp); $('#mb-pr-bauds').classList.toggle('hidden', tcp); }
+  if (e.target.id === 'mb-raw-tr') $('#mb-raw-hostf').classList.toggle('hidden', e.target.value !== 'tcp');
+  if (e.target.id === 'mb-add-name') e.target.dataset.auto = '0';
+  if (e.target.matches('[data-mb-sel]')) { const [d, k] = e.target.dataset.mbSel.split('|'); mbWrite(d, k, e.target.value).catch(err => toast(L('Error: ', 'Chyba: ') + err.message)); }
+  if (e.target.id === 'mb-tpl-import' && e.target.files[0]) {
+    e.target.files[0].text().then(t => { mbEditor(L('Imported template', 'Importovaná šablona'), JSON.parse(t)); }).catch(err => toast(L('Error: ', 'Chyba: ') + err.message));
+    e.target.value = '';
+  }
+});
+document.addEventListener('click', async e => {
+  const t = e.target.closest('#mb-bus-save, #mb-add, #mb-dev-save, #mb-bus-from-tpl, #mb-pr-start, #mb-pr-stop, #mb-raw-send, #mb-tpl-new, #mb-editor-save, #mb-editor-close, [data-mb-open], [data-mb-del], [data-mb-set], [data-mb-sw], [data-mb-press], [data-mb-use], [data-mb-tpl-export], [data-mb-tpl-copy], [data-mb-tpl-edit], [data-mb-tpl-del]');
+  if (!t || !mb) return;
+  try {
+    if (t.id === 'mb-bus-save' || t.id === 'mb-bus-from-tpl') {
+      const tp = mbTpl($('#mb-add-tpl').value);
+      const bus = t.id === 'mb-bus-save' ? { baud: +$('#mb-baud').value, parity: $('#mb-parity').value, stop: +$('#mb-stop').value, timeout_ms: +$('#mb-timeout').value }
+        : { baud: tp.baud, parity: tp.serial[1], stop: +tp.serial[2] };
+      await mbPut({ bus }, L('Bus settings saved', 'Nastavení sběrnice uloženo'));
+    } else if (t.id === 'mb-add') {
+      const tcp = $('#mb-add-tr').value === 'tcp';
+      const d = { name: $('#mb-add-name').value.trim(), template: $('#mb-add-tpl').value, transport: tcp ? 'tcp' : 'rtu', slave: +$('#mb-add-slave').value,
+        poll_s: +$('#mb-add-poll').value, expose: $('#mb-add-expose').value };
+      if (tcp) Object.assign(d, { host: $('#mb-add-host').value.trim(), port: +$('#mb-add-port').value });
+      await mbPut({ devices: [...mbList(), d] }, L(`Added ${d.name}`, `Přidáno ${d.name}`));
+    } else if (t.id === 'mb-dev-save') {
+      await mbPut({ devices: mbList() }, L('Saved', 'Uloženo'));
+    } else if (t.dataset.mbOpen) {
+      mbOpen.has(t.dataset.mbOpen) ? mbOpen.delete(t.dataset.mbOpen) : mbOpen.add(t.dataset.mbOpen);
+      mbRenderDevices();
+    } else if (t.dataset.mbDel) {
+      const d = mb.devices.find(x => x.id === t.dataset.mbDel);
+      if (!await confirmDialog(L(`Remove ${d.name}?`, `Odebrat ${d.name}?`), L('Its entities in Home Assistant become unavailable.', 'Jeho entity v Home Assistant přestanou být dostupné.'))) return;
+      await mbPut({ devices: mbList().filter(x => x.id !== d.id) }, L('Removed', 'Odebráno'));
+    } else if (t.dataset.mbSet) {
+      const [d, k] = t.dataset.mbSet.split('|');
+      await mbWrite(d, k, +document.querySelector(`[data-mb-num="${t.dataset.mbSet}"]`).value);
+    } else if (t.dataset.mbSw) {
+      const [d, k, v] = t.dataset.mbSw.split('|');
+      await mbWrite(d, k, v);
+    } else if (t.dataset.mbPress) {
+      const [d, k] = t.dataset.mbPress.split('|');
+      if (!await confirmDialog(L('Run the command?', 'Spustit příkaz?'), L('It is sent to the device at once.', 'Odešle se do zařízení hned.'))) return;
+      await mbWrite(d, k);
+    } else if (t.id === 'mb-pr-start') {
+      const tcp = $('#mb-pr-tr').value === 'tcp';
+      const body = { transport: tcp ? 'tcp' : 'rtu', from: +$('#mb-pr-from').value, to: +$('#mb-pr-to').value };
+      if ($('#mb-pr-tpl').value) body.template = $('#mb-pr-tpl').value;
+      if (tcp) Object.assign(body, { host: $('#mb-pr-host').value.trim(), port: +$('#mb-pr-port').value });
+      else body.bauds = [...document.querySelectorAll('[data-mb-baud]:checked')].map(c => +c.dataset.mbBaud);
+      await api('/api/modbus/probe', { json: body });
+      mbProbeState();
+    } else if (t.id === 'mb-pr-stop') {
+      await api('/api/modbus/probe', { json: { stop: true } });
+    } else if (t.dataset.mbUse) {
+      const [slave, baud] = t.dataset.mbUse.split('|');
+      $('#mb-add-slave').value = slave;
+      $('#mb-add-tr').value = $('#mb-pr-tr').value;
+      if ($('#mb-pr-tr').value === 'tcp') { $('#mb-add-host').value = $('#mb-pr-host').value; $('#mb-add-port').value = $('#mb-pr-port').value; }
+      if ($('#mb-pr-tpl').value) $('#mb-add-tpl').value = $('#mb-pr-tpl').value;
+      $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value !== 'tcp');
+      mbAddNote();
+      if (baud && +baud !== mb.bus.baud) toast(L(`Found at ${baud} Bd: set the bus to it`, `Nalezeno při ${baud} Bd: nastavte na ni sběrnici`));
+      $('#mb-add-tpl').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (t.id === 'mb-raw-send') {
+      const fc = +$('#mb-raw-fc').value, tcp = $('#mb-raw-tr').value === 'tcp';
+      const addr = parseInt($('#mb-raw-addr').value), n = $('#mb-raw-n').value.trim();
+      const body = { transport: tcp ? 'tcp' : 'rtu', slave: +$('#mb-raw-slave').value, fc, addr };
+      if (tcp) body.host = $('#mb-raw-host').value.trim();
+      if (fc <= 4) body.count = +n; else body.values = n.split(',').map(x => parseInt(x.trim()));
+      $('#mb-raw-out').innerHTML = mbRawOut(await api('/api/modbus/raw', { json: body }), fc);
+    } else if (t.id === 'mb-tpl-new') {
+      mbEditor(L('New template', 'Nová šablona'), { schema: 1, id: 'my_device', manufacturer: 'Manufacturer', model: 'Model', category: 'energy_meter',
+        serial: { baud: 9600, parity: 'N', stop: 1 }, slave: 1, poll_s: 10, max_regs: 40,
+        entities: [{ key: 'voltage', name: 'Voltage', name_cs: 'Napětí', reg: 'input', addr: '0x0000', type: 'f32', unit: 'V', class: 'voltage', state: 'measurement', precision: 1 }] });
+    } else if (t.dataset.mbTplExport || t.dataset.mbTplCopy || t.dataset.mbTplEdit) {
+      const id = t.dataset.mbTplExport || t.dataset.mbTplCopy || t.dataset.mbTplEdit;
+      const j = await api(`/api/modbus/template?id=${encodeURIComponent(id)}`);
+      delete j.builtin; delete j.rev;
+      if (t.dataset.mbTplExport) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(j, null, 1)], { type: 'application/json' }));
+        a.download = `${id}.json`;
+        a.click();
+      } else if (t.dataset.mbTplCopy) mbEditor(L('Copy of ', 'Kopie ') + j.model, { ...j, id: `${id}_copy`.slice(0, 31), model: `${j.model} (copy)`.slice(0, 47) });
+      else mbEditor(L('Edit ', 'Upravit ') + j.model, j);
+    } else if (t.id === 'mb-editor-save') {
+      let j;
+      try { j = JSON.parse($('#mb-editor-text').value); } catch (err) { $('#mb-editor-err').textContent = 'JSON: ' + err.message; return; }
+      try { await api('/api/modbus/template', { method: 'PUT', json: j }); } catch (err) { $('#mb-editor-err').textContent = err.message; return; }
+      $('#mb-editor').classList.add('hidden');
+      await loadModbus(true);
+      toast(L(`Template ${j.id} saved`, `Šablona ${j.id} uložena`));
+    } else if (t.id === 'mb-editor-close') {
+      $('#mb-editor').classList.add('hidden');
+    } else if (t.dataset.mbTplDel) {
+      if (!await confirmDialog(L(`Delete template ${t.dataset.mbTplDel}?`, `Smazat šablonu ${t.dataset.mbTplDel}?`), L('Export it first to keep a copy.', 'Pro zachování kopie ji nejdřív exportujte.'))) return;
+      await api(`/api/modbus/template?id=${encodeURIComponent(t.dataset.mbTplDel)}`, { method: 'DELETE' });
+      await loadModbus(true);
+      toast(L('Deleted', 'Smazáno'));
+    }
+  } catch (err) {
+    toast(L('Error: ', 'Chyba: ') + err.message);
+  }
+});
+
 /* ---------------- users and permissions ---------------- */
 const ROLE_NAMES = () => ({ admin: L('Admin', 'Správce'), user: L('User', 'Uživatel'), viewer: L('Viewer', 'Divák') });
 const LEVELS = () => [L('Hidden', 'Skryto'), L('Read', 'Číst'), L('Edit', 'Upravovat')];
@@ -5336,6 +5675,7 @@ const LOG_SOURCES = {
   zigbee: { label: 'Zigbee', tags: /^(role_zigbee|zigbee_net|zb_.*)$/i },
   sound: { label: 'sound', tags: /^(sound.*|I2S_IF|ES8311|Adev_Codec|FbsLoader|i2s_.*|dl_.*|esp-dl)$/i },
   sensors: { label: 'I2C sensors', tags: /^(sensors|gw_i2c|i2c\..*)$/i },
+  modbus: { label: 'Modbus', tags: /^(modbus|mb_bus|uart)$/i },
   c6: { label: 'C6 flashing', tags: /^(c6_flasher|esp_loader.*|serial_flasher.*)$/i },
 };
 let logSeq = 0, logPaused = false, logRest = '', logLines = [], logTags = new Map();
@@ -5475,6 +5815,7 @@ function render(full) {
     if (route() === 'ha/matter') loadHaFound();
     if (route() === 'radios/status') loadRadios();
     if (route() === 'system/hw') loadHw();
+    if (route() === 'system/rs485') loadModbus();
     if (route() === 'esphome') loadEsphomeWifi();
     if (route().startsWith('system/users/')) loadUsersPage();
     if (route() === 'profile') loadProfile();

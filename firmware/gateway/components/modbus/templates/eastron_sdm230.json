@@ -5,6 +5,7 @@
  "model": "SDM230-Modbus",
  "category": "energy_meter",
  "notes": "Single phase. Default 9600 Bd (manual v1.8; meters with manual v1.6 and older 2400 Bd), 8N1, address 1.",
+ "notes_cs": "Jednofázový. Výchozí 9600 Bd (návod v1.8; elektroměry s návodem v1.6 a starším 2400 Bd), 8N1, adresa 1.",
  "source": "https://www.eastroneurope.com/images/uploads/products/protocol/SDM230-MODBUS_Protocol.pdf",
  "serial": {
   "baud": 9600,

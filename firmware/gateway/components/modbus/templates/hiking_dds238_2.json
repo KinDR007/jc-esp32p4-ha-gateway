@@ -129,6 +129,7 @@
    "state": "measurement"
   }
  ],
+ "notes_cs": "Jednofázový. 9600 Bd 8N1, adresa 1. Zápis jen funkcí 16. Třífázový DTS238-7 má jinou, nezveřejněnou mapu.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

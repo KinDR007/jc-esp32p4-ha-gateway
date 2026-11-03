@@ -5,6 +5,7 @@
  "model": "SDM120-Modbus",
  "category": "energy_meter",
  "notes": "Single phase. Default 2400 Bd, 8N1, address 1; the SDM120-M (the -M variant) ships with 9600 Bd. Address and baud rate on the meter's menu.",
+ "notes_cs": "Jednofázový. Výchozí 2400 Bd, 8N1, adresa 1; varianta SDM120-M má od výroby 9600 Bd. Adresa a rychlost v menu elektroměru.",
  "source": "https://www.eastroneurope.com/images/uploads/products/protocol/SDM120-MODBUS_Protocol.pdf",
  "serial": {
   "baud": 2400,

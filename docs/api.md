@@ -2156,7 +2156,8 @@ Response:
     "sound",
     "sound_events",
     "sound_triggers",
-    "sensors"
+    "sensors",
+    "modbus"
   ],
   "interval": 60,
   "base_topic": "p4gw/p4gw-a1b2c3",
@@ -2206,7 +2207,7 @@ Response:
 }
 ```
 
-Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors.
+Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors, modbus.
 
 Effects: Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.
 
@@ -2368,6 +2369,369 @@ Response:
 ```
 
 Effects: Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors and the codec are only probed, not identified. A chip is added when exactly one type is sure, or when exactly one type answers like it; otherwise it waits in scan.devices for a PUT with the chosen type. The gateway also scans at every start.
+
+### Modbus (RS485 and TCP)
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/modbus` | RS485 bus settings and the Modbus devices with their state and values. | page `system/rs485`, read |
+| PUT | `/api/modbus` | Sets the bus and/or replaces the list of devices. | page `system/rs485`, edit |
+| GET | `/api/modbus/templates` | The device templates, built in and own. | page `system/rs485`, read |
+| GET | `/api/modbus/template` | A whole template (?id=). | page `system/rs485`, read |
+| PUT | `/api/modbus/template` | Stores an own template (new, or replacing the own one with the same id). | page `system/rs485`, edit |
+| DELETE | `/api/modbus/template` | Deletes an own template (?id=). | page `system/rs485`, edit |
+| POST | `/api/modbus/write` | Writes a writable entity of a device. | page `system/rs485`, edit |
+| POST | `/api/modbus/raw` | Manual request: reads or writes registers or coils. | page `system/rs485`, edit |
+| GET | `/api/modbus/probe` | State and result of the address search. | page `system/rs485`, read |
+| POST | `/api/modbus/probe` | Starts a search of addresses (and baud rates), or stops it. | page `system/rs485`, edit |
+
+#### GET `/api/modbus`
+
+Response:
+
+```json
+{
+  "bus": {
+    "baud": 9600,
+    "parity": "N",
+    "stop": 1,
+    "timeout_ms": 500,
+    "ok": true,
+    "uart": 3,
+    "tx": 26,
+    "rx": 27,
+    "stats": {
+      "requests": 1200,
+      "timeouts": 3,
+      "crc_errors": 0,
+      "exceptions": 1
+    }
+  },
+  "devices": [
+    {
+      "id": "d1",
+      "name": "House meter",
+      "template": "eastron_sdm630",
+      "transport": "rtu",
+      "slave": 1,
+      "poll_s": 0,
+      "expose": "integration",
+      "enabled": true,
+      "manufacturer": "Eastron",
+      "model": "SDM630-Modbus V2",
+      "template_rev": 3021911,
+      "state": "ok",
+      "error": "",
+      "age_s": 2,
+      "polls": 120,
+      "errors": 0,
+      "values": {
+        "voltage_l1": 231.4,
+        "total_power": 1835,
+        "import_energy": 15234.112
+      }
+    }
+  ],
+  "max_devices": 16
+}
+```
+
+Effects: values hold the entities read (key from the template): numbers already scaled, true/false for bits and coils, the text of a map entry, strings. state: ok, partial (some reads refused), offline (3 polls without an answer; tried again every 30 s), starting or off. expose: integration, mqtt, both or none. poll_s 0 means the template's interval.
+
+#### PUT `/api/modbus`
+
+Body:
+
+```json
+{
+  "bus": {
+    "baud": 9600,
+    "parity": "N",
+    "stop": 1,
+    "timeout_ms": 500
+  },
+  "devices": [
+    {
+      "id": "d1",
+      "name": "House meter",
+      "template": "eastron_sdm630",
+      "transport": "rtu",
+      "slave": 1,
+      "expose": "integration"
+    },
+    {
+      "name": "Inverter",
+      "template": "my_inverter",
+      "transport": "tcp",
+      "host": "192.168.1.60",
+      "port": 502,
+      "slave": 1,
+      "poll_s": 5,
+      "expose": "both",
+      "enabled": true
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "...": "same as GET /api/modbus"
+}
+```
+
+Errors: 400 baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; tcp without host; slave not 1-247 (TCP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.
+
+Effects: devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.
+
+#### GET `/api/modbus/templates`
+
+Response:
+
+```json
+{
+  "templates": [
+    {
+      "id": "eastron_sdm630",
+      "manufacturer": "Eastron",
+      "model": "SDM630-Modbus V2",
+      "category": "energy_meter",
+      "notes": "Three phase...",
+      "builtin": true,
+      "entities": 37,
+      "rev": 3021911,
+      "baud": 9600,
+      "serial": "8N1",
+      "slave": 1
+    }
+  ],
+  "max_user": 16
+}
+```
+
+#### GET `/api/modbus/template`
+
+Query: `id=eastron_sdm630` template id
+
+Response:
+
+```json
+{
+  "schema": 1,
+  "id": "eastron_sdm120",
+  "manufacturer": "Eastron",
+  "model": "SDM120-Modbus",
+  "serial": {
+    "baud": 2400,
+    "parity": "N",
+    "stop": 1
+  },
+  "slave": 1,
+  "timeout_ms": 500,
+  "gap_ms": 50,
+  "poll_s": 10,
+  "max_regs": 40,
+  "max_gap": 20,
+  "entities": [
+    {
+      "key": "voltage",
+      "name": "Voltage",
+      "name_cs": "Napětí",
+      "reg": "input",
+      "addr": "0x0000",
+      "type": "f32",
+      "precision": 1,
+      "unit": "V",
+      "class": "voltage",
+      "state": "measurement"
+    }
+  ],
+  "builtin": true,
+  "rev": 123
+}
+```
+
+Errors: 404 No such template.
+
+Effects: The format is described in docs/modbus.md (fields, types, word orders, writes).
+
+#### PUT `/api/modbus/template`
+
+Body:
+
+```json
+{
+  "schema": 1,
+  "id": "my_meter",
+  "manufacturer": "Acme",
+  "model": "M1",
+  "serial": {
+    "baud": 9600,
+    "parity": "E",
+    "stop": 1
+  },
+  "entities": [
+    {
+      "key": "power",
+      "name": "Power",
+      "reg": "holding",
+      "addr": "0x0010",
+      "type": "s32",
+      "order": "CDAB",
+      "scale": 0.1,
+      "unit": "W",
+      "class": "power",
+      "state": "measurement"
+    },
+    {
+      "key": "mode",
+      "name": "Mode",
+      "reg": "holding",
+      "addr": "0x0020",
+      "map": {
+        "0": "off",
+        "1": "auto"
+      },
+      "write": {
+        "kind": "select"
+      }
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "...": "the stored template, as GET /api/modbus/template"
+}
+```
+
+Errors: 400 The template is invalid (the message names the field or entity).; 409 The id is a built-in template's; 16 own templates already; NVS full.
+
+Effects: Devices using a replaced template start again with its entities.
+
+#### DELETE `/api/modbus/template`
+
+Query: `id=my_meter` template id
+
+Response:
+
+```json
+{
+  "deleted": "my_meter"
+}
+```
+
+Errors: 404 No such template.; 409 Built in, or a device uses it.
+
+#### POST `/api/modbus/write`
+
+Body:
+
+```json
+{
+  "device": "d2",
+  "key": "alarm_threshold",
+  "value": 2500
+}
+```
+
+Response:
+
+```json
+{
+  "written": true
+}
+```
+
+Errors: 400 Unknown device or key, not writable, value outside min-max, not an option of a select.; 409 The device refused (exception) or did not answer.; 503 Modbus busy for 8 s.
+
+Effects: value: a number (number), "ON"/"OFF" or true/false (switch), the option text (select), nothing (button). The entity is read again right after.
+
+#### POST `/api/modbus/raw`
+
+Body:
+
+```json
+{
+  "transport": "rtu",
+  "slave": 1,
+  "fc": 4,
+  "addr": 0,
+  "count": 2
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "result": 0,
+  "error": "",
+  "registers": [
+    17254,
+    13108
+  ]
+}
+```
+
+Errors: 400 fc not 1-6, 15, 16; addr, count or values invalid; tcp without host.; 503 Modbus busy for 8 s.
+
+Effects: Writes take values (16-bit numbers; coils 0/1). A refused request answers 200 with ok false and the exception in result and error.
+
+#### GET `/api/modbus/probe`
+
+Response:
+
+```json
+{
+  "running": false,
+  "progress": 100,
+  "baud": 0,
+  "found": [
+    {
+      "slave": 1,
+      "baud": 9600
+    },
+    {
+      "slave": 12,
+      "baud": 2400
+    }
+  ]
+}
+```
+
+#### POST `/api/modbus/probe`
+
+Body:
+
+```json
+{
+  "transport": "rtu",
+  "template": "eastron_sdm120",
+  "bauds": [
+    2400,
+    9600
+  ],
+  "from": 1,
+  "to": 247
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 from/to out of range, tcp without host, unknown template, bauds not a list of 1-8.
+
+Effects: Reads the template's first register (without a template holding register 0) at every address; an exception counts as an answer. RS485 devices are not polled while it runs (about 150 ms per address and baud rate). {"stop": true} ends it.
 
 ### Updates and firmware
 

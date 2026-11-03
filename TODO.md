@@ -178,8 +178,10 @@ Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr)
 - [x] M1 Rešerše a kontra-rešerše: Eastron SDM (oficiální protokoly + manuály, ESPHome, mbmd, evcc, Tasmota, sdm_modbus), systémy šablon (evcc, ESPHome, HA modbus, Tasmota, jollyjinx), ORNO/DDS238/DTSU666/EM340/ABB/PZEM; poznámky v build/research
 - [x] M2 Protokol (CRC, RTU, TCP/MBAP, výjimky, typy a pořadí slov) a model šablon s validací a plánem blokových čtení; unit testy v CI
 - [x] M3 Šablony Eastron SDM120, SDM230, SDM630 V2, SDM72D-M V2 a V1 (generované z jedné tabulky, tools/modbus/gen_sdm.py)
-- [ ] M4 Šablony ORNO OR-WE-5xx, Hiking DDS238/DTS238, Chint DDSU666/DTSU666, Peacefair PZEM-016/017 po kontra-rešerši
-- [ ] M5 Komponenta `modbus`: UART3 RTU, TCP klient, zařízení, polling s dělením bloků při výjimce, zápis, offline/backoff, uživatelské šablony v NVS, API, Telegram
-- [ ] M6 MQTT: samostatné zařízení v HA (via_device brána), příkazy pro zápis; integrace 1.7.0: zařízení a entity sensor/number/switch/select/button
-- [ ] M7 Web UI Systém › RS485: sběrnice, zařízení s hodnotami, přidání ze šablony, hledání adresy/rychlosti, editor a import/export šablon, ruční čtení/zápis registrů
-- [ ] M8 Testy: Modbus TCP simulátor SDM na Macu (pymodbus), HW TC48, UI32, HA testy; dokumentace docs/modbus.md
+- [x] M4 Šablony ORNO OR-WE-504/514/516, Hiking DDS238-2, Chint DTSU666/DDSU666, Peacefair PZEM-016/017 po kontra-rešerši (DTS238-7: mapa nenalezena, bez šablony; nepotvrzené registry vynechány)
+- [x] M5 Komponenta `modbus`: UART3 RTU, TCP klient, zařízení, polling s dělením bloků při výjimce, zápis, offline/backoff, uživatelské šablony v NVS, API, Telegram
+- [x] M6 MQTT: samostatné zařízení v HA (via_device brána), příkazy pro zápis; integrace (1.6.0, stejné vydání): zařízení a entity sensor/binary_sensor/number/switch/select/button
+- [x] M7 Web UI Systém › RS485: sběrnice, zařízení s hodnotami, přidání ze šablony, hledání adresy/rychlosti, editor a import/export šablon, ruční čtení/zápis registrů
+- [x] M8 Testy: vlastní Modbus TCP simulátor (tools/modbus/sim_tcp.py, bez závislostí), HW TC48 (vč. MQTT), UI32, HA testy (26); dokumentace docs/modbus.md
+- [ ] M9 Test se skutečným zařízením na RS485 (časování, mapy označené „komunita“: ORNO 504, 516/517)
+- [ ] M10 Ověřit zásobník úlohy modbus (6 kB) a volnou interní RAM (203 kB po přidání I2C a Modbus)

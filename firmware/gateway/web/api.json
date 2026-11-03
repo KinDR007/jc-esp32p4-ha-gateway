@@ -3163,7 +3163,8 @@
               "sound",
               "sound_events",
               "sound_triggers",
-              "sensors"
+              "sensors",
+              "modbus"
             ],
             "interval": 60,
             "base_topic": "p4gw/p4gw-a1b2c3",
@@ -3216,8 +3217,8 @@
             {
               "code": 400,
               "when": {
-                "en": "A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors.",
-                "cs": "Neplatné pole (zpráva říká které): uri musí začínat mqtt://, mqtts://, ws:// nebo wss:// (max 120); user, password, client_id max 63; prefix 1 až 31 znaků bez zástupných znaků, mezer a krajních lomítek; základní téma bez #, +, mezer a krajních lomítek (max 63); tls bundle nebo ca; ca certifikát PEM do 3999 znaků, povinný při tls ca; keepalive 10 až 240; interval 10 až 3600; discovery_groups z roles, system, update, sound, sound_events, sound_triggers, sensors."
+                "en": "A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors, modbus.",
+                "cs": "Neplatné pole (zpráva říká které): uri musí začínat mqtt://, mqtts://, ws:// nebo wss:// (max 120); user, password, client_id max 63; prefix 1 až 31 znaků bez zástupných znaků, mezer a krajních lomítek; základní téma bez #, +, mezer a krajních lomítek (max 63); tls bundle nebo ca; ca certifikát PEM do 3999 znaků, povinný při tls ca; keepalive 10 až 240; interval 10 až 3600; discovery_groups z roles, system, update, sound, sound_events, sound_triggers, sensors, modbus."
               }
             }
           ],
@@ -3406,6 +3407,497 @@
           "effects": {
             "en": "Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors and the codec are only probed, not identified. A chip is added when exactly one type is sure, or when exactly one type answers like it; otherwise it waits in scan.devices for a PUT with the chosen type. The gateway also scans at every start.",
             "cs": "Trvá až několik sekund (SCD4x potřebuje 0,5 s). Nastavené senzory a kodek se jen ověří odpovědí, neidentifikují se. Čip se přidá, když je si jistý právě jeden typ, nebo když podobně odpovídá právě jeden typ; jinak čeká v scan.devices na PUT se zvoleným typem. Brána skenuje i při každém startu."
+          }
+        }
+      ]
+    },
+    {
+      "id": "modbus",
+      "title": {
+        "en": "Modbus (RS485 and TCP)",
+        "cs": "Modbus (RS485 a TCP)"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/modbus",
+          "perm": "system/rs485",
+          "level": 1,
+          "summary": {
+            "en": "RS485 bus settings and the Modbus devices with their state and values.",
+            "cs": "Nastavení sběrnice RS485 a zařízení Modbus s jejich stavem a hodnotami."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "bus": {
+              "baud": 9600,
+              "parity": "N",
+              "stop": 1,
+              "timeout_ms": 500,
+              "ok": true,
+              "uart": 3,
+              "tx": 26,
+              "rx": 27,
+              "stats": {
+                "requests": 1200,
+                "timeouts": 3,
+                "crc_errors": 0,
+                "exceptions": 1
+              }
+            },
+            "devices": [
+              {
+                "id": "d1",
+                "name": "House meter",
+                "template": "eastron_sdm630",
+                "transport": "rtu",
+                "slave": 1,
+                "poll_s": 0,
+                "expose": "integration",
+                "enabled": true,
+                "manufacturer": "Eastron",
+                "model": "SDM630-Modbus V2",
+                "template_rev": 3021911,
+                "state": "ok",
+                "error": "",
+                "age_s": 2,
+                "polls": 120,
+                "errors": 0,
+                "values": {
+                  "voltage_l1": 231.4,
+                  "total_power": 1835,
+                  "import_energy": 15234.112
+                }
+              }
+            ],
+            "max_devices": 16
+          },
+          "effects": {
+            "en": "values hold the entities read (key from the template): numbers already scaled, true/false for bits and coils, the text of a map entry, strings. state: ok, partial (some reads refused), offline (3 polls without an answer; tried again every 30 s), starting or off. expose: integration, mqtt, both or none. poll_s 0 means the template's interval.",
+            "cs": "values obsahuje přečtené entity (klíč ze šablony): čísla už přepočtená, true/false u bitů a cívek, text položky mapy, řetězce. state: ok, partial (část čtení odmítnuta), offline (3 dotazování bez odpovědi; znovu každých 30 s), starting nebo off. expose: integration, mqtt, both nebo none. poll_s 0 znamená interval šablony."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/modbus",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Sets the bus and/or replaces the list of devices.",
+            "cs": "Nastaví sběrnici a/nebo nahradí seznam zařízení."
+          },
+          "body": {
+            "bus": {
+              "baud": 9600,
+              "parity": "N",
+              "stop": 1,
+              "timeout_ms": 500
+            },
+            "devices": [
+              {
+                "id": "d1",
+                "name": "House meter",
+                "template": "eastron_sdm630",
+                "transport": "rtu",
+                "slave": 1,
+                "expose": "integration"
+              },
+              {
+                "name": "Inverter",
+                "template": "my_inverter",
+                "transport": "tcp",
+                "host": "192.168.1.60",
+                "port": 502,
+                "slave": 1,
+                "poll_s": 5,
+                "expose": "both",
+                "enabled": true
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "...": "same as GET /api/modbus"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; tcp without host; slave not 1-247 (TCP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.",
+                "cs": "baud mimo seznam 1200-115200, parity mimo N/E/O, stop mimo 1/2, timeout_ms mimo 50-5000; víc než 16 zařízení; neznámá šablona; tcp bez host; slave mimo 1-247 (TCP 0-255); neplatné port, poll_s, expose nebo enabled; jméno nad 32 znaků nebo s uvozovkami, závorkami, zpětným lomítkem."
+              }
+            }
+          ],
+          "effects": {
+            "en": "devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.",
+            "cs": "devices nahradí celý seznam: pošlete i ta, která mají zůstat, s jejich id; zařízení bez id dostane nové. Zařízení se stejnou šablonou a připojením si ponechá hodnoty. Odpověď přijde, až to brána použije (do 2 s). Následuje MQTT discovery."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/modbus/templates",
+          "perm": "system/rs485",
+          "level": 1,
+          "summary": {
+            "en": "The device templates, built in and own.",
+            "cs": "Šablony zařízení, vestavěné i vlastní."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "templates": [
+              {
+                "id": "eastron_sdm630",
+                "manufacturer": "Eastron",
+                "model": "SDM630-Modbus V2",
+                "category": "energy_meter",
+                "notes": "Three phase...",
+                "builtin": true,
+                "entities": 37,
+                "rev": 3021911,
+                "baud": 9600,
+                "serial": "8N1",
+                "slave": 1
+              }
+            ],
+            "max_user": 16
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/modbus/template",
+          "perm": "system/rs485",
+          "level": 1,
+          "summary": {
+            "en": "A whole template (?id=).",
+            "cs": "Celá šablona (?id=)."
+          },
+          "query": [
+            {
+              "name": "id",
+              "values": "eastron_sdm630",
+              "desc": {
+                "en": "template id",
+                "cs": "id šablony"
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "schema": 1,
+            "id": "eastron_sdm120",
+            "manufacturer": "Eastron",
+            "model": "SDM120-Modbus",
+            "serial": {
+              "baud": 2400,
+              "parity": "N",
+              "stop": 1
+            },
+            "slave": 1,
+            "timeout_ms": 500,
+            "gap_ms": 50,
+            "poll_s": 10,
+            "max_regs": 40,
+            "max_gap": 20,
+            "entities": [
+              {
+                "key": "voltage",
+                "name": "Voltage",
+                "name_cs": "Napětí",
+                "reg": "input",
+                "addr": "0x0000",
+                "type": "f32",
+                "precision": 1,
+                "unit": "V",
+                "class": "voltage",
+                "state": "measurement"
+              }
+            ],
+            "builtin": true,
+            "rev": 123
+          },
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such template.",
+                "cs": "Šablona neexistuje."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The format is described in docs/modbus.md (fields, types, word orders, writes).",
+            "cs": "Formát popisuje docs/modbus.md (pole, typy, pořadí slov, zápisy)."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/modbus/template",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Stores an own template (new, or replacing the own one with the same id).",
+            "cs": "Uloží vlastní šablonu (novou, nebo nahradí vlastní se stejným id)."
+          },
+          "body": {
+            "schema": 1,
+            "id": "my_meter",
+            "manufacturer": "Acme",
+            "model": "M1",
+            "serial": {
+              "baud": 9600,
+              "parity": "E",
+              "stop": 1
+            },
+            "entities": [
+              {
+                "key": "power",
+                "name": "Power",
+                "reg": "holding",
+                "addr": "0x0010",
+                "type": "s32",
+                "order": "CDAB",
+                "scale": 0.1,
+                "unit": "W",
+                "class": "power",
+                "state": "measurement"
+              },
+              {
+                "key": "mode",
+                "name": "Mode",
+                "reg": "holding",
+                "addr": "0x0020",
+                "map": {
+                  "0": "off",
+                  "1": "auto"
+                },
+                "write": {
+                  "kind": "select"
+                }
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "...": "the stored template, as GET /api/modbus/template"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "The template is invalid (the message names the field or entity).",
+                "cs": "Šablona je neplatná (zpráva uvádí pole nebo entitu)."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "The id is a built-in template's; 16 own templates already; NVS full.",
+                "cs": "Id má vestavěná šablona; už 16 vlastních šablon; NVS plné."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Devices using a replaced template start again with its entities.",
+            "cs": "Zařízení s nahrazenou šablonou začnou znovu s jejími entitami."
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/modbus/template",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Deletes an own template (?id=).",
+            "cs": "Smaže vlastní šablonu (?id=)."
+          },
+          "query": [
+            {
+              "name": "id",
+              "values": "my_meter",
+              "desc": {
+                "en": "template id",
+                "cs": "id šablony"
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "deleted": "my_meter"
+          },
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such template.",
+                "cs": "Šablona neexistuje."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Built in, or a device uses it.",
+                "cs": "Vestavěná, nebo ji používá zařízení."
+              }
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/modbus/write",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Writes a writable entity of a device.",
+            "cs": "Zapíše zapisovatelnou entitu zařízení."
+          },
+          "body": {
+            "device": "d2",
+            "key": "alarm_threshold",
+            "value": 2500
+          },
+          "body_type": "json",
+          "response": {
+            "written": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Unknown device or key, not writable, value outside min-max, not an option of a select.",
+                "cs": "Neznámé zařízení nebo klíč, nezapisovatelné, hodnota mimo min-max, není volbou výběru."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "The device refused (exception) or did not answer.",
+                "cs": "Zařízení odmítlo (výjimka) nebo neodpovědělo."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "Modbus busy for 8 s.",
+                "cs": "Modbus 8 s zaneprázdněný."
+              }
+            }
+          ],
+          "effects": {
+            "en": "value: a number (number), \"ON\"/\"OFF\" or true/false (switch), the option text (select), nothing (button). The entity is read again right after.",
+            "cs": "value: číslo (number), \"ON\"/\"OFF\" nebo true/false (switch), text volby (select), nic (button). Entita se hned poté znovu přečte."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/modbus/raw",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Manual request: reads or writes registers or coils.",
+            "cs": "Ruční dotaz: čte nebo zapisuje registry či cívky."
+          },
+          "body": {
+            "transport": "rtu",
+            "slave": 1,
+            "fc": 4,
+            "addr": 0,
+            "count": 2
+          },
+          "body_type": "json",
+          "response": {
+            "ok": true,
+            "result": 0,
+            "error": "",
+            "registers": [
+              17254,
+              13108
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "fc not 1-6, 15, 16; addr, count or values invalid; tcp without host.",
+                "cs": "fc mimo 1-6, 15, 16; neplatné addr, count nebo values; tcp bez host."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "Modbus busy for 8 s.",
+                "cs": "Modbus 8 s zaneprázdněný."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Writes take values (16-bit numbers; coils 0/1). A refused request answers 200 with ok false and the exception in result and error.",
+            "cs": "Zápisy berou values (16bitová čísla; cívky 0/1). Odmítnutý dotaz odpoví 200 s ok false a výjimkou v result a error."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/modbus/probe",
+          "perm": "system/rs485",
+          "level": 1,
+          "summary": {
+            "en": "State and result of the address search.",
+            "cs": "Stav a výsledek hledání adres."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "running": false,
+            "progress": 100,
+            "baud": 0,
+            "found": [
+              {
+                "slave": 1,
+                "baud": 9600
+              },
+              {
+                "slave": 12,
+                "baud": 2400
+              }
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/modbus/probe",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Starts a search of addresses (and baud rates), or stops it.",
+            "cs": "Spustí hledání adres (a rychlostí), nebo ho zastaví."
+          },
+          "body": {
+            "transport": "rtu",
+            "template": "eastron_sdm120",
+            "bauds": [
+              2400,
+              9600
+            ],
+            "from": 1,
+            "to": 247
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "from/to out of range, tcp without host, unknown template, bauds not a list of 1-8.",
+                "cs": "from/to mimo rozsah, tcp bez host, neznámá šablona, bauds není seznam 1-8."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Reads the template's first register (without a template holding register 0) at every address; an exception counts as an answer. RS485 devices are not polled while it runs (about 150 ms per address and baud rate). {\"stop\": true} ends it.",
+            "cs": "Čte první registr šablony (bez šablony holding registr 0) na každé adrese; i výjimka je odpověď. Zařízení na RS485 se během hledání nečtou (asi 150 ms na adresu a rychlost). {\"stop\": true} ho ukončí."
           }
         }
       ]

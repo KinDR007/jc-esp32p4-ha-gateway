@@ -115,6 +115,7 @@
    "state": "total_increasing"
   }
  ],
+ "notes_cs": "Jednofázový. 9600 Bd 8E1 (sudá parita), adresa 1. Energie tarifů T1-T4 na 0xA002-0xA008.",
  "slave": 1,
  "timeout_ms": 500,
  "gap_ms": 50,

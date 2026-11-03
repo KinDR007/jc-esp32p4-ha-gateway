@@ -380,6 +380,25 @@ PAGES = [
        <li>Start projde sběrnici a přidá, co rozpozná; <b>Skenovat sběrnici</b> to zopakuje. U čipu, který sken nerozliší, ho vyberte v <i>Nalezeno na sběrnici</i> a stiskněte <b>Přidat</b>.</li>
        <li>Pojmenujte ho a <b>Uložte</b>. Integrace P4 Gateway ukáže jeho hodnoty jako senzory; MQTT také se skupinou <i>I2C senzory</i>.</li></ol>"""),
      ["system_hw"]),
+    ("system/rs485", "serial-port", T("System › RS485", "Systém › RS485"),
+     T("Modbus devices on RS485 (connector J4) and Modbus TCP, from templates: values, writes, search, own templates.",
+       "Zařízení Modbus na RS485 (konektor J4) a Modbus TCP podle šablon: hodnoty, zápisy, hledání, vlastní šablony."),
+     {"RS485 BUS": T("Wiring and the bus settings (baud rate, parity, stop bits, timeout) shared by all RS485 devices; request statistics.", "Zapojení a nastavení sběrnice (rychlost, parita, stop bity, časový limit) společné všem zařízením na RS485; statistika dotazů."),
+      "ADD A DEVICE": T("Template, name, RS485 address or Modbus TCP host, read interval and how Home Assistant shows it (integration, MQTT, both, none).", "Šablona, jméno, adresa na RS485 nebo host Modbus TCP, interval čtení a jak ho ukáže Home Assistant (integrace, MQTT, obojí, nic)."),
+      "DEVICES": T("State, main values, Home Assistant and enable per device; the arrow shows every value with controls for the writable ones.", "Stav, hlavní hodnoty, Home Assistant a zapnutí po zařízeních; šipka ukáže všechny hodnoty s ovládáním zapisovatelných."),
+      "FIND DEVICES": T("Tries every address (and baud rates) with a read of a template.", "Zkusí každou adresu (a rychlosti) čtením podle šablony."),
+      "MANUAL REQUEST": T("Reads or writes registers; shows them as u16, s16, u32 and float32 in both word orders.", "Čte nebo zapisuje registry; ukáže je jako u16, s16, u32 a float32 v obou pořadích slov."),
+      "TEMPLATES": T("Built-in and own templates: export, copy as a new one, edit with a check, import, delete (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md\">modbus.md</a>).",
+                     "Vestavěné a vlastní šablony: export, kopie jako nová, úprava s kontrolou, import, smazání (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md\">modbus.md</a>).")},
+     T("""<ol><li>Connect A and B of the bus to J4 (and GND), set the bus to the devices' baud rate.</li>
+       <li>Pick the template, the device's address and a name, press <b>Add</b>; not sure about the address: <b>Find devices</b>.</li>
+       <li>The integration shows the device as its own device in Home Assistant; for MQTT choose it per device and allow the group <i>Modbus devices</i>.</li>
+       <li>No template for your device: copy a similar one, edit the registers (the manual request helps) and save.</li></ol>""",
+       """<ol><li>Připojte A a B sběrnice na J4 (a GND), nastavte sběrnici na rychlost zařízení.</li>
+       <li>Zvolte šablonu, adresu zařízení a jméno a stiskněte <b>Přidat</b>; adresu neznáte: <b>Najít zařízení</b>.</li>
+       <li>Integrace ukáže zařízení jako samostatné zařízení v Home Assistant; pro MQTT ho zvolte po zařízení a povolte skupinu <i>Zařízení Modbus</i>.</li>
+       <li>Šablona pro vaše zařízení chybí: zkopírujte podobnou, upravte registry (pomůže ruční dotaz) a uložte.</li></ol>"""),
+     ["system_rs485"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",

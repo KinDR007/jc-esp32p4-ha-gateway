@@ -92,11 +92,11 @@ Pull-ups on the board: 2.2 kΩ (R29, R31 at the camera connector) and 5.1 kΩ (R
 besides the weak internal ones the gateway enables. The bus is not taken from the gateway's other
 roles; the sound component configures the codec at its start only.
 
-## Other interfaces (not used by the gateway)
+## Other interfaces
 
 | Interface | Pins | Notes |
 |---|---|---|
-| RS485 (MAX485, connector J4: A, B, 5 V, GND) | TX1 = GPIO26, RX1 = GPIO27 | direction switched automatically from TX by a 74LVC1G132 and a transistor; TVS and 0.1 A fuses on A/B. A possible Modbus RTU interface |
+| RS485 (MAX485, connector J4: A, B, 5 V, GND) | TX1 = GPIO26, RX1 = GPIO27 (UART3) | direction switched automatically from TX by a 74LVC1G132 and a transistor; TVS and 0.1 A fuses on A/B. Modbus RTU of the gateway ([modbus.md](modbus.md)) |
 | Speaker amplifier NS4150 (CN1) | PA_CTRL = GPIO11 | DAC output of the ES8311 |
 | Display backlight | LCD_PWM = GPIO23 | |
 | SD card | SDIO GPIO39-44, power switch GPIO45 | |
