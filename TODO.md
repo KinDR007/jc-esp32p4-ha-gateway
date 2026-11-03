@@ -148,7 +148,8 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 
 **F7 Uzavření**
 - [x] F7.1 Regrese 2026-11-03 ([report](tests/results/2026-11-03/report.md)): vše prošlo kromě očekávaných TC01–03 (čistá deska) a známého TC26 (router bez sítě); opraveny testy TC09, TC30, TC39, UI22. Soak jen na pokyn
-- [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání); nejisté detaily v api.json k ověření: odpověď /api/thread/topology, úrovně témat /api/auth/telegram
+- [x] F7.2 Dokumentace a CHANGELOG aktualizované (api.md, airtag.md, c6-slots, installation, home-assistant, GitHub Pages)
+- [ ] F7.3 Vydání (tag, CI, push) jen na pokyn uživatele; k ověření v api.json: odpověď /api/thread/topology, úrovně témat /api/auth/telegram
 
 **F8 Odloženo**
 - [x] F8.1 AirTag přes BLE proxy: rešerše ([docs/airtag.md](docs/airtag.md)): anonymní detekce „Find My poblíž“ jde (jen přeposílání inzerátů, Bermuda/šablona v HA), identifikace vlastních AirTagů jen s klíči exportovanými z Macu (křehké, na Sequoia/Tahoe rozbité), automatické přidávání nelze; doporučen BLE tag s pevnou adresou / iBeacon
