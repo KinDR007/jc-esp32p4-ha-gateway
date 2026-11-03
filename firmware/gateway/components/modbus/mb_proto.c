@@ -324,7 +324,7 @@ static uint64_t be_uint(const uint8_t *b, int bytes)
 
 bool mb_decode(const uint8_t *regs, mb_type_t type, mb_order_t order, int bit, double *out)
 {
-    uint8_t b[8];
+    uint8_t b[8] = {0};
     if (bit >= 0) {
         *out = (get16(regs) >> (bit & 15)) & 1;
         return true;
@@ -385,7 +385,7 @@ bool mb_encode(double value, mb_type_t type, mb_order_t order, uint16_t *regs, i
     case MB_T_F64: memcpy(&u, &value, 8); break;
     default: return false;
     }
-    uint8_t be[8], wire[8];
+    uint8_t be[8] = {0}, wire[8];
     for (int i = 0; i < 2 * n; i++) {
         be[i] = (uint8_t)(u >> (8 * (2 * n - 1 - i)));
     }

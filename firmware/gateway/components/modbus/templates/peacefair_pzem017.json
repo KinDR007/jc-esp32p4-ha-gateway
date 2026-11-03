@@ -1,0 +1,172 @@
+{
+ "schema": 1,
+ "id": "peacefair_pzem017",
+ "manufacturer": "Peacefair",
+ "model": "PZEM-017 / PZEM-003",
+ "category": "energy_meter",
+ "notes": "DC module with external shunt. 9600 Bd 8N2 (two stop bits). Set the shunt (current range) to the one fitted.",
+ "source": "https://raw.githubusercontent.com/esphome/esphome/dev/esphome/components/pzemdc/pzemdc.cpp",
+ "serial": {
+  "baud": 9600,
+  "parity": "N",
+  "stop": 2
+ },
+ "max_regs": 8,
+ "entities": [
+  {
+   "key": "voltage",
+   "name": "Voltage",
+   "name_cs": "Napětí",
+   "reg": "input",
+   "addr": "0x0000",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "V",
+   "class": "voltage",
+   "state": "measurement"
+  },
+  {
+   "key": "current",
+   "name": "Current",
+   "name_cs": "Proud",
+   "reg": "input",
+   "addr": "0x0001",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "A",
+   "class": "current",
+   "state": "measurement"
+  },
+  {
+   "key": "power",
+   "name": "Power",
+   "name_cs": "Výkon",
+   "reg": "input",
+   "addr": "0x0002",
+   "type": "u32",
+   "precision": 1,
+   "order": "CDAB",
+   "scale": 0.1,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "energy",
+   "name": "Energy",
+   "name_cs": "Energie",
+   "reg": "input",
+   "addr": "0x0004",
+   "type": "u32",
+   "precision": 3,
+   "order": "CDAB",
+   "scale": 0.001,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  },
+  {
+   "key": "high_voltage_alarm",
+   "name": "High voltage alarm",
+   "name_cs": "Alarm vysokého napětí",
+   "reg": "input",
+   "addr": "0x0006",
+   "type": "u16",
+   "precision": 0,
+   "map": {
+    "0": "off",
+    "65535": "on"
+   }
+  },
+  {
+   "key": "low_voltage_alarm",
+   "name": "Low voltage alarm",
+   "name_cs": "Alarm nízkého napětí",
+   "reg": "input",
+   "addr": "0x0007",
+   "type": "u16",
+   "precision": 0,
+   "map": {
+    "0": "off",
+    "65535": "on"
+   }
+  },
+  {
+   "key": "high_voltage_threshold",
+   "name": "High voltage threshold",
+   "name_cs": "Práh vysokého napětí",
+   "reg": "holding",
+   "addr": "0x0000",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "V",
+   "class": "voltage",
+   "every": 0,
+   "category": "config",
+   "write": {
+    "kind": "number",
+    "min": 5,
+    "max": 350,
+    "step": 0.01
+   }
+  },
+  {
+   "key": "low_voltage_threshold",
+   "name": "Low voltage threshold",
+   "name_cs": "Práh nízkého napětí",
+   "reg": "holding",
+   "addr": "0x0001",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "V",
+   "class": "voltage",
+   "every": 0,
+   "category": "config",
+   "write": {
+    "kind": "number",
+    "min": 1,
+    "max": 350,
+    "step": 0.01
+   }
+  },
+  {
+   "key": "shunt",
+   "name": "Shunt",
+   "name_cs": "Bočník",
+   "reg": "holding",
+   "addr": "0x0003",
+   "type": "u16",
+   "precision": 0,
+   "every": 0,
+   "category": "config",
+   "map": {
+    "0": "100 A",
+    "1": "50 A",
+    "2": "200 A",
+    "3": "300 A"
+   },
+   "write": {
+    "kind": "select"
+   }
+  },
+  {
+   "key": "reset_energy",
+   "name": "Reset energy",
+   "name_cs": "Nulovat energii",
+   "reg": "none",
+   "category": "config",
+   "write": {
+    "kind": "button",
+    "fc": 66
+   }
+  }
+ ],
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 50,
+ "poll_s": 10
+}

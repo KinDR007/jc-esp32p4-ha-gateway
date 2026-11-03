@@ -40,6 +40,18 @@ menu "P4 gateway"
         int "P4 GPIO driving C6 IO9 / BOOT (JP1 17 -> 24)"
         default 20
 
+    config GW_RS485_UART_PORT
+        int "UART of the RS485 transceiver (MAX485, connector J4; docs/modbus.md)"
+        default 3
+
+    config GW_RS485_TX
+        int "P4 GPIO to the MAX485 (TX1); the board switches the direction from it"
+        default 26
+
+    config GW_RS485_RX
+        int "P4 GPIO from the MAX485 (RX1)"
+        default 27
+
     config GW_RADIO_B_UART_PORT
         int "UART to the external radio B (XIAO ESP32-C5 on JP1, docs/dual-radio.md)"
         default 2

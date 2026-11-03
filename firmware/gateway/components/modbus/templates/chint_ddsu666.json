@@ -1,0 +1,107 @@
+{
+ "schema": 1,
+ "id": "chint_ddsu666",
+ "manufacturer": "Chint",
+ "model": "DDSU666",
+ "category": "energy_meter",
+ "notes": "Single phase. 9600 Bd, address on the display (the manual shows 8N1 and mentions two stop bits: try 2 if no answer). Export energy not documented.",
+ "source": "https://github.com/lmatula/ha_chint_pm",
+ "serial": {
+  "baud": 9600,
+  "parity": "N",
+  "stop": 1
+ },
+ "max_regs": 20,
+ "max_gap": 4,
+ "entities": [
+  {
+   "key": "voltage",
+   "name": "Voltage",
+   "name_cs": "Napětí",
+   "reg": "holding",
+   "addr": "0x2000",
+   "type": "f32",
+   "precision": 1,
+   "unit": "V",
+   "class": "voltage",
+   "state": "measurement"
+  },
+  {
+   "key": "current",
+   "name": "Current",
+   "name_cs": "Proud",
+   "reg": "holding",
+   "addr": "0x2002",
+   "type": "f32",
+   "precision": 3,
+   "unit": "A",
+   "class": "current",
+   "state": "measurement"
+  },
+  {
+   "key": "power",
+   "name": "Power",
+   "name_cs": "Výkon",
+   "reg": "holding",
+   "addr": "0x2004",
+   "type": "f32",
+   "precision": 0,
+   "scale": 1000,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "reactive_power",
+   "name": "Reactive power",
+   "name_cs": "Jalový výkon",
+   "reg": "holding",
+   "addr": "0x2006",
+   "type": "f32",
+   "precision": 0,
+   "scale": 1000,
+   "unit": "var",
+   "class": "reactive_power",
+   "state": "measurement"
+  },
+  {
+   "key": "power_factor",
+   "name": "Power factor",
+   "name_cs": "Účiník",
+   "reg": "holding",
+   "addr": "0x200a",
+   "type": "f32",
+   "precision": 3,
+   "class": "power_factor",
+   "state": "measurement"
+  },
+  {
+   "key": "frequency",
+   "name": "Frequency",
+   "name_cs": "Frekvence",
+   "reg": "holding",
+   "addr": "0x200e",
+   "type": "f32",
+   "precision": 2,
+   "unit": "Hz",
+   "class": "frequency",
+   "state": "measurement"
+  },
+  {
+   "key": "import_energy",
+   "name": "Import energy",
+   "name_cs": "Odebraná energie",
+   "reg": "holding",
+   "addr": "0x4000",
+   "type": "f32",
+   "precision": 2,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  }
+ ],
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 50,
+ "poll_s": 10
+}

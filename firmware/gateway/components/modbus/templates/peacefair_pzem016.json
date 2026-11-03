@@ -1,0 +1,144 @@
+{
+ "schema": 1,
+ "id": "peacefair_pzem016",
+ "manufacturer": "Peacefair",
+ "model": "PZEM-016 / PZEM-014",
+ "category": "energy_meter",
+ "notes": "AC module. 9600 Bd 8N1. Address 1-247 (holding 0x0002); a single module on the bus also answers 248 (0xF8).",
+ "source": "https://rcscomponents.kiev.ua/datasheets/pzem-014_16.pdf",
+ "serial": {
+  "baud": 9600,
+  "parity": "N",
+  "stop": 1
+ },
+ "max_regs": 10,
+ "entities": [
+  {
+   "key": "voltage",
+   "name": "Voltage",
+   "name_cs": "Napětí",
+   "reg": "input",
+   "addr": "0x0000",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.1,
+   "unit": "V",
+   "class": "voltage",
+   "state": "measurement"
+  },
+  {
+   "key": "current",
+   "name": "Current",
+   "name_cs": "Proud",
+   "reg": "input",
+   "addr": "0x0001",
+   "type": "u32",
+   "precision": 3,
+   "order": "CDAB",
+   "scale": 0.001,
+   "unit": "A",
+   "class": "current",
+   "state": "measurement"
+  },
+  {
+   "key": "power",
+   "name": "Power",
+   "name_cs": "Výkon",
+   "reg": "input",
+   "addr": "0x0003",
+   "type": "u32",
+   "precision": 1,
+   "order": "CDAB",
+   "scale": 0.1,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "energy",
+   "name": "Energy",
+   "name_cs": "Energie",
+   "reg": "input",
+   "addr": "0x0005",
+   "type": "u32",
+   "precision": 3,
+   "order": "CDAB",
+   "scale": 0.001,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  },
+  {
+   "key": "frequency",
+   "name": "Frequency",
+   "name_cs": "Frekvence",
+   "reg": "input",
+   "addr": "0x0007",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.1,
+   "unit": "Hz",
+   "class": "frequency",
+   "state": "measurement"
+  },
+  {
+   "key": "power_factor",
+   "name": "Power factor",
+   "name_cs": "Účiník",
+   "reg": "input",
+   "addr": "0x0008",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "class": "power_factor",
+   "state": "measurement"
+  },
+  {
+   "key": "alarm",
+   "name": "Power alarm",
+   "name_cs": "Výkonový alarm",
+   "reg": "input",
+   "addr": "0x0009",
+   "type": "u16",
+   "precision": 0,
+   "map": {
+    "0": "off",
+    "65535": "on"
+   }
+  },
+  {
+   "key": "alarm_threshold",
+   "name": "Power alarm threshold",
+   "name_cs": "Práh výkonového alarmu",
+   "reg": "holding",
+   "addr": "0x0001",
+   "type": "u16",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "every": 0,
+   "category": "config",
+   "write": {
+    "kind": "number",
+    "min": 1,
+    "max": 23000,
+    "step": 1
+   }
+  },
+  {
+   "key": "reset_energy",
+   "name": "Reset energy",
+   "name_cs": "Nulovat energii",
+   "reg": "none",
+   "category": "config",
+   "write": {
+    "kind": "button",
+    "fc": 66
+   }
+  }
+ ],
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 50,
+ "poll_s": 10
+}

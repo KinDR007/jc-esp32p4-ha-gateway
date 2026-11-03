@@ -1,0 +1,121 @@
+{
+ "schema": 1,
+ "id": "orno_or_we_504",
+ "manufacturer": "ORNO",
+ "model": "OR-WE-504",
+ "category": "energy_meter",
+ "notes": "Single phase. 9600 Bd 8N1, address 1. Registers from community code (no ORNO document available): check the values against the display.",
+ "source": "https://github.com/apichlinski/orno-reader-domoticz/blob/master/plugin.py",
+ "serial": {
+  "baud": 9600,
+  "parity": "N",
+  "stop": 1
+ },
+ "max_regs": 16,
+ "entities": [
+  {
+   "key": "voltage",
+   "name": "Voltage",
+   "name_cs": "Napětí",
+   "reg": "holding",
+   "addr": "0x0000",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.1,
+   "unit": "V",
+   "class": "voltage",
+   "state": "measurement"
+  },
+  {
+   "key": "current",
+   "name": "Current",
+   "name_cs": "Proud",
+   "reg": "holding",
+   "addr": "0x0001",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.1,
+   "unit": "A",
+   "class": "current",
+   "state": "measurement"
+  },
+  {
+   "key": "frequency",
+   "name": "Frequency",
+   "name_cs": "Frekvence",
+   "reg": "holding",
+   "addr": "0x0002",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.1,
+   "unit": "Hz",
+   "class": "frequency",
+   "state": "measurement"
+  },
+  {
+   "key": "power",
+   "name": "Power",
+   "name_cs": "Výkon",
+   "reg": "holding",
+   "addr": "0x0003",
+   "type": "u16",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "reactive_power",
+   "name": "Reactive power",
+   "name_cs": "Jalový výkon",
+   "reg": "holding",
+   "addr": "0x0004",
+   "type": "u16",
+   "precision": 0,
+   "unit": "var",
+   "class": "reactive_power",
+   "state": "measurement"
+  },
+  {
+   "key": "apparent_power",
+   "name": "Apparent power",
+   "name_cs": "Zdánlivý výkon",
+   "reg": "holding",
+   "addr": "0x0005",
+   "type": "u16",
+   "precision": 0,
+   "unit": "VA",
+   "class": "apparent_power",
+   "state": "measurement"
+  },
+  {
+   "key": "power_factor",
+   "name": "Power factor",
+   "name_cs": "Účiník",
+   "reg": "holding",
+   "addr": "0x0006",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.001,
+   "class": "power_factor",
+   "state": "measurement"
+  },
+  {
+   "key": "energy",
+   "name": "Energy",
+   "name_cs": "Energie",
+   "reg": "holding",
+   "addr": "0x0007",
+   "type": "u32",
+   "precision": 3,
+   "scale": 0.001,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  }
+ ],
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 50,
+ "poll_s": 10
+}

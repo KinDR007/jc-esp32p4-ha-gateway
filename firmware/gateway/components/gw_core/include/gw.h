@@ -305,7 +305,8 @@ typedef enum {
     GW_MQTT_SOUND_EVENTS = 1 << 4, /* event and binary sensor per sound event */
     GW_MQTT_SOUND_TRIGGERS = 1 << 5, /* device trigger per sound event (the integration has none) */
     GW_MQTT_SENSORS = 1 << 6,      /* I2C sensors set to be exposed */
-    GW_MQTT_ALL = 0x7f,
+    GW_MQTT_MODBUS = 1 << 7,       /* Modbus devices set to MQTT (each its own device) */
+    GW_MQTT_ALL = 0xff,
 } gw_mqtt_group_t;
 /* Extra discovery entities (called on every connect) and extra keys in the state JSON; one pair per
  * component (up to 4). */
@@ -319,8 +320,12 @@ void gw_mqtt_entity(gw_mqtt_group_t group, const char *component, const char *ob
                     const char *value_template, void (*extra)(cJSON *cfg));
 /* Publishes a discovery config (unique_id, availability and device are added); cfg is consumed.
  * cfg NULL, discovery off or the group left out removes the entity. component "device_automation"
- * for device triggers. A cfg with its own "availability" list gets no availability_topic. */
+ * for device triggers. A cfg with its own "availability" list gets no availability_topic; one with its own
+ * "device" stays that device, connected via the gateway. */
 void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char *object_id, cJSON *cfg);
+/* Commands below the base topic (filter with + levels, e.g. "modbus/+/+/set"); fn gets the topic below the
+ * base and the payload (up to 63 bytes) in the MQTT task: it must not block. */
+void gw_mqtt_add_command(const char *filter, void (*fn)(const char *suffix, const char *payload));
 bool gw_mqtt_connected(void);
 /* "off" (not configured or disabled), "connected" or "disconnected" */
 const char *gw_mqtt_link(void);

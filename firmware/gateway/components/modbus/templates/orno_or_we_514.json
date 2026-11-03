@@ -1,0 +1,122 @@
+{
+ "schema": 1,
+ "id": "orno_or_we_514",
+ "manufacturer": "ORNO",
+ "model": "OR-WE-514 / OR-WE-515",
+ "category": "energy_meter",
+ "notes": "Single phase. 9600 Bd 8E1 (even parity), address 1. Tariff energies T1-T4 at 0xA002-0xA008.",
+ "source": "https://taphome.com/en/compatibility/orno-or-we-515/",
+ "serial": {
+  "baud": 9600,
+  "parity": "E",
+  "stop": 1
+ },
+ "max_regs": 40,
+ "max_gap": 10,
+ "entities": [
+  {
+   "key": "frequency",
+   "name": "Frequency",
+   "name_cs": "Frekvence",
+   "reg": "holding",
+   "addr": "0x0130",
+   "type": "u16",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "Hz",
+   "class": "frequency",
+   "state": "measurement"
+  },
+  {
+   "key": "voltage",
+   "name": "Voltage",
+   "name_cs": "Napětí",
+   "reg": "holding",
+   "addr": "0x0131",
+   "type": "u16",
+   "precision": 1,
+   "scale": 0.01,
+   "unit": "V",
+   "class": "voltage",
+   "state": "measurement"
+  },
+  {
+   "key": "current",
+   "name": "Current",
+   "name_cs": "Proud",
+   "reg": "holding",
+   "addr": "0x0139",
+   "type": "u32",
+   "precision": 3,
+   "scale": 0.001,
+   "unit": "A",
+   "class": "current",
+   "state": "measurement"
+  },
+  {
+   "key": "power",
+   "name": "Power",
+   "name_cs": "Výkon",
+   "reg": "holding",
+   "addr": "0x0140",
+   "type": "s32",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "reactive_power",
+   "name": "Reactive power",
+   "name_cs": "Jalový výkon",
+   "reg": "holding",
+   "addr": "0x0148",
+   "type": "s32",
+   "precision": 0,
+   "unit": "var",
+   "class": "reactive_power",
+   "state": "measurement"
+  },
+  {
+   "key": "apparent_power",
+   "name": "Apparent power",
+   "name_cs": "Zdánlivý výkon",
+   "reg": "holding",
+   "addr": "0x0150",
+   "type": "s32",
+   "precision": 0,
+   "unit": "VA",
+   "class": "apparent_power",
+   "state": "measurement"
+  },
+  {
+   "key": "power_factor",
+   "name": "Power factor",
+   "name_cs": "Účiník",
+   "reg": "holding",
+   "addr": "0x0158",
+   "type": "s16",
+   "precision": 2,
+   "scale": 0.001,
+   "class": "power_factor",
+   "state": "measurement"
+  },
+  {
+   "key": "energy",
+   "name": "Energy",
+   "name_cs": "Energie",
+   "reg": "holding",
+   "addr": "0xa000",
+   "type": "u32",
+   "precision": 2,
+   "scale": 0.01,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  }
+ ],
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 50,
+ "poll_s": 10
+}

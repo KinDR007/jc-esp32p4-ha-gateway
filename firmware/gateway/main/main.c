@@ -24,6 +24,7 @@
 #include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
+#include "modbus.h"
 #include "sensors.h"
 #include "sound.h"
 #include "sdkconfig.h"
@@ -636,6 +637,7 @@ void app_main(void)
     gw_i2c_init(); /* codec and I2C sensors; a failure leaves both off, not the gateway */
     sound_init();
     sensors_init();
+    modbus_init();
     gw_mqtt_start();
     gw_update_start();
     gw_inet_start();
