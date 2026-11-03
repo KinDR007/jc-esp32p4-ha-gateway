@@ -115,7 +115,8 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 
 **F1 MQTT a HA**
 - [x] F1.1 Výběr expozice MQTT po skupinách (roles, system, update, sound, sound_events) s předvolbou „Jen co integrace nemá“ (UI, API `discovery_groups`, NVS `mqtt_grp`, odstranění retained configů), TC46, UI24
-- [ ] F1.2 Aktualizace v HA i pro C5 a ESPHome proxy (průběh, poznámky, instalace), úpravy fw dle potřeby, test TC a ověření v UI HA
+- [x] F1.2 Aktualizace v HA i pro C5 (entita *C5 radio firmware*, integrace 1.5.0); ESPHome proxy je v balících rádií, změna jeho verze je ve shrnutí; testy `tests/ha_integration` (test_c5_update)
+- [ ] F1.2b Nasadit integraci 1.5.0 do HA a ověřit entity aktualizací v UI HA (s uživatelem)
 
 **F2 BLE proxy a rádia**
 - [ ] F2.1 ESPHome proxy: aktivní, `connection_slots: 5`, kontrola RAM C6/C5, diagnostické entity (RSSI Wi-Fi, uptime, volná RAM, volné sloty, verze)

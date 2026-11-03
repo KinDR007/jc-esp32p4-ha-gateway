@@ -154,6 +154,9 @@
     "update": {
       "c6_firmware": {
         "name": "C6 radio firmware"
+      },
+      "c5_firmware": {
+        "name": "C5 radio firmware"
       }
     }
   },

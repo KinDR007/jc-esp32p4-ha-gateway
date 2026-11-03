@@ -166,6 +166,9 @@
     "update": {
       "c6_firmware": {
         "name": "Firmware rádia C6"
+      },
+      "c5_firmware": {
+        "name": "Firmware rádia C5"
       }
     }
   },

@@ -320,6 +320,33 @@ async def test_c6_update(hass: HomeAssistant, gateway) -> None:
     assert ("/api/update/install", {"target": "c6"}) in gateway.posts
 
 
+async def test_c5_update(hass: HomeAssistant, gateway) -> None:
+    """Radio B with an ESP32-C5 gets the C5 package entity; install posts target c5, a listed release by its id."""
+    gateway.status["update"]["c5"] = {"offered": True, "available": True, "in_progress": False, "percent": 0,
+                                      "installed_id": "b6c56e01", "offered_id": "7f00aa11",
+                                      "installed_versions": {"esphome": "p4gw-ble-proxy 2026.10.1"},
+                                      "offered_versions": {"esphome": "p4gw-ble-proxy 2026.11.1"}}
+    gateway.status["update"]["releases"] = [{"version": "v1.9", "c5": "b6c56e01"}]
+    await setup_entry(hass, gateway)
+    c5 = entity_id(hass, "update", "c5_firmware")
+    state = hass.states.get(c5)
+    assert state.state == STATE_ON
+    assert state.attributes["installed_version"] == "b6c56e01" and state.attributes["latest_version"] == "7f00aa11"
+    assert "esphome: p4gw-ble-proxy 2026.10.1 → p4gw-ble-proxy 2026.11.1" in state.attributes["release_summary"]
+    await hass.services.async_call("update", "install", {"entity_id": c5}, blocking=True)
+    assert ("/api/update/install", {"target": "c5"}) in gateway.posts
+    await hass.services.async_call("update", "install", {"entity_id": c5, "version": "b6c56e01"}, blocking=True)
+    assert ("/api/update/install", {"target": "c5", "version": "v1.9"}) in gateway.posts
+
+
+async def test_no_c5_update_without_c5(hass: HomeAssistant, gateway) -> None:
+    """Radio B without an ESP32-C5 (or none): no C5 package entity."""
+    gateway.status["update"]["c5"] = {"offered": False, "installed_id": ""}
+    gateway.status["role"]["b"]["chip"] = "ESP32-C6"
+    await setup_entry(hass, gateway)
+    assert entity_id(hass, "update", "c5_firmware") is None
+
+
 async def test_rollback(hass: HomeAssistant, gateway) -> None:
     """A listed release is installed with update.install and its version (the C6 package by its id)."""
     gateway.status["update"]["releases"] = [{"version": "v1.7", "c6": "1b2c3d4e"}, {"version": "v1.6", "c6": "0cc0a7ad"}]

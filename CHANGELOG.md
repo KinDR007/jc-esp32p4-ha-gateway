@@ -15,6 +15,9 @@
   of `/api/mqtt`; the web UI offers the preset "Only what the integration lacks" (only the per-event
   sound entities), so the P4 Gateway integration and MQTT no longer show entities twice. A group left
   out is removed from Home Assistant, the state topics stay. Test TC46, UI24.
+- Home Assistant integration 1.5.0: update entity *C5 radio firmware* for an ESP32-C5 as radio B (the
+  C5 package with its firmwares, the ESPHome Bluetooth proxy included; install, progress, rollback to
+  a listed release), next to the C6 one.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.

@@ -113,6 +113,7 @@ MQTT, with or without a broker). The push connection reconnects by itself after 
 | `event.<host>_<event>`, `binary_sensor.<host>_<event>_active` | one pair per enabled sound event, attributes `class`, `score`, `level_db`, `name_cs`; events added on the gateway appear without a reload |
 | Firmware (update) | install with progress, from the online update manifest |
 | C6 radio firmware (update) | the package of all C6 firmwares from the same manifest; versions are the first 8 hex digits of its sha256, the release summary lists the firmwares that change; install downloads it into the gateway's RAM, stores it and restarts the gateway, which then updates the C6 |
+| C5 radio firmware (update) | only with an ESP32-C5 as radio B: the C5 package of the same manifest, like the C6 one (installs with `{"target": "c5"}`). Both packages carry every radio firmware, the ESPHome Bluetooth proxy included, so a new proxy shows up in the release summary (`esphome: … → …`) |
 | Restart, Identify, Back up Zigbee network, Check for update (buttons) | Zigbee backup only in a Zigbee role |
 | Notification (event) | every notification of the gateway: event type `info`, `warning` or `critical`, attributes `topic` (security, system, network, sound), `text`, `time`; for automations, e.g. forwarding to the phone |
 | Ethernet, Zigbee host connected, Push connection | binary sensors (push connection disabled by default) |
