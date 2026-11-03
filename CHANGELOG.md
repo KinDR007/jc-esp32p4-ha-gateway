@@ -41,6 +41,11 @@
   state and control, Wi-Fi uplink) and the consumers (Home Assistant, Zigbee2MQTT, MQTT broker,
   Telegram, web UI and API) with drawn links coloured by state, a details box per node with every
   flow through it and its traffic, and a table of all flows with a link to their settings. Test UI28.
+- Web UI: setup wizard, a panel at the bottom right that walks through every setting step by step
+  (account, LAN, radios and roles, Wi-Fi uplink, Thread, Zigbee, ESPHome, Home Assistant, MQTT,
+  notifications, sound, updates) on the real pages, with a check of each step's state; it opens by
+  itself while the gateway has no user account, later from System › Information, and continues after
+  the restart of a role switch. Test UI29.
 - UI tests UI06 and UI07 use the language and theme switches of the side bar again.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install

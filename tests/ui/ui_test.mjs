@@ -737,6 +737,39 @@ await test('UI28', 'Data flows: a node per active source, service and consumer, 
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 
+await test('UI29', 'Setup wizard: starts from System › Information, each step opens its page, survives a reload, finishing closes it', async () => {
+  await tab('system/info');
+  await page.click('#main [data-wiz=start]');
+  await page.waitForSelector('#wiz[open]');
+  const steps = await page.$$eval('#wiz [data-wiz-step]', b => b.map(x => x.dataset.wizStep));
+  check(steps[0] === 'welcome' && steps.at(-1) === 'done' && steps.includes('roles') && steps.includes('ha'), `${steps.length} steps: ${steps.join(', ')}`);
+  const routes = [];
+  for (let i = 1; i < steps.length; i++) {
+    await page.click('#wiz [data-wiz=next]');
+    await page.waitForTimeout(400);
+    routes.push(await page.evaluate(() => location.hash.slice(1)));
+    if (i === 2) {
+      await page.reload();
+      await page.waitForSelector('#wiz[open]', { timeout: 20000 });
+      check(await page.$eval('#wiz [data-wiz-step].cur', b => b.dataset.wizStep) === steps[2], `after a reload the wizard is back at ${steps[2]}`);
+    }
+  }
+  const known = await page.evaluate(() => NAV.flatMap(n => n.subs ? n.subs.flatMap(sb => sb.subs ? sb.subs.map(t => `${n.id}/${sb.id}/${t.id}`) : [`${n.id}/${sb.id}`]) : [n.id]));
+  check(routes.every(r => known.includes(r)), `every step opened a page of the UI (${routes.join(', ')})`);
+  check(await page.$('#wiz [data-wiz=finish]') !== null, 'the last step offers Finish');
+  await page.click('#wiz [data-wiz=finish]');
+  check(!(await page.$('#wiz[open]')) && await page.evaluate(() => localStorage.getItem('wizardSeen')) === 'done', 'finished: closed and not opened by itself again');
+  // first start: a gateway without user accounts opens the wizard by itself (status answered with auth off)
+  await page.route(base + 'api/status', async r => { const resp = await r.fetch(); r.fulfill({ response: resp, json: { ...(await resp.json()), auth: false } }); });
+  await page.evaluate(() => localStorage.removeItem('wizardSeen'));
+  await page.reload();
+  check(await page.waitForSelector('#wiz[open]', { timeout: 20000 }).then(() => true, () => false), 'without a user account the wizard opens by itself');
+  await page.click('#wiz [data-wiz=close]');
+  await page.unroute(base + 'api/status');
+  check(await page.evaluate(() => localStorage.getItem('wizardSeen')) === 'closed', 'closing it keeps it closed in this browser');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it
 async function legendClear(box) {
   return page.evaluate(box => {

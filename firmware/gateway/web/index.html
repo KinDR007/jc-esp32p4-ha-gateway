@@ -343,6 +343,18 @@ tr.ns-member td:first-child { padding-left: 22px; }
 .meter .progress > span.warn { background: var(--warn); } .meter .progress > span.bad { background: var(--bad); }
 .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
 #busy-dlg { max-width: 460px; }
+/* setup wizard: a panel at the bottom right that walks through the pages, the page stays usable */
+dialog.wizard { position: fixed; inset: auto 16px 16px auto; margin: 0; max-width: 420px; padding: 14px 16px; z-index: 50; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+.wizard .wz-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.wizard h4 { margin: 8px 0 6px; font-size: 16px; }
+.wizard p { margin: 0 0 8px; font-size: 14px; }
+.wizard .progress { height: 4px; margin: 8px 0 10px; }
+.wizard .wz-check { display: flex; gap: 6px; align-items: baseline; font-size: 13px; margin: 2px 0; }
+.wizard .wz-steps { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.wizard .wz-steps button { border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 6px; padding: 2px 7px; font-size: 12px; cursor: pointer; }
+.wizard .wz-steps button.cur { border-color: var(--accent); color: var(--accent); }
+.wizard .wz-steps button.done::before { content: '✓ '; color: var(--ok); }
+@media (max-width: 700px) { dialog.wizard { inset: auto 8px 8px 8px; max-width: none; width: auto; } }
 #busy-dlg .progress { height: 12px; margin: 14px 0 8px; }
 #busy-dlg .progress > div { transition: width .5s linear; }
 #busy-dlg .progress.ind > div { width: 30%; animation: ind 1.4s ease-in-out infinite; }
@@ -440,6 +452,7 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
     <div class="row" style="margin-top:12px"><button class="btn primary" value="ok">OK</button><button class="btn" value="cancel" formnovalidate>Cancel</button></div>
   </form>
 </dialog>
+<dialog id="wiz" class="wizard" aria-labelledby="wiz-title" data-notr></dialog>
 <dialog id="busy-dlg" aria-live="polite">
   <h3 style="margin-top:0" id="busy-title" data-notr></h3>
   <div class="muted" id="busy-stage" data-notr></div>
@@ -1193,6 +1206,7 @@ const ICONS = {
   'account-group-outline': 'M12,5A3.5,3.5 0 0,0 8.5,8.5A3.5,3.5 0 0,0 12,12A3.5,3.5 0 0,0 15.5,8.5A3.5,3.5 0 0,0 12,5M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M5.5,8A2.5,2.5 0 0,0 3,10.5C3,11.44 3.53,12.25 4.29,12.68C4.65,12.88 5.06,13 5.5,13C5.94,13 6.35,12.88 6.71,12.68C7.08,12.47 7.39,12.17 7.62,11.81C6.89,10.86 6.5,9.7 6.5,8.5C6.5,8.41 6.5,8.31 6.5,8.22C6.2,8.08 5.86,8 5.5,8M18.5,8C18.14,8 17.8,8.08 17.5,8.22C17.5,8.31 17.5,8.41 17.5,8.5C17.5,9.7 17.11,10.86 16.38,11.81C16.5,12 16.63,12.15 16.78,12.3C16.94,12.45 17.1,12.58 17.29,12.68C17.65,12.88 18.06,13 18.5,13C18.94,13 19.35,12.88 19.71,12.68C20.47,12.25 21,11.44 21,10.5A2.5,2.5 0 0,0 18.5,8M12,14C9.66,14 5,15.17 5,17.5V19H19V17.5C19,15.17 14.34,14 12,14M4.71,14.55C2.78,14.78 0,15.76 0,17.5V19H3V17.07C3,16.06 3.69,15.22 4.71,14.55M19.29,14.55C20.31,15.22 21,16.06 21,17.07V19H24V17.5C24,15.76 21.22,14.78 19.29,14.55M12,16C13.53,16 15.24,16.5 16.23,17H7.77C8.76,16.5 10.47,16 12,16Z',
   'account-multiple-outline': 'M13.07 10.41A5 5 0 0 0 13.07 4.59A3.39 3.39 0 0 1 15 4A3.5 3.5 0 0 1 15 11A3.39 3.39 0 0 1 13.07 10.41M5.5 7.5A3.5 3.5 0 1 1 9 11A3.5 3.5 0 0 1 5.5 7.5M7.5 7.5A1.5 1.5 0 1 0 9 6A1.5 1.5 0 0 0 7.5 7.5M16 17V19H2V17S2 13 9 13 16 17 16 17M14 17C13.86 16.22 12.67 15 9 15S4.07 16.31 4 17M15.95 13A5.32 5.32 0 0 1 18 17V19H22V17S22 13.37 15.94 13Z',
   'account-plus-outline': 'M15,4A4,4 0 0,0 11,8A4,4 0 0,0 15,12A4,4 0 0,0 19,8A4,4 0 0,0 15,4M15,5.9C16.16,5.9 17.1,6.84 17.1,8C17.1,9.16 16.16,10.1 15,10.1A2.1,2.1 0 0,1 12.9,8A2.1,2.1 0 0,1 15,5.9M4,7V10H1V12H4V15H6V12H9V10H6V7H4M15,13C12.33,13 7,14.33 7,17V20H23V17C23,14.33 17.67,13 15,13M15,14.9C17.97,14.9 21.1,16.36 21.1,17V18.1H8.9V17C8.9,16.36 12,14.9 15,14.9Z',
+  'auto-fix': 'M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.34,12.78L15.78,10.34L13.66,8.22L11.22,10.66L13.34,12.78M14.37,7.29L16.71,9.63C17.1,10 17.1,10.65 16.71,11.04L5.04,22.71C4.65,23.1 4,23.1 3.63,22.71L1.29,20.37C0.9,20 0.9,19.35 1.29,18.96L12.96,7.29C13.35,6.9 14,6.9 14.37,7.29Z',
   'backup-restore': 'M12,3A9,9 0 0,0 3,12H0L4,16L8,12H5A7,7 0 0,1 12,5A7,7 0 0,1 19,12A7,7 0 0,1 12,19C10.5,19 9.09,18.5 7.94,17.7L6.5,19.14C8.04,20.3 9.94,21 12,21A9,9 0 0,0 21,12A9,9 0 0,0 12,3M14,12A2,2 0 0,0 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12Z',
   'bell-cog-outline': 'M22.72 19.5C22.74 19.33 22.75 19.17 22.75 19S22.74 18.67 22.72 18.5L23.77 17.68C23.87 17.61 23.89 17.5 23.83 17.36L22.83 15.64C22.77 15.53 22.64 15.5 22.53 15.53L21.28 16C21 15.83 20.75 15.66 20.44 15.54L20.25 14.21C20.23 14.09 20.13 14 20 14H18C17.88 14 17.77 14.09 17.75 14.21L17.57 15.54C17.25 15.66 17 15.83 16.72 16L15.5 15.53C15.37 15.5 15.23 15.53 15.17 15.64L14.17 17.36C14.11 17.5 14.14 17.61 14.23 17.68L15.29 18.5C15.27 18.67 15.25 18.84 15.25 19S15.27 19.33 15.29 19.5L14.23 20.32C14.14 20.39 14.11 20.53 14.17 20.64L15.17 22.37C15.23 22.5 15.37 22.5 15.5 22.5L16.72 21.97C17 22.17 17.25 22.34 17.57 22.47L17.75 23.79C17.77 23.91 17.88 24 18 24H20C20.13 24 20.23 23.91 20.25 23.79L20.44 22.47C20.75 22.34 21 22.17 21.28 21.97L22.53 22.5C22.64 22.5 22.77 22.5 22.83 22.37L23.83 20.64C23.89 20.53 23.87 20.39 23.77 20.32L22.72 19.5M19 20.75C18.04 20.75 17.25 19.97 17.25 19S18.04 17.25 19 17.25 20.75 18.03 20.75 19 19.97 20.75 19 20.75M12.08 20H3V19L5 17V11C5 7.9 7 5.2 10 4.3V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.3C17 5.2 19 7.9 19 11V12C18.31 12 17.63 12.11 17 12.29V11C17 8.2 14.8 6 12 6S7 8.2 7 11V18H12.08C12.03 18.33 12 18.66 12 19C12 19.34 12.03 19.67 12.08 20M12.3 21C12.5 21.6 12.74 22.17 13.06 22.69C12.75 22.88 12.39 23 12 23C10.9 23 10 22.1 10 21H12.3Z',
   'bell-ring-outline': 'M10,21H14A2,2 0 0,1 12,23A2,2 0 0,1 10,21M21,19V20H3V19L5,17V11C5,7.9 7.03,5.17 10,4.29C10,4.19 10,4.1 10,4A2,2 0 0,1 12,2A2,2 0 0,1 14,4C14,4.1 14,4.19 14,4.29C16.97,5.17 19,7.9 19,11V17L21,19M17,11A5,5 0 0,0 12,6A5,5 0 0,0 7,11V18H17V11M19.75,3.19L18.33,4.61C20.04,6.3 21,8.6 21,11H23C23,8.07 21.84,5.25 19.75,3.19M1,11H3C3,8.6 3.96,6.3 5.67,4.61L4.25,3.19C2.16,5.25 1,8.07 1,11Z',
@@ -1202,6 +1216,8 @@ const ICONS = {
   'bridge': 'M7,14V10.91C6.28,10.58 5.61,10.18 5,9.71V14H7M5,18H3V16H1V14H3V7H5V8.43C6.8,10 9.27,11 12,11C14.73,11 17.2,10 19,8.43V7H21V14H23V16H21V18H19V16H5V18M17,10.91V14H19V9.71C18.39,10.18 17.72,10.58 17,10.91M16,14V11.32C15.36,11.55 14.69,11.72 14,11.84V14H16M13,14V11.96L12,12L11,11.96V14H13M10,14V11.84C9.31,11.72 8.64,11.55 8,11.32V14H10Z',
   'cellphone-key': 'M7 1C5.9 1 5 1.9 5 3V7H7V4H17V20H7V17H5V21C5 22.1 5.9 23 7 23H17C18.1 23 19 22.1 19 21V3C19 1.9 18.1 1 17 1H7M6 9C4.3 9 3 10.3 3 12S4.3 15 6 15C7.3 15 8.4 14.2 8.8 13H11V15H13V13H15V11H8.8C8.4 9.8 7.3 9 6 9M6 11C6.6 11 7 11.4 7 12S6.6 13 6 13 5 12.6 5 12 5.4 11 6 11Z',
   'check': 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z',
+  'chevron-left': 'M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z',
+  'chevron-right': 'M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z',
   'chip': 'M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z',
   'clock-outline': 'M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z',
   'close': 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
@@ -1705,8 +1721,113 @@ function maintenanceBanner() {
 
   if (r.maintenance) html += `<div class="alert bad"><b>Maintenance mode:</b> ${esc(r.maintenance)}</div>`;
   if (!status.auth) html += `<div class="alert" data-notr>${L('No user account yet: anyone on the LAN can switch roles and read the Thread network key. Create an admin account under',
-    'Zatím žádný uživatelský účet: kdokoli v LAN může přepínat role a číst klíč sítě Thread. Vytvořte účet správce v')} <a href="#system/users/list">${L('System › User management', 'Systém › Správa uživatelů')}</a>.</div>`;
+    'Zatím žádný uživatelský účet: kdokoli v LAN může přepínat role a číst klíč sítě Thread. Vytvořte účet správce v')} <a href="#system/users/list">${L('System › User management', 'Systém › Správa uživatelů')}</a>
+    ${L('or let the', 'nebo nechte')} <a href="#" data-wiz="start">${L('setup wizard', 'průvodce nastavením')}</a> ${L('walk you through everything.', 'provést vším.')}</div>`;
   return html;
+}
+
+/* ---------------- setup wizard ----------------
+ * Walks through the pages that set the gateway up, one step each; the page itself is shown and used
+ * as always, the panel explains the step and checks its state. Opens by itself while the gateway has
+ * no user account (first start) until finished or closed in this browser, later from System ›
+ * Information. The step survives a restart (a role switch restarts the gateway). */
+function wizSteps() {
+  const s = status, r = s.role, b = r.b || {}, ln = s.links || {}, e = s.eth, rs = s.role_status || {};
+  const thr = protoStatus('thread'), zb = protoStatus('zigbee');
+  const esp = [r.active, b.active].includes('esphome'), wifiOn = !!wifiUplink();
+  return [
+    { id: 'welcome', route: 'overview', title: L('Welcome', 'Vítejte'), text: L(`This wizard goes through everything the gateway ${s.hostname} needs: account, network, radios and their networks, Home Assistant, notifications, sound and updates. Each step opens its page; change what you need there and go on. Steps can be skipped and the wizard started again later from System › Information.`,
+      `Průvodce projde vše, co brána ${s.hostname} potřebuje: účet, síť, rádia a jejich sítě, Home Assistant, oznámení, zvuk a aktualizace. Každý krok otevře svou stránku; změňte tam, co potřebujete, a pokračujte. Kroky lze přeskočit a průvodce později spustit znovu ze Systém › Informace.`),
+      checks: [[true, L(`firmware ${s.version}, address ${e.ipv4 || s.hostname + '.local'}`, `firmware ${s.version}, adresa ${e.ipv4 || s.hostname + '.local'}`)]] },
+    { id: 'account', route: 'system/users/list', title: L('Administrator account', 'Účet správce'), text: L('Without an account anyone on the LAN can switch roles and read the Thread network key. Create the first user: it becomes the administrator. Two-factor sign-in and API tokens are set up on the same pages.',
+      'Bez účtu může kdokoli v LAN přepínat role a číst klíč sítě Thread. Vytvořte prvního uživatele: stane se správcem. Dvoufázové přihlášení a API tokeny se nastavují na stejných stránkách.'),
+      checks: [[s.auth, s.auth ? L('user accounts on', 'uživatelské účty zapnuté') : L('no account yet', 'zatím žádný účet')]], skip: !perm('system/users/list') },
+    { id: 'lan', route: 'system/lan', title: 'LAN', text: L('DHCP is fine for most networks; a static address or a fixed lease on the router keeps the gateway at one address for Home Assistant and Zigbee2MQTT. A change has to be confirmed from the new address.',
+      'Pro většinu sítí stačí DHCP; statická adresa nebo pevný lease na routeru drží bránu na jedné adrese pro Home Assistant a Zigbee2MQTT. Změnu je třeba potvrdit z nové adresy.'),
+      checks: [[e.link, e.link ? L(`link ${e.speed} Mb/s`, `linka ${e.speed} Mb/s`) : L('no Ethernet link', 'bez linky Ethernet')], [!!e.ipv4, e.ipv4 ? `${e.mode === 'static' ? L('static', 'statická') : 'DHCP'} ${e.ipv4}` : L('no address', 'bez adresy')]] },
+    { id: 'roles', route: 'radios/roles', title: L('Radios and their roles', 'Rádia a jejich role'), text: L('Radio A (the C6 of the board) and the optional radio B on JP1 each run one role: Thread border router or router, Zigbee coordinator or router, ESPHome Bluetooth proxy or Wi-Fi uplink. At most one Thread and one Zigbee network. A switch restarts the gateway; the wizard continues afterwards.',
+      'Rádio A (C6 na desce) a volitelné rádio B na JP1 mají každé jednu roli: Thread border router nebo router, Zigbee koordinátor nebo router, ESPHome Bluetooth proxy nebo Wi-Fi uplink. Nejvýš jedna síť Thread a jedna Zigbee. Přepnutí restartuje bránu; průvodce pak pokračuje.'),
+      checks: [[r.active !== 'none' && !r.maintenance, L(`radio A: ${ROLES[r.active]?.name || 'none'}`, `rádio A: ${ROLES[r.active]?.name || 'žádná'}`) + (r.maintenance ? ` (${r.maintenance})` : '')],
+        ...(b.wired || (b.desired && b.desired !== 'none') ? [[!b.maintenance, L(`radio B: ${ROLES[b.active]?.name || 'off'}`, `rádio B: ${ROLES[b.active]?.name || 'vypnuto'}`)]] : [])] },
+    { id: 'wifi', route: 'system/wifi', title: 'Wi-Fi', text: L('With the Wi-Fi uplink role a radio connects the gateway to the home Wi-Fi: as the only connection where there is no Ethernet, or as a backup that takes over when the LAN fails.',
+      'S rolí Wi-Fi uplink připojí rádio bránu do domácí Wi-Fi: jako jediné připojení tam, kde není Ethernet, nebo jako záloha, která převezme provoz při výpadku LAN.'),
+      checks: [[wifiUplink()?.state === 'connected', wifiOn ? wifiState(wifiUplink()) : L('optional, no radio runs it', 'volitelné, žádné rádio ji neprovozuje')]], skip: !wifiOn },
+    { id: 'thread', route: 'thread/settings', title: 'Thread', text: L('The border router forms its own Thread network or joins the one of Home Assistant: paste the dataset TLVs from Home Assistant (Settings › Thread) to share one network with Matter devices. The Home Assistant guide shows the OTBR integration.',
+      'Border router vytvoří vlastní síť Thread nebo se připojí k síti Home Assistant: vložte TLV datasetu z Home Assistant (Nastavení › Thread) a sdílejte jednu síť se zařízeními Matter. Návod Home Assistant ukazuje integraci OTBR.'),
+      checks: [[thr.phase === 'running', `${esc(thr.network_name || '')} · ${thr.role || ''}`]], skip: !isThread() },
+    { id: 'zigbee', route: 'zigbee/info', title: 'Zigbee', text: L('Coordinator: point Zigbee2MQTT to the TCP address shown on the page (adapter zboss). Router: put your Zigbee network into pairing mode, the radio joins it.',
+      'Koordinátor: nastavte v Zigbee2MQTT TCP adresu ze stránky (adaptér zboss). Router: přepněte svou síť Zigbee do párovacího režimu, rádio se připojí.'),
+      checks: [[zb.client_connected || zb.router?.joined, zigbeeRole() === 'zigbee_coordinator' ? (zb.client_connected ? `Zigbee2MQTT ${zb.client}` : L('Zigbee2MQTT not connected', 'Zigbee2MQTT nepřipojen')) : (zb.router?.state || '')]], skip: !isZigbee() },
+    { id: 'esphome', route: 'esphome', title: L('ESPHome Bluetooth proxy', 'ESPHome Bluetooth proxy'), text: L('Set the Wi-Fi of the proxy here; Home Assistant then finds it (Settings › Devices › Discovered) and adopts it with its own key.',
+      'Tady nastavte Wi-Fi proxy; Home Assistant ji pak najde (Nastavení › Zařízení › Objeveno) a převezme ji s vlastním klíčem.'),
+      checks: [[[s.role_status, s.role_status_b].some(x => x?.improv === 'provisioned'), L('proxy on Wi-Fi', 'proxy na Wi-Fi')]], skip: !esp },
+    { id: 'ha', route: 'ha/guide', title: 'Home Assistant', text: L('Install the P4 Gateway integration (HACS): it finds the gateway by itself and brings roles, sound events, updates and diagnostics into Home Assistant without a broker.',
+      'Nainstalujte integraci P4 Gateway (HACS): bránu najde sama a přinese do Home Assistant role, zvukové události, aktualizace a diagnostiku bez brokeru.'),
+      checks: [[ln.ha_clients > 0, ln.ha_clients > 0 ? L('integration connected', 'integrace připojena') : L('integration not connected yet', 'integrace zatím nepřipojena')]] },
+    { id: 'mqtt', route: 'ha/mqtt', title: L('MQTT (optional)', 'MQTT (volitelné)'), text: L('For Node-RED, other systems or Home Assistant without the integration. With the integration choose Only what the integration lacks under Advanced, so no entity shows up twice.',
+      'Pro Node-RED, jiné systémy nebo Home Assistant bez integrace. S integrací zvolte v Pokročilých Jen co integrace nemá, aby žádná entita nebyla dvakrát.'),
+      checks: [[ln.mqtt !== 'disconnected', { connected: L('connected', 'připojeno'), disconnected: L('broker not reachable', 'broker nedostupný') }[ln.mqtt] || L('off', 'vypnuto')]] },
+    { id: 'notify', route: 'system/notify', title: L('Notifications', 'Oznámení'), text: L('A Telegram bot sends notifications (restarts, network faults, updates, sound events) and takes commands with confirmation; users pair their chat on their profile page.',
+      'Telegram bot posílá oznámení (restarty, výpadky sítí, aktualizace, zvukové události) a přijímá příkazy s potvrzením; uživatelé si svůj chat spárují na stránce profilu.'),
+      checks: [[true, L('optional', 'volitelné')]], skip: !perm('system/notify') },
+    { id: 'sound', route: 'sound/events', title: L('Sound recognition', 'Rozpoznávání zvuku'), text: L('The microphone and YAMNet recognise sounds on the gateway (doorbell, dog, alarm, glass, speech…). Pick the events that go to Home Assistant; learned sounds add your own.',
+      'Mikrofon a YAMNet rozpoznávají zvuky přímo v bráně (zvonek, pes, alarm, sklo, řeč…). Vyberte události, které jdou do Home Assistant; naučené zvuky přidají vaše vlastní.'),
+      checks: [[true, L('optional', 'volitelné')]] },
+    { id: 'updates', route: 'system/firmware/online', title: L('Updates', 'Aktualizace'), text: L('The gateway checks the releases on GitHub and offers new firmware for itself and the radios; Home Assistant shows them as update entities.',
+      'Brána kontroluje vydání na GitHubu a nabízí nový firmware pro sebe i rádia; Home Assistant je ukazuje jako entity aktualizací.'),
+      checks: [[!!s.update?.url, s.update?.url ? L(`checking ${s.update.url === s.update.default_url ? 'GitHub releases' : s.update.url}`, `kontroluje ${s.update.url === s.update.default_url ? 'vydání na GitHubu' : s.update.url}`) : L('online update off', 'online aktualizace vypnutá')]] },
+    { id: 'done', route: 'flows', title: L('Done', 'Hotovo'), text: L('The gateway is set up. Data flows shows where everything goes; the wizard starts again from System › Information.',
+      'Brána je nastavená. Toky dat ukazují, kam co teče; průvodce se znovu spouští ze Systém › Informace.'), checks: [] },
+  ].filter(x => !x.skip);
+}
+let wiz = null;
+try { wiz = JSON.parse(localStorage.getItem('wizard') || 'null'); } catch (e) { /* storage blocked */ }
+function wizSave() { try { localStorage.setItem('wizard', JSON.stringify(wiz)); } catch (e) { /* storage blocked */ } }
+function wizOpen(step) {
+  wiz = { step: step || 'welcome' };
+  wizSave();
+  wizShow(true);
+}
+function wizClose(finished) {
+  wiz = null;
+  try { localStorage.removeItem('wizard'); localStorage.setItem('wizardSeen', finished ? 'done' : 'closed'); } catch (e) { /* storage blocked */ }
+  $('#wiz').close();
+}
+function wizShow(navigate) {
+  if (!wiz || !status) return;
+  const steps = wizSteps(), i = Math.max(0, steps.findIndex(x => x.id === wiz.step)), st = steps[i];
+  if (navigate && route() !== st.route) go(st.route);
+  const ok = x => x.checks.every(c => c[0]);
+  $('#wiz').innerHTML = `<div class="wz-head">${ic('auto-fix')}<span>${L('Setup wizard', 'Průvodce nastavením')} · ${i + 1} / ${steps.length}</span><span class="spacer"></span>
+      <button class="btn sm" data-wiz="close" title="${L('Close the wizard', 'Zavřít průvodce')}">${ic('close')}</button></div>
+    <div class="progress"><div style="width:${(i + 1) / steps.length * 100}%"></div></div>
+    <h4 id="wiz-title">${esc(st.title)}</h4><p>${esc(st.text)}</p>
+    ${st.checks.map(c => `<div class="wz-check">${c[0] ? `<span class="ok-text">✓</span>` : `<span class="warn-text">!</span>`}<span>${c[1]}</span></div>`).join('')}
+    <div class="wz-steps">${steps.map((x, j) => `<button data-wiz-step="${x.id}" class="${j === i ? 'cur' : ''} ${j < i && ok(x) ? 'done' : ''}">${esc(x.title)}</button>`).join('')}</div>
+    <div class="row" style="justify-content:flex-end">${i ? `<button class="btn" data-wiz="back">${ic('chevron-left')}${L('Back', 'Zpět')}</button>` : ''}
+      ${i < steps.length - 1 ? `<button class="btn primary" data-wiz="next">${L('Next', 'Další')}${ic('chevron-right')}</button>`
+        : `<button class="btn primary" data-wiz="finish">${ic('check')}${L('Finish', 'Dokončit')}</button>`}</div>`;
+  if (!$('#wiz').open) $('#wiz').show();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-wiz], [data-wiz-step]');
+  if (!t || !wiz && !t.dataset.wiz) return;
+  e.preventDefault();
+  if (t.dataset.wiz === 'start') return wizOpen();
+  if (t.dataset.wiz === 'close') return wizClose(false);
+  if (t.dataset.wiz === 'finish') return wizClose(true);
+  if (!wiz) return;
+  const steps = wizSteps(), i = steps.findIndex(x => x.id === wiz.step);
+  wiz.step = t.dataset.wizStep || steps[Math.max(0, Math.min(steps.length - 1, i + (t.dataset.wiz === 'back' ? -1 : 1)))].id;
+  wizSave();
+  wizShow(true);
+});
+/* first start: no user account yet and the wizard neither finished nor closed in this browser */
+function wizAuto() {
+  let seen = null;
+  try { seen = localStorage.getItem('wizardSeen'); } catch (e) { /* storage blocked */ }
+  if (wiz) wizShow(false);
+  else if (status && !status.auth && !seen) wizOpen();
 }
 
 /* ---------------- views ---------------- */
@@ -2770,7 +2891,8 @@ views['system/info'] = () => {
   const s = status, h = s.heap, hw = s.hw || {};
   const slots = s.slots.map(x => `<tr><td>${esc(x.label)}${tip('slot:' + x.label)}</td><td>${esc(x.project || '—')}</td><td>${esc(x.version || '')}</td>
     <td>${esc(x.built || '')}</td><td>${esc(x.state || '')}</td><td>${x.running ? pill('ok', 'running') : ''}${x.boot && !x.running ? pill('warn', 'next boot') : ''}</td></tr>`).join('');
-  return maintenanceBanner() + `<div class="grid">
+  return maintenanceBanner() + `<div class="card" style="margin-bottom:16px"><div class="row">${ic('auto-fix')}<span style="flex:1">${L('The setup wizard goes through every setting of the gateway step by step.', 'Průvodce nastavením projde krok za krokem všechna nastavení brány.')}</span>
+      <button class="btn primary" data-wiz="start">${ic('auto-fix')}${L('Start the setup wizard', 'Spustit průvodce nastavením')}</button></div></div><div class="grid">
     <div class="card wide">${h3('harddisk', 'Firmware slots')}<div class="table-wrap"><table>
       <tr>${['Slot', 'Project', 'Version', 'Built', 'State'].map(th).join('')}<th></th></tr>${slots}</table></div></div>
     <div class="card">${h3('developer-board', 'ESP32-P4')}${dl([
@@ -5058,6 +5180,7 @@ function render(full) {
   }
   if (navRole !== radioRoles().join()) renderNav();
   renderHeader();
+  if (wiz && $('#wiz').open && !$('#wiz').contains(document.activeElement)) wizShow(false);
   const main = $('#main');
   /* Forms keep their input: only redraw passive pages on every poll. */
   const editing = document.activeElement?.matches?.('#main input, #main select');
@@ -5113,7 +5236,7 @@ async function loadMe() {
   renderNav();
 }
 history.replaceState(null, '', '#' + route());
-loadMe().then(poll).then(() => render(true));
+loadMe().then(poll).then(() => { render(true); wizAuto(); });
 setInterval(pollLog, 1500);
 </script>
 </body>

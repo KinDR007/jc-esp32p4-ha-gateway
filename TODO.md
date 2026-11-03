@@ -134,9 +134,9 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F3.5 UI testy UI01–UI28 na bráně prošly (UI06/UI07 opraveny na přepínače v postranním panelu); snímky dokumentace zůstávají v bodu „Přefotit snímky“
 
 **F4 Konfigurační průvodce**
-- [ ] F4.1 Návrh kroků (účet → síť → rádia a role → Thread/Zigbee/ESPHome → MQTT/HA/Telegram → zvuk → aktualizace), pokračování po restartu
-- [ ] F4.2 Modální okno, první spuštění automaticky, později ručně
-- [ ] F4.3 Testy: čistá deska, upgrade, přerušení
+- [x] F4.1 Kroky: úvod, účet, LAN, role, Wi-Fi, Thread, Zigbee, ESPHome, HA, MQTT, oznámení, zvuk, aktualizace, hotovo (nepoužité se vynechají); krok přežije restart
+- [x] F4.2 Vyskakovací panel vpravo dole nad skutečnými stránkami (žádné duplicitní formuláře), sám při bráně bez účtu, ručně ze Systém › Informace a z upozornění „žádný účet“
+- [x] F4.3 UI29: průchod všemi kroky, obnovení po reloadu, dokončení, samootevření bez účtu, zavření
 
 **F5 API dokumentace**
 - [ ] F5.1 Úplná dokumentace API (od tokenu po příkazy) na GitHub Pages

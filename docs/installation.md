@@ -83,6 +83,11 @@ factory image. To replace the model on a running board: turn sound off, restart,
 4. Open `http://p4gw-xxxxxx.local/`. The gateway is in maintenance mode.
 5. **Radios › Status and maintenance › Back up C6 flash** (about 3.5 min) and keep the file.
 6. **System › User management**: an admin account. **Radios › Roles**: choose the role of each radio.
+   The setup wizard (it opens by itself while the gateway has no user account, later from
+   **System › Information**) goes through these and every other setting step by step: account, LAN,
+   radios and roles, Wi-Fi uplink, Thread, Zigbee, ESPHome, Home Assistant, MQTT, notifications,
+   sound, updates. Each step opens its page and checks its state; the step survives the restart of a
+   role switch. Steps that do not apply (no Thread role, no Zigbee role, …) are left out.
 
 The gateway never overwrites a C6 it has not flashed itself until a backup is done or skipped
 explicitly.
