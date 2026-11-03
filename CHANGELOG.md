@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v1.10 (2026-11-03)
+
+Summary: Data flows page, setup wizard, HTTP API reference (System › API, `/api/help`, docs/api.md),
+MQTT discovery per group (no duplicates next to the P4 Gateway integration), Radios › Roles as a table,
+traffic in the header tooltips, Wi-Fi uplink (and ESPHome on the C5) as radio slots (switching offline),
+ESPHome proxy with 5 connections and diagnostics, Home Assistant integration 1.5.0 (C5 update entity),
+64 kB more internal RAM, flash layout v4 (optional USB migration, the release also runs on v3).
 
 - Flash layout v4: the `esphome` slot (unused since v1.8) goes to the gateway slots, 3 -> 4 MB each
   (28 % free with the current image instead of 4.5 %). Migration over USB once with
