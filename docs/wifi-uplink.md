@@ -90,7 +90,12 @@ esp_hosted`): host and co-processor must run the same major version, so the pin 
   any other chip, so the gateway builds it from the pinned checkout with a patch that accepts a
   known chip with a warning (`firmware/gateway/patches/esp_hosted_any_cp.patch`).
 - In access point plus station mode the radio has one channel: when the station joins a network
-  on another channel, the phone on the setup access point drops and has to join again.
+  on another channel, the phone on the setup access point drops and has to join again. While the
+  access point is open the station retries only once a minute (each scan takes the radio off the
+  access point's channel) and not at all while a phone is joined.
+- The web server once stopped answering on port 80 after many setup access point runs (ping and
+  port 8081 still answered; cause unknown). The gateway now asks its own web server every 60 s and
+  after three misses aborts with a core dump (`/api/coredump`) and restarts.
 - lwIP has one DNS list and each DHCP answer replaces it: the gateway keeps the servers of the LAN and
   of the Wi-Fi and puts back those of the interface carrying the traffic (the Wi-Fi in standby does not
   replace the LAN's; LAN gone, the Wi-Fi's apply). The IDF option for DNS per interface

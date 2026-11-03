@@ -238,8 +238,9 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
             s_wifi.disconnects++;
             gw_notify("network", GW_NOTIFY_WARNING, "Wi-Fi uplink lost %s: %s", s_wifi.ssid, s_wifi.error);
         }
-        /* back off: 2, 4, 8 ... 60 s */
-        uint32_t delay_s = s_wifi.retries < 5 ? 2u << s_wifi.retries : RETRY_MAX_S;
+        /* back off: 2, 4, 8 ... 60 s; a minute while the setup access point is open (a scan takes the
+         * radio off its channel) */
+        uint32_t delay_s = s_wifi.retries < 5 && !s_portal.on ? 2u << s_wifi.retries : RETRY_MAX_S;
         s_wifi.retries++;
         s_wifi.retry_at_us = esp_timer_get_time() + (int64_t)(delay_s > RETRY_MAX_S ? RETRY_MAX_S : delay_s) * 1000000;
         ESP_LOGW(TAG, "%s: %s, retry in %lu s", s_wifi.ssid, s_wifi.error, (unsigned long)delay_s);

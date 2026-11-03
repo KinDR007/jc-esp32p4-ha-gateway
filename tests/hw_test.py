@@ -1766,13 +1766,20 @@ def _dns_a(server, name, src_ip):
         sock.bind((src_ip, 0))
         sock.settimeout(3)
         for attempt in range(5):
-            sock.sendto(q, (server, 53))
+            try:
+                sock.sendto(q, (server, 53))
+            except OSError:
+                if attempt == 4:
+                    raise
+                time.sleep(2)
+                continue
             try:
                 r = sock.recv(512)
                 break
-            except socket.timeout:
+            except OSError:  # timeout, or no route while the station rejoins
                 if attempt == 4:
                     raise
+                time.sleep(2)
     return socket.inet_ntoa(r[-4:]) if r[7] else None
 
 

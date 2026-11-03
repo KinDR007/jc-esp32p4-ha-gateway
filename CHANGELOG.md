@@ -14,6 +14,8 @@
   can swap the roles of radio A and B to move the Wi-Fi. API: `/api/net/wifi`, `/api/net/wifi/scan`,
   `/api/net/wifi/traffic`, `POST /api/role {"swap": true}`, `POST /api/net/lan/outage` (failover test).
   Home Assistant integration and Telegram `/role` know the role. Tests TC41–TC45.
+- The gateway checks its own web server every minute; three misses in a row restart it with a
+  core dump.
 - Fix: after the manifest URL was changed, the offer of the old URL stayed installable when the
   check of the new one failed. A changed URL now drops the old offer first; a failed check of the
   same URL still keeps it (server down).

@@ -5,9 +5,11 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "gw.h"
+#include "lwip/sockets.h"
 
 static const char *TAG = "gw_http";
 
@@ -244,6 +246,47 @@ void gw_http_push(const char *topic, const char *payload)
     }
 }
 
+/* ---- self check ----
+ * The web server stopped accepting connections once while the rest of the gateway ran (Wi-Fi uplink
+ * tests, docs/wifi-uplink.md). Every minute the gateway fetches its own favicon over 127.0.0.1; after
+ * three misses in a row it aborts: the core dump holds the backtrace of the task that blocked, and
+ * the restart brings the web UI back. */
+#define SELF_CHECK_MS (60 * 1000)
+#define SELF_CHECK_MISSES 3
+
+static bool self_check_once(void)
+{
+    int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
+        return true; /* no socket free: not the server's fault */
+    }
+    struct timeval tv = {.tv_sec = 10};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(80), .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    static const char req[] = "GET /favicon.ico HTTP/1.0\r\n\r\n";
+    char buf[16];
+    bool ok = connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0 && send(fd, req, sizeof(req) - 1, 0) > 0 &&
+              recv(fd, buf, sizeof(buf), 0) > 0;
+    close(fd);
+    return ok;
+}
+
+static void self_check_task(void *arg)
+{
+    int misses = 0;
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(SELF_CHECK_MS));
+        misses = self_check_once() ? 0 : misses + 1;
+        if (misses) {
+            ESP_LOGW(TAG, "self check: no answer from the web server (%d of %d)", misses, SELF_CHECK_MISSES);
+        }
+        if (misses >= SELF_CHECK_MISSES) {
+            esp_system_abort("web server not answering");
+        }
+    }
+}
+
 esp_err_t gw_http_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -267,6 +310,7 @@ esp_err_t gw_http_start(void)
                       .ws_pre_handshake_cb = ws_auth};
     httpd_register_uri_handler(s_server, &ws);
     s_push_queue = xQueueCreate(PUSH_QUEUE_LEN, sizeof(char *));
+    xTaskCreate(self_check_task, "http_check", 3072, NULL, 2, NULL);
     ESP_LOGI(TAG, "web UI on port %d", config.server_port);
     return ESP_OK;
 }

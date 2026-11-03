@@ -100,4 +100,6 @@
 - [ ] `dependencies.lock` zapisuje cestu záplatované kopie esp_hosted absolutně (správce komponent)
 - [ ] Test matice: Zigbee koordinátor přes Wi-Fi (#6), ESPHome + uplink (#10), odpojené rádio B (#13), soak přes Wi-Fi (#16) až na vyžádání
 - [ ] Automatická role Wi-Fi na rádiu A u brány bez LAN od první instalace (zatím volba v UI)
+- [ ] Webový server (port 80) jednou přestal odpovídat po TC44 (ping i 8081 šly); vlastní kontrola teď restartuje s coredumpem, příčinu zjistit z coredumpu, až se to zopakuje
+- [ ] TC32 (statická adresa LAN) občas selže: internet zmizí ~75 s po přepnutí, místní MQTT jede; nejspíš router po uvolnění DHCP, neověřeno
 
