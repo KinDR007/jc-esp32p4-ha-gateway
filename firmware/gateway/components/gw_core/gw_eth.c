@@ -31,6 +31,27 @@ static bool s_link_up;
 static uint32_t s_link_changes;
 static int64_t s_link_down_us;
 static esp_netif_t *s_uplink; /* the Wi-Fi uplink, docs/wifi-uplink.md */
+/* lwIP has one DNS list for all interfaces and each DHCP answer replaces it: the servers of the
+ * interface carrying the traffic are put back (the Wi-Fi in standby must not replace the LAN's) */
+static esp_netif_dns_info_t s_lan_dns[2], s_uplink_dns[2];
+
+static void dns_save(esp_netif_t *netif, esp_netif_dns_info_t dns[2])
+{
+    for (int i = 0; i < 2; i++) {
+        if (esp_netif_get_dns_info(netif, i ? ESP_NETIF_DNS_BACKUP : ESP_NETIF_DNS_MAIN, &dns[i]) != ESP_OK) {
+            memset(&dns[i], 0, sizeof(dns[i]));
+        }
+    }
+}
+
+static void dns_apply(esp_netif_t *netif, esp_netif_dns_info_t dns[2])
+{
+    for (int i = 0; i < 2; i++) {
+        if (dns[i].ip.type == ESP_IPADDR_TYPE_V4 && dns[i].ip.u_addr.ip4.addr) {
+            esp_netif_set_dns_info(netif, i ? ESP_NETIF_DNS_BACKUP : ESP_NETIF_DNS_MAIN, &dns[i]);
+        }
+    }
+}
 static esp_timer_handle_t s_outage_timer;
 /* an outage test goes on across a software restart (the border router moving to the uplink restarts) */
 #define OUTAGE_MAGIC 0x4c414e30
@@ -468,6 +489,9 @@ static void on_eth_event(void *arg, esp_event_base_t base, int32_t id, void *dat
         s_link_changes++;
         s_link_down_us = esp_timer_get_time();
         xEventGroupClearBits(s_events, BIT_IP4 | BIT_IP6);
+        if (gw_net_uplink()) {
+            dns_apply(s_uplink, s_uplink_dns);
+        }
         ESP_LOGW(TAG, "link down");
         break;
     default:
@@ -480,6 +504,7 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
     if (id == IP_EVENT_ETH_GOT_IP) {
         ip_event_got_ip_t *event = data;
         ESP_LOGI(TAG, "IPv4 " IPSTR, IP2STR(&event->ip_info.ip));
+        dns_save(s_netif, s_lan_dns);
         xEventGroupSetBits(s_events, BIT_IP4);
     } else if (id == IP_EVENT_GOT_IP6) {
         ip_event_got_ip6_t *event = data;
@@ -559,6 +584,10 @@ void gw_net_uplink_ip(esp_netif_t *netif, bool up)
 {
     s_uplink = netif;
     if (up) {
+        dns_save(netif, s_uplink_dns);
+        if (gw_eth_has_ip()) {
+            dns_apply(s_netif, s_lan_dns);
+        }
         xEventGroupSetBits(s_events, BIT_UPLINK);
     } else {
         xEventGroupClearBits(s_events, BIT_UPLINK);

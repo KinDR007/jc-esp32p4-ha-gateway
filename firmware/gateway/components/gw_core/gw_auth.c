@@ -821,6 +821,7 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/net/wifi", HTTP_POST, "system/lan", 2},
     {"/api/net/wifi/traffic", -1, "system/lan", 1},
     {"/api/net/wifi/scan", -1, "system/lan", 2},
+    {"/api/net/wifi/restart", -1, "system/lan", 2},
     {"/api/net/scan", HTTP_GET, "system/netscan", 1},
     {"/api/net/scan", HTTP_POST, "system/netscan", 2},
     {"/api/ota/gateway", -1, "system/firmware", 2},

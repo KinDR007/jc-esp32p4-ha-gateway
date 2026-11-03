@@ -27,9 +27,11 @@ static const char *TAG = "role_wifi";
 #define UART_BAUD 921600  /* firmware/c6/wifi_uplink/sdkconfig.overlay */
 #define POLL_MS 5000      /* signal and channel refresh while connected */
 #define BRINGUP_RETRY_S 30
+#define RPC_FAILS_MAX 3   /* polls without an answer from the radio before it is restarted */
 #define RETRY_MAX_S 60
 
-#define EV_APPLY BIT0 /* worker task notification: settings changed */
+#define EV_APPLY BIT0   /* worker task notifications: settings changed */
+#define EV_RESTART BIT1 /* restart the radio (API) */
 
 /* Setup access point (captive portal): open, only after a start without LAN and without a Wi-Fi
  * connection, and only for a few minutes, longer while a phone is on it. */
@@ -51,7 +53,9 @@ static struct {
     uint8_t channel;
     char phy[8];
     uint8_t reason;       /* last disconnect reason (wifi_err_reason_t) */
-    uint32_t connects, disconnects, retries;
+    uint32_t connects, disconnects, retries, restarts;
+    int rpc_fails;
+    int hang_test_s;      /* API: hold the radio in reset this long without telling the host */
     int64_t connected_us, retry_at_us;
     bool has_ip;
     bool fixed;           /* static IPv4 */
@@ -511,7 +515,7 @@ static void portal_check(void)
     }
 }
 
-static void wifi_task(void *arg)
+static void bring_up(void)
 {
     s_wifi.state = "starting";
     while (host_up() != ESP_OK) {
@@ -521,11 +525,64 @@ static void wifi_task(void *arg)
         s_wifi.state = "starting";
     }
     s_wifi.up = true;
+    s_wifi.rpc_fails = 0;
+}
+
+/* The radio stopped answering (seen after the setup access point closed): the host goes down, the
+ * radio is reset and everything comes up again. */
+static void restart_radio(const char *why)
+{
+    ESP_LOGW(TAG, "radio %c restarted: %s", 'A' + s_wifi.radio, why);
+    gw_notify("network", GW_NOTIFY_WARNING, "Wi-Fi uplink: radio %c restarted (%s)", 'A' + s_wifi.radio, why);
+    s_wifi.up = false;
+    s_wifi.restarts++;
+    s_wifi.has_ip = false;
+    s_wifi.connected_us = 0;
+    gw_net_uplink_ip(s_wifi.netif, false);
+    esp_netif_action_disconnected(s_wifi.netif, NULL, 0, NULL);
+    if (s_portal.on) {
+        portal_stop("radio restart");
+    }
+    esp_wifi_deinit(); /* frees the host's channels also when the radio does not answer */
+    esp_hosted_deinit();
+    /* the radio's start adds the station netif to lwIP again: out of it first (a stop event of a
+     * radio that still answered comes within the pause) */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_netif_action_stop(s_wifi.netif, NULL, 0, NULL);
+    bring_up();
+    station_apply();
+}
+
+static void wifi_task(void *arg)
+{
+    bring_up();
     ESP_LOGI(TAG, "radio %c: co-processor %s up", 'A' + s_wifi.radio, s_wifi.cp_version);
     station_apply();
     while (true) {
         uint32_t ev = 0;
         xTaskNotifyWait(0, UINT32_MAX, &ev, pdMS_TO_TICKS(POLL_MS));
+        if (ev & EV_RESTART) {
+            if (s_wifi.hang_test_s) {
+                /* the radio held in reset looks hung to the host: the poll below finds it */
+                c6_hold_reset(s_wifi.radio, true);
+                vTaskDelay(pdMS_TO_TICKS(s_wifi.hang_test_s * 1000));
+                c6_hold_reset(s_wifi.radio, false);
+                s_wifi.hang_test_s = 0;
+            } else {
+                restart_radio("requested");
+                continue;
+            }
+        }
+        /* liveness: an RPC the co-processor answers in any state */
+        esp_hosted_coprocessor_fwver_t ver;
+        if (esp_hosted_get_coprocessor_fwversion(&ver) != 0) {
+            if (++s_wifi.rpc_fails >= RPC_FAILS_MAX) {
+                restart_radio("no answer");
+                continue;
+            }
+        } else {
+            s_wifi.rpc_fails = 0;
+        }
         if (ev & EV_APPLY) {
             station_apply();
         } else if (s_wifi.retry_at_us && esp_timer_get_time() >= s_wifi.retry_at_us && !s_portal.clients) {
@@ -561,6 +618,7 @@ static cJSON *wifi_status(void)
     }
     cJSON_AddNumberToObject(j, "connects", s_wifi.connects);
     cJSON_AddNumberToObject(j, "disconnects", s_wifi.disconnects);
+    cJSON_AddNumberToObject(j, "radio_restarts", s_wifi.restarts);
     cJSON_AddNumberToObject(j, "last_reason", s_wifi.reason);
     cJSON_AddStringToObject(j, "ip_mode", s_wifi.fixed ? "static" : "dhcp");
     cJSON_AddBoolToObject(j, "default_route", s_wifi.netif && esp_netif_get_default_netif() == s_wifi.netif);
@@ -687,6 +745,28 @@ static esp_err_t wifi_post(httpd_req_t *req)
     return wifi_get(req);
 }
 
+/* {} restarts the radio; {"hang_test_s": 20} holds it in reset without telling the host, a test of
+ * the watchdog. */
+static esp_err_t wifi_restart_post(httpd_req_t *req)
+{
+    cJSON *body = req->content_len ? gw_http_read_json(req) : NULL;
+    if (req->content_len && !body) {
+        return ESP_OK;
+    }
+    cJSON *hang = cJSON_GetObjectItem(body, "hang_test_s");
+    int hang_s = cJSON_IsNumber(hang) ? hang->valueint : 0;
+    cJSON_Delete(body);
+    if (!s_wifi.task || !s_wifi.up) {
+        return gw_http_send_error(req, 409, "the Wi-Fi uplink does not run");
+    }
+    if (hang_s < 0 || hang_s > 60) {
+        return gw_http_send_error(req, 400, "hang_test_s: 0..60");
+    }
+    s_wifi.hang_test_s = hang_s;
+    xTaskNotify(s_wifi.task, EV_RESTART, eSetBits);
+    return gw_http_send_json(req, cJSON_CreateObject());
+}
+
 static esp_err_t wifi_traffic_get(httpd_req_t *req)
 {
     return gw_http_send_json(req, gw_traffic_json(GW_TRAFFIC_WIFI));
@@ -733,6 +813,7 @@ void role_wifi_init(void)
     gw_http_register("/api/net/wifi", HTTP_POST, wifi_post);
     gw_http_register("/api/net/wifi/traffic", HTTP_GET, wifi_traffic_get);
     gw_http_register("/api/net/wifi/scan", HTTP_GET, wifi_scan_get);
+    gw_http_register("/api/net/wifi/restart", HTTP_POST, wifi_restart_post);
 }
 
 esp_err_t role_wifi_start(c6_radio_t radio)

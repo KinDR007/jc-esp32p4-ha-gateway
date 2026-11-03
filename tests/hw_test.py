@@ -1760,11 +1760,19 @@ def tc43_wifi_wrong_network():
 def _dns_a(server, name, src_ip):
     q = os.urandom(2) + b'\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00'
     q += b''.join(bytes([len(p)]) + p.encode() for p in name.split('.')) + b'\x00\x00\x01\x00\x01'
+    # retried like a phone's resolver: a scan of the station takes the radio off the access point's
+    # channel for a few seconds
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind((src_ip, 0))
         sock.settimeout(3)
-        sock.sendto(q, (server, 53))
-        r = sock.recv(512)
+        for attempt in range(5):
+            sock.sendto(q, (server, 53))
+            try:
+                r = sock.recv(512)
+                break
+            except socket.timeout:
+                if attempt == 4:
+                    raise
     return socket.inet_ntoa(r[-4:]) if r[7] else None
 
 

@@ -120,6 +120,3 @@ CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM=y
 CONFIG_EH_HOST_PORT_DMA_PREFER_SPIRAM=y
 CONFIG_ESP_HOSTED_HOST_FEAT_WIFI_EXT_ITWT=n
 CONFIG_ESP_HOSTED_HOST_LOG_LEVEL_WARN=y
-# DNS servers per interface: those of the interface with the default route (Ethernet while its link
-# is up), not the ones the last DHCP answer brought (the Wi-Fi uplink in standby)
-CONFIG_ESP_NETIF_SET_DNS_PER_DEFAULT_NETIF=y
