@@ -432,20 +432,24 @@
   "page": "overview__router",
   "cards": [
    {
-    "title": "ROLE",
+    "title": "",
     "file": "overview__router__1"
    },
    {
-    "title": "NETWORK",
+    "title": "MAIN BOARD: ESP32-P4",
     "file": "overview__router__2"
    },
    {
-    "title": "ESP32-P4",
+    "title": "LAN: ETHERNET OF THE P4",
     "file": "overview__router__3"
    },
    {
-    "title": "ESP32-C6 RADIO",
+    "title": "RADIO A: ESP32-C6 · INTERNAL",
     "file": "overview__router__4"
+   },
+   {
+    "title": "RADIO B: ESP32-C5 · EXTERNAL, JP1",
+    "file": "overview__router__5"
    }
   ]
  },

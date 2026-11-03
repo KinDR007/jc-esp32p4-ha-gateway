@@ -560,8 +560,8 @@ LABELS = {
     "howto": T("How to", "Postup"), "full": T("Whole page", "Celá stránka"), "shots": T("Screenshots", "Snímky obrazovky"),
     "zigbee_shot": T("in the Zigbee coordinator role", "v roli Zigbee koordinátor"), "router_shot": T("in the Zigbee router role", "v roli Zigbee router"),
     "dialogs": T("Dialogs", "Dialogy"), "api": T("HTTP API", "HTTP API"),
-    "foot": T("Screenshots: firmware v1.10, dark theme, English (Zigbee router pages: older firmware). The board, network names and addresses are those of the test setup.",
-              "Snímky: firmware v1.10, tmavý vzhled, angličtina (stránky Zigbee routeru: starší firmware). Deska, názvy sítí a adresy jsou z testovací instalace."),
+    "foot": T("Screenshots: firmware v1.10, dark theme, English. The board, network names and addresses are those of the test setup.",
+              "Snímky: firmware v1.10, tmavý vzhled, angličtina. Deska, názvy sítí a adresy jsou z testovací instalace."),
 }
 
 SECTION_ICONS = {"overview": "view-dashboard-outline", "role": "swap-horizontal", "thread": "thread", "zigbee": "zigbee", "sound": "waveform",

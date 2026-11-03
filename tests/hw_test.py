@@ -469,7 +469,7 @@ def tc26_zigbee_backup():
     check(after.get('generation', 0) == before.get('generation', 0) + 1, f'new generation {after.get("generation")}')
     check(abs(after.get('saved', 0) - time.time()) < 120, 'saved time is now')
     check(status()['c6']['chip']['flashes'] == flashes, 'nothing flashed')
-    check('Zigbee network backup: ESP_OK' in logs_since(0), 'backup logged')
+    check('Zigbee network backup of radio A: ESP_OK' in logs_since(0), 'backup logged')
     r = wait_until('router joined', lambda: (lambda rs: rs if (rs.get('router') or {}).get('joined') else None)(status()['role_status'] or {}), 60)['router']
     check(True, f'router back in its network after {time.time() - t0:.0f} s: pan {r["pan_id"]}')
     switch('thread_br')

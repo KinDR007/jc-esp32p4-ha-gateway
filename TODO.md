@@ -38,7 +38,7 @@
 - [x] Dvě rádia F6: ESPHome BLE proxy jako role rádia (C6/C5), Wi-Fi přes Improv, ESPHome na P4 zrušeno
 - [ ] ESPHome na rádiu: připojení k Wi-Fi a převzetí v HA ověřit s Wi-Fi uživatele (TC09 s nastavenou Wi-Fi)
 - [x] Dvě rádia F7–F8: UI (Role, Rádia, ESPHome, hlavička, přehled, menu dle rádia), HA 1.4.0, Telegram, dokumentace
-- [ ] Zigbee router rádia A: znovu připojit do sítě (záloha ztracena během vývoje F3), pak TC23
+- [x] Zigbee router rádia A znovu v síti Zigbee2MQTT (PAN 0x1a62, kanál 11; párování otevřeno přes `/api/zigbee/net/request`, 2026-11-03); TC23 a TC26 prošly (TC26: text zprávy o záloze opraven)
 - [x] Vydání v1.8.1 (dvě rádia; tag v1.8 bez vydání, CI chyba ESPHome)
 - [ ] Nasazení HA integrace 1.4.0; HW testy (Wi-Fi ESPHome, TC38, router) příště; soak až na pokyn
 - [x] Krok B v kódu: layout v3 (c6fw 64 kB, model 6 MB), balík C6 v noinit PSRAM, stažení při potřebě, migrační skript
@@ -83,7 +83,8 @@
 - [ ] Sledovat: po flashi přes USB jednou přestalo odpovídat HTTP (TCP 80 otevřený, ping OK) do ~10 min po startu, bez logu; po resetu nereprodukováno
 - [x] UI testy UI06/UI07 přepsány na přepínače `#seg-lang`/`#seg-theme` (2026-11-03), UI25 prošel
 - [x] Snímky dokumentace přefoceny na v1.10 (fáze thread a zigbee, nové stránky Toky dat, Wi-Fi, API, průvodce, tooltip MQTT), 2026-11-03
-- [ ] Snímky fáze `router` (Zigbee router rádia A) až router bude znovu v síti; dialogy 2FA a párování Telegramu jen s přihlášeným uživatelem (ne API tokenem)
+- [x] Snímky fáze `router` přefoceny na v1.10
+- [ ] Dialogy 2FA a párování Telegramu přefotit s přihlášeným uživatelem (API token je spustit nemůže)
 - [x] Rádio B v UI se stejnými údaji a akcemi jako rádio A (přehled, Stav a údržba: přeflashování, záloha flash, firmwary)
 - [x] Úplný sken na rádiu A i B (C5: 5 GHz, šířka, standardy), oprava WPA3 hlášené jako otevřená (skener 1.1.0); TC20 prošel
 - [x] Nové balíky c6fw/c5fw (skener 1.1.0) ve vydání v1.9

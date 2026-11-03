@@ -1,0 +1,43 @@
+  09:13:00 radio B esphome switched off for the run
+  09:13:15 ok: radio B none started ('')
+TC23 C6 slots layout: a role switch only selects the slot, the Zigbee router keeps its network.
+  09:13:15 ok: c6fw carries the slots layout
+  09:13:29 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  09:13:29 ok: thread_br started without maintenance ('')
+  09:13:29 ok: active role is thread_br
+  09:13:29 switch took 14 s
+  09:13:43 back after restart: active=zigbee_router c6=zigbee_router uptime=11s
+  09:13:43 ok: zigbee_router started without maintenance ('')
+  09:13:43 ok: active role is zigbee_router
+  09:13:43 switch took 14 s
+  09:13:43 ok: zigbee_router: layout already on the C6, not written again
+  09:13:43 ok: zigbee_router: slot selected
+  09:13:54 ok: router back in its network: pan 0x1a62, channel 11
+  09:14:13 back after restart: active=thread_br c6=ot_rcp uptime=17s
+  09:14:13 ok: thread_br started without maintenance ('')
+  09:14:13 ok: active role is thread_br
+  09:14:13 switch took 19 s
+  09:14:13 ok: thread_br: layout already on the C6, not written again
+  09:14:13 ok: thread_br: slot selected
+  09:14:29 ok: Thread attached as child
+  09:14:29 ok: switches done in under a minute: zigbee_router 14 s, thread_br 19 s
+TC23 PASS (74 s) 
+
+TC26 Zigbee backup on request: refused outside Zigbee, router data saved with its time, router rejoins.
+  09:14:29 ok: refused in the Thread role (only in a Zigbee role)
+  09:14:29 ok: interval other than 0, 1, 7 refused
+  09:14:29 ok: weekly set
+  09:14:49 back after restart: active=zigbee_router c6=zigbee_router uptime=17s
+  09:14:49 ok: zigbee_router started without maintenance ('')
+  09:14:49 ok: active role is zigbee_router
+  09:14:49 switch took 19 s
+  09:14:59 ok: backup requested
+  09:15:13 back after restart: active=zigbee_router c6=zigbee_router uptime=11s
+  09:15:13 ok: new generation 94
+  09:15:13 ok: saved time is now
+  09:15:13 ok: nothing flashed
+TC26 FAIL (44 s) backup logged
+
+  09:15:28 ok: radio B esphome started ('')
+  09:15:28 radio B esphome again
+Summary: TC23 PASS, TC26 FAIL
