@@ -103,3 +103,47 @@
 - [ ] Webový server (port 80) jednou přestal odpovídat po TC44 (ping i 8081 šly); vlastní kontrola teď restartuje s coredumpem, příčinu zjistit z coredumpu, až se to zopakuje
 - [ ] TC32 (statická adresa LAN) občas selže: internet zmizí ~75 s po přepnutí, místní MQTT jede; nejspíš router po uvolnění DHCP, neověřeno
 
+
+## Rozšíření funkcí (zadání add_.md, 2026-11-03)
+Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 v4a (zrušit `esphome`, sloty 2 × 4 MB), model YAMNet zůstává ve flash (6 MB), Role s přepínačem list / tabulka / dlaždice, online help z popisu API v bráně + úplná dokumentace na GitHub Pages.
+
+**F0 Příprava**
+- [x] F0.1 Rozpracované změny zacommitované (707a67a); `dependencies.lock` s absolutní cestou zůstává mimo commit (viz Wi-Fi uplink)
+- [ ] F0.2 Rozpočet RAM/PSRAM: mapa využití, kandidáti na přesun do PSRAM s ohledem na stabilitu
+- [ ] F0.3 Layout v4a: `partitions.csv` (gw_a 0x20000 4 MB, gw_b 0x420000 4 MB, od `c6fw` beze změny), migrační skript přes USB, kontrola layoutu u OTA a releases.json, test upgradu z v1.9 a rollbacku, dokumentace
+
+**F1 MQTT a HA**
+- [ ] F1.1 Výběr expozice MQTT po kategoriích s předvolbou „jen co integrace nemá“ (UI, API, NVS, odstranění retained configů), test TC
+- [ ] F1.2 Aktualizace v HA i pro C5 a ESPHome proxy (průběh, poznámky, instalace), úpravy fw dle potřeby, test TC a ověření v UI HA
+
+**F2 BLE proxy a rádia**
+- [ ] F2.1 ESPHome proxy: aktivní, `connection_slots: 5`, kontrola RAM C6/C5, diagnostické entity (RSSI Wi-Fi, uptime, volná RAM, volné sloty, verze)
+- [ ] F2.2 Rozbor flash rádií: co se vejde do slotu, přepíná se slotem; ESPHome (1,45–1,5 MB) celým flashem; na C5 (8 MB) zvážit ESPHome jako slot
+- [ ] F2.3 Testy: TC09 rozšířený (aktivní připojení, sloty), regrese rolí
+
+**F3 Web UI**
+- [ ] F3.1 Tooltipy v přehledu HW (první karta a její položky)
+- [ ] F3.2 Tooltipy štítků v hlavičce s datovým provozem (fw: počítadla ETH, Wi-Fi, Thread, MQTT v `/api/status`)
+- [ ] F3.3 Rádia › Role: kompaktní výpis s přepínačem list / tabulka / dlaždice
+- [ ] F3.4 Vizualizace HW flow s tooltipy a prokliky do nastavení, bez CDN
+- [ ] F3.5 UI testy, snímky dokumentace
+
+**F4 Konfigurační průvodce**
+- [ ] F4.1 Návrh kroků (účet → síť → rádia a role → Thread/Zigbee/ESPHome → MQTT/HA/Telegram → zvuk → aktualizace), pokračování po restartu
+- [ ] F4.2 Modální okno, první spuštění automaticky, později ručně
+- [ ] F4.3 Testy: čistá deska, upgrade, přerušení
+
+**F5 API dokumentace**
+- [ ] F5.1 Úplná dokumentace API (od tokenu po příkazy) na GitHub Pages
+- [ ] F5.2 Online help v UI z kompaktního popisu API v bráně, příklady z aktuálních hodnot
+- [ ] F5.3 Test shody dokumentace s endpointy
+
+**F6 Zvuk**
+- [ ] F6.1 Audio ring 10 s → 20 s jen při změřeném přínosu
+
+**F7 Uzavření**
+- [ ] F7.1 Úplná regrese (soak jen na pokyn)
+- [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání)
+
+**F8 Odloženo**
+- [ ] F8.1 AirTag přes BLE proxy: rešerše proveditelnosti, test s reálným AirTagem
