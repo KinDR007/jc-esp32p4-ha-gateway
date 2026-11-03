@@ -1,0 +1,481 @@
+  06:05:58 radio B esphome switched off for the run
+  06:06:13 ok: radio B none started ('')
+TC01 First start keeps the factory C6 and reports maintenance.
+TC01 FAIL (0 s) no role active on first start
+
+TC02 A UART role is refused until the C6 is backed up or the backup is skipped.
+TC02 FAIL (0 s) role switch refused with c6_backup_required
+
+TC03 Full C6 flash dump over JP1 (also proves the jumpers and the ROM loader link).
+TC03 FAIL (0 s) backup HTTP 200 (got 409 {'error': 'only in maintenance mode (no active role)'})
+
+TC04 Thread border router: C6 gets ot_rcp, network forms, OTBR REST and CLI work.
+  06:06:22 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  06:06:22 ok: thread_br started without maintenance ('')
+  06:06:22 ok: active role is thread_br
+  06:06:22 switch took 9 s
+  06:06:22 ok: C6 runs ot_rcp
+  06:06:22 ok: Thread role router, network MyHome284238473, channel 25, RCP openthread-esp32/721025a-; esp32c6;  2026-10-31 05:17:10 UTC
+  06:06:22 ok: border routing running
+  06:06:22 ok: dataset TLVs readable
+  06:06:22 ok: border agent active, SRP stopped, NAT64 idle (role router)
+  06:06:22 ok: OTBR REST /node on port 8081 (200)
+  06:06:22 ok: OTBR REST active dataset (200)
+  06:06:22 ok: web CLI state: ['router']
+TC04 PASS (10 s) 
+
+TC05 Zigbee coordinator: C6 gets zigbee_ncp, TCP bridge accepts a client, NCP answers after reset.
+  06:06:36 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=10s
+  06:06:36 ok: zigbee_coordinator started without maintenance ('')
+  06:06:36 ok: active role is zigbee_coordinator
+  06:06:36 switch took 13 s
+  06:06:36 ok: C6 runs zigbee_ncp
+  06:06:39 ok: NCP sent 553 B after reset (UART link alive)
+  06:06:39 ok: no UART errors
+  06:06:40 ok: TCP client registered (192.168.88.189)
+  06:06:41 ok: client disconnect detected
+TC05 PASS (19 s) 
+
+TC06 Leaving and re-entering the coordinator saves and restores its network data.
+  06:07:00 back after restart: active=thread_br c6=ot_rcp uptime=16s
+  06:07:00 ok: thread_br started without maintenance ('')
+  06:07:00 ok: active role is thread_br
+  06:07:00 switch took 18 s
+  06:07:00 ok: snapshot of zigbee_ncp saved ({'bundle': 'zigbee_ncp', 'radio': 'b', 'size': 17408, 'generation': 6, 'saved': 1793442573})
+  06:07:02 ok: Thread network unchanged after a Zigbee detour
+  06:07:20 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=16s
+  06:07:20 ok: zigbee_coordinator started without maintenance ('')
+  06:07:20 ok: active role is zigbee_coordinator
+  06:07:20 switch took 18 s
+  06:07:20 ok: zb_storage restored on return to the coordinator
+  06:07:20 ok: snapshot generation unchanged (no extra save)
+TC06 PASS (39 s) 
+
+TC07 Zigbee router: C6 gets the router firmware and reports status over the line protocol.
+  06:07:39 back after restart: active=zigbee_router c6=zigbee_router uptime=16s
+  06:07:39 ok: zigbee_router started without maintenance ('')
+  06:07:39 ok: active role is zigbee_router
+  06:07:39 switch took 19 s
+  06:07:39 ok: C6 runs zigbee_router
+  06:07:43 ok: router state idle, channel 255, ieee 9c139efffec404d0
+  06:07:43 ok: command accepted
+  06:07:43 ok: coordinator snapshot still kept while the router runs
+TC07 PASS (23 s) 
+
+TC08 Thread router: idle without dataset, joins after the dataset is applied.
+  06:08:02 back after restart: active=thread_router c6=ot_rcp uptime=17s
+  06:08:02 ok: thread_router started without maintenance ('')
+  06:08:02 ok: active role is thread_router
+  06:08:02 switch took 19 s
+  06:08:03 ok: C6 runs ot_rcp
+  06:08:03 ok: router mode
+  06:08:03 ok: dataset applied ({'network_name': 'MyHome284238473'})
+  06:08:08 ok: Thread router role router on MyHome284238473
+TC08 PASS (24 s) 
+
+TC09 ESPHome Bluetooth proxy as the role of a radio (radio B when present, else A): the ESPHome bundle is
+flashed, the device answers over Improv; with Wi-Fi set (ESPHome page) it joins and
+reports its URL. The radio's role comes back afterwards.
+  06:08:23 ok: radio B esphome started ('')
+  06:08:23 radio B: p4gw.radio_ble_proxy 1.1.0 ESP32-C5 p4gw-ble-proxy-ce87ac  improv=provisioned on Wi-Fi 
+  06:08:23 ok: the radio runs ESPHome and answers over Improv
+  06:08:38 ok: radio B none started ('')
+TC09 FAIL (30 s) joined Wi-Fi Automatizace ()
+
+TC10 Gateway OTA: new image goes to the other slot and confirms itself after 60 s.
+  06:09:28 ok: upload accepted into gw_a
+  06:09:28 ok: written to the inactive slot
+  06:09:40 back after restart: active=thread_router c6=ot_rcp uptime=9s
+  06:09:40 ok: boots the new slot, pending verify
+  06:10:50 ok: confirmed valid after 60 s
+TC10 PASS (132 s) 
+
+TC11 An admin account protects the API (Basic auth for clients of older versions); deleting it opens the gateway again.
+  06:10:51 skipped: the gateway has user accounts (TC11 needs an open gateway)
+TC11 PASS (0 s) 
+
+TC12 Broken uploads are rejected and do not damage the stored images.
+  06:10:51 ok: garbage c6fw rejected ({'error': 'ESP_ERR_INVALID_VERSION'})
+  06:10:51 ok: stored bundles intact after the rejected upload (7)
+  06:10:51 ok: garbage gateway image rejected ({'error': 'image has no application description'})
+  06:10:51 ok: valid c6fw re-uploaded
+  06:10:51 ok: 7 bundles listed again
+TC12 PASS (1 s) 
+
+TC14 Sound service: microphone captures, YAMNet loads and runs within the CPU budget.
+  06:10:51 ok: capturing, level -65.3 dBFS, floor -67
+  06:10:51 ok: model loaded in 579 ms
+  06:10:51 ok: inference 62 ms avg, 68.5 ms max
+  06:11:26 ok: CPU 6 % of core 1, still enabled
+  06:11:26 ok: 2 s WAV clip
+TC14 PASS (35 s) 
+
+TC16 Border router keeps its own network after the router role joined another one.
+  06:11:36 back after restart: active=thread_br c6=ot_rcp uptime=6s
+  06:11:36 ok: thread_br started without maintenance ('')
+  06:11:36 ok: active role is thread_br
+  06:11:36 switch took 9 s
+  06:11:47 back after restart: active=thread_router c6=ot_rcp uptime=7s
+  06:11:47 ok: thread_router started without maintenance ('')
+  06:11:47 ok: active role is thread_router
+  06:11:47 switch took 10 s
+  06:11:47 ok: router joined the test network
+  06:11:59 back after restart: active=thread_br c6=ot_rcp uptime=9s
+  06:11:59 ok: thread_br started without maintenance ('')
+  06:11:59 ok: active role is thread_br
+  06:11:59 switch took 12 s
+  06:11:59 ok: border router back on MyHome284238473
+TC16 PASS (33 s) 
+
+TC17 Sound events: validation, save, survives a restart; the original configuration is restored.
+  06:11:59 ok: invalid id rejected (event 0: id must be a-z, 0-9, _ (max 23))
+  06:11:59 ok: class out of range rejected (event a: class indexes 0-520)
+  06:11:59 ok: duplicate id rejected (duplicate event id a)
+  06:11:59 ok: event added
+  06:12:12 back after restart: active=thread_br c6=ot_rcp uptime=9s
+  06:12:12 ok: event survived the restart unchanged
+  06:12:12 ok: exclusion survived the restart
+  06:12:12 ok: preset applied
+  06:12:12 ok: original configuration restored
+TC17 PASS (13 s) 
+
+TC19 C6 telemetry in every gateway role; the Zigbee host stream stays clean and answers requests.
+  06:12:26 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  06:12:26 ok: thread_br started without maintenance ('')
+  06:12:26 ok: active role is thread_br
+  06:12:26 switch took 14 s
+  06:12:26 ok: Thread RCP: 37.5 °C, 421236 B free, up 260 s
+  06:13:01 ok: no RCP failure while it is polled
+  06:13:19 back after restart: active=zigbee_coordinator c6=zigbee_ncp uptime=15s
+  06:13:19 ok: zigbee_coordinator started without maintenance ('')
+  06:13:19 ok: active role is zigbee_coordinator
+  06:13:19 switch took 18 s
+  06:13:29 ok: Zigbee NCP: 39.5 °C, 295444 B free
+  06:14:04 ok: no telemetry frame reached the host (2 frames)
+  06:14:04 ok: NCP answered GET_MODULE_VERSION (000101003700004f00050100000f0302000000)
+  06:14:04 ok: telemetry keeps coming while a host is connected
+  06:14:20 back after restart: active=zigbee_router c6=zigbee_router uptime=12s
+  06:14:20 ok: zigbee_router started without maintenance ('')
+  06:14:20 ok: active role is zigbee_router
+  06:14:20 switch took 15 s
+  06:14:20 ok: Zigbee router: 34.5 °C, 374872 B free
+  06:14:34 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  06:14:34 ok: thread_br started without maintenance ('')
+  06:14:34 ok: active role is thread_br
+  06:14:34 switch took 14 s
+TC19 PASS (142 s) 
+
+TC20 Network surroundings: quick scan in the Thread role, full scan with Wi-Fi, role restored afterwards.
+  06:14:47 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  06:14:47 ok: thread_br started without maintenance ('')
+  06:14:47 ok: active role is thread_br
+  06:14:47 switch took 13 s
+  06:14:47 ok: quick scan started ({'started': True})
+  06:15:02 ok: quick: 16 channels in 13191 ms
+  06:15:02 ok: quick: own network MyHome284238473 found on channel 25
+  06:15:02 ok: no RCP failure caused by the scan
+  06:15:02 ok: full scan requested, gateway restarts
+  06:15:32 ok: full: scanner 1.1.0, 16 channels, 14505 ms
+  06:15:32 ok: full: 25 Wi-Fi access points, one entry each
+  06:15:32 ok: full: own Thread PAN seen in traffic
+  06:15:32 ok: full: radio A, channel width and known security for every access point (wpa/wpa2, wpa2, wpa3)
+  06:15:37 back after restart: active=thread_br c6=ot_rcp uptime=32s
+  06:15:37 ok: role firmware back on the C6
+  06:15:37 ok: Thread network unchanged after the scan
+  06:15:37 ok: full scan on radio B requested
+  06:16:28 ok: radio B: scanner 1.1.0, 16 channels, 33907 ms
+  06:16:28 ok: radio B: 5 GHz access points (19 of 44)
+  06:16:33 back after restart: active=thread_br c6=ot_rcp uptime=52s
+  06:16:33 ok: radio B back in its role none
+TC20 PASS (119 s) 
+
+TC21 Thread network map: topology discovery returns this gateway and the routers it links to.
+  06:16:46 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  06:16:46 ok: thread_br started without maintenance ('')
+  06:16:46 ok: active role is thread_br
+  06:16:46 switch took 13 s
+  06:17:37 ok: 11 routers in 431 ms (all answered)
+  06:17:37 ok: this gateway is in the map as border router R59
+  06:17:37 ok: its links: [1, 5, 7, 23, 28, 33, 47]
+  06:17:37 ok: a second discovery right after works too
+TC21 PASS (64 s) 
+
+TC22 Zigbee network through Zigbee2MQTT: instance found on the broker, devices, an operation answered.
+  06:17:37 ok: Zigbee2MQTT 2.14.2 at zigbee2mqtt, coordinator ZStack3x0, 78 devices
+  06:17:37 ok: device list includes the coordinator
+  06:17:38 ok: permit join closed, answered by Zigbee2MQTT (ok)
+  06:17:38 ok: unknown action refused
+TC22 PASS (1 s) 
+
+TC24 Log before the last restart: kept in RAM over a requested restart, ends with the restart.
+  06:17:51 back after restart: active=thread_br c6=ot_rcp uptime=10s
+  06:17:51 ok: previous log 8235 B
+  06:17:51 ok: ends with the restart request of the previous run (other tasks may log in its last 500 ms)
+  06:17:51 ok: the current log starts fresh
+TC24 PASS (13 s) 
+
+TC25 Settings backup: export without board state, refused imports change nothing, import restores.
+  06:17:51 ok: export with secrets, 44 keys
+  06:17:51 ok: no per-board state keys
+  06:17:51 ok: role and Thread dataset included
+  06:17:51 ok: passwords only with secrets=1
+  06:17:51 ok: invalid base64 refused: zz_bad: invalid base64
+  06:17:51 ok: unknown role refused: role: unknown role 99
+  06:17:51 ok: other format refused
+  06:17:51 ok: refused imports changed nothing
+  06:17:51 ok: import accepted ({'keys': 45, 'restarting': True})
+  06:18:05 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  06:18:05 ok: imported value active after the restart
+  06:18:05 ok: board key in the file ignored (no C6 reflash)
+  06:18:18 back after restart: active=thread_br c6=ot_rcp uptime=9s
+  06:18:18 ok: original settings restored
+TC25 PASS (27 s) 
+
+TC26 Zigbee backup on request: refused outside Zigbee, router data saved with its time, router rejoins.
+  06:18:18 ok: refused in the Thread role (only in a Zigbee role)
+  06:18:18 ok: interval other than 0, 1, 7 refused
+  06:18:18 ok: weekly set
+  06:18:36 back after restart: active=zigbee_router c6=zigbee_router uptime=15s
+  06:18:36 ok: zigbee_router started without maintenance ('')
+  06:18:36 ok: active role is zigbee_router
+  06:18:36 switch took 18 s
+TC26 FAIL (79 s) timeout waiting for router joined (last: None)
+
+TC27 Online update: URL validation, no install without an offer, readable errors of a failed check.
+  06:19:37 ok: non-HTTP URL refused
+  06:19:37 ok: check without a URL refused
+  06:19:37 ok: install without an offer refused
+  06:19:37 ok: missing manifest: manifest: HTTP 404
+  06:19:38 ok: not a manifest: manifest: expected {"version", "p4gw"}
+  06:19:39 ok: HTTPS reaches the server (certificate bundle): manifest: HTTP 404
+  06:19:39 ok: still nothing to install
+  06:19:39 ok: URL back to off
+TC27 PASS (2 s) 
+
+TC28 Learned sounds from WAV uploads: tone and embedding profiles, background from the room, calibration, scoring.
+  06:19:40 ok: background: 6 s of this room from the microphone
+  06:19:40 ok: recognition runs
+  06:19:40 ok: not a WAV refused (16 kHz mono 16-bit PCM WAV expected)
+  06:19:40 ok: invalid name refused (profile: a-z, 0-9, _ (max 23))
+  06:19:42 ok: tone profile: 2003 Hz from 3 samples
+  06:19:42 ok: a sample of the other type refused
+  06:19:45 ok: 5 background recordings saved, 34 slots free
+  06:19:45 ok: tc_beep: samples alike 0.85, background 0.01, threshold 0.6
+  06:19:45 ok: tc_dog: samples alike 0.64, background 0.23, threshold 0.55
+  06:19:45 ok: a sample plays back as WAV
+  06:19:45 ok: the beep scores 0.85 for tc_beep
+  06:19:45 ok: a 900 Hz tone scores 0 for tc_beep
+  06:19:46 ok: another dog recording scores 0.77 for tc_dog
+  06:19:52 ok: rain, clapping, fireworks score at most 0.49 for tc_dog
+  06:19:54 ok: event on the learned tone saved with its profile
+  06:19:54 ok: invalid profile in an event refused (event tc_beep: profile must be a-z, 0-9, _ (max 23))
+  06:19:58 ok: test samples removed
+TC28 PASS (19 s) 
+
+TC30 Home Assistant integration: mDNS _p4gw._tcp with the MAC, WebSocket push of every sound message, password.
+  06:20:01 ok: mDNS _p4gw._tcp answers with mac=30:ed:a0:e3:0a:08 (1 packets)
+  06:20:01 ok: WebSocket handshake without a password
+  06:20:03 ok: test event added
+  06:20:11 ok: state of all 23 enabled events pushed in one burst (23 received)
+  06:20:11 ok: detection pushed: [{'event_type': 'detected', 'class': 'Silence', 'score': 1, 'level_db': -64.1}]
+  06:20:11 ok: events restored
+  06:20:12 ok: admin account created
+TC30 FAIL (14 s) account deleted
+
+TC31 Sound pressure in dB(A): plausible levels, calibration by a reference reading and by an offset, reset.
+  06:20:12 ok: microphone running
+  06:20:12 ok: spl reported: {'las': 24.3, 'laeq': 28.6, 'lamax': 45, 'overload': False, 'window_s': 60, 'partial': False, 'offset': 122.4, 'calibrated': True}
+  06:20:12 ok: plausible levels: LAeq 28.6, LAmax 45 dB(A)
+  06:20:12 ok: reference out of range rejected ({'error': 'reference 20-130 dB(A)'})
+  06:20:12 ok: calibrated by a reference reading
+  06:20:12 ok: level now reads the reference: 34.3 vs 34.3 dB(A)
+  06:20:12 ok: offset moved by the difference: 122.4 -> 132.4
+  06:20:12 ok: offset set directly
+  06:20:12 ok: calibration kept
+  06:20:12 ok: reset to the default estimate
+TC31 PASS (0 s) 
+
+TC32 Header links, traffic counters, LAN settings: validation, revert when not confirmed, confirm, back to DHCP.
+  06:20:12 ok: links reported: {'mqtt': 'connected', 'ha_clients': 1, 'internet': True, 'internet_age_s': 41}
+  06:20:12 ok: eth mode dhcp, mask 255.255.255.0
+  06:20:12 ok: web traffic counted: 2299827 -> 2305004 B
+  06:20:12 ok: totals are the sum of the services
+  06:20:12 ok: rejected: netmask
+  06:20:12 ok: rejected: gateway outside
+  06:20:12 ok: rejected: no address
+  06:20:12 ok: rejected: link mode
+  06:20:12 ok: confirm without a pending change: 409
+  06:20:13 ok: static settings applied
+  06:20:14 ok: waits for confirmation (118 s)
+  06:22:14 ok: not confirmed: back to dhcp
+  06:22:14 ok: static settings applied again
+  06:22:17 ok: confirmed and stored
+  06:22:17 ok: internet reachable with the static address (DNS kept beside the Thread DNS64 server)
+  06:22:20 ok: settings restored (dhcp)
+TC32 PASS (127 s) 
+
+TC33 Restart from the menu: the C6 is reset right before the P4, the role comes back.
+  06:22:20 ok: full restart accepted
+  06:22:36 back after restart: active=zigbee_router c6=zigbee_router uptime=13s
+  06:22:36 ok: C6 restarted with the P4 (P4 14 s, C6 10 s)
+TC33 PASS (17 s) 
+
+TC34 Users: first admin, sign-in, lock, permissions per role and user, Basic and tokens, 2FA with recovery codes, reset request, back to open.
+  06:22:36 skipped: the gateway has user accounts (TC34 needs an open gateway)
+TC34 PASS (0 s) 
+
+TC35 Telegram bot settings: validation, an invalid token reaches Telegram and is refused (TLS works), own settings need a user.
+  06:22:36 ok: every HTTP handler registered (table not full)
+  06:22:36 ok: bot state running
+  06:22:36 ok: malformed token rejected
+  06:22:36 ok: empty time zone rejected
+  06:22:36 a real token is set: the invalid-token check is skipped to keep it
+  06:22:36 ok: own Telegram settings: 409 (409 for a token, open gateway)
+  06:22:36 ok: pairing refused while the bot does not run or without a user
+TC35 PASS (0 s) 
+
+TC36 Online update of the C6 package: offered by a manifest, downloaded into PSRAM, checked (sha256), stored, the old one back.
+  06:22:36 ok: manifest URL http://192.168.88.189:54818/manifest.json
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:36] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /releases.json HTTP/1.1" 404 -
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:36] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /releases.json HTTP/1.1" 404 -
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:36] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:36] "GET /releases.json HTTP/1.1" 404 -
+  06:22:38 ok: C6 package offered: 82f4b51b -> f3ee902c
+192.168.88.243 - - [03/Nov/2026 06:22:38] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:38] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:38] "GET /releases.json HTTP/1.1" 404 -
+192.168.88.243 - - [03/Nov/2026 06:22:38] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:38] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:38] "GET /releases.json HTTP/1.1" 404 -
+  06:22:41 ok: install with a wrong sha256 started
+192.168.88.243 - - [03/Nov/2026 06:22:41] "GET /test.bin HTTP/1.1" 200 -
+  06:22:42 ok: refused, no restart: radio package sha256 does not match the manifest
+192.168.88.243 - - [03/Nov/2026 06:22:42] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:42] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:42] "GET /releases.json HTTP/1.1" 404 -
+192.168.88.243 - - [03/Nov/2026 06:22:42] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:22:42] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:22:42] "GET /releases.json HTTP/1.1" 404 -
+  06:22:44 ok: C6 install started
+192.168.88.243 - - [03/Nov/2026 06:22:44] "GET /test.bin HTTP/1.1" 200 -
+  06:23:03 ok: new package stored after the restart
+  06:23:03 ok: role back, the C6 was not rewritten
+192.168.88.243 - - [03/Nov/2026 06:23:03] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:23:03] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:23:03] "GET /releases.json HTTP/1.1" 404 -
+192.168.88.243 - - [03/Nov/2026 06:23:03] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:23:03] code 404, message File not found
+192.168.88.243 - - [03/Nov/2026 06:23:03] "GET /releases.json HTTP/1.1" 404 -
+  06:23:05 ok: C6 install started
+192.168.88.243 - - [03/Nov/2026 06:23:05] "GET /orig.bin HTTP/1.1" 200 -
+  06:23:24 ok: original package back
+TC36 PASS (49 s) 
+
+TC37 releases.json: only releases that name the board's flash layout are listed (on layout 4 also those
+of layout 3: v4 only grew the gateway slots); a picked release whose manifest does not run on the
+layout, or an unlisted one, is refused without a restart.
+  06:23:25 ok: manifest URL set
+192.168.88.243 - - [03/Nov/2026 06:23:25] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:23:25] "GET /releases.json HTTP/1.1" 200 -
+  06:23:27 ok: listed for layout 4: ['v1.9-30-g69e7b45-dirty', 'v0.0-v3', 'v0.0-nolayout']
+  06:23:27 ok: release of another layout refused (409)
+  06:23:27 ok: unlisted release refused (409)
+  06:23:27 ok: listed release accepted
+192.168.88.243 - - [03/Nov/2026 06:23:27] "GET /nolayout.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:23:27] "GET /manifest.json HTTP/1.1" 200 -
+192.168.88.243 - - [03/Nov/2026 06:23:27] "GET /releases.json HTTP/1.1" 200 -
+  06:23:28 ok: manifest without the layout refused: v0.0-nolayout does not run on the flash layout of this gateway
+  06:23:28 ok: offer restored, no restart
+192.168.88.243 - - [03/Nov/2026 06:23:28] "GET /manifest.json HTTP/1.1" 200 -
+  06:23:30 ok: latest of another layout not offered: v0.0-new does not run on the flash layout of this gateway
+TC37 PASS (6 s) 
+
+TC39 Radio A Thread border router and radio B (external, JP1) Zigbee coordinator at the same time: both
+run, radio B's NCP sends telemetry and frames, its TCP bridge takes a client, role conflicts are refused.
+  06:23:45 back after restart: active=thread_br c6=ot_rcp uptime=11s
+  06:23:45 ok: thread_br started without maintenance ('')
+  06:23:45 ok: active role is thread_br
+  06:23:45 switch took 14 s
+  06:24:00 ok: radio B zigbee_coordinator started ('')
+  06:24:00 ok: radio A still Thread border router
+  06:24:15 ok: radio B none started ('')
+TC39 FAIL (44 s) Thread network up on radio A (detached)
+
+TC40 Each radio keeps its own Thread network: Thread on radio B starts with B's settings (not radio A's
+network), and back on radio A the first network returns unchanged.
+  06:24:15 radio A network MyHome284238473 b76a258fd1c648c2
+  06:24:35 back after restart: active=zigbee_router c6=zigbee_router uptime=17s
+  06:24:35 ok: zigbee_router started without maintenance ('')
+  06:24:35 ok: active role is zigbee_router
+  06:24:35 switch took 20 s
+  06:24:55 ok: radio B thread_br started ('')
+  06:25:10 radio B network P4GW-0A08 7181fae5c809938f, RCP openthread-esp32/721025a-; esp32c5;  2026-10-31 05:14:06 UTC
+  06:25:10 ok: RCP of radio B answers
+  06:25:10 ok: radio B has its own Thread network
+  06:25:25 ok: radio B none started ('')
+  06:25:44 back after restart: active=thread_br c6=ot_rcp uptime=17s
+  06:25:44 ok: thread_br started without maintenance ('')
+  06:25:44 ok: active role is thread_br
+  06:25:44 switch took 19 s
+  06:27:31 ok: radio A back on its network (MyHome284238473)
+TC40 PASS (196 s) 
+
+TC41 Radio B as the Wi-Fi uplink next to Thread on radio A, LAN up: Wi-Fi joins with its own address,
+Ethernet keeps the default route, the web UI answers over Wi-Fi, its traffic is counted, no password
+in the API, a second uplink is refused, throughput over Wi-Fi recorded.
+  06:27:51 ok: radio B wifi_uplink started ('')
+  06:28:03 uplink on radio B: 192.168.87.66, 2.4 GHz channel 6, -37 dBm
+  06:28:03 ok: Ethernet keeps the default route, Wi-Fi is the standby
+  06:28:03 ok: Thread backbone on Ethernet
+  06:28:04 ok: web UI over Wi-Fi (192.168.87.66)
+  06:28:06 web UI over Wi-Fi: 160771 B in 2.00 s (80 kB/s)
+  06:28:06 ok: throughput over Wi-Fi above 30 kB/s
+  06:28:06 ok: the page counted under web on Wi-Fi
+  06:28:06 ok: no password in the API
+  06:28:17 ok: scan: 31 networks
+  06:28:17 ok: second uplink refused (409)
+TC41 PASS (46 s) 
+
+TC42 LAN pulled while running (outage test): the gateway stays reachable over Wi-Fi and reaches the
+internet, the Thread border router moves to the Wi-Fi backbone (restart); LAN back: traffic on
+Ethernet at once, the backbone back on Ethernet after the 5 min hysteresis.
+  06:28:17 uplink on radio B: 192.168.87.66, 2.4 GHz channel 6, -37 dBm
+  06:28:18 ok: reachable over Wi-Fi 192.168.87.66 0 s into the outage
+  06:28:18 ok: internet reachable over Wi-Fi (TCP to github.com:443)
+  06:30:04 ok: border router restarted onto the Wi-Fi backbone (up 17 s)
+  06:30:04 ok: Thread network MyHome284238473 router over Wi-Fi
+  06:30:56 ok: Ethernet has the default route again
+  06:36:16 ok: backbone back on Ethernet (up 10 s)
+TC42 PASS (479 s) 
+
+TC43 A network that is not there: clear error in the status, retries, LAN untouched; dropping the own
+setting returns to the ESPHome Wi-Fi.
+  06:36:23 uplink on radio B: 192.168.87.66, 2.4 GHz channel 6, 0 dBm
+  06:36:23 ok: network set
+  06:36:35 ok: state disconnected: network not found (reason 201)
+  06:36:35 ok: LAN untouched
+  06:36:35 ok: own setting dropped
+  06:36:50 ok: connected again (2 connections)
+  06:36:50 ok: password shorter than 8 refused
+  06:36:50 ok: static without netmask refused
+TC43 PASS (34 s) 
+
+TC45 The Wi-Fi uplink moves to radio A (C6) by swapping the roles: radio A joins the Wi-Fi, radio B runs
+radio A's former role; swapped back, radio A returns to its Thread network unchanged.
+  06:36:50 uplink on radio B: 192.168.87.66, 2.4 GHz channel 6, -37 dBm
+  06:36:50 ok: swap accepted
+  06:37:16 ok: radio A (C6) is the Wi-Fi uplink: 192.168.87.180, 2.4 GHz channel 6
+  06:37:16 ok: web UI over the Wi-Fi of radio A
+  06:37:16 ok: Thread border router runs on radio B
+  06:37:16 ok: swap back accepted
+  06:37:45 ok: radio A back on its Thread network (MyHome284238473)
+TC45 PASS (55 s) 
+
+  06:38:05 ok: radio B esphome started ('')
+  06:38:05 radio B esphome again
+Summary: TC01 FAIL, TC02 FAIL, TC03 FAIL, TC04 PASS, TC05 PASS, TC06 PASS, TC07 PASS, TC08 PASS, TC09 FAIL, TC10 PASS, TC11 PASS, TC12 PASS, TC14 PASS, TC16 PASS, TC17 PASS, TC19 PASS, TC20 PASS, TC21 PASS, TC22 PASS, TC24 PASS, TC25 PASS, TC26 FAIL, TC27 PASS, TC28 PASS, TC30 FAIL, TC31 PASS, TC32 PASS, TC33 PASS, TC34 PASS, TC35 PASS, TC36 PASS, TC37 PASS, TC39 FAIL, TC40 PASS, TC41 PASS, TC42 PASS, TC43 PASS, TC45 PASS

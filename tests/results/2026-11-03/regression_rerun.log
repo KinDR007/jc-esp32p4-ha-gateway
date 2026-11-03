@@ -1,0 +1,33 @@
+  06:39:09 radio B esphome switched off for the run
+  06:39:24 ok: radio B none started ('')
+TC09 ESPHome Bluetooth proxy as the role of a radio (radio B when present, else A): the ESPHome bundle is
+flashed, the device answers over Improv; with Wi-Fi set (ESPHome page) it joins and
+reports its URL. The radio's role comes back afterwards.
+  06:39:46 ok: radio B esphome started ('')
+  06:39:46 radio B: p4gw.radio_ble_proxy 1.1.0 ESP32-C5 p4gw-ble-proxy-ce87ac  improv=provisioned on Wi-Fi 
+  06:39:46 ok: the radio runs ESPHome and answers over Improv
+  06:39:46 ok: joined Wi-Fi Automatizace (on Wi-Fi)
+  06:39:55 ok: radio B none started ('')
+TC09 PASS (31 s) 
+
+TC30 Home Assistant integration: mDNS _p4gw._tcp with the MAC, WebSocket push of every sound message, password.
+TC30 FAIL (3 s) mDNS _p4gw._tcp answers with mac=30:ed:a0:e3:0a:08 (0 packets)
+
+TC39 Radio A Thread border router and radio B (external, JP1) Zigbee coordinator at the same time: both
+run, radio B's NCP sends telemetry and frames, its TCP bridge takes a client, role conflicts are refused.
+  06:40:18 ok: radio B zigbee_coordinator started ('')
+  06:40:18 ok: radio A still Thread border router
+  06:40:19 ok: Thread network up on radio A (router)
+  06:40:34 radio B: ESP32-C5, 37.9 °C, up 0 s
+  06:40:34 ok: radio B link clean (1 telemetry frames)
+  06:40:35 ok: TCP client on radio B registered
+  06:40:36 ok: client disconnect detected
+  06:40:36 ok: second Thread network refused (409)
+  06:40:36 ok: second Zigbee network on radio A refused (409)
+  06:41:11 ok: radio B did not restart (0 -> 30 s)
+  06:41:20 ok: radio B none started ('')
+TC39 PASS (82 s) 
+
+  06:41:35 ok: radio B esphome started ('')
+  06:41:35 radio B esphome again
+Summary: TC09 PASS, TC30 FAIL, TC39 PASS

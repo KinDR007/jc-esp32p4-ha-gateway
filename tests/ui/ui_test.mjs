@@ -573,6 +573,7 @@ await test('UI21', 'Zigbee backups: open in any role, the automatic interval is 
 
 await test('UI22', 'Online update: the card saves the URL and shows why a check failed', async () => {
   await tab('system/firmware');
+  const before = (await (await page.request.get(base + 'api/status')).json()).update.url;
   await page.fill('#upd-url', `http://${host}/nope.json`);
   await page.click('#upd-save');
   await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('HTTP 404'), null, { timeout: 25000 });
@@ -584,6 +585,8 @@ await test('UI22', 'Online update: the card saves the URL and shows why a check 
   await page.click('#upd-save');
   await page.waitForFunction(() => document.querySelector('#upd-state')?.textContent.includes('Off'), null, { timeout: 10000 });
   check(await page.isDisabled('#upd-check'), 'cleared: off, Check disabled');
+  await page.request.post(base + 'api/settings', { data: { update_url: before } });
+  check((await (await page.request.get(base + 'api/status')).json()).update.url === before, `URL back to ${before || 'off'}`);
 });
 
 await test('UI23', 'Learned sounds: the page loads, a foreign file is refused, a test recording shows its scores', async () => {

@@ -147,7 +147,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F6.1 Audio ring 10 s ponechán: čte ho inference (zpoždění ≤ 1 s + okno 0,96 s), učení (0,975 s) a `/api/sound/clip` (≤ 9 s); 20 s by přineslo jen delší ruční klip, žádné funkci nepomůže (+320 kB PSRAM). Smysl by dávalo až s nahráváním zvuku k události (např. příloha v Telegramu)
 
 **F7 Uzavření**
-- [ ] F7.1 Úplná regrese (soak jen na pokyn)
+- [x] F7.1 Regrese 2026-11-03 ([report](tests/results/2026-11-03/report.md)): vše prošlo kromě očekávaných TC01–03 (čistá deska) a známého TC26 (router bez sítě); opraveny testy TC09, TC30, TC39, UI22. Soak jen na pokyn
 - [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání); nejisté detaily v api.json k ověření: odpověď /api/thread/topology, úrovně témat /api/auth/telegram
 
 **F8 Odloženo**

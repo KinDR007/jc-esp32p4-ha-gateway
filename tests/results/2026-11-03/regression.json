@@ -1,0 +1,230 @@
+[
+  {
+    "id": "TC01",
+    "result": "FAIL",
+    "detail": "no role active on first start",
+    "seconds": 0
+  },
+  {
+    "id": "TC02",
+    "result": "FAIL",
+    "detail": "role switch refused with c6_backup_required",
+    "seconds": 0
+  },
+  {
+    "id": "TC03",
+    "result": "FAIL",
+    "detail": "backup HTTP 200 (got 409 {'error': 'only in maintenance mode (no active role)'})",
+    "seconds": 0
+  },
+  {
+    "id": "TC04",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 10
+  },
+  {
+    "id": "TC05",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 19
+  },
+  {
+    "id": "TC06",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 39
+  },
+  {
+    "id": "TC07",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 23
+  },
+  {
+    "id": "TC08",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 24
+  },
+  {
+    "id": "TC09",
+    "result": "FAIL",
+    "detail": "joined Wi-Fi Automatizace ()",
+    "seconds": 30
+  },
+  {
+    "id": "TC10",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 132
+  },
+  {
+    "id": "TC11",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC12",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 1
+  },
+  {
+    "id": "TC14",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 35
+  },
+  {
+    "id": "TC16",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 33
+  },
+  {
+    "id": "TC17",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 13
+  },
+  {
+    "id": "TC19",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 142
+  },
+  {
+    "id": "TC20",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 119
+  },
+  {
+    "id": "TC21",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 64
+  },
+  {
+    "id": "TC22",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 1
+  },
+  {
+    "id": "TC24",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 13
+  },
+  {
+    "id": "TC25",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 27
+  },
+  {
+    "id": "TC26",
+    "result": "FAIL",
+    "detail": "timeout waiting for router joined (last: None)",
+    "seconds": 79
+  },
+  {
+    "id": "TC27",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 2
+  },
+  {
+    "id": "TC28",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 19
+  },
+  {
+    "id": "TC30",
+    "result": "FAIL",
+    "detail": "account deleted",
+    "seconds": 14
+  },
+  {
+    "id": "TC31",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC32",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 127
+  },
+  {
+    "id": "TC33",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 17
+  },
+  {
+    "id": "TC34",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC35",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 0
+  },
+  {
+    "id": "TC36",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 49
+  },
+  {
+    "id": "TC37",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 6
+  },
+  {
+    "id": "TC39",
+    "result": "FAIL",
+    "detail": "Thread network up on radio A (detached)",
+    "seconds": 44
+  },
+  {
+    "id": "TC40",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 196
+  },
+  {
+    "id": "TC41",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 46
+  },
+  {
+    "id": "TC42",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 479
+  },
+  {
+    "id": "TC43",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 34
+  },
+  {
+    "id": "TC45",
+    "result": "PASS",
+    "detail": "",
+    "seconds": 55
+  }
+]

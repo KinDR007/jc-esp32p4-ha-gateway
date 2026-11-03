@@ -316,7 +316,8 @@ def tc09_esphome_radio():
         log(f'radio {radio.upper()}: {rs.get("device")} improv={rs.get("improv")} {rs.get("note")} {rs.get("url")}')
         check('ESPHome' in rs.get('device', '') or 'p4gw' in rs.get('device', ''), 'the radio runs ESPHome and answers over Improv')
         if wifi.get('ssid'):
-            check(rs.get('improv') == 'provisioned' and rs.get('url'), f'joined Wi-Fi {wifi["ssid"]} ({rs.get("url")})')
+            # the proxy has no web server, so Improv names no URL: provisioned means it joined
+            check(rs.get('improv') == 'provisioned', f'joined Wi-Fi {wifi["ssid"]} ({rs.get("note")})')
         else:
             check(rs.get('improv') == 'not provisioned', 'not provisioned without Wi-Fi settings')
             log('Wi-Fi not set: the join is not tested')
@@ -1080,7 +1081,7 @@ def mdns_query(service, timeout=3):
 class WsClient:
     """Minimal WebSocket client (text frames from the server, no masking needed on receive)."""
 
-    def __init__(self, path, auth=None, token=None):
+    def __init__(self, path, auth=None, token=None, anonymous=False):
         import base64
         self.sock = socket.create_connection((ARGS.host, 80), timeout=10)
         key = base64.b64encode(os.urandom(16)).decode()
@@ -1088,7 +1089,7 @@ class WsClient:
               f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n'
         if auth:
             hdr += 'Authorization: Basic ' + base64.b64encode(auth.encode()).decode() + '\r\n'
-        if token or (ARGS.token and not auth):
+        if token or (ARGS.token and not auth and not anonymous):
             hdr += f'Authorization: Bearer {token or ARGS.token}\r\n'
         self.sock.sendall((hdr + '\r\n').encode())
         resp = b''
@@ -1161,9 +1162,14 @@ def tc30_ha_integration_interface():
     check('tc30_test' not in {e['id'] for e in http('GET', '/api/sound/events')[1]['events']}, 'events restored')
 
     pw = 'hwtest-' + str(int(time.time()))
-    check(http('POST', '/api/users', {'name': 'hwtest', 'role': 'admin', 'password': pw})[0] == 200, 'admin account created')
+    code, r = http('POST', '/api/users', {'name': 'hwtest', 'role': 'admin', 'password': pw})
+    check(code == 200, 'admin account created')
     try:
-        ws = WsClient('/api/ws')
+        if r.get('must_change'):  # created by another admin: its own password first
+            new = pw + '-own'
+            check(http('POST', '/api/auth/password', {'old': pw, 'new': new}, auth=pw, user='hwtest')[0] == 200, 'own password set')
+            pw = new
+        ws = WsClient('/api/ws', anonymous=True)
         check(ws.status != 101, f'handshake without credentials refused ({ws.status})')
         ws.close()
         ws = WsClient('/api/ws', auth=f'hwtest:{pw}')
@@ -1175,7 +1181,9 @@ def tc30_ha_integration_interface():
         ws.close()
     finally:
         http('POST', '/api/tokens/delete', {'name': 'hwtest'}, auth=pw, user='hwtest')
-        check(http('POST', '/api/users/delete', {'name': 'hwtest'}, auth=pw, user='hwtest')[0] == 200, 'account deleted')
+        # on a gateway with accounts the new admin has to change its password first: the run's token deletes it
+        who = {} if ARGS.token else {'auth': pw, 'user': 'hwtest'}
+        check(http('POST', '/api/users/delete', {'name': 'hwtest'}, **who)[0] == 200, 'account deleted')
 
 
 def tc31_sound_pressure():
@@ -1614,7 +1622,8 @@ def tc39_two_radios():
         s = switch_b('zigbee_coordinator') if status()['role']['b']['active'] != 'zigbee_coordinator' else status()
         check(s['role']['active'] == 'thread_br', 'radio A still Thread border router')
         wait_thread_running()
-        t = http('GET', '/api/thread/status')[1]
+        # after the restart the border router attaches again within a few seconds (detached meanwhile)
+        t = wait_until('Thread attached', lambda: (lambda t: t if t.get('role') in ('leader', 'router', 'child') else None)(http('GET', '/api/thread/status')[1]), 90, 3)
         check(t.get('role') in ('leader', 'router', 'child'), f'Thread network up on radio A ({t.get("role")})')
 
         def telemetry():
