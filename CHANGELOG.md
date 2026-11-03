@@ -18,6 +18,10 @@
 - Home Assistant integration 1.5.0: update entity *C5 radio firmware* for an ESP32-C5 as radio B (the
   C5 package with its firmwares, the ESPHome Bluetooth proxy included; install, progress, rollback to
   a listed release), next to the C6 one.
+- ESPHome Bluetooth proxy 1.1.0 (radio role): five active connection slots (default was three) and
+  diagnostic entities in Home Assistant: Wi-Fi signal, uptime, chip temperature, free heap and largest
+  free block, ESPHome version, IP address, Wi-Fi network, restart button. Image 1.47 MB (C6), 1.52 MB
+  (C5), RAM 41 % on the C6.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.
