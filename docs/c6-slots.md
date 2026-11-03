@@ -28,7 +28,8 @@ NVS 12 kB, system 10 kB, HAL 10 kB, 802.15.4 driver 9 kB, SPI flash 8 kB, ...; m
 `esp_idf_size` over the map files): ot_rcp + zigbee_router 818 kB as two images, ~650 kB as one.
 That is ~4 % of the C6 flash, which holds all four slot firmwares with room to spare.
 
-Layout ([firmware/c6/slots.csv](../firmware/c6/slots.csv)), 2.8 MB of 4 MB:
+Layout ([firmware/c6/slots.csv](../firmware/c6/slots.csv)), the whole 4 MB of the C6; the C5 of radio
+B (8 MB) adds ota_5 ([firmware/c6/slots_c5.csv](../firmware/c6/slots_c5.csv)):
 
 | Partition | Offset | Size | Content |
 |---|---|---|---|
@@ -38,10 +39,17 @@ Layout ([firmware/c6/slots.csv](../firmware/c6/slots.csv)), 2.8 MB of 4 MB:
 | ota_2 | 0x140000 | 768 kB | zigbee_ncp (coordinator) |
 | ota_3 | 0x200000 | 768 kB | scanner (full network scan) |
 | zb_storage, zb_fct | 0x2C0000 | 17 kB | Zigbee network data |
+| ota_4 | 0x2D0000 | 1216 kB | wifi_uplink (ESP-Hosted co-processor, 926 kB C6 / 965 kB C5) |
+| ota_5 (C5 only) | 0x400000 | 2 MB | esphome (Bluetooth proxy, 1.5 MB) |
 
 The rollback pair of the C6 is not needed: the gateway keeps every image and reinstalls it.
-ESPHome keeps its own two-slot layout (esp-hosted updates the C6 over SDIO into its OTA slots), so
-switching to ESPHome replaces the slots layout and returning installs it again (~70 s).
+Since 2026-11-03 the Wi-Fi uplink is a slot as well (the slots before it and the Zigbee data kept
+their offsets), so a radio switches to the uplink without the package, i.e. without LAN or internet:
+measured 23 s on radio A, 28 s on radio B. On the C5 the ESPHome proxy is a slot too (its image is
+built with an 8 MB flash size, the slot lies above 4 MB): switching 10–25 s. The ESPHome proxy does
+not fit the 4 MB of the C6 and keeps its own whole-flash layout there: switching to it replaces the
+slots layout and returning installs it again (~70 s), both from the package. A package with a new
+layout installs it once on the next start (measured 95 s on the C6, 150 s on the C5).
 
 ZBOSS finds its data by the label `zb_storage`, so the coordinator and the router share one
 region; the gateway keeps each one's network in its `c6data` snapshot as before (16 kB copy per

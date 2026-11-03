@@ -159,8 +159,9 @@ Run the build locally the same way:
 Web UI (Radios › Roles, both radios), Home Assistant (*Role* and *Radio B role* selects), MQTT
 (`p4gw/<host>/role/set`, radio A), Telegram (`/role <role>`, `/role b <role>`), API
 `POST /api/role {"role": ..., "radio": "a" | "b"}` (radio B also `none`). At most one Thread network,
-one Zigbee network and one ESPHome proxy. Typical times measured on the board: a slot switch 13–20 s,
-the first install of the layout on a radio about 80 s, the ESPHome role about 90 s (whole flash).
+one Zigbee network and one ESPHome proxy. Typical times measured on the board: a slot switch 13–28 s
+(Thread, Zigbee, scanner, Wi-Fi uplink; on the C5 also ESPHome), the first install of the layout on a
+radio 95–150 s, the ESPHome role on the C6 about 90 s (whole flash, needs the package).
 
 ## LAN settings
 

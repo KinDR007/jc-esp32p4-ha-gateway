@@ -22,6 +22,12 @@
   diagnostic entities in Home Assistant: Wi-Fi signal, uptime, chip temperature, free heap and largest
   free block, ESPHome version, IP address, Wi-Fi network, restart button. Image 1.47 MB (C6), 1.52 MB
   (C5), RAM 41 % on the C6.
+- Radio slots: the Wi-Fi uplink gets slot ota_4 on both radios (C6 and C5) and the ESPHome proxy slot
+  ota_5 on the C5 (8 MB, `firmware/c6/slots_c5.csv`): switching to and from them selects the slot
+  (23–28 s) without the package, so a gateway without LAN or internet can still switch a radio to the
+  Wi-Fi uplink. Earlier slots and the Zigbee data keep their offsets; the new layout installs once on
+  the next start with the new package (95 s on the C6, 150 s on the C5). ESPHome on the C6 (4 MB)
+  stays a whole-flash bundle. The C5 ESPHome image is built for 8 MB flash.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.

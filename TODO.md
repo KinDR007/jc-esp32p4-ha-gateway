@@ -121,8 +121,10 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 
 **F2 BLE proxy a rádia**
 - [x] F2.1 ESPHome proxy 1.1.0 na rádiu B (C5): HA vidí 5 slotů (bluetooth connection allocations), diagnostika v HA (Wi-Fi −36 dBm, 35,9 °C, volná RAM 90 kB, verze, IP, síť, restart). Záznam ESPHome v HA byl „Door Sensor“ (stejná MAC XIAO), přejmenován na „P4 Gateway BLE proxy“. Volné sloty ESPHome neexponuje jako entitu
-- [ ] F2.2 Rozbor flash rádií: co se vejde do slotu, přepíná se slotem; ESPHome (1,45–1,5 MB) celým flashem; na C5 (8 MB) zvážit ESPHome jako slot
-- [ ] F2.3 Testy: TC09 rozšířený (aktivní připojení, sloty), regrese rolí
+- [x] F2.2 Sloty rádií: Wi-Fi uplink jako ota_4 na C6 i C5, ESPHome jako ota_5 na C5 (`slots_c5.csv`, image pro 8 MB); přepnutí 10–28 s bez balíku; instalace layoutu 95 s (C6) / 150 s (C5); ESPHome na C6 dál celým flashem
+- [ ] Sledovat: rádio B jednou po přepnutí wifi_uplink → esphome „bootloader not responding“ (2026-11-03, hned po instalaci nového layoutu); úplný restart pomohl, 4 další přepnutí v pořádku
+- [ ] TC13 (vynucené přeflashování) ověřit s balíkem z vydání: lokálně nahraný balík brána po flashi zahodí a stáhne ten z vydání
+- [x] F2.3 Testy: přepínání rádia A (Thread ↔ Wi-Fi) a B (ESPHome ↔ Wi-Fi, 4×) ze slotů, TC04, TC23 až po krok připojení routeru (známý problém: router bez sítě); HA vidí 5 slotů proxy
 
 **F3 Web UI**
 - [ ] F3.1 Tooltipy v přehledu HW (první karta a její položky)

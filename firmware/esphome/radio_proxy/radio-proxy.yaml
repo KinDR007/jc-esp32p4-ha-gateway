@@ -7,6 +7,8 @@
 #   checkout path has a space: PlatformIO refuses those)
 substitutions:
   chip: esp32c6
+  # 8MB for the C5: its ESPHome slot lies above 4 MB (firmware/c6/slots_c5.csv)
+  flash_size: 4MB
   build_path: .esphome/build/p4gw-ble-proxy
 
 esphome:
@@ -20,6 +22,7 @@ esphome:
 
 esp32:
   variant: ${chip}
+  flash_size: ${flash_size}
   framework:
     type: esp-idf
 

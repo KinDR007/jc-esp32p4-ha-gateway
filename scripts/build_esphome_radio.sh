@@ -26,6 +26,7 @@ for chip in $chips; do
     # ESPHome brings its own ESP-IDF; the one of this repository (IDF_PATH, CI container) would make it
     # look for that environment's tools and fail
     env -u IDF_PATH -u IDF_TOOLS_PATH -u IDF_PYTHON_ENV_PATH -u ESP_IDF_VERSION \
-        "$ESPHOME" -s chip "$chip" -s build_path "$out" compile firmware/esphome/radio_proxy/radio-proxy.yaml
+        "$ESPHOME" -s chip "$chip" -s flash_size "$([ "$chip" = esp32c5 ] && echo 8MB || echo 4MB)" -s build_path "$out" \
+        compile firmware/esphome/radio_proxy/radio-proxy.yaml
     test -f "$out/build/flash_args"
 done

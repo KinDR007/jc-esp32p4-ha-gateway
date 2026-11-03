@@ -74,7 +74,8 @@ P4 flash (16 MB, firmware/partitions.csv)
 - Switching stores the role and restarts. On boot the gateway compares each radio's bundle with the
   one its role needs and updates the radio through its ROM bootloader. The Thread and Zigbee
   firmwares share one layout with a slot each, so a switch only selects the slot (8 kB, offline,
-  [docs/c6-slots.md](docs/c6-slots.md)); ESPHome is a whole-flash bundle from the package.
+  [docs/c6-slots.md](docs/c6-slots.md)); the Wi-Fi uplink has a slot too, ESPHome on the C5 as well,
+  on the C6 it is a whole-flash bundle from the package.
 - Each radio keeps its own networks: Zigbee data survives switching (snapshot per radio, restored
   on return; also weekly at night or on request), the Thread settings are kept per radio in P4 NVS.
 - Stability: gateway images confirm themselves after 60 s (else rollback), repeated crashes stop
