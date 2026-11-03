@@ -482,6 +482,7 @@ def tc27_online_update_checks():
         http('POST', '/api/settings', {'update_url': url})
         return wait_until('check done', lambda: (lambda u: u if not u['checking'] else None)(status()['update']), 40, 0.5)
 
+    before = status()['update']['url']
     check(http('POST', '/api/settings', {'update_url': 'ftp://x/m.json'})[0] == 400, 'non-HTTP URL refused')
     http('POST', '/api/settings', {'update_url': ''})
     check(http('POST', '/api/update/check')[0] == 409, 'check without a URL refused')
@@ -493,8 +494,8 @@ def tc27_online_update_checks():
     u = checked('https://example.com/p4gw/manifest.json')
     check(u['error'] == 'manifest: HTTP 404', f'HTTPS reaches the server (certificate bundle): {u["error"]}')
     check(http('POST', '/api/update/install')[0] == 409, 'still nothing to install')
-    http('POST', '/api/settings', {'update_url': ''})
-    check(status()['update']['url'] == '', 'URL cleared')
+    http('POST', '/api/settings', {'update_url': before})
+    check(status()['update']['url'] == before, f'URL back to {before or "off"}')
 
 
 def _tone_wav(path, hz, seconds=1.5, lead=0.4):
