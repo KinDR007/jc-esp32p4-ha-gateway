@@ -63,6 +63,10 @@ CONFIG_MBEDTLS_CMAC_C=y
 CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE=y
 CONFIG_MBEDTLS_ECJPAKE_C=y
+# TLS sessions (update checks, OTA, Telegram, MQTT over TLS) take about 40 kB each: from PSRAM, the
+# internal RAM stays for the network stack and the radios. No mbedTLS code runs in an ISR or while
+# the flash cache is off.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
 # OpenThread border router, RCP over UART
 CONFIG_OPENTHREAD_ENABLED=y

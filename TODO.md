@@ -109,7 +109,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 
 **F0 Příprava**
 - [x] F0.1 Rozpracované změny zacommitované (707a67a); `dependencies.lock` s absolutní cestou zůstává mimo commit (viz Wi-Fi uplink)
-- [ ] F0.2 Rozpočet RAM/PSRAM: mapa využití, kandidáti na přesun do PSRAM s ohledem na stabilitu. Změřeno 2026-11-03: interní RAM volná 108–129 kB (minimum 75 kB, největší blok 64 kB), statická 279 kB; PSRAM volná 24 MB z 32 MB. `s_bands` zvuku zhuštěn (66 kB → 2,4 kB .bss, výstup bit po bitu shodný, TC14/TC28/TC31), statická RAM 279 → 215 kB, volná interní 168 kB (minimum 134 kB). Zbývající kandidáti: mbedTLS alokace do PSRAM, `s_kept` (16 kB, log přes restart); OpenThread instance zůstává interně
+- [x] F0.2 Rozpočet RAM/PSRAM: mapa využití, kandidáti na přesun do PSRAM s ohledem na stabilitu. Změřeno 2026-11-03: interní RAM volná 108–129 kB (minimum 75 kB, největší blok 64 kB), statická 279 kB; PSRAM volná 24 MB z 32 MB. `s_bands` zvuku zhuštěn (66 kB → 2,4 kB .bss, výstup bit po bitu shodný, TC14/TC28/TC31), statická RAM 279 → 215 kB, volná interní 168 kB (minimum 134 kB). mbedTLS v PSRAM (volná interní RAM při TLS ~190 kB místo 128 kB, minimum po startu 145 kB místo 85 kB; TC04/10/27/35). `s_kept` (16 kB, log přes restart) a OpenThread instance zůstávají interně
 - [x] F0.3 Layout v4a (gw_a 0x20000 4 MB, gw_b 0x420000 4 MB, od `c6fw` beze změny, 28 % volného místa), `scripts/migrate_layout_v4.sh` (s `--rollback`), deska převedena 2026-11-03, TC10 (OTA do nového gw_b), TC14, TC27, TC37 (vydání pro v3 na v4) prošly; v1.9 nastartovala na v4
 - [x] Oprava: instalace staré nabídky po změně nebo smazání URL manifestu, než ji úloha znovu zkontroluje (TC27 instaloval v1.9 z GitHubu)
 

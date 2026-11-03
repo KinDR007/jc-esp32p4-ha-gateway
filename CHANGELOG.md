@@ -9,6 +9,8 @@
   still offered on v4, a manifest names only layout 4 when `p4gw.bin` is larger than 3 MB.
 - Sound: the mel filter bank keeps only the used weights (66 kB -> 2.4 kB of internal RAM, same
   output bit for bit).
+- mbedTLS allocates from PSRAM: a TLS session (update check, OTA, Telegram, MQTT over TLS) no longer
+  takes about 40 kB of internal RAM; the lowest free internal RAM since start went from 85 to 145 kB.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.
