@@ -61,15 +61,16 @@ static const char *const s_pages[] = {
     "sound/live",     "sound/events",   "sound/log",     "sound/classes",   "sound/learn",
     "ha/guide",       "ha/mqtt",        "ha/esphome",    "system/info",     "system/lan",
     "system/firmware", "system/diag",   "system/netscan", "system/settings", "system/maint",
+    "system/hw",
 };
 #define PAGES (sizeof(s_pages) / sizeof(s_pages[0]))
 
 /* defaults of the user and viewer roles, in the order of s_pages (0 hidden, 1 read, 2 edit) */
 static const uint8_t s_default_levels[2][PAGES] = {
     /* user: operates the gateway, no firmware, maintenance, MQTT or system settings */
-    {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 0, 1},
+    {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 0, 1, 2},
     /* viewer: reads, no keys (Thread settings, Zigbee backups, MQTT, system settings, maintenance) */
-    {1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0},
+    {1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1},
 };
 
 typedef struct {
@@ -846,6 +847,9 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/radios/thread/forget", -1, "thread/settings", 2},
     {"/api/radios", -1, "system/maint", 1},
     {"/api/c6/backup", -1, "system/maint", 2},
+    {"/api/sensors", HTTP_GET, "system/hw", 1},
+    {"/api/sensors", HTTP_PUT, "system/hw", 2},
+    {"/api/sensors/scan", -1, "system/hw", 2},
     {"/api/ws", -1, "*", 1},
     {"/api/notify", -1, "*", 1},
     {"/api/auth/me", -1, "self", 1},

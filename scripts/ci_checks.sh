@@ -11,6 +11,9 @@ cc -std=c11 -Wall -Wextra -Werror -o "$tmp/zb_filter_test" tests/unit/zb_filter_
 cc -std=c11 -Wall -Wextra -Werror -I firmware/gateway/components/sound -o "$tmp/aweight_test" \
     tests/unit/aweight_test.c firmware/gateway/components/sound/sound_aweight.c -lm
 "$tmp/aweight_test"
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -I firmware/gateway/components/sensors -o "$tmp/sensor_drv_test" \
+    tests/unit/sensor_drv_test.c -lm
+"$tmp/sensor_drv_test"
 
 echo "== API description matches the firmware"
 python3 tests/unit/api_spec_test.py

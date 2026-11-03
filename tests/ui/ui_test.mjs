@@ -631,7 +631,7 @@ await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certific
   await page.click('[data-mqp="integration"]');
   check(await groups() === 'sound_triggers', 'preset Only what the integration lacks: sound event device triggers only');
   await page.click('[data-mqp="all"]');
-  check(await groups() === 'roles,system,update,sound,sound_events,sound_triggers', 'preset All: every group');
+  check(await groups() === 'roles,system,update,sound,sound_events,sound_triggers,sensors', 'preset All: every group');
   await page.fill('#mq-uri', uri);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
@@ -794,6 +794,44 @@ await test('UI30', 'System › API: every endpoint of /api/help listed, filter, 
   check((await page.textContent('.api-ep[data-api-ep="GET /api/status"] .api-out')).startsWith('HTTP 200'), 'Try it: GET /api/status answered 200');
   await page.fill('#api-token', '');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI31', 'System › Hardware: wiring (CN3), scan with the onboard codec, supported types, add by hand, rename and expose, remove; the configuration of before comes back', async () => {
+  const before = await (await page.request.get(base + 'api/sensors')).json();
+  const keep = before.sensors.map(({ addr, type, chip, name, expose, enabled }) => ({ addr, type, chip, name, expose, enabled }));
+  try {
+    await tab('system/hw');
+    await page.waitForSelector('#hw-types tr:nth-child(2)', { timeout: 15000 });
+    check((await page.textContent('#main')).includes('1 GND, 2 3.3 V, 3 SCL, 4 SDA'), 'wiring of CN3 shown');
+    check(await page.$$eval('#hw-types tr', r => r.length - 1) === before.types.length, `${before.types.length} supported types listed`);
+    await page.click('#hw-scan');
+    await page.waitForFunction(() => /Added|No new sensor/.test(document.querySelector('#toast').textContent), null, { timeout: 30000 });
+    check((await page.textContent('#hw-found')).includes('ES8311'), `scan: codec at 0x18 listed (${await toastText()})`);
+    const free = [0x77, 0x76].find(a => !before.sensors.some(s => s.addr === a) && !before.scan.devices.some(d => d.addr === a));
+    await page.fill('#hw-add-addr', '0x' + free.toString(16));
+    const opts = await page.$$eval('#hw-add-type option', o => o.map(x => x.value));
+    check(opts.includes('bme280') && !opts.includes('sht3x'), `types offered for 0x${free.toString(16)}: ${opts.join(', ')}`);
+    await page.selectOption('#hw-add-type', 'bme280');
+    await page.click('#hw-add');
+    const row = `tr[data-hw="${free}"]`;
+    await page.waitForSelector(row);
+    await page.fill(`${row} [data-hw-name]`, 'Ložnice UI31');
+    await page.uncheck(`${row} [data-hw-expose]`);
+    await page.click('#hw-save');
+    await page.waitForFunction(() => document.querySelector('#toast').textContent === 'Saved', null, { timeout: 5000 });
+    const s = (await (await page.request.get(base + 'api/sensors')).json()).sensors.find(x => x.addr === free);
+    check(s && s.name === 'Ložnice UI31' && !s.expose && s.chip === 'BME280', 'stored: name with diacritics, not exposed');
+    await page.waitForFunction(r => /error|starting/.test(document.querySelector(r + ' td:nth-child(5)')?.textContent || ''), row, { timeout: 15000 });
+    check(true, `state of the missing sensor: ${(await page.textContent(`${row} td:nth-child(5)`)).trim()}`);
+    await page.click(`[data-hw-del="${free}"]`);
+    await page.waitForSelector('#confirm[open]');
+    await page.click('#confirm button[value="yes"]');
+    await page.waitForFunction(r => !document.querySelector(r), row, { timeout: 5000 });
+    check(!(await (await page.request.get(base + 'api/sensors')).json()).sensors.some(x => x.addr === free), 'removed');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/sensors', { data: { interval_s: before.interval_s, sensors: keep } });
+  }
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

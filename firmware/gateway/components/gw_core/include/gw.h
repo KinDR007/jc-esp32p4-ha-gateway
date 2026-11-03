@@ -304,16 +304,22 @@ typedef enum {
     GW_MQTT_SOUND = 1 << 3,        /* sound level and noise */
     GW_MQTT_SOUND_EVENTS = 1 << 4, /* event and binary sensor per sound event */
     GW_MQTT_SOUND_TRIGGERS = 1 << 5, /* device trigger per sound event (the integration has none) */
-    GW_MQTT_ALL = 0x3f,
+    GW_MQTT_SENSORS = 1 << 6,      /* I2C sensors set to be exposed */
+    GW_MQTT_ALL = 0x7f,
 } gw_mqtt_group_t;
-/* Extra discovery entities (called on every connect) and extra keys in the state JSON. */
+/* Extra discovery entities (called on every connect) and extra keys in the state JSON; one pair per
+ * component (up to 4). */
 void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state));
+/* The entities of an extension changed: discovery again (from any task, done by the publish task, which
+ * also does it after every connect). Extension callbacks therefore run in that task, never in the MQTT
+ * client's task. */
+void gw_mqtt_rediscover(void);
 /* One retained discovery config; value_template reads the shared state topic, extra adds fields. */
 void gw_mqtt_entity(gw_mqtt_group_t group, const char *component, const char *object_id, const char *name,
                     const char *value_template, void (*extra)(cJSON *cfg));
 /* Publishes a discovery config (unique_id, availability and device are added); cfg is consumed.
  * cfg NULL, discovery off or the group left out removes the entity. component "device_automation"
- * for device triggers. */
+ * for device triggers. A cfg with its own "availability" list gets no availability_topic. */
 void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char *object_id, cJSON *cfg);
 bool gw_mqtt_connected(void);
 /* "off" (not configured or disabled), "connected" or "disconnected" */

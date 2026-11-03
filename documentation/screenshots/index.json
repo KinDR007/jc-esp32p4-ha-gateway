@@ -651,5 +651,30 @@
     "file": "zigbee_backups__zigbee__1"
    }
   ]
+ },
+ "system/hw": {
+  "page": "system_hw",
+  "cards": [
+   {
+    "title": "I2C BUS (GPIO7 SDA, GPIO8 SCL)",
+    "file": "system_hw__1"
+   },
+   {
+    "title": "FOUND ON THE BUS",
+    "file": "system_hw__2"
+   },
+   {
+    "title": "SENSORS",
+    "file": "system_hw__3"
+   },
+   {
+    "title": "ADD MANUALLY",
+    "file": "system_hw__4"
+   },
+   {
+    "title": "SUPPORTED SENSORS",
+    "file": "system_hw__5"
+   }
+  ]
  }
 }

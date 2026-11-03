@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- I2C sensors on connector CN3 (or JP1), System › Hardware: 24 chip families (Bosch BME/BMP, Sensirion
+  SHT3x/SHT4x/SCD4x/SGP30, AHT2x, Si7021/HTU21D, HDC1080, ENS160, PMSA003I, BH1750, VEML7700, TSL25x1,
+  LTR390, OPT3001, MAX44009, TMP117, MCP9808). A scan at every start and on request identifies chips by
+  their ID registers and adds those recognised without doubt; for shared addresses the user picks the
+  chip. Name, expose and enable per sensor, read interval. API `/api/sensors`, `/api/sensors/scan`,
+  Telegram `/sensors`, page permission `system/hw` ([docs/sensors.md](docs/sensors.md)).
+- Home Assistant: integration 1.6.0 adds a sensor entity per exposed I2C sensor and quantity; MQTT
+  discovery group `sensors` (a stored "all groups" of older firmware includes it).
+- MQTT: discovery and the state are published only by the publish task, never from the client's event
+  handler; this removes a deadlock between the MQTT client and components that publish while holding
+  their own lock (sound events, sensors) after a reconnect.
+- The I2C bus is shared through gw_core (`gw_i2c`); docs/hardware.md describes the bus, CN3, RS485
+  and the other interfaces from the full schematics.
 - API reference: the response of `/api/thread/topology` (router, child and vendor fields, time limits)
   and the meaning of the Telegram levels (0 off, 1 critical, 2 warnings and critical, 3 all; quiet hours
   critical only) checked against the code.

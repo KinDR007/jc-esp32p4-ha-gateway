@@ -362,6 +362,24 @@ PAGES = [
       "CURRENT STATE": T("Which radio runs the uplink, its address, signal and whether it carries the traffic.", "Které rádio uplink provozuje, jeho adresa, signál a zda nese provoz."),
       "TRAFFIC OVER WI-FI": T("Rates and totals per service, like System › LAN.", "Rychlosti a součty po službách, jako Systém › LAN.")},
      None, ["system_wifi"]),
+    ("system/hw", "expansion-card-variant", T("System › Hardware", "Systém › Hardware"),
+     T("I2C sensors on connector CN3 (or JP1): scan, recognition, names and what goes to Home Assistant.",
+       "I2C senzory na konektoru CN3 (nebo JP1): sken, rozpoznání, jména a co jde do Home Assistant."),
+     {"I2C BUS (GPIO7 SDA, GPIO8 SCL)": T("Wiring of CN3 and JP1, the codec on the bus and <b>Scan the bus</b>.", "Zapojení CN3 a JP1, kodek na sběrnici a <b>Skenovat sběrnici</b>."),
+      "FOUND ON THE BUS": T("Every address that answered: the configured sensor, a choice of chips when several fit (✓ sure), or what the address usually is.",
+                            "Každá adresa, která odpověděla: nastavený senzor, výběr čipů, když jich sedí víc (✓ jistě), nebo co na adrese obvykle bývá."),
+      "SENSORS": T("Name (shown in Home Assistant), chip, address, current values, state, <b>Expose</b> and <b>Enabled</b>; the read interval.",
+                   "Jméno (zobrazí Home Assistant), čip, adresa, aktuální hodnoty, stav, <b>Exponovat</b> a <b>Zapnuto</b>; interval čtení."),
+      "ADD MANUALLY": T("Address and type for a sensor the scan cannot settle.", "Adresa a typ pro senzor, který sken nerozhodne."),
+      "SUPPORTED SENSORS": T("24 chip families with their addresses (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/sensors.md\">sensors.md</a>).",
+                             "24 rodin čipů s adresami (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/sensors.md\">sensors.md</a>).")},
+     T("""<ol><li>Connect the sensor to CN3 (1 GND, 2 3.3 V, 3 SCL, 4 SDA) with the gateway off and start it.</li>
+       <li>The start scans the bus and adds what it recognises; <b>Scan the bus</b> does it again. For a chip the scan cannot tell apart pick it under <i>Found on the bus</i> and press <b>Add</b>.</li>
+       <li>Give it a name and <b>Save</b>. The P4 Gateway integration shows its values as sensors; MQTT does too with the group <i>I2C sensors</i>.</li></ol>""",
+       """<ol><li>Připojte senzor na CN3 (1 GND, 2 3,3 V, 3 SCL, 4 SDA) při vypnuté bráně a bránu zapněte.</li>
+       <li>Start projde sběrnici a přidá, co rozpozná; <b>Skenovat sběrnici</b> to zopakuje. U čipu, který sken nerozliší, ho vyberte v <i>Nalezeno na sběrnici</i> a stiskněte <b>Přidat</b>.</li>
+       <li>Pojmenujte ho a <b>Uložte</b>. Integrace P4 Gateway ukáže jeho hodnoty jako senzory; MQTT také se skupinou <i>I2C senzory</i>.</li></ol>"""),
+     ["system_hw"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",

@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "gw.h"
+#include "gw_i2c.h"
 #include "mdns.h"
 #include "netscan.h"
 #include "role_esphome.h"
@@ -23,6 +24,7 @@
 #include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
+#include "sensors.h"
 #include "sound.h"
 #include "sdkconfig.h"
 
@@ -631,7 +633,9 @@ void app_main(void)
     role_esphome_init();
     role_wifi_init();
     zigbee_net_init(); /* before MQTT connects: it subscribes on connect */
+    gw_i2c_init(); /* codec and I2C sensors; a failure leaves both off, not the gateway */
     sound_init();
+    sensors_init();
     gw_mqtt_start();
     gw_update_start();
     gw_inet_start();

@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "driver/i2c_master.h"
+#include "gw_i2c.h"
 #include "driver/i2s_std.h"
 #include "esp_check.h"
 #include "esp_codec_dev.h"
@@ -30,8 +30,6 @@
 
 static const char *TAG = "sound";
 
-#define PIN_I2C_SDA 7
-#define PIN_I2C_SCL 8
 #define PIN_I2S_MCLK 13
 #define PIN_I2S_BCLK 12
 #define PIN_I2S_WS 10
@@ -164,16 +162,8 @@ static const char *class_name(int i)
 
 static esp_err_t audio_open(void)
 {
-    i2c_master_bus_config_t bus_cfg = {
-        .i2c_port = -1,
-        .sda_io_num = PIN_I2C_SDA,
-        .scl_io_num = PIN_I2C_SCL,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus;
-    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &bus), TAG, "I2C bus");
+    i2c_master_bus_handle_t bus = gw_i2c_bus();
+    ESP_RETURN_ON_FALSE(bus, ESP_ERR_INVALID_STATE, TAG, "I2C bus");
 
     i2s_chan_handle_t rx;
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
@@ -195,7 +185,7 @@ static esp_err_t audio_open(void)
     ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(rx, &std_cfg), TAG, "I2S std mode");
 
     audio_codec_i2s_cfg_t i2s_cfg = {.port = I2S_NUM_0, .rx_handle = rx, .tx_handle = NULL};
-    audio_codec_i2c_cfg_t i2c_cfg = {.port = 0, .addr = ES8311_CODEC_DEFAULT_ADDR, .bus_handle = bus};
+    audio_codec_i2c_cfg_t i2c_cfg = {.port = 0, .addr = ES8311_CODEC_DEFAULT_ADDR, /* 8-bit form of GW_I2C_CODEC_ADDR */ .bus_handle = bus};
     const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
     const audio_codec_ctrl_if_t *ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
     const audio_codec_gpio_if_t *gpio_if = audio_codec_new_gpio();

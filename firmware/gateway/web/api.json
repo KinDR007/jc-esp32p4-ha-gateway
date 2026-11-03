@@ -3162,7 +3162,8 @@
               "update",
               "sound",
               "sound_events",
-              "sound_triggers"
+              "sound_triggers",
+              "sensors"
             ],
             "interval": 60,
             "base_topic": "p4gw/p4gw-a1b2c3",
@@ -3215,14 +3216,196 @@
             {
               "code": 400,
               "when": {
-                "en": "A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers.",
-                "cs": "Neplatné pole (zpráva říká které): uri musí začínat mqtt://, mqtts://, ws:// nebo wss:// (max 120); user, password, client_id max 63; prefix 1 až 31 znaků bez zástupných znaků, mezer a krajních lomítek; základní téma bez #, +, mezer a krajních lomítek (max 63); tls bundle nebo ca; ca certifikát PEM do 3999 znaků, povinný při tls ca; keepalive 10 až 240; interval 10 až 3600; discovery_groups z roles, system, update, sound, sound_events, sound_triggers."
+                "en": "A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors.",
+                "cs": "Neplatné pole (zpráva říká které): uri musí začínat mqtt://, mqtts://, ws:// nebo wss:// (max 120); user, password, client_id max 63; prefix 1 až 31 znaků bez zástupných znaků, mezer a krajních lomítek; základní téma bez #, +, mezer a krajních lomítek (max 63); tls bundle nebo ca; ca certifikát PEM do 3999 znaků, povinný při tls ca; keepalive 10 až 240; interval 10 až 3600; discovery_groups z roles, system, update, sound, sound_events, sound_triggers, sensors."
               }
             }
           ],
           "effects": {
             "en": "Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.",
             "cs": "Tělo do 8 kB. Uloží do NVS, pak klienta MQTT zastaví a znovu spustí. Vypnutí discovery nebo skupiny nejdřív odebere ty entity z Home Assistantu. interval je perioda publikace stavu v sekundách. Vrací nový stav jako GET."
+          }
+        }
+      ]
+    },
+    {
+      "id": "sensors",
+      "title": {
+        "en": "I2C sensors",
+        "cs": "I2C senzory"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/sensors",
+          "perm": "system/hw",
+          "level": 1,
+          "summary": {
+            "en": "I2C sensors on header JP1: configuration, state, values, the last scan and the supported types.",
+            "cs": "I2C senzory na konektoru JP1: nastavení, stav, hodnoty, poslední sken a podporované typy."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "bus": {
+              "ok": true,
+              "sda": 7,
+              "scl": 8,
+              "khz": 100
+            },
+            "interval_s": 30,
+            "max_sensors": 16,
+            "sensors": [
+              {
+                "id": "i2c_76",
+                "addr": 118,
+                "type": "bme280",
+                "chip": "BME280",
+                "name": "Living room",
+                "expose": true,
+                "enabled": true,
+                "state": "ok",
+                "error": "",
+                "quantities": [
+                  "temperature",
+                  "humidity",
+                  "pressure"
+                ],
+                "values": {
+                  "temperature": 21.4,
+                  "humidity": 45.2,
+                  "pressure": 1004.1
+                },
+                "age_s": 3.2,
+                "reads": 120,
+                "errors": 0
+              }
+            ],
+            "scan": {
+              "done": true,
+              "time": 1793700000,
+              "ago_s": 42,
+              "devices": [
+                {
+                  "addr": 24,
+                  "onboard": true,
+                  "configured": false,
+                  "hint": "ES8311 audio codec (on the board)",
+                  "candidates": []
+                },
+                {
+                  "addr": 68,
+                  "onboard": false,
+                  "configured": false,
+                  "hint": "",
+                  "candidates": [
+                    {
+                      "type": "sht4x",
+                      "chip": "SHT4x",
+                      "sure": true
+                    }
+                  ]
+                },
+                {
+                  "addr": 118,
+                  "onboard": false,
+                  "configured": true,
+                  "hint": "DPS310, SPL06, MS5611 (not supported)",
+                  "candidates": []
+                }
+              ]
+            },
+            "types": [
+              {
+                "type": "bme280",
+                "label": "BME280",
+                "vendor": "Bosch",
+                "note": "GY-BME280 (0x76), Adafruit and SparkFun (0x77)",
+                "addrs": [
+                  118,
+                  119
+                ],
+                "quantities": [
+                  "temperature",
+                  "humidity",
+                  "pressure"
+                ]
+              }
+            ],
+            "quantities": [
+              {
+                "key": "temperature",
+                "name": "Temperature",
+                "unit": "°C",
+                "device_class": "temperature",
+                "precision": 1
+              }
+            ]
+          },
+          "effects": {
+            "en": "values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes.",
+            "cs": "values obsahuje jen čerstvé hodnoty (u senzoru, který přestal odpovídat, žádné a chybí age_s). state: ok, starting, stale (tři periody bez nové hodnoty), error (proč říká error; senzor se znovu spouští každých 60 s) nebo off. scan.devices uvádí každou adresu, která odpověděla: onboard je kodek desky, candidates čipy, které identifikace našla (sure: shodl se ID registr nebo ID příkaz; jinak čip jen odpovídá podobně). types uvádí všechny podporované čipy s adresami; quantities jednotky a třídy zařízení Home Assistant."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/sensors",
+          "perm": "system/hw",
+          "level": 2,
+          "summary": {
+            "en": "Sets the read interval and/or replaces the list of sensors.",
+            "cs": "Nastaví interval čtení a/nebo nahradí seznam senzorů."
+          },
+          "body": {
+            "interval_s": 30,
+            "sensors": [
+              {
+                "addr": 118,
+                "type": "bme280",
+                "name": "Living room",
+                "expose": true,
+                "enabled": true
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "...": "same as GET /api/sensors"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "interval_s not 5..3600; more than 16 sensors; addr outside 0x08..0x77, 0x18 (the codec) or not an address of the type; unknown type; an address twice; name over 32 characters or with quotes, braces or backslash.",
+                "cs": "interval_s mimo 5..3600; víc než 16 senzorů; addr mimo 0x08..0x77, 0x18 (kodek) nebo adresa, kterou typ nemůže mít; neznámý typ; adresa dvakrát; jméno delší než 32 znaků nebo s uvozovkami, složenými závorkami či zpětným lomítkem."
+              }
+            }
+          ],
+          "effects": {
+            "en": "sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant.",
+            "cs": "sensors nahradí celý seznam (pošlete i ty, které mají zůstat). name je výchozí podle čipu, expose a enabled true; chip (přesný čip, např. BME688) se uloží, jak přišel. Senzor se stejnou adresou a typem běží dál; odebrané se zastaví a jejich entity MQTT se odstraní. expose: integrace a MQTT (skupina discovery sensors) ho ukážou v Home Assistant."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sensors/scan",
+          "perm": "system/hw",
+          "level": 2,
+          "summary": {
+            "en": "Scans the bus, identifies new chips and adds those recognised without doubt.",
+            "cs": "Projde sběrnici, rozpozná nové čipy a přidá ty rozpoznané bez pochybností."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "added": [
+              68
+            ],
+            "...": "same as GET /api/sensors"
+          },
+          "effects": {
+            "en": "Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors and the codec are only probed, not identified. A chip is added when exactly one type is sure, or when exactly one type answers like it; otherwise it waits in scan.devices for a PUT with the chosen type. The gateway also scans at every start.",
+            "cs": "Trvá až několik sekund (SCD4x potřebuje 0,5 s). Nastavené senzory a kodek se jen ověří odpovědí, neidentifikují se. Čip se přidá, když je si jistý právě jeden typ, nebo když podobně odpovídá právě jeden typ; jinak čeká v scan.devices na PUT se zvoleným typem. Brána skenuje i při každém startu."
           }
         }
       ]

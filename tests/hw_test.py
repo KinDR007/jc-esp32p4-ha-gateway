@@ -703,21 +703,30 @@ def tc46_mqtt_discovery_groups():
     try:
         for bad in (['bogus'], 'roles', [1]):
             check(http('POST', '/api/mqtt', {'discovery_groups': bad})[0] == 400, f'refused: discovery_groups {bad!r}')
-        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers']
+        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors']
+        # an I2C sensor to expose (need not be connected: its entity exists, unavailable)
+        sensors = http('GET', '/api/sensors')[1]['sensors']
+        if not any(x['addr'] == 0x76 for x in sensors):
+            sensors = sensors + [{'addr': 0x76, 'type': 'bme280', 'name': 'TC46'}]
+        check(http('PUT', '/api/sensors', {'sensors': [dict(x, expose=True, enabled=True) for x in sensors]})[0] == 200, 'I2C sensor at 0x76 exposed')
         code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle',
                                              'base': '', 'prefix': 'homeassistant', 'discovery': True,
                                              'discovery_groups': all_groups, 'enabled': True})
         check(code == 200 and connected()['discovery_groups'] == all_groups, 'test broker, every group')
         time.sleep(2)
-        entities = {('sensor', 'role'): 'roles', ('sensor', 'uptime'): 'system', ('update', 'firmware'): 'update'}
-        check(all(retained(c, o) for c, o in entities), 'role, uptime and firmware entities published')
+        entities = {('sensor', 'role'): 'roles', ('sensor', 'uptime'): 'system', ('update', 'firmware'): 'update',
+                    ('sensor', 'i2c_76_temperature'): 'sensors'}
+        check(all(retained(c, o) for c, o in entities), 'role, uptime, firmware and I2C sensor entities published')
+        cfg = json.loads(retained('sensor', 'i2c_76_temperature'))
+        check(cfg['device_class'] == 'temperature' and cfg['availability_mode'] == 'all' and len(cfg['availability']) == 2
+              and 'availability_topic' not in cfg, 'I2C sensor entity: temperature, unavailable without a value or without the gateway')
         events = subprocess.run(['mosquitto_sub', '-h', host, '-p', port, '-t', f'homeassistant/binary_sensor/{name}/+/config',
                                  '-v', '-W', '3'], capture_output=True, text=True).stdout.split()
         sound_events = [t.split('/')[3] for t in events if t.startswith('homeassistant/') and '/snd_' in t]
         check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_triggers']})[0] == 200, 'preset: only what the integration lacks')
         check(connected()['discovery_groups'] == ['sound_triggers'], 'stored: sound_triggers')
         time.sleep(2)
-        check(all(not retained(c, o) for c, o in entities), 'role, uptime and firmware entities removed (empty retained config)')
+        check(all(not retained(c, o) for c, o in entities), 'role, uptime, firmware and I2C sensor entities removed (empty retained config)')
         if sound_events:
             check(not retained('binary_sensor', sound_events[0]), f'sound event binary sensor {sound_events[0]} removed')
             trigger = sound_events[0][:-len('_active')]
@@ -728,12 +737,61 @@ def tc46_mqtt_discovery_groups():
         time.sleep(2)
         check(all(retained(c, o) for c, o in entities), 'entities published again')
     finally:
-        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers']})
+        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors']})
         code, r = http('POST', '/api/settings/import', backup)
         check(code == 200, 'original settings imported, the gateway restarts')
         wait_restart(status()['role']['desired'])
     m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] or not m['enabled'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
     check(m['uri'] == backup['keys'].get('mqtt_uri', {}).get('str', m['uri']), f'original broker {m["uri"]}')
+
+
+def tc47_i2c_sensors():
+    """I2C sensors on JP1: the scan finds the board's codec and leaves it alone, the configuration is checked
+    and kept, a sensor that does not answer shows its error, the microphone keeps working on the shared bus.
+    Sensors connected for real must give plausible values. The configuration of before comes back."""
+    code, before = http('GET', '/api/sensors')
+    check(code == 200 and before['bus']['ok'] and before['bus']['sda'] == 7 and before['bus']['scl'] == 8, 'bus on GPIO7/8')
+    keep = [{k: x[k] for k in ('addr', 'type', 'chip', 'name', 'expose', 'enabled')} for x in before['sensors']]
+    snd = http('GET', '/api/sound/status')[1]
+    try:
+        code, r = http('POST', '/api/sensors/scan', timeout=60)
+        devices = {d['addr']: d for d in r['scan']['devices']}
+        check(code == 200 and r['scan']['done'], f'scan: {", ".join(f"0x{a:02x}" for a in devices)}, added {r["added"]}')
+        check(0x18 in devices and devices[0x18]['onboard'] and not devices[0x18]['candidates'], 'ES8311 codec at 0x18, not taken for a sensor')
+        for a, d in devices.items():
+            if a != 0x18 and not d['configured']:
+                log(f'0x{a:02x}: {[c["chip"] + (" (sure)" if c["sure"] else "") for c in d["candidates"]] or d["hint"] or "unknown"}')
+        for bad, why in ((0x18, 'codec address'), (0x40, 'address the type cannot have')):
+            check(http('PUT', '/api/sensors', {'sensors': [{'addr': bad, 'type': 'bme280'}]})[0] == 400, f'refused: {why}')
+        for body, why in (({'sensors': [{'addr': 0x76, 'type': 'x'}]}, 'unknown type'), ({'interval_s': 1}, 'interval 1 s'),
+                          ({'sensors': [{'addr': 0x76, 'type': 'bme280'}, {'addr': 0x76, 'type': 'bmp280'}]}, 'address twice'),
+                          ({'sensors': [{'addr': 0x76, 'type': 'bme280', 'name': 'x' * 33}]}, 'name of 33 characters')):
+            check(http('PUT', '/api/sensors', body)[0] == 400, f'refused: {why}')
+        absent = next(a for a in (0x77, 0x76) if a not in devices)
+        name = 'Obývák ' + 'ž' * 25  # 32 characters, 57 bytes
+        code, r = http('PUT', '/api/sensors', {'interval_s': 10, 'sensors': [{'addr': absent, 'type': 'bme280', 'name': name}]})
+        check(code == 200 and r['interval_s'] == 10 and r['sensors'][0]['name'] == name and r['sensors'][0]['chip'] == 'BME280',
+              'stored: interval 10 s, BME280 with a name of 32 characters with diacritics')
+        s = wait_until('error of the sensor that does not answer', lambda: (lambda x: x if x['state'] == 'error' else None)(
+            http('GET', '/api/sensors')[1]['sensors'][0]), 15, 1)
+        check(not s['values'] and s['errors'] >= 1, f'no values, error "{s["error"]}"')
+        if devices.keys() - {0x18}:
+            r = http('PUT', '/api/sensors', {'sensors': keep})[1]
+            r = http('POST', '/api/sensors/scan', timeout=60)[1]
+            real = [x for x in r['sensors'] if x['addr'] in devices]
+            limits = {'temperature': (-30, 60), 'humidity': (1, 100), 'pressure': (850, 1100), 'illuminance': (0, 150000),
+                      'co2': (300, 10000), 'eco2': (400, 65000), 'tvoc': (0, 65000), 'aqi': (1, 5)}
+            for x in real:
+                v = wait_until(f'values of {x["chip"]} at 0x{x["addr"]:02x}', lambda: (lambda y: y if y and y['state'] == 'ok' else None)(
+                    next((y for y in http('GET', '/api/sensors')[1]['sensors'] if y['addr'] == x['addr']), None)), 90, 3)
+                odd = {k: val for k, val in v['values'].items() if k in limits and not limits[k][0] <= val <= limits[k][1]}
+                check(not odd, f'{x["chip"]}: {v["values"]}' + (f', implausible {odd}' if odd else ''))
+        snd2 = http('GET', '/api/sound/status')[1]
+        check(snd2['running'] == snd['running'] and snd2.get('read_errors', 0) == snd.get('read_errors', 0),
+              f'microphone {"running" if snd2["running"] else "off"} as before, no new read errors')
+    finally:
+        code, r = http('PUT', '/api/sensors', {'interval_s': before['interval_s'], 'sensors': keep})
+        check(code == 200 and len(r['sensors']) == len(keep), 'configuration of before restored')
 
 
 def tc13_rcp_reflash():
@@ -1983,7 +2041,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2010,7 +2068,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

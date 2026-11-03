@@ -3,6 +3,8 @@
 Module JC-ESP32P4-M3: ESP32-P4NRW32 (16 MB Boya flash, 32 MB PSRAM) and an ESP32-C6 co-processor.
 Schematics: [schematics/](schematics/), source
 [makergo1024/JC-ESP32P4-M3-DEV-v3.2](https://github.com/makergo1024/JC-ESP32P4-M3-DEV-v3.2/tree/main/5-Schematic).
+All eight sheets (also USB and RS485, MIPI DSI/CSI, RJ45, touch) with an ESPHome example:
+[p1ngb4ck/unofficial_guition_esp32p4_repo](https://github.com/p1ngb4ck/unofficial_guition_esp32p4_repo/tree/main/JC-ESP32P4-M3-Dev).
 
 ## Chip revision
 
@@ -72,6 +74,33 @@ Net labels in the schematic sit **above** the wire they name.
 Pin 26 stays unconnected: the P4 drives C6 CHIP_PU through GPIO54 inside the module. Check pin 1
 with a multimeter (3.3 V against GND, pin 2 shows 5 V) before wiring. The working wiring is
 confirmed by TC03 (full C6 flash read over JP1).
+
+## I2C bus (ES_I2C, GPIO7 SDA / GPIO8 SCL)
+
+One bus for everything on the board ([sensors.md](sensors.md) for the sensors the gateway reads):
+
+| Where | Pins | Notes |
+|---|---|---|
+| **CN3**, 4-pin connector (same small type as the UART connector CN2) | 1 GND, 2 3.3 V, 3 SCL, 4 SDA | the place for I2C sensors |
+| JP1 | 23 SDA, 25 SCL; 3.3 V on 1/3, GND on 5 | the radio header |
+| ES8311 audio codec | address 0x18 | the microphone |
+| DSI display connector J2 | 11 SCL, 12 SDA | a display's touch controller (GT911 at 0x5d or 0x14) and backlight controller (0x45 on Waveshare panels) appear on the bus |
+| CSI camera connector J3 | 13 SCL, 14 SDA | camera sensor (e.g. OV5647 0x36) |
+| touch FPC1 | 3 SDA, 4 SCL (nets RTC_DAT/SDA1, RTC_CLK/SCL1 = ES_I2C) | INT GPIO21, RST GPIO22 |
+
+Pull-ups on the board: 2.2 kΩ (R29, R31 at the camera connector) and 5.1 kΩ (R65, R71 at FPC1),
+besides the weak internal ones the gateway enables. The bus is not taken from the gateway's other
+roles; the sound component configures the codec at its start only.
+
+## Other interfaces (not used by the gateway)
+
+| Interface | Pins | Notes |
+|---|---|---|
+| RS485 (MAX485, connector J4: A, B, 5 V, GND) | TX1 = GPIO26, RX1 = GPIO27 | direction switched automatically from TX by a 74LVC1G132 and a transistor; TVS and 0.1 A fuses on A/B. A possible Modbus RTU interface |
+| Speaker amplifier NS4150 (CN1) | PA_CTRL = GPIO11 | DAC output of the ES8311 |
+| Display backlight | LCD_PWM = GPIO23 | |
+| SD card | SDIO GPIO39-44, power switch GPIO45 | |
+| Battery | charger IP5306 (CN4), voltage divider 68k/100k on GPIO53 | |
 
 ## C6 telemetry
 

@@ -15,8 +15,8 @@ Deleting all users opens the gateway again (the last admin can be deleted only a
 | Role | Default |
 |---|---|
 | Admin | every page and action, user management, cannot be limited |
-| User | operates the gateway; reads Home Assistant pages, system information, LAN, firmware and maintenance; no system settings |
-| Viewer | reads; Thread settings (network key), Zigbee backups, MQTT, system settings and maintenance hidden |
+| User | operates the gateway; reads Home Assistant pages, system information, LAN, firmware and maintenance; no system settings; edits the I2C sensors (System › Hardware) |
+| Viewer | reads (System › Hardware too); Thread settings (network key), Zigbee backups, MQTT, system settings and maintenance hidden |
 
 Every page of the menu has a level per role: hidden, read or edit (System › User management › Roles
 and permissions). A user can have own levels for single pages (Users › Edit › Own permissions). A

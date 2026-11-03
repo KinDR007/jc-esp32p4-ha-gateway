@@ -157,3 +157,17 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 **F8 Odloženo**
 - [x] F8.1 AirTag přes BLE proxy: rešerše ([docs/airtag.md](docs/airtag.md)): anonymní detekce „Find My poblíž“ jde (jen přeposílání inzerátů, Bermuda/šablona v HA), identifikace vlastních AirTagů jen s klíči exportovanými z Macu (křehké, na Sequoia/Tahoe rozbité), automatické přidávání nelze; doporučen BLE tag s pevnou adresou / iBeacon
 - [ ] F8.2 (volitelné) test anonymní detekce s reálným AirTagem, pokud o ni bude zájem
+
+## I2C senzory (zadání 2026-11-03)
+Sběrnice: konektor CN3 (1 GND, 2 3V3, 3 SCL, 4 SDA) nebo JP1 pin 23 SDA (GPIO7), 25 SCL (GPIO8), sdílená s kodekem ES8311 (0x18), 100 kHz; napájení 3V3 (pin 1/3), GND (pin 5). Rozhodnutí (autonomně, bez dotazu): stránka Systém › Hardware (`system/hw`, vlastní oprávnění), automaticky se přidá jen jednoznačně rozpoznaný senzor, při konfliktu adres volí uživatel; ruční přidání s libovolnou podporovanou adresou; jméno výchozí podle čipu; expozice per senzor (výchozí zapnuto), v MQTT navíc skupina `sensors`; integrace vytváří entity dynamicky.
+
+- [x] S1 Rešerše: senzory, adresy, ID registry, konflikty, klony ([docs/sensors.md](docs/sensors.md)); kontrola konstant proti zdrojům ESPHome, Adafruit, Sensirion, Bosch; neověřené (ID VEML7700, reset MAX44009) mají záložní cestu
+- [x] S2 Sdílená sběrnice v gw_core (`gw_i2c`), zvuk ji převezme; mikrofon běží (TC47, TC14 se sníženým prahem)
+- [x] S3 Komponenta `sensors`: ovladače nad abstrakcí sběrnice (testovatelné na hostu), sken, identifikace s jistotou, konfigurace v NVS, úloha čtení, `/api/sensors*`, Telegram `/sensors`
+- [x] S4 MQTT: skupina `sensors`, seznam rozšíření, nová discovery při změně; opraven deadlock (discovery jen v publikační úloze), TC46
+- [x] S5 HA integrace 1.6.0: entity senzorů dynamicky, testy (24 prošlo); do HA zatím nenasazeno (žádný senzor připojen)
+- [x] S6 Web UI Systém › Hardware: sběrnice a zapojení, senzory (jméno, expozice, hodnoty), sken s volbou při konfliktu, ruční přidání, interval; UI test
+- [x] S7 Testy: unit (ovladače se simulovanými čipy, CI), křížová kontrola BME680/BMP3 proti Adafruit, HW TC47, TC46, UI31, UI24
+- [x] S8 Dokumentace (sensors.md, hardware.md s CN3 a RS485, api.json, users, home-assistant, GitHub Pages), CHANGELOG
+- [ ] S9 Test se skutečnými senzory (BME280/BMP280, SHT4x, AHT20, BH1750 …): převody zatím ověřené jen simulací
+- [ ] S10 Nasadit integraci 1.6.0 do HA, až bude senzor připojený

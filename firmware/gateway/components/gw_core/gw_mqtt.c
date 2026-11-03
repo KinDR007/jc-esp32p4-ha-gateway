@@ -32,7 +32,8 @@ static const char *TAG = "gw_mqtt";
 #define KEY_KEEPALIVE "mqtt_ka"  /* u8 seconds, 0 = default */
 #define KEY_BASE "mqtt_base"     /* str, empty = p4gw/<hostname> */
 #define KEY_DISCOVERY "mqtt_disc" /* u8, 0 = no Home Assistant discovery (entities removed) */
-#define KEY_GROUPS "mqtt_grp"     /* u8, gw_mqtt_group_t mask of the discovery groups, default all */
+#define KEY_GROUPS "mqtt_grp"     /* u8, gw_mqtt_group_t mask of the discovery groups | GROUPS_V2, default all */
+#define GROUPS_V2 0x80           /* stored since the sensors group; without it 0x3f meant all */
 #define KEY_INTERVAL "mqtt_int"  /* str seconds, state publish interval, empty = default */
 #define DEFAULT_KEEPALIVE 30
 #define DEFAULT_INTERVAL_S 30
@@ -54,8 +55,17 @@ static const struct {
 } s_group_names[] = {
     {GW_MQTT_ROLES, "roles"}, {GW_MQTT_SYSTEM, "system"}, {GW_MQTT_UPDATE, "update"},
     {GW_MQTT_SOUND, "sound"}, {GW_MQTT_SOUND_EVENTS, "sound_events"}, {GW_MQTT_SOUND_TRIGGERS, "sound_triggers"},
+    {GW_MQTT_SENSORS, "sensors"},
 };
 static uint32_t s_interval_s = DEFAULT_INTERVAL_S;
+
+/* Stored mask of the discovery groups. A mask saved before the sensors group came (v1.11) gets it
+ * when it held all the groups of then. */
+static uint8_t groups_stored(void)
+{
+    uint8_t mask = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL | GROUPS_V2);
+    return !(mask & GROUPS_V2) && mask == 0x3f ? GW_MQTT_ALL : mask & GW_MQTT_ALL;
+}
 static TaskHandle_t s_publish_task;
 
 static bool has_prefix(const char *s, const char *p)
@@ -155,13 +165,31 @@ static void listener_data(esp_mqtt_event_handle_t e)
     }
 }
 
-static void (*s_ext_discovery)(void);
-static void (*s_ext_state)(cJSON *state);
+#define EXTENSIONS 4
+static struct {
+    void (*discovery)(void);
+    void (*state)(cJSON *state);
+} s_ext[EXTENSIONS];
+static volatile bool s_rediscover;
 
 void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state))
 {
-    s_ext_discovery = discovery;
-    s_ext_state = state;
+    for (int i = 0; i < EXTENSIONS; i++) {
+        if (!s_ext[i].discovery && !s_ext[i].state) {
+            s_ext[i].discovery = discovery;
+            s_ext[i].state = state;
+            return;
+        }
+    }
+    ESP_LOGE(TAG, "no room for another MQTT extension");
+}
+
+void gw_mqtt_rediscover(void)
+{
+    s_rediscover = true;
+    if (s_publish_task) {
+        xTaskNotifyGive(s_publish_task);
+    }
 }
 
 bool gw_mqtt_connected(void)
@@ -214,9 +242,11 @@ void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char 
     if (strcmp(component, "device_automation") != 0) {
         cJSON_AddStringToObject(cfg, "unique_id", id);
         cJSON_AddStringToObject(cfg, "object_id", id);
-        char avail[96];
-        topic(avail, sizeof(avail), "availability");
-        cJSON_AddStringToObject(cfg, "availability_topic", avail);
+        if (!cJSON_GetObjectItem(cfg, "availability")) { /* an own list includes the gateway's topic */
+            char avail[96];
+            topic(avail, sizeof(avail), "availability");
+            cJSON_AddStringToObject(cfg, "availability_topic", avail);
+        }
     }
     cJSON_AddItemToObject(cfg, "device", device_json());
     char *payload = cJSON_PrintUnformatted(cfg);
@@ -319,8 +349,10 @@ static void publish_discovery(void)
     gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "c6_firmware", "C6 firmware", "{{ value_json.c6 }}", diag);
     gw_mqtt_entity(GW_MQTT_SYSTEM, "button", "restart", "Restart", NULL, restart_extra);
     gw_update_mqtt_discovery();
-    if (s_ext_discovery) {
-        s_ext_discovery();
+    for (int i = 0; i < EXTENSIONS; i++) {
+        if (s_ext[i].discovery) {
+            s_ext[i].discovery();
+        }
     }
 }
 
@@ -347,8 +379,10 @@ static void publish_state(void)
     gw_config_get_str(GW_KEY_C6_BUNDLE, buf, sizeof(buf));
     cJSON_AddStringToObject(state, "c6", buf);
 
-    if (s_ext_state) {
-        s_ext_state(state);
+    for (int i = 0; i < EXTENSIONS; i++) {
+        if (s_ext[i].state) {
+            s_ext[i].state(state);
+        }
     }
     cJSON *role = gw_api_role_status(0);
     if (role) {
@@ -384,9 +418,7 @@ static void handle_command(const char *t, int tlen, const char *data, int dlen)
     if (strcmp(name, expect) == 0) {
         if (strcmp(payload, "online") == 0) {
             ESP_LOGI(TAG, "Home Assistant online, discovery again");
-            publish_discovery();
-            publish_state();
-            gw_update_mqtt_state();
+            gw_mqtt_rediscover();
         }
         return;
     }
@@ -440,9 +472,9 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
             snprintf(buf, sizeof(buf), "%s/status", s_prefix);
             esp_mqtt_client_subscribe(s_client, buf, 1);
         }
-        publish_discovery();
-        publish_state();
-        gw_update_mqtt_state();
+        /* discovery in the publish task: here the client's lock is held, and the extensions take their
+         * own locks, which other tasks hold while they publish (deadlock) */
+        gw_mqtt_rediscover();
         if (s_listener.on_connect) {
             s_listener.on_connect();
         }
@@ -513,7 +545,7 @@ static void start_client(void)
         strlcpy(client_id, st->hostname, sizeof(client_id));
     }
     s_discovery = gw_config_get_u8(KEY_DISCOVERY, 1);
-    s_groups = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL) & GW_MQTT_ALL;
+    s_groups = groups_stored();
     s_interval_s = gw_config_get_str(KEY_INTERVAL, interval, sizeof(interval)) && atoi(interval) >= 10
                        ? atoi(interval) : DEFAULT_INTERVAL_S;
     uint8_t keepalive = gw_config_get_u8(KEY_KEEPALIVE, 0);
@@ -565,7 +597,15 @@ static void publish_task(void *arg)
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(s_interval_s * 1000));
         xSemaphoreTake(s_lock, portMAX_DELAY);
         if (s_client && s_connected) {
+            bool discovery = s_rediscover;
+            s_rediscover = false;
+            if (discovery) {
+                publish_discovery();
+            }
             publish_state();
+            if (discovery) {
+                gw_update_mqtt_state();
+            }
         }
         xSemaphoreGive(s_lock);
     }
@@ -595,7 +635,7 @@ static esp_err_t mqtt_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "base", buf);
     cJSON_AddBoolToObject(json, "discovery", gw_config_get_u8(KEY_DISCOVERY, 1));
     cJSON *groups = cJSON_AddArrayToObject(json, "discovery_groups");
-    uint8_t mask = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL);
+    uint8_t mask = groups_stored();
     for (size_t i = 0; i < sizeof(s_group_names) / sizeof(s_group_names[0]); i++) {
         if (mask & s_group_names[i].group) {
             cJSON_AddItemToArray(groups, cJSON_CreateString(s_group_names[i].name));
@@ -690,7 +730,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     } else if (interval && (!cJSON_IsNumber(interval) || interval->valueint < 10 || interval->valueint > 3600)) {
         error = "interval: 10-3600 s";
     } else if (groups && mask < 0) {
-        error = "discovery_groups: list of roles, system, update, sound, sound_events, sound_triggers";
+        error = "discovery_groups: list of roles, system, update, sound, sound_events, sound_triggers, sensors";
     }
     if (error) {
         cJSON_Delete(body);
@@ -735,7 +775,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
         gw_config_set_u8(KEY_DISCOVERY, cJSON_IsTrue(discovery));
     }
     if (mask >= 0) {
-        gw_config_set_u8(KEY_GROUPS, mask);
+        gw_config_set_u8(KEY_GROUPS, mask | GROUPS_V2);
     }
     if (cJSON_IsBool(enabled)) {
         gw_config_set_u8(KEY_ENABLED, cJSON_IsTrue(enabled));
@@ -745,7 +785,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     /* Discovery or groups switched off: remove the entities while still connected with the old settings. */
     bool on = gw_config_get_u8(KEY_DISCOVERY, 1);
-    uint8_t now = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL) & GW_MQTT_ALL;
+    uint8_t now = groups_stored();
     if (s_discovery && gw_mqtt_connected() && (!on || (s_groups & ~now))) {
         s_discovery = on;
         s_groups = now;
@@ -768,5 +808,5 @@ esp_err_t gw_mqtt_start(void)
     gw_http_register("/api/mqtt", HTTP_POST, mqtt_post);
     snprintf(s_base, sizeof(s_base), "p4gw/%s", gw_state()->hostname);
     start_client();
-    return xTaskCreate(publish_task, "mqtt_pub", 4096, NULL, 3, &s_publish_task) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    return xTaskCreate(publish_task, "mqtt_pub", 6144, NULL, 3, &s_publish_task) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

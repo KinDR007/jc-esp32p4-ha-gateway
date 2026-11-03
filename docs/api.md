@@ -2155,7 +2155,8 @@ Response:
     "update",
     "sound",
     "sound_events",
-    "sound_triggers"
+    "sound_triggers",
+    "sensors"
   ],
   "interval": 60,
   "base_topic": "p4gw/p4gw-a1b2c3",
@@ -2205,9 +2206,168 @@ Response:
 }
 ```
 
-Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers.
+Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors.
 
 Effects: Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.
+
+### I2C sensors
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/sensors` | I2C sensors on header JP1: configuration, state, values, the last scan and the supported types. | page `system/hw`, read |
+| PUT | `/api/sensors` | Sets the read interval and/or replaces the list of sensors. | page `system/hw`, edit |
+| POST | `/api/sensors/scan` | Scans the bus, identifies new chips and adds those recognised without doubt. | page `system/hw`, edit |
+
+#### GET `/api/sensors`
+
+Response:
+
+```json
+{
+  "bus": {
+    "ok": true,
+    "sda": 7,
+    "scl": 8,
+    "khz": 100
+  },
+  "interval_s": 30,
+  "max_sensors": 16,
+  "sensors": [
+    {
+      "id": "i2c_76",
+      "addr": 118,
+      "type": "bme280",
+      "chip": "BME280",
+      "name": "Living room",
+      "expose": true,
+      "enabled": true,
+      "state": "ok",
+      "error": "",
+      "quantities": [
+        "temperature",
+        "humidity",
+        "pressure"
+      ],
+      "values": {
+        "temperature": 21.4,
+        "humidity": 45.2,
+        "pressure": 1004.1
+      },
+      "age_s": 3.2,
+      "reads": 120,
+      "errors": 0
+    }
+  ],
+  "scan": {
+    "done": true,
+    "time": 1793700000,
+    "ago_s": 42,
+    "devices": [
+      {
+        "addr": 24,
+        "onboard": true,
+        "configured": false,
+        "hint": "ES8311 audio codec (on the board)",
+        "candidates": []
+      },
+      {
+        "addr": 68,
+        "onboard": false,
+        "configured": false,
+        "hint": "",
+        "candidates": [
+          {
+            "type": "sht4x",
+            "chip": "SHT4x",
+            "sure": true
+          }
+        ]
+      },
+      {
+        "addr": 118,
+        "onboard": false,
+        "configured": true,
+        "hint": "DPS310, SPL06, MS5611 (not supported)",
+        "candidates": []
+      }
+    ]
+  },
+  "types": [
+    {
+      "type": "bme280",
+      "label": "BME280",
+      "vendor": "Bosch",
+      "note": "GY-BME280 (0x76), Adafruit and SparkFun (0x77)",
+      "addrs": [
+        118,
+        119
+      ],
+      "quantities": [
+        "temperature",
+        "humidity",
+        "pressure"
+      ]
+    }
+  ],
+  "quantities": [
+    {
+      "key": "temperature",
+      "name": "Temperature",
+      "unit": "°C",
+      "device_class": "temperature",
+      "precision": 1
+    }
+  ]
+}
+```
+
+Effects: values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes.
+
+#### PUT `/api/sensors`
+
+Body:
+
+```json
+{
+  "interval_s": 30,
+  "sensors": [
+    {
+      "addr": 118,
+      "type": "bme280",
+      "name": "Living room",
+      "expose": true,
+      "enabled": true
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "...": "same as GET /api/sensors"
+}
+```
+
+Errors: 400 interval_s not 5..3600; more than 16 sensors; addr outside 0x08..0x77, 0x18 (the codec) or not an address of the type; unknown type; an address twice; name over 32 characters or with quotes, braces or backslash.
+
+Effects: sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant.
+
+#### POST `/api/sensors/scan`
+
+Response:
+
+```json
+{
+  "added": [
+    68
+  ],
+  "...": "same as GET /api/sensors"
+}
+```
+
+Effects: Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors and the codec are only probed, not identified. A chip is added when exactly one type is sure, or when exactly one type answers like it; otherwise it waits in scan.devices for a PUT with the chosen type. The gateway also scans at every start.
 
 ### Updates and firmware
 
