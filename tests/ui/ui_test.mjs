@@ -686,11 +686,34 @@ await test('UI26', 'Wi-Fi: the page shows the settings without the password, the
     }
   }
   await tab('radios/roles');
-  check(await page.$$eval('.role-group h4', x => x.some(h => h.textContent.includes('Wi-Fi'))), 'role group Wi-Fi in Radios › Roles');
+  check(await page.$$eval('.roles-table .rt-group th, .role-group h4', x => x.some(h => h.textContent.includes('Wi-Fi'))), 'role group Wi-Fi in Radios › Roles');
   check(!!(await page.$('#role-swap')) === st, `swap button ${st ? 'shown' : 'hidden'} with${st ? '' : 'out'} an uplink`);
   await tab('overview');
   const topo = await page.$eval('.topo-flow', x => x.innerText);
   check(!st || /WI-FI/i.test(topo), 'overview diagram shows the Wi-Fi network');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI27', 'Radios › Roles: table, list and tiles show the same choice, the view is remembered', async () => {
+  await tab('radios/roles');
+  await page.click('[data-roles-view="table"]');
+  await page.waitForSelector('.roles-table');
+  const cols = await page.$$eval('.roles-table tr:first-child th', x => x.length);
+  check(cols === (status.role.b?.wired || (status.role.b?.desired && status.role.b.desired !== 'none') ? 3 : 2), `table: a column per radio (${cols - 1})`);
+  const active = await page.$$eval('.roles-table .pill', x => x.length);
+  check(active >= 1, `table: ${active} active or selected role(s)`);
+  const switches = () => page.$$eval('#main [data-role]', x => x.map(b => b.dataset.role + '/' + b.dataset.radio).sort().join());
+  const inTable = await switches();
+  await page.click('[data-roles-view="list"]');
+  await page.waitForSelector('.role-line');
+  check(await switches() === inTable, 'list: the same switch buttons as the table');
+  await page.click('[data-roles-view="tiles"]');
+  await page.waitForSelector('.role-group');
+  check(await page.evaluate(() => localStorage.getItem('rolesView')) === 'tiles', 'view stored in the browser');
+  await page.reload();
+  await page.waitForSelector('#main .role-group', { timeout: 15000 });
+  check(true, 'tiles again after a reload');
+  await page.click('[data-roles-view="table"]');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

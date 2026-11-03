@@ -127,9 +127,9 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F2.3 Testy: přepínání rádia A (Thread ↔ Wi-Fi) a B (ESPHome ↔ Wi-Fi, 4×) ze slotů, TC04, TC23 až po krok připojení routeru (známý problém: router bez sítě); HA vidí 5 slotů proxy
 
 **F3 Web UI**
-- [ ] F3.1 Tooltipy v přehledu HW (první karta a její položky)
-- [ ] F3.2 Tooltipy štítků v hlavičce s datovým provozem (fw: počítadla ETH, Wi-Fi, Thread, MQTT v `/api/status`)
-- [ ] F3.3 Rádia › Role: kompaktní výpis s přepínačem list / tabulka / dlaždice
+- [x] F3.1 Tooltipy uzlů diagramu na přehledu (LAN, P4, rádia A/B, jejich sítě)
+- [x] F3.2 Provoz v tooltipech hlavičky (od startu a aktuální rychlost po službách, `/api/net/traffic` každých 10 s; firmware už počítadla měl)
+- [x] F3.3 Rádia › Role: tabulka (výchozí), seznam, dlaždice, volba v prohlížeči; UI27
 - [ ] F3.4 Vizualizace HW flow s tooltipy a prokliky do nastavení, bez CDN
 - [ ] F3.5 UI testy, snímky dokumentace
 

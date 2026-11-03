@@ -28,6 +28,14 @@
   Wi-Fi uplink. Earlier slots and the Zigbee data keep their offsets; the new layout installs once on
   the next start with the new package (95 s on the C6, 150 s on the C5). ESPHome on the C6 (4 MB)
   stays a whole-flash bundle. The C5 ESPHome image is built for 8 MB flash.
+- Web UI: the overview diagram nodes (LAN, main board, radio A and B, their networks) show a details
+  box on hover (chip, firmware, slot and flash layout, temperatures, RAM, radio chip data and
+  telemetry, network state); the header tags add the traffic since start and the current rate of
+  their service (LAN, Thread routed by the border router, Zigbee2MQTT, OTBR REST, web UI and
+  integration, MQTT, HTTPS/DNS/NTP, Wi-Fi uplink), sampled every 10 s from `/api/net/traffic`.
+- Web UI: Radios › Roles as a table (roles × radios, default), a list (one line per role) or the
+  tiles, the choice is remembered in the browser; on a phone the switch buttons show only the icon.
+  Tests UI27, UI26 updated.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install
   is refused until the current URL was checked.

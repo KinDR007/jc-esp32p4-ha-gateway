@@ -82,6 +82,19 @@ header.flashing #flash-strip { display: block; }
   cursor: pointer; color: var(--muted); }
 .seg button:hover { color: var(--text); }
 .seg button.on { background: var(--panel); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+#roles-view button { gap: 5px; font-size: 13px; }
+.btn.sm { padding: 4px 10px; font-size: 13px; }
+.roles-table td, .roles-table th { vertical-align: middle; }
+.roles-table .rt-group th { padding-top: 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.roles-table .rt-group th svg, .rl-name svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
+.rl-name { display: inline-flex; align-items: center; font-weight: 600; white-space: nowrap; }
+.role-lines { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.role-line { display: grid; grid-template-columns: 22px minmax(150px, 220px) 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+.role-line.active { background: var(--panel-2); }
+.role-line > svg { width: 18px; height: 18px; }
+.role-line .rl-desc { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) { .role-line { grid-template-columns: 22px 1fr auto; } .role-line .rl-desc { display: none; } #roles-view span { display: none; }
+  .roles-table .btn.sm span, .roles-table th .muted { display: none; } .roles-table .rl-name { white-space: normal; } .roles-table td, .roles-table th { padding-left: 4px; padding-right: 4px; } }
 .seg .flag { display: block; width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
 .seg button:not(.on) .flag { opacity: .55; }
 #side-reboot { justify-content: center; }
@@ -1196,6 +1209,7 @@ const ICONS = {
   'ear-hearing': 'M17,20C16.71,20 16.44,19.94 16.24,19.85C15.53,19.5 15.03,18.97 14.53,17.47C14,15.91 13.06,15.18 12.14,14.47C11.35,13.86 10.53,13.23 9.82,11.94C9.29,11 9,9.93 9,9C9,6.2 11.2,4 14,4C16.8,4 19,6.2 19,9H21C21,5.07 17.93,2 14,2C10.07,2 7,5.07 7,9C7,10.26 7.38,11.65 8.07,12.9C9,14.55 10.05,15.38 10.92,16.05C11.73,16.67 12.31,17.12 12.63,18.1C13.23,19.92 14,20.94 15.36,21.65C15.87,21.88 16.43,22 17,22A4,4 0 0,0 21,18H19A2,2 0 0,1 17,20M7.64,2.64L6.22,1.22C4.23,3.21 3,5.96 3,9C3,12.04 4.23,14.79 6.22,16.78L7.63,15.37C6,13.74 5,11.5 5,9C5,6.5 6,4.26 7.64,2.64M11.5,9A2.5,2.5 0 0,0 14,11.5A2.5,2.5 0 0,0 16.5,9A2.5,2.5 0 0,0 14,6.5A2.5,2.5 0 0,0 11.5,9Z',
   'ethernet': 'M7,15H9V18H11V15H13V18H15V15H17V18H19V9H15V6H9V9H5V18H7V15M4.38,3H19.63C20.94,3 22,4.06 22,5.38V19.63A2.37,2.37 0 0,1 19.63,22H4.38C3.06,22 2,20.94 2,19.63V5.38C2,4.06 3.06,3 4.38,3Z',
   'eye-outline': 'M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5C8.24,6.5 4.83,8.64 3.18,12Z',
+  'format-list-bulleted': 'M7,5H21V7H7V5M7,13V11H21V13H7M4,4.5A1.5,1.5 0 0,1 5.5,6A1.5,1.5 0 0,1 4,7.5A1.5,1.5 0 0,1 2.5,6A1.5,1.5 0 0,1 4,4.5M4,10.5A1.5,1.5 0 0,1 5.5,12A1.5,1.5 0 0,1 4,13.5A1.5,1.5 0 0,1 2.5,12A1.5,1.5 0 0,1 4,10.5M7,19V17H21V19H7M4,16.5A1.5,1.5 0 0,1 5.5,18A1.5,1.5 0 0,1 4,19.5A1.5,1.5 0 0,1 2.5,18A1.5,1.5 0 0,1 4,16.5Z',
   'graph-outline': 'M19.5 17C19.36 17 19.24 17 19.11 17.04L17.5 13.8C17.95 13.35 18.25 12.71 18.25 12C18.25 10.62 17.13 9.5 15.75 9.5C15.61 9.5 15.5 9.5 15.35 9.54L13.74 6.3C14.21 5.84 14.5 5.21 14.5 4.5C14.5 3.12 13.38 2 12 2S9.5 3.12 9.5 4.5C9.5 5.2 9.79 5.84 10.26 6.29L8.65 9.54C8.5 9.5 8.39 9.5 8.25 9.5C6.87 9.5 5.75 10.62 5.75 12C5.75 12.71 6.04 13.34 6.5 13.79L4.89 17.04C4.76 17 4.64 17 4.5 17C3.12 17 2 18.12 2 19.5C2 20.88 3.12 22 4.5 22S7 20.88 7 19.5C7 18.8 6.71 18.16 6.24 17.71L7.86 14.46C8 14.5 8.12 14.5 8.25 14.5C8.38 14.5 8.5 14.5 8.63 14.46L10.26 17.71C9.79 18.16 9.5 18.8 9.5 19.5C9.5 20.88 10.62 22 12 22S14.5 20.88 14.5 19.5C14.5 18.12 13.38 17 12 17C11.87 17 11.74 17 11.61 17.04L10 13.8C10.45 13.35 10.75 12.71 10.75 12C10.75 11.3 10.46 10.67 10 10.21L11.61 6.96C11.74 7 11.87 7 12 7C12.13 7 12.26 7 12.39 6.96L14 10.21C13.54 10.66 13.25 11.3 13.25 12C13.25 13.38 14.37 14.5 15.75 14.5C15.88 14.5 16 14.5 16.13 14.46L17.76 17.71C17.29 18.16 17 18.8 17 19.5C17 20.88 18.12 22 19.5 22S22 20.88 22 19.5C22 18.12 20.88 17 19.5 17M4.5 20.5C3.95 20.5 3.5 20.05 3.5 19.5S3.95 18.5 4.5 18.5 5.5 18.95 5.5 19.5 5.05 20.5 4.5 20.5M13 19.5C13 20.05 12.55 20.5 12 20.5S11 20.05 11 19.5 11.45 18.5 12 18.5 13 18.95 13 19.5M7.25 12C7.25 11.45 7.7 11 8.25 11S9.25 11.45 9.25 12 8.8 13 8.25 13 7.25 12.55 7.25 12M11 4.5C11 3.95 11.45 3.5 12 3.5S13 3.95 13 4.5 12.55 5.5 12 5.5 11 5.05 11 4.5M14.75 12C14.75 11.45 15.2 11 15.75 11S16.75 11.45 16.75 12 16.3 13 15.75 13 14.75 12.55 14.75 12M19.5 20.5C18.95 20.5 18.5 20.05 18.5 19.5S18.95 18.5 19.5 18.5 20.5 18.95 20.5 19.5 20.05 20.5 19.5 20.5Z',
   'harddisk': 'M6,2H18A2,2 0 0,1 20,4V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V4A2,2 0 0,1 6,2M12,4A6,6 0 0,0 6,10C6,13.31 8.69,16 12.1,16L11.22,13.77C10.95,13.29 11.11,12.68 11.59,12.4L12.45,11.9C12.93,11.63 13.54,11.79 13.82,12.27L15.74,14.69C17.12,13.59 18,11.9 18,10A6,6 0 0,0 12,4M12,9A1,1 0 0,1 13,10A1,1 0 0,1 12,11A1,1 0 0,1 11,10A1,1 0 0,1 12,9M7,18A1,1 0 0,0 6,19A1,1 0 0,0 7,20A1,1 0 0,0 8,19A1,1 0 0,0 7,18M12.09,13.27L14.58,19.58L17.17,18.08L12.95,12.77L12.09,13.27Z',
   'history': 'M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3',
@@ -1223,6 +1237,7 @@ const ICONS = {
   'play': 'M8,5.14V19.14L19,12.14L8,5.14Z',
   'playlist-check': 'M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z',
   'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+  'power': 'M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13',
   'qrcode': 'M3,11H5V13H3V11M11,5H13V9H11V5M9,11H13V15H11V13H9V11M15,11H17V13H19V11H21V13H19V15H21V19H19V21H17V19H13V21H11V17H15V15H17V13H15V11M19,19V15H17V19H19M15,3H21V9H15V3M17,5V7H19V5H17M3,3H9V9H3V3M5,5V7H7V5H5M3,15H9V21H3V15M5,17V19H7V17H5Z',
   'radar': 'M19.07,4.93L17.66,6.34C19.1,7.79 20,9.79 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12C4,7.92 7.05,4.56 11,4.07V6.09C8.16,6.57 6,9.03 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12C18,10.34 17.33,8.84 16.24,7.76L14.83,9.17C15.55,9.9 16,10.9 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12C8,10.14 9.28,8.59 11,8.14V10.28C10.4,10.63 10,11.26 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.26 13.6,10.62 13,10.28V2H12A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,9.24 20.88,6.74 19.07,4.93Z',
   'record-circle-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z',
@@ -1238,6 +1253,7 @@ const ICONS = {
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
   'stethoscope': 'M19,8C19.56,8 20,8.43 20,9A1,1 0 0,1 19,10C18.43,10 18,9.55 18,9C18,8.43 18.43,8 19,8M2,2V11C2,13.96 4.19,16.5 7.14,16.91C7.76,19.92 10.42,22 13.5,22A6.5,6.5 0 0,0 20,15.5V11.81C21.16,11.39 22,10.29 22,9A3,3 0 0,0 19,6A3,3 0 0,0 16,9C16,10.29 16.84,11.4 18,11.81V15.41C18,17.91 16,19.91 13.5,19.91C11.5,19.91 9.82,18.7 9.22,16.9C12,16.3 14,13.8 14,11V2H10V5H12V11A4,4 0 0,1 8,15A4,4 0 0,1 4,11V5H6V2H2Z',
   'swap-horizontal': 'M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z',
+  'table': 'M5,4H19A2,2 0 0,1 21,6V18A2,2 0 0,1 19,20H5A2,2 0 0,1 3,18V6A2,2 0 0,1 5,4M5,8V12H11V8H5M13,8V12H19V8H13M5,14V18H11V14H5M13,14V18H19V14H13Z',
   'text-box-outline': 'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
   'theme-light-dark': 'M7.5,2C5.71,3.15 4.5,5.18 4.5,7.5C4.5,9.82 5.71,11.85 7.53,13C4.46,13 2,10.54 2,7.5A5.5,5.5 0 0,1 7.5,2M19.07,3.5L20.5,4.93L4.93,20.5L3.5,19.07L19.07,3.5M12.89,5.93L11.41,5L9.97,6L10.39,4.3L9,3.24L10.75,3.12L11.33,1.47L12,3.1L13.73,3.13L12.38,4.26L12.89,5.93M9.59,9.54L8.43,8.81L7.31,9.59L7.65,8.27L6.56,7.44L7.92,7.35L8.37,6.06L8.88,7.33L10.24,7.36L9.19,8.23L9.59,9.54M19,13.5A5.5,5.5 0 0,1 13.5,19C12.28,19 11.15,18.6 10.24,17.93L17.93,10.24C18.6,11.15 19,12.28 19,13.5M14.6,20.08L17.37,18.93L17.13,22.28L14.6,20.08M18.93,17.38L20.08,14.61L22.28,17.15L18.93,17.38M20.08,12.42L18.94,9.64L22.28,9.88L20.08,12.42M9.63,18.93L12.4,20.08L9.87,22.27L9.63,18.93Z',
   'thread': 'M12 2C6.48 2 2 6.49 2 12c0 5.48 4.43 9.94 9.89 10V12.01h-3.27c-0.97 0-1.77 0.79-1.77 1.77s0.79 1.77 1.77 1.77v2.18c-2.18 0-3.95-1.77-3.95-3.94 0-2.18 1.77-3.95 3.95-3.95h3.27v-1.1c0-1.81 1.47-3.28 3.28-3.28s3.28 1.47 3.28 3.28-1.47 3.28-3.28 3.28h-1.1v9.77C18.59 20.83 22 16.8 22 12 22 6.49 17.52 2 12 2m4.27 6.73c0-0.61-0.5-1.1-1.1-1.1-0.61 0-1.1 0.5-1.1 1.1v1.1h1.1c0.61 0 1.1-0.49 1.1-1.1',
@@ -1246,6 +1262,7 @@ const ICONS = {
   'upload': 'M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z',
   'vector-polyline': 'M2 3V9H4.95L6.95 15H6V21H12V16.41L17.41 11H22V5H16V9.57L10.59 15H9.06L7.06 9H8V3M4 5H6V7H4M18 7H20V9H18M8 17H10V19H8Z',
   'view-dashboard-outline': 'M19,5V7H15V5H19M9,5V11H5V5H9M19,13V19H15V13H19M9,17V19H5V17H9M21,3H13V9H21V3M11,3H3V13H11V3M21,11H13V21H21V11M11,15H3V21H11V15Z',
+  'view-grid-outline': 'M3 11H11V3H3M5 5H9V9H5M13 21H21V13H13M15 15H19V19H15M3 21H11V13H3M5 15H9V19H5M13 3V11H21V3M19 9H15V5H19Z',
   'volume-high': 'M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z',
   'waveform': 'M22 12L20 13L19 14L18 13L17 16L16 13L15 21L14 13L13 15L12 13L11 17L10 13L9 22L8 13L7 19L6 13L5 14L4 13L2 12L4 11L5 10L6 11L7 5L8 11L9 2L10 11L11 7L12 11L13 9L14 11L15 3L16 11L17 8L18 11L19 10L20 11L22 12Z',
   'weather-night': 'M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.64 6.35,17.66C9.37,20.67 14.19,20.78 17.33,17.97Z',
@@ -1498,14 +1515,16 @@ function renderHeader() {
     ['IPv4', esc(e.ipv4 || '')], [L('Netmask', 'Maska'), esc(e.netmask || '')], [L('Gateway', 'Výchozí brána'), esc(e.gateway || '')],
     ['DNS', esc((e.dns || []).join(', '))], ['IPv6', (e.ipv6 || []).map(esc).join('<br>')], ['MAC', esc(e.mac || '')],
     [L('Link changes', 'Změny linky'), e.link_changes],
-    [L('Waiting for confirmation', 'Čeká na potvrzení'), e.confirm_s ? e.confirm_s + ' s' : '']]);
+    [L('Waiting for confirmation', 'Čeká na potvrzení'), e.confirm_s ? e.confirm_s + ' s' : ''], ...netRows('lan'),
+    [L('Packets in / out', 'Pakety dovnitř / ven'), hdrNet.lan.cur ? `${hdrNet.lan.cur.rx_packets} / ${hdrNet.lan.cur.tx_packets}` : '']]);
   const role = ROLES[r.active];
   setTag('#hdr-role', maint ? 'bad' : 'ok', ic(role?.icon || 'wrench-outline'), role?.name || L('Maintenance', 'Údržba'), L('Role', 'Role'), [
     [L('Active', 'Aktivní'), esc(role?.name || r.active)], [L('Desired', 'Požadovaná'), esc(ROLES[r.desired]?.name || r.desired)],
     [L('State', 'Stav'), maint ? `<span class="bad-text">${esc(maint)}</span>` : L('running', 'běží')],
     [L('Stable start', 'Stabilní start'), yes(r.stable)],
     ['C6 firmware', tel ? esc(`${tel.fw} ${tel.ver}`) : ''],
-    [L('C6 temperature', 'Teplota C6'), tel?.temp_c !== undefined ? tel.temp_c + ' °C' : '']]);
+    [L('C6 temperature', 'Teplota C6'), tel?.temp_c !== undefined ? tel.temp_c + ' °C' : ''],
+    ...(r.active === 'thread_br' ? netRows('lan', ['thread']) : r.active === 'wifi_uplink' ? netRows('wifi') : [])]);
   /* radio B (external, docs/dual-radio.md): shown once it has a role or answered the wiring test */
   const rb = r.b || {}, rbRole = ROLES[rb.active];
   const rbShown = rb.desired && rb.desired !== 'none' || rb.wired;
@@ -1519,7 +1538,8 @@ function renderHeader() {
         [L('State', 'Stav'), rb.maintenance ? `<span class="bad-text">${esc(rb.maintenance)}</span>` : rbRole ? L('running', 'běží') : L('off', 'vypnuto')],
         [L('Wiring', 'Zapojení'), rb.wired === undefined ? '' : rb.wired ? L('found', 'nalezeno') : `<span class="bad-text">${L('not found', 'nenalezeno')}</span>`],
         ['Zigbee2MQTT', tb.mode === 'coordinator' ? (tb.client_connected ? esc(tb.client) : L('not connected', 'nepřipojen')) : ''],
-        ['ESPHome', tb.mode === 'esphome' ? esc(tb.improv + (tb.url ? ' ' + tb.url : '')) : '']]);
+        ['ESPHome', tb.mode === 'esphome' ? esc(tb.improv + (tb.url ? ' ' + tb.url : '')) : ''],
+        ...(rb.active === 'thread_br' ? netRows('lan', ['thread']) : rb.active === 'wifi_uplink' ? netRows('wifi') : [])]);
   }
   /* who uses the gateway: Zigbee2MQTT keeps a TCP session; Home Assistant calls the OTBR REST API
    * only now and then (start, Thread settings, dataset changes), so for Thread the last contact */
@@ -1529,7 +1549,8 @@ function renderHeader() {
     const rs = protoStatus('zigbee');
     p = rs.client_connected
       ? ['ok', ic('lan-connect'), 'Zigbee2MQTT', [[L('Client', 'Klient'), esc(rs.client)], [L('Session', 'Relace'), fmtUptime(rs.session_s)],
-        [L('Sessions since start', 'Relací od startu'), rs.sessions], [L('Frames C6 → host / host → C6', 'Rámce C6 → host / host → C6'), `${rs.frames_rx} / ${rs.frames_tx}`]]]
+        [L('Sessions since start', 'Relací od startu'), rs.sessions], [L('Frames C6 → host / host → C6', 'Rámce C6 → host / host → C6'), `${rs.frames_rx} / ${rs.frames_tx}`],
+        ...netRows('lan', ['zigbee'])]]
       : ['bad', ic('lan-connect'), L('no Zigbee2MQTT', 'bez Zigbee2MQTT'), [[L('State', 'Stav'), L(`no host connected to TCP port ${rs.tcp_port}`, `k TCP portu ${rs.tcp_port} není připojen žádný hostitel`)]]];
   } else if (threadRole() === 'thread_br') {
     const rs = protoStatus('thread');
@@ -1540,19 +1561,23 @@ function renderHeader() {
     const thread = [[L('Thread role', 'Role v síti Thread'), esc(rs.role || '')], [L('Network', 'Síť'), esc(rs.network_name || '')], [L('Channel', 'Kanál'), rs.channel]];
     p = age === null ? ['', ic('home-assistant'), 'Home Assistant', [[L('OTBR REST API', 'OTBR REST API'), L('not used yet', 'zatím nepoužito')], ...thread]]
       : [age < 7 * 86400 ? 'ok' : 'warn', ic('home-assistant'), isHa ? 'Home Assistant' : 'OTBR REST',
-        [[L('OTBR REST client', 'Klient OTBR REST'), esc(rs.rest_client)], [L('Last contact', 'Poslední kontakt'), age === Infinity ? '' : ago(age)], ...thread]];
+        [[L('OTBR REST client', 'Klient OTBR REST'), esc(rs.rest_client)], [L('Last contact', 'Poslední kontakt'), age === Infinity ? '' : ago(age)], ...thread,
+          ...netRows('lan', ['otbr_rest'])]];
   }
   peer.classList.toggle('hidden', !p);
   if (p) setTag(peer, p[0], p[1], p[2], p[2], p[3]);
   setTag('#hdr-ha', ln.ha_clients ? 'ok' : '', ic('home-assistant'), 'HA', L('Home Assistant integration', 'Integrace Home Assistant'), [
     [L('P4 Gateway integration', 'Integrace P4 Gateway'), ln.ha_clients ? L(`connected (${ln.ha_clients}×)`, `připojena (${ln.ha_clients}×)`) : L('not connected', 'nepřipojena')],
-    [L('Push channel', 'Kanál push'), '<code>/api/ws</code>'], [L('Discovery', 'Vyhledání'), 'mDNS <code>_p4gw._tcp</code>']]);
+    [L('Push channel', 'Kanál push'), '<code>/api/ws</code>'], [L('Discovery', 'Vyhledání'), 'mDNS <code>_p4gw._tcp</code>'],
+    ...netRows('lan', ['web'], L('LAN (web UI, API, integration)', 'LAN (web, API, integrace)'))]);
   const mq = { connected: ['ok', L('connected', 'připojen')], disconnected: ['bad', L('not reachable', 'nedostupný')] }[ln.mqtt] || ['', L('off', 'vypnuto')];
-  setTag('#hdr-mqtt', mq[0], ic('transit-connection-variant'), 'MQTT', 'MQTT', [[L('Broker', 'Broker'), mq[1]], [L('Settings', 'Nastavení'), 'Home Assistant › MQTT']]);
+  setTag('#hdr-mqtt', mq[0], ic('transit-connection-variant'), 'MQTT', 'MQTT', [[L('Broker', 'Broker'), mq[1]], [L('Settings', 'Nastavení'), 'Home Assistant › MQTT'],
+    ...netRows('lan', ['mqtt'])]);
   const inet = ln.internet === true ? ['ok', L('reachable', 'dostupný')] : ln.internet === false
     ? ['bad', L('not reachable (DNS or route)', 'nedostupný (DNS nebo routa)')] : ['', L('not checked yet', 'zatím neověřeno')];
   setTag('#hdr-inet', inet[0], ic('web'), 'Internet', 'Internet', [[L('State', 'Stav'), inet[1]], ['Test', 'TCP github.com:443'],
-    [L('Checked', 'Ověřeno'), ln.internet_age_s >= 0 ? ago(ln.internet_age_s) : ''], ['Interval', '60 s']]);
+    [L('Checked', 'Ověřeno'), ln.internet_age_s >= 0 ? ago(ln.internet_age_s) : ''], ['Interval', '60 s'],
+    ...netRows('lan', ['https', 'dns_ntp'], 'LAN (HTTPS, DNS, NTP)')]);
   /* device uptime, below it the Zigbee2MQTT session or the C6 uptime */
   const zs = rs.session_s, second = zs >= 0 ? ['Z2M', zs] : tel ? ['C6', tel.uptime_s] : null;
   $('#hdr-uptime').innerHTML = `<span>${L('Device', 'Zařízení')}</span><span>${fmtUptime(status.uptime_s)}</span>`
@@ -1591,6 +1616,40 @@ function renderHeader() {
     <span>${L(`Confirm them within ${cs} s, otherwise the previous settings come back.`, `Potvrďte ho do ${cs} s, jinak se vrátí předchozí nastavení.`)}</span>
     <button class="btn primary" id="lan-confirm">${ic('check')}${L('Confirm', 'Potvrdit')}</button></div>`;
 }
+/* traffic for the header and overview tooltips: counters of the LAN (and of the Wi-Fi uplink while a
+ * radio runs it) every 10 s, rates from the last two samples; nothing without the permission of
+ * System › LAN (the request fails, the rows stay empty) */
+const hdrNet = { lan: {}, wifi: {} };
+let hdrNetAt = 0;
+async function sampleNet() {
+  if (Date.now() - hdrNetAt < 9500) return;
+  hdrNetAt = Date.now();
+  for (const [k, url] of [['lan', '/api/net/traffic'], ['wifi', wifiUplink() ? '/api/net/wifi/traffic' : null]]) {
+    const n = hdrNet[k];
+    if (!url) { hdrNet[k] = {}; continue; }
+    try {
+      const t = await api(url);
+      const dt = n.cur && t.uptime_ms > n.cur.uptime_ms ? (t.uptime_ms - n.cur.uptime_ms) / 1000 : 0;
+      const d = (a, b) => Math.max(0, (a - b) / dt);
+      n.rates = dt ? { rx: d(t.rx, n.cur.rx), tx: d(t.tx, n.cur.tx),
+        svc: Object.fromEntries(Object.keys(t.services).map(x => [x, { rx: d(t.services[x].rx, n.cur.services[x].rx), tx: d(t.services[x].tx, n.cur.services[x].tx) }])) } : null;
+      n.cur = t;
+    } catch (e) { hdrNet[k] = {}; }
+  }
+}
+/* tooltip rows of traffic: since start and the current rate, of all or of the listed services; via
+ * names what the traffic is (LAN or Wi-Fi by default) */
+function netRows(k, svcs, via) {
+  const n = hdrNet[k], t = n.cur, r = n.rates;
+  if (!t?.uptime_ms) return [];
+  const sum = (o, f) => svcs.reduce((a, x) => a + (o[x]?.[f] || 0), 0);
+  const total = svcs ? [sum(t.services, 'rx'), sum(t.services, 'tx')] : [t.rx, t.tx];
+  const rate = r ? (svcs ? [sum(r.svc, 'rx'), sum(r.svc, 'tx')] : [r.rx, r.tx]) : null;
+  const where = via || (k === 'wifi' ? 'Wi-Fi' : 'LAN');
+  return [[L(`Traffic over ${where} since start`, `Provoz přes ${where} od startu`), `↓ ${fmtBytes(total[0])} · ↑ ${fmtBytes(total[1])}`],
+    [L('Now', 'Nyní'), rate ? `↓ ${fmtRate(rate[0])} · ↑ ${fmtRate(rate[1])}` : '…']];
+}
+
 /* header tags: an icon, a short text and a box with details on hover (the box of the network maps) */
 const hdrTips = {};
 function setTag(el, cls, icon, text, title, rows) {
@@ -1688,8 +1747,40 @@ function radioRoleRows(active, desired, rs) {
   return rows;
 }
 
-/* One node of the overview diagram: what it is, its state and a line or two of the most important values. */
-const topoNode = (cls, href, kind, title, lines) => `<a class="tnode ${cls}" href="${href}"><span class="tkind">${kind}</span><b>${title}</b>${lines.filter(Boolean).map(l => `<span>${l}</span>`).join('')}</a>`;
+/* One node of the overview diagram: what it is, its state and a line or two of the most important values;
+ * tip = [key, title, rows] gives it the details box of the header tags on hover. */
+const topoNode = (cls, href, kind, title, lines, tip) => {
+  if (tip) hdrTips[tip[0]] = { title: tip[1], rows: tip[2] };
+  return `<a class="tnode ${cls}" href="${href}"${tip ? ` data-htip="${tip[0]}"` : ''}><span class="tkind">${kind}</span><b>${title}</b>${lines.filter(Boolean).map(l => `<span>${l}</span>`).join('')}</a>`;
+};
+/* details of a radio for its diagram node: chip data from its last flashing and its telemetry */
+function radioTipRows(active, bundle, version, c = {}, t) {
+  return [[L('Role', 'Role'), esc(ROLES[active]?.name || L('none', 'žádná'))],
+    [L('Running', 'Běží'), bundle ? esc(t?.fw || bundle) + (version || t?.ver ? ` <span class="muted">${esc(version || t.ver)}</span>` : '') : ''],
+    ['MAC', esc(c.mac || '')], [L('Chip revision', 'Revize čipu'), c.mac ? rev(c.revision) : ''],
+    ['Flash', c.flash_size ? fmtBytes(c.flash_size) : ''], [L('Flashes', 'Počet flashování'), c.flashes || ''],
+    [L('Temperature', 'Teplota'), t?.temp_c != null ? telTemp(t) : ''],
+    [L('Memory', 'Paměť'), t ? `${fmtBytes(t.heap_free)} ${L('free', 'volné')}, min ${fmtBytes(t.heap_min)}` : ''],
+    [L('Uptime', 'Doba běhu'), t ? fmtUptime(t.uptime_s) : ''], [L('Last reset', 'Poslední reset'), t ? esc(t.reset) : '']];
+}
+/* details of the network a radio serves, for its diagram node */
+function netTipRows(active, rs) {
+  if (active.startsWith('thread')) return [[L('Network', 'Síť'), esc(rs.network_name || '')], [L('Channel', 'Kanál'), rs.channel ?? ''],
+    [L('Thread role', 'Role v síti Thread'), esc(rs.role || '')], [L('Phase', 'Fáze'), esc(rs.phase || '')],
+    [L('Backbone', 'Páteř'), esc(rs.backbone || '')], ...(active === 'thread_br' ? netRows('lan', ['thread'], L('LAN ↔ Thread', 'LAN ↔ Thread')) : [])];
+  if (active === 'zigbee_coordinator') return [['Zigbee2MQTT', rs.client_connected ? esc(rs.client) : L('not connected', 'nepřipojen')],
+    ['TCP port', rs.tcp_port ?? ''], [L('Frames radio → host / host → radio', 'Rámce rádio → host / host → rádio'), rs.frames_rx !== undefined ? `${rs.frames_rx} / ${rs.frames_tx}` : ''],
+    ...netRows('lan', ['zigbee'], L('LAN (Zigbee2MQTT)', 'LAN (Zigbee2MQTT)'))];
+  if (active === 'zigbee_router') {
+    const z = rs.router || {};
+    return [[L('Router', 'Router'), esc(z.state || '')], ['PAN ID', z.joined ? esc(z.pan_id) : ''], [L('Channel', 'Kanál'), z.joined ? z.channel : '']];
+  }
+  if (active === 'esphome') return [['Improv', esc(rs.improv || '')], [L('Device', 'Zařízení'), esc(rs.device || '')], [L('State', 'Stav'), esc(rs.note || '')]];
+  if (active === 'wifi_uplink') return [[L('Network', 'Síť'), esc(rs.ssid || '')], ['IPv4', esc(rs.ipv4 || '')],
+    [L('Signal', 'Signál'), rs.rssi ? `${rs.rssi} dBm · ${wifiBand(rs)}` : ''],
+    [L('Traffic', 'Provoz'), rs.ipv4 ? (rs.default_route ? L('default route', 'výchozí trasa') : L('standby', 'záloha')) : ''], ...netRows('wifi')];
+  return [];
+}
 /* the network a radio serves, for the diagram */
 function radioNet(active, rs) {
   if (active.startsWith('thread')) return [rs.phase === 'running' ? 'ok' : 'warn', '#thread/info', 'Thread', esc(rs.network_name || '–'), [L(`channel ${rs.channel ?? '–'}`, `kanál ${rs.channel ?? '–'}`), esc(rs.role || '')]];
@@ -1713,18 +1804,32 @@ views.overview = () => {
   const services = [ln.ha_clients ? 'Home Assistant' : '', ln.mqtt === 'connected' ? 'MQTT' : '', ln.internet ? L('internet', 'internet') : ''].filter(Boolean).join(' · ');
   const netA = radioNet(r.active || 'none', rsA), netB = radioNet(b.active || 'none', rsB);
   const diagram = `<div class="card wide"><div class="topo-flow">
-    ${topoNode(e.link ? 'ok' : 'bad', '#system/lan', 'LAN', 'Ethernet', [e.link ? `${e.speed} Mb/s · ${esc(e.ipv4 || '')}` : L('no link', 'bez linky'), services])}
+    ${topoNode(e.link ? 'ok' : 'bad', '#system/lan', 'LAN', 'Ethernet', [e.link ? `${e.speed} Mb/s · ${esc(e.ipv4 || '')}` : L('no link', 'bez linky'), services],
+      ['ov-lan', L('LAN: Ethernet of the P4', 'LAN: Ethernet desky P4'), [[L('Link', 'Linka'), e.link ? `${e.speed} Mb/s ${e.full_duplex ? 'full' : 'half'} duplex` : L('down', 'bez linky')],
+        ['IPv4', esc(e.ipv4 || '') + (e.netmask ? ` / ${esc(e.netmask)}` : '')], [L('Gateway', 'Výchozí brána'), esc(e.gateway || '')], ['DNS', esc((e.dns || []).join(', '))],
+        ['IPv6', (e.ipv6 || []).map(esc).join('<br>')], ['MAC', esc(e.mac || '')], [L('Name', 'Název'), esc(s.hostname) + '.local'], ...netRows('lan')]])}
     <span class="tarrow t-lan">⇄</span>
-    ${topoNode(r.maintenance ? 'bad' : r.stable ? 'ok' : 'warn', '#system/info', L('Main board', 'Hlavní deska'), 'ESP32-P4', [esc(s.version), L(`up ${fmtUptime(s.uptime_s)}`, `běží ${fmtUptime(s.uptime_s)}`)])}
+    ${topoNode(r.maintenance ? 'bad' : r.stable ? 'ok' : 'warn', '#system/info', L('Main board', 'Hlavní deska'), 'ESP32-P4', [esc(s.version), L(`up ${fmtUptime(s.uptime_s)}`, `běží ${fmtUptime(s.uptime_s)}`)],
+      ['ov-p4', L('Main board: ESP32-P4', 'Hlavní deska: ESP32-P4'), [[L('Chip', 'Čip'), `ESP32-P4 ${rev(s.chip_revision)} · ${s.hw?.cores || 2}× ${s.hw?.cpu_mhz || ''} MHz`],
+        ['Firmware', esc(s.version)], ['ESP-IDF', esc(s.idf || '')], [L('Running slot', 'Běžící slot'), esc(s.hw?.app_slot || '') + (s.update?.layout ? ` · ${L('flash layout', 'rozložení flash')} v${s.update.layout}` : '')],
+        [L('Uptime', 'Doba běhu'), fmtUptime(s.uptime_s)], [L('Last reset', 'Poslední reset'), esc(s.reset_reason)], [L('Temperature', 'Teplota'), temp(s)],
+        [L('CPU load', 'Zátěž CPU'), (s.hw?.cpu_load || []).map(l => l.toFixed(0) + ' %').join(' · ')],
+        [L('Internal RAM', 'Interní RAM'), `${fmtBytes(h.internal_free)} ${L('free', 'volné')}, min ${fmtBytes(h.internal_min)}`],
+        ['PSRAM', `${fmtBytes(h.psram_free)} ${L('free of', 'volné z')} ${fmtBytes(s.hw?.psram_size || 0)}`], ['Flash', s.hw?.flash_size ? fmtBytes(s.hw.flash_size) : '']]])}
     <span class="tarrow t-a">→</span>
-    ${topoNode(radioCls(r.active || 'none', r.maintenance), '#radios/status', L('Radio A · internal', 'Rádio A · interní'), 'ESP32-C6', [roleName(r.active)])}
+    ${topoNode(radioCls(r.active || 'none', r.maintenance), '#radios/status', L('Radio A · internal', 'Rádio A · interní'), 'ESP32-C6', [roleName(r.active)],
+      ['ov-ra', L('Radio A: ESP32-C6 (internal)', 'Rádio A: ESP32-C6 (interní)'), [...radioTipRows(r.active, s.c6.bundle, (s.c6.images || []).find(i => i.name === s.c6.bundle)?.version, s.c6.chip, s.c6.telemetry),
+        [L('State', 'Stav'), r.maintenance ? `<span class="bad-text">${esc(r.maintenance)}</span>` : '']]])}
     <span class="tarrow t-na">→</span>
-    ${topoNode(netA[0], netA[1], netA[2], netA[3], netA[4])}
+    ${topoNode(netA[0], netA[1], netA[2], netA[3], netA[4], ['ov-na', `${netA[2]}: ${L('radio A', 'rádio A')}`, netTipRows(r.active || 'none', rsA)])}
     <span class="tarrow t-b">→</span>
-    ${bThere ? topoNode(radioCls(b.active || 'none', b.maintenance || b.wired === false), '#radios/status', L('Radio B · external (JP1)', 'Rádio B · externí (JP1)'), esc(b.chip || L('radio', 'rádio')), [b.wired === false ? L('not found on JP1', 'na JP1 nenalezeno') : roleName(b.active)])
+    ${bThere ? topoNode(radioCls(b.active || 'none', b.maintenance || b.wired === false), '#radios/status', L('Radio B · external (JP1)', 'Rádio B · externí (JP1)'), esc(b.chip || L('radio', 'rádio')), [b.wired === false ? L('not found on JP1', 'na JP1 nenalezeno') : roleName(b.active)],
+        ['ov-rb', L(`Radio B: ${b.chip || ''} (external, JP1)`, `Rádio B: ${b.chip || ''} (externí, JP1)`), [...radioTipRows(b.active || 'none', b.bundle, null, b.chip_info, b.telemetry),
+          [L('Wiring', 'Zapojení'), b.wired === undefined ? '' : b.wired ? L('found', 'nalezeno') : `<span class="bad-text">${L('not found', 'nenalezeno')}</span>`],
+          [L('State', 'Stav'), b.maintenance ? `<span class="bad-text">${esc(b.maintenance)}</span>` : '']]])
       : topoNode('off', '#radios/roles', L('Radio B · external (JP1)', 'Rádio B · externí (JP1)'), L('not connected', 'nepřipojeno'), [L('optional second radio', 'volitelné druhé rádio')])}
     <span class="tarrow t-nb">→</span>
-    ${bThere ? topoNode(netB[0], netB[1], netB[2], netB[3], netB[4]) : '<span class="tnode-empty"></span>'}
+    ${bThere ? topoNode(netB[0], netB[1], netB[2], netB[3], netB[4], ['ov-nb', `${netB[2]}: ${L('radio B', 'rádio B')}`, netTipRows(b.active || 'none', rsB)]) : '<span class="tnode-empty"></span>'}
   </div></div>`;
   const bCard = bThere ? `<div class="card">${h3('chip', L('Radio B: ', 'Rádio B: ') + esc(b.chip || '') + ` <span class="muted">· ${L('external, JP1', 'externí, JP1')}</span>`)}${dl([
       ...radioRoleRows(b.active || 'none', b.desired, rsB),
@@ -1750,10 +1855,23 @@ views.overview = () => {
 };
 
 /* Roles of both radios (docs/dual-radio.md): radio A is the C6 of the board, radio B the external one
- * on JP1. At most one Thread and one Zigbee network and one ESPHome proxy; a switch restarts the gateway. */
+ * on JP1. At most one Thread and one Zigbee network and one ESPHome proxy; a switch restarts the gateway.
+ * Three views of the same choice: a table (roles × radios, default), a list per radio and the tiles. */
+const ROLE_GROUPS = [['Thread', 'access-point-network'], ['Zigbee', 'zigbee'], ['ESPHome', 'bluetooth'], ['Wi-Fi', 'wifi']];
+let rolesView = 'table';
+try { rolesView = ['table', 'list', 'tiles'].includes(localStorage.getItem('rolesView')) ? localStorage.getItem('rolesView') : 'table'; } catch (e) { /* storage blocked */ }
 views['radios/roles'] = () => {
   const r = status.role, b = r.b || {};
   const kind = id => ROLES[id]?.group;
+  /* the state of a role on a radio: running, selected (switch pending), taken by the other radio, or a switch button */
+  const cell = (id, radio, active, desired, other, label) => {
+    if (id === active) return pill('ok', L('active', 'aktivní'));
+    if (id === desired) return pill('warn', L('selected', 'vybráno'));
+    if (other && other !== 'none' && kind(other) === kind(id)) return `<span class="muted" title="${L(`one ${kind(id)} at a time`, `${kind(id)} jen jednou`)}">${L(`on radio ${radio === 'a' ? 'B' : 'A'}`, `na rádiu ${radio === 'a' ? 'B' : 'A'}`)}</span>`;
+    return `<button class="btn sm primary" data-role="${id}" data-radio="${radio}" title="${L('Switch', 'Přepnout')}">${ic('swap-horizontal')}<span>${label || L('Switch', 'Přepnout')}</span></button>`;
+  };
+  const viewSeg = `<div class="seg" id="roles-view" role="group" aria-label="${L('View', 'Zobrazení')}">${[['table', ic('table'), L('Table', 'Tabulka')], ['list', ic('format-list-bulleted'), L('List', 'Seznam')], ['tiles', ic('view-grid-outline'), L('Tiles', 'Dlaždice')]]
+    .map(([v, icon, name]) => `<button data-roles-view="${v}" class="${rolesView === v ? 'on' : ''}" title="${name}" aria-pressed="${rolesView === v}">${icon}<span>${name}</span></button>`).join('')}</div>`;
   const section = (radio, active, desired, other) => {
     const card = ([id, role]) => {
       const clash = other && other !== 'none' && kind(other) === kind(id);
@@ -1764,9 +1882,13 @@ views['radios/roles'] = () => {
         <div><button class="btn ${id === active ? '' : 'primary'}" data-role="${id}" data-radio="${radio}" ${id === active || clash ? 'disabled' : ''}>${ic(id === active ? 'check' : 'swap-horizontal')}${id === active ? L('Running', 'Běží') : L('Switch', 'Přepnout')}</button></div>
       </div>`;
     };
-    const groups = [['Thread', 'access-point-network'], ['Zigbee', 'zigbee'], ['ESPHome', 'bluetooth'], ['Wi-Fi', 'wifi']].map(([g, icon]) =>
-      `<div class="role-group"><h4>${ic(icon)}<span>${g}</span></h4><div class="roles">${Object.entries(ROLES).filter(([, x]) => x.group === g).map(card).join('')}</div></div>`).join('');
-    return groups;
+    const row = ([id, role]) => `<div class="role-line ${id === active ? 'active' : ''}">${ic(role.icon)}<span class="rl-name">${role.name}${tip('role:' + id)}</span>
+      <span class="rl-desc muted">${role.desc}</span><span class="rl-state">${cell(id, radio, active, desired, other)}</span></div>`;
+    return ROLE_GROUPS.map(([g, icon]) => {
+      const roles = Object.entries(ROLES).filter(([, x]) => x.group === g);
+      return rolesView === 'list' ? `<div class="role-lines">${roles.map(row).join('')}</div>`
+        : `<div class="role-group"><h4>${ic(icon)}<span>${g}</span></h4><div class="roles">${roles.map(card).join('')}</div></div>`;
+    }).join('');
   };
   const showB = b.wired || (b.desired && b.desired !== 'none');
   const offB = `<div class="row" style="margin-top:8px"><button class="btn" data-role="none" data-radio="b" ${b.desired === 'none' ? 'disabled' : ''}>${ic('close')}${L('Switch radio B off', 'Vypnout rádio B')}</button>
@@ -1776,9 +1898,21 @@ views['radios/roles'] = () => {
     <p class="muted">${L(`Radio ${up ? 'B' : 'A'} is the Wi-Fi uplink. Swapping gives radio ${up ? 'A' : 'B'} the Wi-Fi and radio ${up ? 'B' : 'A'} the role ${ROLES[up ? r.desired : b.desired]?.name}, in one restart. Thread and Zigbee then run with the network data of the radio they land on.`,
       `Rádio ${up ? 'B' : 'A'} je Wi-Fi uplink. Prohozením dostane Wi-Fi rádio ${up ? 'A' : 'B'} a rádio ${up ? 'B' : 'A'} roli ${ROLES[up ? r.desired : b.desired]?.name}, jedním restartem. Thread a Zigbee pak běží s daty sítě rádia, na které přejdou.`)}</p>
     <button class="btn" id="role-swap">${ic('swap-horizontal')}${L('Swap radio A and B', 'Prohodit rádio A a B')}</button></div>` : '';
+  const intro = `<div class="row" style="margin-bottom:12px"><p class="muted" style="margin:0;flex:1">${L('Switching restarts the gateway and reflashes the radio when the role needs other firmware (about 30 s). Each radio keeps its own Thread and Zigbee networks.',
+      'Přepnutí restartuje bránu a přeflashuje rádio, když role potřebuje jiný firmware (asi 30 s). Každé rádio si drží své vlastní sítě Thread a Zigbee.')}</p>${viewSeg}</div>`;
+  if (rolesView === 'table') {
+    const head = `<tr><th>${L('Role', 'Role')}</th><th>${L('Radio A', 'Rádio A')} <span class="muted">ESP32-C6</span></th>${showB ? `<th>${L('Radio B', 'Rádio B')} <span class="muted">${esc(b.chip || '')}</span></th>` : ''}</tr>`;
+    const rows = ROLE_GROUPS.map(([g, icon]) => `<tr class="rt-group"><th colspan="${showB ? 3 : 2}">${ic(icon)}${g}</th></tr>` + Object.entries(ROLES).filter(([, x]) => x.group === g).map(([id, role]) =>
+      `<tr><td><span class="rl-name">${ic(role.icon)}${role.name}${tip('role:' + id)}</span></td><td>${cell(id, 'a', activeRole(), r.desired, b.desired)}</td>${showB ? `<td>${cell(id, 'b', b.active, b.desired, r.desired)}</td>` : ''}</tr>`).join('')).join('')
+      + (showB ? `<tr class="rt-group"><th colspan="3">${ic('power')}${L('Off', 'Vypnuto')}</th></tr><tr><td><span class="rl-name">${ic('close')}${L('Radio B off', 'Rádio B vypnuto')}</span></td><td class="muted">–</td>
+        <td>${b.desired === 'none' ? pill(b.active === 'none' ? 'ok' : 'warn', b.active === 'none' ? L('active', 'aktivní') : L('selected', 'vybráno')) : `<button class="btn sm" data-role="none" data-radio="b" title="${L('Switch off', 'Vypnout')}">${ic('close')}<span>${L('Switch off', 'Vypnout')}</span></button>`}</td></tr>` : '');
+    return maintenanceBanner() + swap + `<div class="card">${h3('swap-horizontal', L('Roles of the radios', 'Role rádií'))}${intro}
+      <div class="table-wrap"><table class="roles-table">${head}${rows}</table></div>
+      ${b.maintenance ? `<p class="bad-text">${L('Radio B', 'Rádio B')}: ${esc(b.maintenance)}</p>` : ''}
+      ${showB ? '' : `<p class="muted">${L('No radio B found on JP1: wiring and its test under Status and maintenance.', 'Na JP1 nebylo nalezeno rádio B: zapojení a jeho test ve Stavu a údržbě.')}</p>`}</div>`;
+  }
   return maintenanceBanner() + swap + `<div class="card">${h3('swap-horizontal', L('Radio A: C6 of the board', 'Rádio A: C6 na desce'))}
-    <p class="muted">${L('Switching restarts the gateway and reflashes the radio when the role needs other firmware (about 30 s). Each radio keeps its own Thread and Zigbee networks.',
-      'Přepnutí restartuje bránu a přeflashuje rádio, když role potřebuje jiný firmware (asi 30 s). Každé rádio si drží své vlastní sítě Thread a Zigbee.')}</p>
+    ${intro}
     ${section('a', activeRole(), r.desired, b.desired)}</div>
     ${showB ? `<div class="card" style="margin-top:16px">${h3('chip', L('Radio B: external', 'Rádio B: externí') + (b.chip ? ' ' + esc(b.chip) : ''))}
       ${section('b', b.active, b.desired, r.desired)}${offB}</div>`
@@ -4147,7 +4281,11 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button');
   if (!t) return;
   try {
-    if (t.dataset.role) {
+    if (t.dataset.rolesView) {
+      rolesView = t.dataset.rolesView;
+      try { localStorage.setItem('rolesView', rolesView); } catch (e) { /* storage blocked */ }
+      render(true);
+    } else if (t.dataset.role) {
       const radio = t.dataset.radio || 'a', name = ROLES[t.dataset.role]?.name || L('off', 'vypnuto');
       if (!await confirmDialog(L(`Radio ${radio.toUpperCase()}: ${name}?`, `Rádio ${radio.toUpperCase()}: ${name}?`),
         L('The gateway restarts and may reflash the radio. Devices on its current network go offline until you switch back.',
@@ -4847,7 +4985,7 @@ async function poll() {
     api('/api/auth/me').then(m => { if (m.requests !== me.requests) { me = m; renderUser(); renderNav(); } else me = m; }).catch(() => {});
   }
   if (!restarting) {
-    try { status = await api('/api/status'); render(false); } catch (e) { setTag('#hdr-role', 'bad', ic('close'), 'offline', L('Gateway', 'Brána'), [[L('State', 'Stav'), L('does not answer', 'neodpovídá')]]); }
+    try { status = await api('/api/status'); await sampleNet(); render(false); } catch (e) { setTag('#hdr-role', 'bad', ic('close'), 'offline', L('Gateway', 'Brána'), [[L('State', 'Stav'), L('does not answer', 'neodpovídá')]]); }
   }
   setTimeout(poll, $('#busy-dlg').open ? 500 : status?.c6?.flash?.busy || status?.identify_s || status?.eth?.confirm_s ? 1000 : 5000);
 }
