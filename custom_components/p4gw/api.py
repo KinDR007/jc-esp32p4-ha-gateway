@@ -78,6 +78,13 @@ class P4Client:
         """I2C sensors with their values (firmware 1.11 on; older answers 404)."""
         return await self._request("GET", "/api/sensors")
 
+    async def modbus(self) -> dict[str, Any]:
+        """Modbus devices with their values (firmware 1.11 on; older answers 404)."""
+        return await self._request("GET", "/api/modbus")
+
+    async def modbus_template(self, template_id: str) -> dict[str, Any]:
+        return await self._request("GET", f"/api/modbus/template?id={template_id}")
+
     async def notifications(self, since: int) -> dict[str, Any]:
         """Notifications the gateway keeps, newer than seq since: {"notifications": [...], "seq"}."""
         return await self._request("GET", f"/api/notify?since={since}")

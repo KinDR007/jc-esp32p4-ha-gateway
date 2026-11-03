@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import P4Client
@@ -13,6 +14,7 @@ PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
     Platform.EVENT,
+    Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
@@ -27,6 +29,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: P4ConfigEntry) -> bool:
     coordinator = P4Coordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+    # the gateway's device first: the Modbus devices are connected via it
+    dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **coordinator.device_info)
     entry.async_create_background_task(hass, coordinator.async_listen(), "p4gw-push")
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_options_updated))

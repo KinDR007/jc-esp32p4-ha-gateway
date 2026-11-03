@@ -16,6 +16,7 @@ from .api import P4Error
 from .const import ZIGBEE_ROLES
 from .coordinator import P4ConfigEntry, P4Data
 from .entity import P4Entity
+from .modbus import P4ModbusEntity, add_modbus_entities
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -60,6 +61,14 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: P4ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     async_add_entities(P4Button(entry.runtime_data, d) for d in BUTTONS)
+    add_modbus_entities(entry.runtime_data, async_add_entities, "button", P4ModbusButton)
+
+
+class P4ModbusButton(P4ModbusEntity, ButtonEntity):
+    """A command of a Modbus device (writes the template's value, or sends a device function)."""
+
+    async def async_press(self) -> None:
+        await self.write()
 
 
 class P4Button(P4Entity, ButtonEntity):

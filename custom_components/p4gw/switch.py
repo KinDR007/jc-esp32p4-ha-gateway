@@ -13,12 +13,33 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .api import P4Error
 from .coordinator import P4ConfigEntry, P4Coordinator
 from .entity import P4Entity
+from .modbus import P4ModbusEntity, add_modbus_entities
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: P4ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     async_add_entities([P4SoundSwitch(entry.runtime_data)])
+    add_modbus_entities(entry.runtime_data, async_add_entities, "switch", P4ModbusSwitch)
+
+
+class P4ModbusSwitch(P4ModbusEntity, SwitchEntity):
+    """A writable coil or register of a Modbus device (its on/off values from the template)."""
+
+    @property
+    def is_on(self) -> bool | None:
+        value = self.value
+        if value is None:
+            return None
+        return value is True or (not isinstance(value, bool) and value == (self.spec.get("write") or {}).get("on", 1))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.write("ON")
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.write("OFF")
+        await self.coordinator.async_request_refresh()
 
 
 class P4SoundSwitch(P4Entity, SwitchEntity):

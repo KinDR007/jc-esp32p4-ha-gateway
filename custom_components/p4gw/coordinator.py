@@ -38,6 +38,8 @@ class P4Data:
     events: dict[str, dict[str, Any]]  # sound events by id
     sensors: dict[str, dict[str, Any]]  # I2C sensors by id ("i2c_76")
     quantities: dict[str, dict[str, Any]]  # what the sensors measure, by key
+    modbus: dict[str, dict[str, Any]]  # Modbus devices by id ("d1"), with their values
+    modbus_templates: dict[str, dict[str, Any]]  # templates of the exposed Modbus devices, by id
 
 
 class P4Coordinator(DataUpdateCoordinator[P4Data]):
@@ -85,6 +87,11 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
                 sensors = await self.client.sensors()
             except P4RequestError:
                 sensors = {}  # firmware without I2C sensors, or a token without the right to System › Hardware
+            try:
+                modbus = (await self.client.modbus())["devices"]
+            except P4RequestError:
+                modbus = []  # firmware without Modbus, or no right to System › RS485
+            templates = await self._modbus_templates(modbus)
         except P4AuthError as err:
             raise ConfigEntryAuthFailed from err
         except P4Error as err:
@@ -95,7 +102,27 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
             events={e["id"]: e for e in events},
             sensors={s["id"]: s for s in sensors.get("sensors", [])},
             quantities={q["key"]: q for q in sensors.get("quantities", [])},
+            modbus={d["id"]: d for d in modbus},
+            modbus_templates=templates,
         )
+
+    async def _modbus_templates(self, devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Templates of the devices shown through the integration; fetched again when their revision changes."""
+        known = self.data.modbus_templates if self.data else {}
+        templates: dict[str, dict[str, Any]] = {}
+        for device in devices:
+            tid = device["template"]
+            if device.get("expose") not in ("integration", "both") or tid in templates:
+                continue
+            cached = known.get(tid)
+            if cached and cached.get("rev") == device.get("template_rev"):
+                templates[tid] = cached
+            else:
+                try:
+                    templates[tid] = await self.client.modbus_template(tid)
+                except P4RequestError as err:
+                    LOGGER.warning("Modbus template %s: %s", tid, err)
+        return templates
 
     @callback
     def _on_push(self, topic: str, payload: str) -> None:
@@ -113,6 +140,19 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
                 self.async_set_updated_data(self.data)
         elif topic.startswith("sound/"):
             async_dispatcher_send(self.hass, self.sound_signal, topic[6:], json.loads(payload))
+        elif topic.startswith("modbus/"):
+            # a read of a Modbus device: its values, or its availability
+            parts = topic.split("/")
+            device = self.data.modbus.get(parts[1])
+            if device is None:
+                return
+            if len(parts) == 3 and parts[2] == "availability":
+                device["state"] = "ok" if payload == "online" else "offline"
+            elif len(parts) == 2:
+                device["values"] = json.loads(payload)
+                if device.get("state") not in ("ok", "partial"):
+                    device["state"] = "ok"
+            self.async_set_updated_data(self.data)
         elif topic == "notify":
             note = json.loads(payload)
             if isinstance(note, dict):

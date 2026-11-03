@@ -403,3 +403,51 @@ async def test_firmware_without_sensors(hass: HomeAssistant, gateway) -> None:
     entry = await setup_entry(hass, gateway)
     assert entry.state is ConfigEntryState.LOADED
     assert entity_id(hass, "sensor", "i2c_76_temperature") is None
+
+
+async def test_modbus_device(hass: HomeAssistant, gateway) -> None:
+    """A Modbus device shown through the integration is its own device via the gateway, with an entity per
+    template entity of the right kind; writes go to /api/modbus/write; pushed reads update the values."""
+    from homeassistant.helpers import device_registry as dr
+
+    await setup_entry(hass, gateway)
+    reg = er.async_get(hass)
+    eid = lambda platform, key: reg.async_get_entity_id(platform, DOMAIN, f"{MAC}_mb_d1_{key}")
+    voltage = hass.states.get(eid("sensor", "voltage"))
+    assert voltage.state == "52.31" and voltage.attributes["unit_of_measurement"] == "V" and voltage.attributes["device_class"] == "voltage"
+    assert hass.states.get(eid("sensor", "high_voltage_alarm")).attributes["options"] == ["off", "on"]
+    assert hass.states.get(eid("binary_sensor", "fault")).state == STATE_OFF
+    assert hass.states.get(eid("switch", "relay")).state == STATE_ON
+    thr = hass.states.get(eid("number", "high_voltage_threshold"))
+    assert float(thr.state) == 58.4 and thr.attributes["min"] == 5 and thr.attributes["max"] == 350
+    assert hass.states.get(eid("select", "shunt")).state == "100 A"
+    assert eid("button", "reset_energy") is not None
+    assert reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_mb_d2_voltage") is None  # MQTT only
+
+    entry_id = hass.config_entries.async_entries(DOMAIN)[0].entry_id
+    devices = dr.async_get(hass)
+    meter = devices.async_get_device_by_identifier((DOMAIN, f"{MAC}_mb_d1"), entry_id)
+    gw = devices.async_get_device_by_identifier((DOMAIN, MAC), entry_id)
+    assert meter.name == "Battery meter" and meter.model == "PZEM-017 / PZEM-003" and meter.via_device_id == gw.id
+
+    await hass.services.async_call("number", "set_value", {"entity_id": eid("number", "high_voltage_threshold"), "value": 57}, blocking=True)
+    await hass.services.async_call("select", "select_option", {"entity_id": eid("select", "shunt"), "option": "200 A"}, blocking=True)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": eid("switch", "relay")}, blocking=True)
+    await hass.services.async_call("button", "press", {"entity_id": eid("button", "reset_energy")}, blocking=True)
+    assert ("/api/modbus/write", {"device": "d1", "key": "high_voltage_threshold", "value": 57.0}) in gateway.posts
+    assert ("/api/modbus/write", {"device": "d1", "key": "shunt", "value": "200 A"}) in gateway.posts
+    assert ("/api/modbus/write", {"device": "d1", "key": "relay", "value": "OFF"}) in gateway.posts
+    assert ("/api/modbus/write", {"device": "d1", "key": "reset_energy"}) in gateway.posts
+
+    await push(hass, gateway, "modbus/d1", {**gateway.modbus["devices"][0]["values"], "voltage": 53.0})
+    assert hass.states.get(eid("sensor", "voltage")).state == "53.0"
+    await push(hass, gateway, "modbus/d1/availability", "offline")
+    assert hass.states.get(eid("sensor", "voltage")).state == STATE_UNAVAILABLE
+    assert gateway.template_gets == 1  # the template is fetched once while its revision stays
+
+
+async def test_firmware_without_modbus(hass: HomeAssistant, gateway) -> None:
+    gateway.modbus = None
+    entry = await setup_entry(hass, gateway)
+    assert entry.state is ConfigEntryState.LOADED
+    assert er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{MAC}_mb_d1_voltage") is None

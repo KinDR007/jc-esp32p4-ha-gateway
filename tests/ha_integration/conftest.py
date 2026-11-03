@@ -43,6 +43,27 @@ SENSORS = {
 }
 
 
+# a Modbus device: the built-in PZEM-017 template (number, select, button, enum sensors) plus a coil switch
+# and a register bit, as the gateway serves them
+TEMPLATE = json.loads((Path(__file__).resolve().parents[2] / "firmware/gateway/components/modbus/templates/peacefair_pzem017.json").read_text())
+TEMPLATE["entities"] += [
+    {"key": "relay", "name": "Relay", "reg": "coil", "addr": "0x0000", "write": {"kind": "switch", "on": 1, "off": 0}},
+    {"key": "fault", "name": "Fault", "reg": "holding", "addr": "0x0010", "bit": 2},
+]
+TEMPLATE.update(builtin=True, rev=1)
+MODBUS = {
+    "devices": [
+        {"id": "d1", "name": "Battery meter", "template": "peacefair_pzem017", "template_rev": 1, "manufacturer": "Peacefair",
+         "model": "PZEM-017 / PZEM-003", "transport": "rtu", "slave": 1, "expose": "integration", "enabled": True, "state": "ok",
+         "values": {"voltage": 52.31, "current": 3.5, "power": 183.1, "energy": 12.345, "high_voltage_alarm": "off",
+                    "low_voltage_alarm": "off", "high_voltage_threshold": 58.4, "low_voltage_threshold": 44.0, "shunt": "100 A",
+                    "relay": True, "fault": False}},
+        {"id": "d2", "name": "MQTT only", "template": "peacefair_pzem017", "template_rev": 1, "manufacturer": "Peacefair",
+         "model": "PZEM-017", "transport": "rtu", "slave": 2, "expose": "mqtt", "enabled": True, "state": "ok", "values": {}},
+    ]
+}
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     yield
@@ -54,6 +75,8 @@ class FakeGateway:
         self.sound = dict(SOUND)
         self.events = copy.deepcopy(EVENTS)
         self.sensors = copy.deepcopy(SENSORS)  # None: firmware without /api/sensors
+        self.modbus = copy.deepcopy(MODBUS)  # None: firmware without /api/modbus
+        self.template_gets = 0
         self.password = ""  # admin password of firmware before user accounts (Basic)
         self.token = ""  # API token of firmware with user accounts (Bearer)
         self.forbidden: set[str] = set()  # POST paths the token's role may not use (403)
@@ -67,6 +90,8 @@ class FakeGateway:
         app.router.add_get("/api/sound/status", self._get(lambda: self.sound))
         app.router.add_get("/api/sound/events", self._get(lambda: {"events": self.events}))
         app.router.add_get("/api/sensors", self._sensors)
+        app.router.add_get("/api/modbus", self._modbus)
+        app.router.add_get("/api/modbus/template", self._modbus_template)
         app.router.add_get("/api/notify", self._get(lambda: {"notifications": self.notes, "seq": len(self.notes), "boot": self.boot}))
         app.router.add_post("/api/{path:.*}", self._post)
         app.router.add_get("/api/ws", self._ws)
@@ -98,6 +123,17 @@ class FakeGateway:
         if self.sensors is None:
             return web.Response(status=404, text="Nothing matches the given URI")
         return await self._get(lambda: self.sensors)(request)
+
+    async def _modbus(self, request: web.Request) -> web.Response:
+        if self.modbus is None:
+            return web.Response(status=404, text="Nothing matches the given URI")
+        return await self._get(lambda: self.modbus)(request)
+
+    async def _modbus_template(self, request: web.Request) -> web.Response:
+        self.template_gets += 1
+        if request.query.get("id") != TEMPLATE["id"]:
+            return web.json_response({"error": "no such template"}, status=404)
+        return await self._get(lambda: TEMPLATE)(request)
 
     async def _post(self, request: web.Request) -> web.Response:
         if not self._authorized(request):

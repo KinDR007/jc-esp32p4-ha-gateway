@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import P4ConfigEntry, P4Coordinator
 from .entity import P4Entity, P4SoundEntity, add_sound_entities
+from .modbus import P4ModbusEntity, add_modbus_entities
 
 
 async def async_setup_entry(
@@ -17,6 +18,15 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     async_add_entities([P4Ethernet(coordinator), P4ZigbeeHost(coordinator), P4Push(coordinator)])
     add_sound_entities(coordinator, async_add_entities, P4SoundActive)
+    add_modbus_entities(coordinator, async_add_entities, "binary_sensor", P4ModbusBinarySensor)
+
+
+class P4ModbusBinarySensor(P4ModbusEntity, BinarySensorEntity):
+    """A coil, discrete input or register bit of a Modbus device."""
+
+    @property
+    def is_on(self) -> bool | None:
+        return None if self.value is None else bool(self.value)
 
 
 class P4Ethernet(P4Entity, BinarySensorEntity):

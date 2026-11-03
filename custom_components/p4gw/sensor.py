@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from .const import ROLES
 from .coordinator import P4ConfigEntry, P4Data
 from .entity import P4Entity
+from .modbus import P4ModbusEntity, add_modbus_entities, sensor_attrs
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -168,6 +169,20 @@ async def async_setup_entry(
 
     add_new()
     entry.async_on_unload(coordinator.async_add_listener(add_new))
+    add_modbus_entities(coordinator, async_add_entities, "sensor", P4ModbusSensor)
+
+
+class P4ModbusSensor(P4ModbusEntity, SensorEntity):
+    """A read-only value of a Modbus device: a number, a named state (enum) or a text."""
+
+    def __init__(self, coordinator, device_id: str, entity: dict[str, Any]) -> None:
+        super().__init__(coordinator, device_id, entity)
+        for attr, value in sensor_attrs(entity).items():
+            setattr(self, f"_attr_{attr}", value)
+
+    @property
+    def native_value(self) -> Any:
+        return self.value
 
 
 class P4I2CSensor(P4Entity, SensorEntity):

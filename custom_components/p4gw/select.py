@@ -13,6 +13,7 @@ from .api import P4Error
 from .const import ROLES
 from .coordinator import P4ConfigEntry, P4Coordinator
 from .entity import P4Entity
+from .modbus import P4ModbusEntity, add_modbus_entities
 
 
 async def async_setup_entry(
@@ -23,6 +24,23 @@ async def async_setup_entry(
     if "b" in coordinator.data.status.get("role", {}):
         entities.append(P4RadioBRoleSelect(coordinator))
     async_add_entities(entities)
+    add_modbus_entities(coordinator, async_add_entities, "select", P4ModbusSelect)
+
+
+class P4ModbusSelect(P4ModbusEntity, SelectEntity):
+    """A register of a Modbus device with named values (the template's map)."""
+
+    @property
+    def options(self) -> list[str]:
+        return list(self.spec["map"].values())
+
+    @property
+    def current_option(self) -> str | None:
+        value = self.value
+        return value if isinstance(value, str) and value in self.options else None
+
+    async def async_select_option(self, option: str) -> None:
+        await self.write(option)
 
 
 class P4RoleSelect(P4Entity, SelectEntity):
