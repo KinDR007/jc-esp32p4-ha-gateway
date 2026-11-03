@@ -151,4 +151,5 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání)
 
 **F8 Odloženo**
-- [ ] F8.1 AirTag přes BLE proxy: rešerše proveditelnosti, test s reálným AirTagem
+- [x] F8.1 AirTag přes BLE proxy: rešerše ([docs/airtag.md](docs/airtag.md)): anonymní detekce „Find My poblíž“ jde (jen přeposílání inzerátů, Bermuda/šablona v HA), identifikace vlastních AirTagů jen s klíči exportovanými z Macu (křehké, na Sequoia/Tahoe rozbité), automatické přidávání nelze; doporučen BLE tag s pevnou adresou / iBeacon
+- [ ] F8.2 (volitelné) test anonymní detekce s reálným AirTagem, pokud o ni bude zájem
