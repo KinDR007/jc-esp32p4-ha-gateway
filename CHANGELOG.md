@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.11 (2026-11-03)
+
+Summary: I2C sensors on connector CN3 (24 chip families, recognised by the gateway) and Modbus devices on RS485 and Modbus TCP with JSON templates (Eastron SDM, ORNO, Hiking, Chint, Peacefair built in), each shown in Home Assistant through the integration or MQTT.
 
 - Modbus, System › RS485: devices on the board's RS485 port (J4, UART3) and over Modbus TCP, described
   by JSON templates (read and write: number, switch, select, button). Built-in templates after research
