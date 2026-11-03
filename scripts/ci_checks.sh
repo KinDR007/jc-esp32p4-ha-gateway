@@ -12,6 +12,11 @@ cc -std=c11 -Wall -Wextra -Werror -I firmware/gateway/components/sound -o "$tmp/
     tests/unit/aweight_test.c firmware/gateway/components/sound/sound_aweight.c -lm
 "$tmp/aweight_test"
 
+echo "== API description matches the firmware"
+python3 tests/unit/api_spec_test.py
+python3 tools/docs/api_md.py "$tmp/api.md" >/dev/null
+cmp -s docs/api.md "$tmp/api.md" || { echo "docs/api.md outdated: run python3 tools/docs/api_md.py" >&2; exit 1; }
+
 echo "== python syntax"
 python3 -m py_compile scripts/*.py tests/*.py tests/zha/*.py tests/ha_integration/*.py custom_components/p4gw/*.py
 python3 -m json.tool custom_components/p4gw/manifest.json >/dev/null

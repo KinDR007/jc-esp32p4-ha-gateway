@@ -106,6 +106,16 @@ header.flashing #flash-strip { display: block; }
 .side-user small { color: var(--muted); }
 .side-user button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 8px; display: inline-flex; }
 .side-user button:hover { color: var(--bad); background: var(--panel-2); }
+.api-ep { border-top: 1px solid var(--border); padding: 8px 0; }
+.api-ep > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; cursor: pointer; list-style: none; }
+.api-ep > summary::-webkit-details-marker { display: none; }
+.api-m { font: 600 11px/1 var(--mono, monospace); padding: 3px 6px; border-radius: 4px; min-width: 46px; text-align: center; color: #fff; background: var(--muted); }
+.api-m.GET { background: var(--ok); } .api-m.POST { background: var(--accent); } .api-m.PUT { background: var(--warn); } .api-m.DELETE { background: var(--bad); }
+.api-ep code.path { font-weight: 600; }
+.api-ep .api-perm { font-size: 12px; color: var(--muted); }
+.api-ep .api-body { display: grid; gap: 8px; margin: 8px 0 4px 54px; }
+.api-ep pre { margin: 0; max-height: 320px; overflow: auto; }
+@media (max-width: 700px) { .api-ep .api-body { margin-left: 0; } }
 .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 700; margin-left: auto; }
 #side .subs .subs { margin-left: 10px; }
@@ -1206,6 +1216,7 @@ const ICONS = {
   'account-group-outline': 'M12,5A3.5,3.5 0 0,0 8.5,8.5A3.5,3.5 0 0,0 12,12A3.5,3.5 0 0,0 15.5,8.5A3.5,3.5 0 0,0 12,5M12,7A1.5,1.5 0 0,1 13.5,8.5A1.5,1.5 0 0,1 12,10A1.5,1.5 0 0,1 10.5,8.5A1.5,1.5 0 0,1 12,7M5.5,8A2.5,2.5 0 0,0 3,10.5C3,11.44 3.53,12.25 4.29,12.68C4.65,12.88 5.06,13 5.5,13C5.94,13 6.35,12.88 6.71,12.68C7.08,12.47 7.39,12.17 7.62,11.81C6.89,10.86 6.5,9.7 6.5,8.5C6.5,8.41 6.5,8.31 6.5,8.22C6.2,8.08 5.86,8 5.5,8M18.5,8C18.14,8 17.8,8.08 17.5,8.22C17.5,8.31 17.5,8.41 17.5,8.5C17.5,9.7 17.11,10.86 16.38,11.81C16.5,12 16.63,12.15 16.78,12.3C16.94,12.45 17.1,12.58 17.29,12.68C17.65,12.88 18.06,13 18.5,13C18.94,13 19.35,12.88 19.71,12.68C20.47,12.25 21,11.44 21,10.5A2.5,2.5 0 0,0 18.5,8M12,14C9.66,14 5,15.17 5,17.5V19H19V17.5C19,15.17 14.34,14 12,14M4.71,14.55C2.78,14.78 0,15.76 0,17.5V19H3V17.07C3,16.06 3.69,15.22 4.71,14.55M19.29,14.55C20.31,15.22 21,16.06 21,17.07V19H24V17.5C24,15.76 21.22,14.78 19.29,14.55M12,16C13.53,16 15.24,16.5 16.23,17H7.77C8.76,16.5 10.47,16 12,16Z',
   'account-multiple-outline': 'M13.07 10.41A5 5 0 0 0 13.07 4.59A3.39 3.39 0 0 1 15 4A3.5 3.5 0 0 1 15 11A3.39 3.39 0 0 1 13.07 10.41M5.5 7.5A3.5 3.5 0 1 1 9 11A3.5 3.5 0 0 1 5.5 7.5M7.5 7.5A1.5 1.5 0 1 0 9 6A1.5 1.5 0 0 0 7.5 7.5M16 17V19H2V17S2 13 9 13 16 17 16 17M14 17C13.86 16.22 12.67 15 9 15S4.07 16.31 4 17M15.95 13A5.32 5.32 0 0 1 18 17V19H22V17S22 13.37 15.94 13Z',
   'account-plus-outline': 'M15,4A4,4 0 0,0 11,8A4,4 0 0,0 15,12A4,4 0 0,0 19,8A4,4 0 0,0 15,4M15,5.9C16.16,5.9 17.1,6.84 17.1,8C17.1,9.16 16.16,10.1 15,10.1A2.1,2.1 0 0,1 12.9,8A2.1,2.1 0 0,1 15,5.9M4,7V10H1V12H4V15H6V12H9V10H6V7H4M15,13C12.33,13 7,14.33 7,17V20H23V17C23,14.33 17.67,13 15,13M15,14.9C17.97,14.9 21.1,16.36 21.1,17V18.1H8.9V17C8.9,16.36 12,14.9 15,14.9Z',
+  'api': 'M7 7H5A2 2 0 0 0 3 9V17H5V13H7V17H9V9A2 2 0 0 0 7 7M7 11H5V9H7M14 7H10V17H12V13H14A2 2 0 0 0 16 11V9A2 2 0 0 0 14 7M14 11H12V9H14M20 9V15H21V17H17V15H18V9H17V7H21V9Z',
   'auto-fix': 'M7.5,5.6L5,7L6.4,4.5L5,2L7.5,3.4L10,2L8.6,4.5L10,7L7.5,5.6M19.5,15.4L22,14L20.6,16.5L22,19L19.5,17.6L17,19L18.4,16.5L17,14L19.5,15.4M22,2L20.6,4.5L22,7L19.5,5.6L17,7L18.4,4.5L17,2L19.5,3.4L22,2M13.34,12.78L15.78,10.34L13.66,8.22L11.22,10.66L13.34,12.78M14.37,7.29L16.71,9.63C17.1,10 17.1,10.65 16.71,11.04L5.04,22.71C4.65,23.1 4,23.1 3.63,22.71L1.29,20.37C0.9,20 0.9,19.35 1.29,18.96L12.96,7.29C13.35,6.9 14,6.9 14.37,7.29Z',
   'backup-restore': 'M12,3A9,9 0 0,0 3,12H0L4,16L8,12H5A7,7 0 0,1 12,5A7,7 0 0,1 19,12A7,7 0 0,1 12,19C10.5,19 9.09,18.5 7.94,17.7L6.5,19.14C8.04,20.3 9.94,21 12,21A9,9 0 0,0 21,12A9,9 0 0,0 12,3M14,12A2,2 0 0,0 12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12Z',
   'bell-cog-outline': 'M22.72 19.5C22.74 19.33 22.75 19.17 22.75 19S22.74 18.67 22.72 18.5L23.77 17.68C23.87 17.61 23.89 17.5 23.83 17.36L22.83 15.64C22.77 15.53 22.64 15.5 22.53 15.53L21.28 16C21 15.83 20.75 15.66 20.44 15.54L20.25 14.21C20.23 14.09 20.13 14 20 14H18C17.88 14 17.77 14.09 17.75 14.21L17.57 15.54C17.25 15.66 17 15.83 16.72 16L15.5 15.53C15.37 15.5 15.23 15.53 15.17 15.64L14.17 17.36C14.11 17.5 14.14 17.61 14.23 17.68L15.29 18.5C15.27 18.67 15.25 18.84 15.25 19S15.27 19.33 15.29 19.5L14.23 20.32C14.14 20.39 14.11 20.53 14.17 20.64L15.17 22.37C15.23 22.5 15.37 22.5 15.5 22.5L16.72 21.97C17 22.17 17.25 22.34 17.57 22.47L17.75 23.79C17.77 23.91 17.88 24 18 24H20C20.13 24 20.23 23.91 20.25 23.79L20.44 22.47C20.75 22.34 21 22.17 21.28 21.97L22.53 22.5C22.64 22.5 22.77 22.5 22.83 22.37L23.83 20.64C23.89 20.53 23.87 20.39 23.77 20.32L22.72 19.5M19 20.75C18.04 20.75 17.25 19.97 17.25 19S18.04 17.25 19 17.25 20.75 18.03 20.75 19 19.97 20.75 19 20.75M12.08 20H3V19L5 17V11C5 7.9 7 5.2 10 4.3V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.3C17 5.2 19 7.9 19 11V12C18.31 12 17.63 12.11 17 12.29V11C17 8.2 14.8 6 12 6S7 8.2 7 11V18H12.08C12.03 18.33 12 18.66 12 19C12 19.34 12.03 19.67 12.08 20M12.3 21C12.5 21.6 12.74 22.17 13.06 22.69C12.75 22.88 12.39 23 12 23C10.9 23 10 22.1 10 21H12.3Z',
@@ -1381,6 +1392,7 @@ const NAV = [
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
     { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
+    { id: 'api', label: 'API', icon: 'api' },
     { id: 'notify', label: 'Notifications', icon: 'bell-cog-outline', admin: true },
     { id: 'users', label: 'User management', icon: 'account-group-outline', admin: true, subs: [
       { id: 'list', label: 'Users', icon: 'account-multiple-outline' }, { id: 'roles', label: 'Roles and permissions', icon: 'shield-account-outline' },
@@ -2088,6 +2100,104 @@ function drawFlows() {
   }).join('');
 }
 addEventListener('resize', () => { if (route() === 'flows') drawFlows(); });
+
+/* System › API: the API description of the firmware (GET /api/help, firmware/gateway/web/api.json)
+ * with examples built for this gateway: the address the browser uses, the hostname, a token typed in
+ * here (kept only in this tab), the radios and roles it has now; GET requests without side effects
+ * can be tried right away with the current sign-in. */
+let apiSpec = null, apiFilter = '', apiToken = '';
+const apiOpen = new Set(); /* endpoints expanded, kept over a redraw */
+try { apiToken = sessionStorage.getItem('apiToken') || ''; } catch (e) { /* storage blocked */ }
+const API_NO_TRY = ['/api/ws', '/api/c6/backup', '/api/sound/clip', '/api/coredump', '/api/settings/export', '/api/sound/learn/sample', '/api/radios/b/console'];
+async function loadApiSpec() {
+  if (!apiSpec) {
+    try { apiSpec = await api('/api/help'); } catch (e) { apiSpec = { error: e.message }; }
+    if (route() === 'system/api') render(true);
+  }
+}
+/* an example body adapted to this gateway: valid roles and radios now, the current LAN and MQTT values */
+function apiBody(e) {
+  const b = e.body && typeof e.body === 'object' ? JSON.parse(JSON.stringify(e.body)) : e.body, r = status.role, hasB = !!(r.b?.wired || (r.b?.desired && r.b.desired !== 'none'));
+  if (!b || typeof b !== 'object') return b;
+  if ('radio' in b && !hasB) b.radio = 'a';
+  if (e.path === '/api/role' && 'role' in b) {
+    const other = (b.radio === 'b' ? r.desired : r.b?.desired) || 'none', kind = id => ROLES[id]?.group;
+    b.role = Object.keys(ROLES).find(id => id !== (b.radio === 'b' ? r.b?.active : r.active) && !(other !== 'none' && kind(other) === kind(id))) || b.role;
+  }
+  if (e.path === '/api/net/lan' && e.method === 'POST') Object.assign(b, { mode: status.eth.mode || 'dhcp' }, status.eth.mode === 'static' ? { ip: status.eth.ipv4, netmask: status.eth.netmask, gateway: status.eth.gateway } : {});
+  return b;
+}
+function apiExamples(e) {
+  const origin = location.origin, tok = apiToken || 'TOKEN', q = (e.query || []).map(x => `${x.name}=${String(x.values || '').split('|')[status.role.b?.wired && x.name === 'radio' ? 1 : 0] || ''}`).join('&');
+  const url = origin + e.path + (q ? '?' + q : ''), body = apiBody(e), json = body && typeof body === 'object' ? JSON.stringify(body) : null;
+  const curl = [`curl -s -H 'Authorization: Bearer ${tok}'`, e.method !== 'GET' ? `-X ${e.method}` : '',
+    json ? `-H 'Content-Type: application/json' -d '${json}'` : e.body_type === 'binary' ? `--data-binary @${body || 'file.bin'}` : '', `'${url}'`].filter(Boolean).join(' ');
+  const py = `import requests\nr = requests.${e.method.toLowerCase()}('${url}', headers={'Authorization': 'Bearer ${tok}'}${json ? `, json=${json.replace(/true/g, 'True').replace(/false/g, 'False').replace(/null/g, 'None')}` : e.body_type === 'binary' ? `, data=open('${body || 'file.bin'}', 'rb')` : ''})\nprint(r.status_code, r.text[:500])`;
+  const name = 'p4gw_' + e.path.replace(/^\/api\//, '').replace(/[^a-z0-9]+/g, '_');
+  const ha = e.method !== 'GET' && e.body_type !== 'binary' ? `rest_command:\n  ${name}:\n    url: ${url}\n    method: ${e.method.toLowerCase()}\n    headers:\n      Authorization: !secret p4gw_bearer   # "Bearer <token>"\n${json ? `    content_type: application/json\n    payload: '${json}'\n` : ''}` : '';
+  return [['curl', curl], ['Python', py], ...(ha ? [['Home Assistant', ha]] : [])];
+}
+views['system/api'] = () => {
+  loadApiSpec();
+  if (!apiSpec) return `<div class="card muted">${L('Loading…', 'Načítám…')}</div>`;
+  if (apiSpec.error) return `<div class="card bad-text">${esc(apiSpec.error)}</div>`;
+  const tx = o => esc(o ? (lang === 'cs' ? o.cs : o.en) || o.en || '' : ''), origin = location.origin, tok = apiToken || 'TOKEN';
+  const permTxt = e => e.perm === 'public' ? L('no sign-in', 'bez přihlášení') : e.perm === 'admin' ? L('administrators', 'správci')
+    : e.perm === '*' ? L('any signed-in client', 'kdokoli přihlášený') : e.perm === 'self' ? L('own account', 'vlastní účet') : `${esc(e.perm)} · ${e.level === 2 ? L('edit', 'úpravy') : L('read', 'čtení')}`;
+  const f = apiFilter.toLowerCase(), match = e => !f || (e.path + ' ' + e.method + ' ' + tx(e.summary)).toLowerCase().includes(f);
+  const ep = e => `<details class="api-ep" data-api-ep="${esc(e.method + ' ' + e.path)}" ${apiOpen.has(e.method + ' ' + e.path) ? 'open' : ''}><summary><span class="api-m ${e.method}">${e.method}</span><code class="path">${esc(e.path)}</code>
+      <span>${tx(e.summary)}</span><span class="api-perm">${ic('shield-account-outline')} ${permTxt(e)}</span></summary><div class="api-body">
+      ${(e.query || []).length ? `<div><b>${L('Query', 'Parametry')}</b> ${e.query.map(x => `<code>${esc(x.name)}=${esc(x.values || '')}</code> ${tx(x.desc)}`).join('<br>')}</div>` : ''}
+      ${e.body_type === 'json' && e.body ? `<div><b>${L('Body', 'Tělo')}</b><pre>${esc(JSON.stringify(apiBody(e), null, 2))}</pre></div>` : e.body_type === 'binary' ? `<div><b>${L('Body', 'Tělo')}</b> ${L('raw file', 'surový soubor')} <code>${esc(e.body || '')}</code></div>` : ''}
+      ${e.response !== undefined && e.response !== null ? `<div><b>${L('Response', 'Odpověď')}</b><pre>${esc(typeof e.response === 'string' ? e.response : JSON.stringify(e.response, null, 2))}</pre></div>` : ''}
+      ${(e.errors || []).length ? `<div><b>${L('Errors', 'Chyby')}</b> ${e.errors.map(x => `<code>${x.code}</code> ${tx(x.when)}`).join('<br>')}</div>` : ''}
+      ${e.effects ? `<div><b>${L('Effects', 'Účinky')}</b> ${tx(e.effects)}</div>` : ''}
+      ${apiExamples(e).map(([n, code]) => `<div><b>${n}</b><pre>${esc(code)}</pre></div>`).join('')}
+      ${e.method === 'GET' && !API_NO_TRY.includes(e.path) && e.perm !== 'public' || e.path === '/api/help' ? `<div><button class="btn sm" data-api-try="${esc(e.path)}">${ic('play')}<span>${L('Try it', 'Vyzkoušet')}</span></button><pre class="api-out hidden"></pre></div>` : ''}
+    </div></details>`;
+  const groups = apiSpec.groups.map(g => [g, g.endpoints.filter(match)]).filter(([, es]) => es.length);
+  const count = apiSpec.groups.reduce((a, g) => a + g.endpoints.length, 0);
+  return `<div class="grid"><div class="card wide">${h3('api', L('Getting started', 'Jak začít'))}
+      <p>${tx(apiSpec.auth)}</p>
+      <ol class="steps">
+        <li>${L('Create a token:', 'Vytvořte token:')} ${perm('system/users/tokens') ? `<a href="#system/users/tokens">${L('System › User management › API tokens', 'Systém › Správa uživatelů › API tokeny')}</a>` : L('an administrator creates it under System › User management › API tokens', 'vytvoří ho správce v Systém › Správa uživatelů › API tokeny')}
+          ${status.auth ? '' : `<br><span class="warn-text">${L('This gateway has no user account yet: the API is open without a token.', 'Tato brána zatím nemá uživatelský účet: API je otevřené i bez tokenu.')}</span>`}</li>
+        <li>${L('Paste it here to fill it into the examples (kept only in this browser tab):', 'Vložte ho sem a doplní se do příkladů (zůstane jen v této záložce prohlížeče):')}
+          <input type="password" id="api-token" value="${esc(apiToken)}" placeholder="p4gw_…" autocomplete="off" style="max-width:340px"></li>
+        <li>${L('Address of this gateway:', 'Adresa této brány:')} <code>${esc(origin)}</code> ${L('or', 'nebo')} <code>http://${esc(status.hostname)}.local</code></li>
+        <li>${L('First call:', 'První volání:')}<pre>curl -s -H 'Authorization: Bearer ${esc(tok)}' ${esc(origin)}/api/status</pre></li>
+        <li>${L('Errors come as', 'Chyby přicházejí jako')} <code>{"error": "…"}</code> ${L('with 400 (invalid input), 401 (sign-in), 403 (permission), 409 (not possible now). Pushed changes: WebSocket', 's 400 (neplatný vstup), 401 (přihlášení), 403 (oprávnění), 409 (teď nelze). Změny v reálném čase: WebSocket')} <code>${esc(origin.replace(/^http/, 'ws'))}/api/ws</code>.</li>
+      </ol></div></div>
+    <div class="card" style="margin-top:16px">${h3('format-list-bulleted', L(`Endpoints (${count})`, `Endpointy (${count})`))}
+      <input type="search" id="api-filter" value="${esc(apiFilter)}" placeholder="${L('Filter: path, method or text', 'Filtr: cesta, metoda nebo text')}" style="max-width:420px">
+      ${groups.map(([g, es]) => `<h4 style="margin:16px 0 4px">${tx(g.title)}</h4>${es.map(ep).join('')}`).join('') || `<p class="muted">${L('Nothing matches.', 'Nic neodpovídá.')}</p>`}</div>`;
+};
+document.addEventListener('input', e => {
+  if (e.target.id === 'api-filter') { apiFilter = e.target.value; const pos = e.target.selectionStart; render(true); const f = $('#api-filter'); f?.focus(); f?.setSelectionRange(pos, pos); }
+  if (e.target.id === 'api-token') {
+    apiToken = e.target.value.trim();
+    try { sessionStorage.setItem('apiToken', apiToken); } catch (err) { /* storage blocked */ }
+    render(true);
+    $('#api-token')?.focus();
+  }
+});
+document.addEventListener('toggle', e => {
+  if (e.target.matches?.('.api-ep')) apiOpen[e.target.open ? 'add' : 'delete'](e.target.dataset.apiEp);
+}, true);
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-api-try]');
+  if (!t) return;
+  const out = t.parentElement.querySelector('.api-out'), path = t.dataset.apiTry;
+  out.classList.remove('hidden');
+  out.textContent = '…';
+  try {
+    const r = await fetch(path, { headers: sessionStorage.getItem('auth') ? { Authorization: 'Basic ' + sessionStorage.getItem('auth') } : {} });
+    const text = await r.text();
+    let shown = text;
+    try { shown = JSON.stringify(JSON.parse(text), null, 2); } catch (err) { /* not JSON */ }
+    out.textContent = `HTTP ${r.status}\n` + (shown.length > 6000 ? shown.slice(0, 6000) + '\n…' : shown);
+  } catch (err) { out.textContent = err.message; }
+});
 
 /* Roles of both radios (docs/dual-radio.md): radio A is the C6 of the board, radio B the external one
  * on JP1. At most one Thread and one Zigbee network and one ESPHome proxy; a switch restarts the gateway.

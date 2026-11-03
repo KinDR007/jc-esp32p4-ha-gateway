@@ -46,6 +46,14 @@
   notifications, sound, updates) on the real pages, with a check of each step's state; it opens by
   itself while the gateway has no user account, later from System › Information, and continues after
   the restart of a role switch. Test UI29.
+- HTTP API reference: `firmware/gateway/web/api.json` describes all 103 endpoints (permission, query,
+  body, response, errors, effects; English and Czech). The gateway serves it at `GET /api/help`
+  (public, 32 kB gzip); the web UI shows it under System › API with a getting-started (token, address,
+  first call) and curl, Python and Home Assistant `rest_command` examples built for that gateway (its
+  address, a token typed in, its radios and current roles), GET requests can be tried at once.
+  `docs/api.md` and the GitHub Pages documentation are generated from it; `tests/unit/api_spec_test.py`
+  (in `scripts/ci_checks.sh`) fails when an endpoint is missing, extra or its permission differs from
+  `gw_auth.c`. Test UI30.
 - UI tests UI06 and UI07 use the language and theme switches of the side bar again.
 - Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
   installed until the update task checked again (TC27 installed the GitHub release). The install

@@ -139,16 +139,16 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F4.3 UI29: průchod všemi kroky, obnovení po reloadu, dokončení, samootevření bez účtu, zavření
 
 **F5 API dokumentace**
-- [ ] F5.1 Úplná dokumentace API (od tokenu po příkazy) na GitHub Pages
-- [ ] F5.2 Online help v UI z kompaktního popisu API v bráně, příklady z aktuálních hodnot
-- [ ] F5.3 Test shody dokumentace s endpointy
+- [x] F5.1 `api.json` (103 endpointů, cs/en) → `docs/api.md` a sekce HTTP API na GitHub Pages (`tools/docs/api_md.py`, `build_docs.py`)
+- [x] F5.2 `GET /api/help` (veřejné, 32 kB gzip) a Systém › API: jak začít, příklady curl/Python/HA s adresou, tokenem a rolemi této brány, Vyzkoušet pro GET; UI30
+- [x] F5.3 `tests/unit/api_spec_test.py` v CI (endpointy, metody, oprávnění z `AUTH_MAP`), kontrola aktuálnosti `docs/api.md`
 
 **F6 Zvuk**
 - [x] F6.1 Audio ring 10 s ponechán: čte ho inference (zpoždění ≤ 1 s + okno 0,96 s), učení (0,975 s) a `/api/sound/clip` (≤ 9 s); 20 s by přineslo jen delší ruční klip, žádné funkci nepomůže (+320 kB PSRAM). Smysl by dávalo až s nahráváním zvuku k události (např. příloha v Telegramu)
 
 **F7 Uzavření**
 - [ ] F7.1 Úplná regrese (soak jen na pokyn)
-- [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání)
+- [ ] F7.2 Dokumentace, CHANGELOG, vydání (push jen na vyžádání); nejisté detaily v api.json k ověření: odpověď /api/thread/topology, úrovně témat /api/auth/telegram
 
 **F8 Odloženo**
 - [x] F8.1 AirTag přes BLE proxy: rešerše ([docs/airtag.md](docs/airtag.md)): anonymní detekce „Find My poblíž“ jde (jen přeposílání inzerátů, Bermuda/šablona v HA), identifikace vlastních AirTagů jen s klíči exportovanými z Macu (křehké, na Sequoia/Tahoe rozbité), automatické přidávání nelze; doporučen BLE tag s pevnou adresou / iBeacon

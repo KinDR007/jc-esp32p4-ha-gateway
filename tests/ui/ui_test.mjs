@@ -60,7 +60,7 @@ if (args.password) {
 
 const toastText = () => page.textContent('#toast');
 // every page of the left menu (section/sub page)
-const ROUTES = ['overview', 'flows', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
+const ROUTES = ['overview', 'flows', 'system/api', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
   'zigbee/info', 'zigbee/network', 'zigbee/backups', 'zigbee/diag', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes',
   'ha/guide', 'ha/mqtt', 'ha/matter', 'system/info', 'system/lan', 'system/firmware', 'system/maint', 'system/diag'];
 // false when the menu has the page closed (it needs a role that is not active)
@@ -767,6 +767,29 @@ await test('UI29', 'Setup wizard: starts from System › Information, each step 
   await page.click('#wiz [data-wiz=close]');
   await page.unroute(base + 'api/status');
   check(await page.evaluate(() => localStorage.getItem('wizardSeen')) === 'closed', 'closing it keeps it closed in this browser');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI30', 'System › API: every endpoint of /api/help listed, filter, examples carry this address and the typed token, Try it calls the gateway', async () => {
+  const spec = await (await page.request.get(base + 'api/help')).json();
+  const total = spec.groups.reduce((a, g) => a + g.endpoints.length, 0);
+  await tab('system/api');
+  await page.waitForSelector('.api-ep', { timeout: 15000 });
+  check(await page.$$eval('.api-ep', x => x.length) === total, `${total} endpoints listed`);
+  await page.fill('#api-filter', '/api/role');
+  await page.waitForTimeout(300);
+  const shown = await page.$$eval('.api-ep', x => x.map(d => d.dataset.apiEp));
+  check(shown.length > 0 && shown.every(x => x.includes('/api/role')), `filter: ${shown.join(', ')}`);
+  await page.fill('#api-filter', '');
+  await page.fill('#api-token', 'p4gw_example_token');
+  await page.waitForTimeout(300);
+  await page.$eval('.api-ep[data-api-ep="GET /api/status"]', d => { d.open = true; });
+  const ex = await page.$eval('.api-ep[data-api-ep="GET /api/status"]', d => d.textContent);
+  check(ex.includes('Bearer p4gw_example_token') && ex.includes(base + 'api/status'), 'examples carry the typed token and the address of this gateway');
+  await page.click('.api-ep[data-api-ep="GET /api/status"] [data-api-try]');
+  await page.waitForFunction(() => /HTTP \d+/.test(document.querySelector('.api-ep[data-api-ep="GET /api/status"] .api-out')?.textContent || ''), null, { timeout: 10000 });
+  check((await page.textContent('.api-ep[data-api-ep="GET /api/status"] .api-out')).startsWith('HTTP 200'), 'Try it: GET /api/status answered 200');
+  await page.fill('#api-token', '');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });
 

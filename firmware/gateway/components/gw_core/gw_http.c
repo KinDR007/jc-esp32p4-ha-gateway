@@ -20,6 +20,8 @@ static const char *TAG = "gw_http";
 
 extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");
 extern const uint8_t index_html_gz_end[] asm("_binary_index_html_gz_end");
+extern const uint8_t api_json_gz_start[] asm("_binary_api_json_gz_start");
+extern const uint8_t api_json_gz_end[] asm("_binary_api_json_gz_end");
 extern const uint8_t p4gw_favicon_ico_start[] asm("_binary_p4gw_favicon_ico_start");
 extern const uint8_t p4gw_favicon_ico_end[] asm("_binary_p4gw_favicon_ico_end");
 
@@ -148,6 +150,15 @@ static esp_err_t index_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     return httpd_resp_send(req, (const char *)index_html_gz_start, index_html_gz_end - index_html_gz_start);
+}
+
+/* The API description (firmware/gateway/web/api.json): no secret in it, so no sign-in needed. */
+static esp_err_t api_help_get(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=3600");
+    return httpd_resp_send(req, (const char *)api_json_gz_start, api_json_gz_end - api_json_gz_start);
 }
 
 /* Browsers ask for it before the page says anything, and without a password. */
@@ -309,6 +320,7 @@ esp_err_t gw_http_start(void)
     httpd_uri_t ws = {.uri = "/api/ws", .method = HTTP_GET, .handler = ws_handler, .is_websocket = true,
                       .ws_pre_handshake_cb = ws_auth};
     httpd_register_uri_handler(s_server, &ws);
+    gw_http_register_public("/api/help", HTTP_GET, api_help_get);
     s_push_queue = xQueueCreate(PUSH_QUEUE_LEN, sizeof(char *));
     xTaskCreate(self_check_task, "http_check", 3072, NULL, 2, NULL);
     ESP_LOGI(TAG, "web UI on port %d", config.server_port);

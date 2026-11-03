@@ -538,7 +538,7 @@ LABELS = {
     "ha": T("Home Assistant", "Home Assistant"), "tg": T("Telegram bot", "Telegram bot"), "recovery": T("Troubleshooting", "Řešení problémů"),
     "howto": T("How to", "Postup"), "full": T("Whole page", "Celá stránka"), "shots": T("Screenshots", "Snímky obrazovky"),
     "zigbee_shot": T("in the Zigbee coordinator role", "v roli Zigbee koordinátor"), "router_shot": T("in the Zigbee router role", "v roli Zigbee router"),
-    "dialogs": T("Dialogs", "Dialogy"),
+    "dialogs": T("Dialogs", "Dialogy"), "api": T("HTTP API", "HTTP API"),
     "foot": T("Screenshots: firmware v1.4, dark theme, English. The board, network names and addresses are those of the test setup.",
               "Snímky: firmware v1.4, tmavý vzhled, angličtina. Deska, názvy sítí a adresy jsou z testovací instalace."),
 }
@@ -548,6 +548,32 @@ SECTION_ICONS = {"overview": "view-dashboard-outline", "role": "swap-horizontal"
 
 
 # ---------------------------------------------------------------- rendering
+
+def api_section(lang: str) -> str:
+    """The HTTP API from firmware/gateway/web/api.json (the gateway serves the same file at /api/help and
+    its web UI shows it under System › API with examples for that gateway)."""
+    spec = json.loads((ROOT / "firmware/gateway/web/api.json").read_text())
+    tx = lambda o: html.escape((o or {}).get(lang) or (o or {}).get("en") or "")
+    perm = lambda e: {"public": T("no sign-in", "bez přihlášení"), "admin": T("administrators", "správci"), "*": T("signed in", "přihlášení"),
+                      "self": T("own account", "vlastní účet")}.get(e["perm"], {lang: f'{e["perm"]} · {T("edit", "úpravy")[lang] if e["level"] == 2 else T("read", "čtení")[lang]}'})[lang]
+    intro = T("""<p>Base URL <code>http://&lt;gateway&gt;</code> (its address or <code>p4gw-xxxxxx.local</code>), JSON in and out, errors as
+      <code>{"error": "…"}</code> with 400, 401, 403 or 409. The web UI of each gateway (System › API) shows the same reference with
+      examples built for that gateway (its address, your token, its radios) and tries GET requests at once.</p>
+      <pre>curl -s -H 'Authorization: Bearer p4gw_…' http://192.168.1.10/api/status</pre>""",
+              """<p>Základní URL <code>http://&lt;brána&gt;</code> (její adresa nebo <code>p4gw-xxxxxx.local</code>), JSON dovnitř i ven, chyby jako
+      <code>{"error": "…"}</code> s kódem 400, 401, 403 nebo 409. Webové UI každé brány (Systém › API) ukazuje stejný přehled s příklady
+      pro tu bránu (její adresa, váš token, její rádia) a GET požadavky rovnou vyzkouší.</p>
+      <pre>curl -s -H 'Authorization: Bearer p4gw_…' http://192.168.1.10/api/status</pre>""")[lang]
+    out = [f"<p>{tx(spec['auth'])}</p>", intro]
+    for g in spec["groups"]:
+        out.append(f"<h4>{tx(g['title'])}</h4><table><thead><tr><th></th><th>{T('Path', 'Cesta')[lang]}</th><th>{T('What it does', 'Co dělá')[lang]}</th><th>{T('Permission', 'Oprávnění')[lang]}</th></tr></thead><tbody>")
+        for e in g["endpoints"]:
+            body = e.get("body")
+            ex = f"<details><summary>{T('body', 'tělo')[lang]}</summary><pre>{html.escape(json.dumps(body, indent=2, ensure_ascii=False))}</pre></details>" if e.get("body_type") == "json" and isinstance(body, dict) else ""
+            out.append(f"<tr><td><code>{e['method']}</code></td><td><code>{html.escape(e['path'])}</code></td><td>{tx(e['summary'])}{ex}</td><td>{perm(e)}</td></tr>")
+        out.append("</tbody></table>")
+    return "\n".join(out)
+
 
 def img(file: str, alt: str, cls: str = "shot") -> str:
     path = SHOTS / f"{file}.jpg"
@@ -609,7 +635,7 @@ def build(lang: str) -> str:
     nav = "".join(f'<a href="#{i}">{ic(icn)}<span>{t}</span></a>' for i, icn, t in nav_items)
     nav += f'<a href="#pages">{ic("view-dashboard-outline")}<span>{L("pages")}</span></a><div class="subs">{page_nav}</div>'
     nav += "".join(f'<a href="#{i}">{ic(icn)}<span>{t}</span></a>' for i, icn, t in
-                   [("ha", "home-assistant", L("ha")), ("tg", "send", L("tg")), ("recovery", "wrench-outline", L("recovery"))])
+                   [("ha", "home-assistant", L("ha")), ("tg", "send", L("tg")), ("api", "api", L("api")), ("recovery", "wrench-outline", L("recovery"))])
     tips = "".join(img(f, f) for f in ("tip_lan", "tip_role", "tip_peer", "tip_ha", "tip_internet", "tip_uptime"))
     dialogs = "".join(f'<figure>{img(f, f)}<figcaption>{c[lang]}</figcaption></figure>' for f, c in [
         ("login", T("Sign-in", "Přihlášení")), ("dialog_restart", T("Restart", "Restart")), ("dialog_new_user", T("New user", "Nový uživatel")),
@@ -638,6 +664,7 @@ def build(lang: str) -> str:
 {"".join(page_section(p, lang) for p in PAGES)}
 <section class="card wide" id="ha"><h3>{ic("home-assistant")}<span>{L("ha")}</span></h3>{HA[lang]}</section>
 <section class="card wide" id="tg"><h3>{ic("send")}<span>{L("tg")}</span></h3>{TELEGRAM[lang]}</section>
+<section class="card wide" id="api"><h3>{ic("api")}<span>{L("api")}</span></h3>{api_section(lang)}</section>
 <section class="card wide" id="recovery"><h3>{ic("wrench-outline")}<span>{L("recovery")}</span></h3>{RECOVERY[lang]}</section>
 <p class="muted foot">{L("foot")}</p>
 </main></div>

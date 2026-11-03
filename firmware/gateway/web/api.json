@@ -1,0 +1,4041 @@
+{
+  "version": 1,
+  "auth": {
+    "en": "A gateway without any user account is open: no sign-in is needed and every endpoint works (create the first admin with POST /api/users). Once an account exists, every endpoint except /api/help, /api/auth/state, /api/auth/login and /api/auth/reset-request needs one of three proofs, tried in this order: an API token sent as Authorization: Bearer <token> (an admin creates it in System > User management > API tokens, or with POST /api/tokens, and it has the role chosen then), HTTP Basic with user name and password (for clients of older versions; works only for users without two-factor sign-in), or the session cookie p4s that POST /api/auth/login sets for the web UI. Missing or wrong credentials give 401; insufficient rights give 403 forbidden; an account that must change its password or set up two-factor gets 403 password_change_required or totp_setup_required. Each endpoint's perm is the page of the web UI it belongs to and level 1 (read) or 2 (edit); GET needs the read level, other methods edit, admin means admins only, public means no sign-in, * means any signed-in user, self means the own account. All errors are JSON {\"error\": \"message\"}; successful replies are JSON unless noted.",
+    "cs": "Brána bez jakéhokoli uživatelského účtu je otevřená: přihlášení není třeba a všechny endpointy fungují (prvního admina vytvoříte přes POST /api/users). Jakmile účet existuje, každý endpoint kromě /api/help, /api/auth/state, /api/auth/login a /api/auth/reset-request vyžaduje jeden ze tří způsobů prokázání, zkoušených v tomto pořadí: API token v hlavičce Authorization: Bearer <token> (vytvoří ho admin v Systém > Správa uživatelů > API tokeny, nebo přes POST /api/tokens, a má roli zvolenou při vytvoření), HTTP Basic se jménem a heslem (pro klienty starších verzí; funguje jen u uživatelů bez dvoufázového ověření), nebo cookie relace p4s, kterou pro webové rozhraní nastaví POST /api/auth/login. Chybějící nebo špatné údaje vrací 401; nedostatečná práva 403 forbidden; účet, který musí změnit heslo nebo nastavit dvoufázové ověření, dostane 403 password_change_required nebo totp_setup_required. Pole perm každého endpointu je stránka webového rozhraní, do které patří, a level 1 (čtení) nebo 2 (úpravy); GET vyžaduje úroveň čtení, ostatní metody úpravy, admin znamená jen správce, public bez přihlášení, * libovolného přihlášeného uživatele, self vlastní účet. Všechny chyby jsou JSON {\"error\": \"zpráva\"}; úspěšné odpovědi jsou JSON, pokud není uvedeno jinak."
+  },
+  "groups": [
+    {
+      "id": "status",
+      "title": {
+        "en": "Status and system",
+        "cs": "Stav a systém"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/help",
+          "perm": "public",
+          "level": 0,
+          "summary": {
+            "en": "This API description (the content of api.json), no sign-in needed.",
+            "cs": "Tento popis API (obsah souboru api.json), bez přihlášení."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "version": 1,
+            "auth": {
+              "en": "...",
+              "cs": "..."
+            },
+            "groups": [
+              {
+                "id": "status",
+                "title": {
+                  "en": "Status and system",
+                  "cs": "Stav a systém"
+                },
+                "endpoints": [
+                  "..."
+                ]
+              }
+            ]
+          },
+          "effects": {
+            "en": "Sent gzip-compressed (Content-Encoding: gzip), cached for an hour. It contains no secrets.",
+            "cs": "Posílá se komprimovaně gzip (Content-Encoding: gzip), cache na hodinu. Neobsahuje žádná tajemství."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/identify",
+          "perm": "overview",
+          "level": 2,
+          "summary": {
+            "en": "Makes the identify icon blink in the web UI header, to find the gateway.",
+            "cs": "Rozbliká ikonu identifikace v záhlaví webu, aby šla brána najít."
+          },
+          "body": {
+            "seconds": 10
+          },
+          "body_type": "json",
+          "response": {
+            "identify_s": 10
+          },
+          "effects": {
+            "en": "seconds is clamped to 0..120 (default 10); 0 stops the blinking.",
+            "cs": "seconds se ořízne na 0 až 120 (výchozí 10); 0 blikání vypne."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/status",
+          "perm": "*",
+          "level": 1,
+          "summary": {
+            "en": "Full gateway state: firmware, uptime, memory, roles of both radios, Ethernet, flash slots, radio firmware, hardware, update and link state.",
+            "cs": "Úplný stav brány: firmware, doba běhu, paměť, role obou rádií, Ethernet, flash sloty, firmware rádií, hardware, aktualizace a spojení."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "hostname": "p4gw-a1b2c3",
+            "version": "v1.9",
+            "idf": "v5.5.1",
+            "built": "Nov  2 2026",
+            "built_time": "10:15:00",
+            "time": 1793610000,
+            "matter_url": "ws://192.168.1.10:5580/ws",
+            "chip_revision": 301,
+            "uptime_s": 120,
+            "reset_reason": "software",
+            "auth": true,
+            "temperature_c": 48.3,
+            "heap": {
+              "internal_free": 120000,
+              "internal_min": 90000,
+              "internal_largest": 65536,
+              "psram_free": 20000000,
+              "psram_heap": 30000000,
+              "psram_parts": [
+                {
+                  "name": "c6fw",
+                  "bytes": 2097152
+                }
+              ]
+            },
+            "role": {
+              "active": "thread_br",
+              "desired": "thread_br",
+              "maintenance": "",
+              "stable": true,
+              "b": {
+                "active": "none",
+                "desired": "none",
+                "maintenance": "",
+                "wired": true,
+                "chip": "ESP32-C5",
+                "bundle": "",
+                "chip_info": {
+                  "flashes": 0
+                }
+              }
+            },
+            "eth": {
+              "...": "link, speed, IP addresses"
+            },
+            "slots": [
+              {
+                "label": "ota_0",
+                "size": 3145728,
+                "project": "p4gw",
+                "version": "v1.9",
+                "state": "valid",
+                "running": true,
+                "boot": true
+              }
+            ],
+            "c6": {
+              "bundle": "ot_rcp",
+              "adopted": true,
+              "images": [
+                {
+                  "name": "ot_rcp",
+                  "version": "1.2",
+                  "size": 600000
+                }
+              ],
+              "chip": {
+                "mac": "aa:bb:cc:dd:ee:ff",
+                "revision": 0,
+                "flash_size": 4194304,
+                "flashes": 1
+              },
+              "flash": {
+                "busy": false,
+                "percent": 0,
+                "stage": "",
+                "last_error": ""
+              },
+              "snapshot_days": 1,
+              "snapshots": []
+            },
+            "hw": {
+              "cpu_mhz": 360,
+              "cores": 2,
+              "cpu_load": [
+                12.5,
+                8.1
+              ],
+              "tasks": 40,
+              "flash_size": 16777216,
+              "psram_size": 33554432,
+              "mac_base": "aa:bb:cc:dd:ee:ff",
+              "app_slot": "ota_0",
+              "nvs": {
+                "used": 300,
+                "total": 700,
+                "namespaces": 12
+              },
+              "http_register_errors": 0
+            },
+            "update": {
+              "installed_version": "v1.9",
+              "latest_version": "v1.9",
+              "available": false
+            },
+            "identify_s": 0,
+            "links": {
+              "mqtt": "connected",
+              "ha_clients": 1,
+              "internet": true,
+              "internet_age_s": 20
+            },
+            "role_status": {
+              "mode": "border_router",
+              "phase": "running"
+            },
+            "role_status_b": {
+              "...": "status summary of the role on radio B, when it has one"
+            }
+          },
+          "effects": {
+            "en": "Read only. role_status and role_status_b hold the short status of the role running on radio A and B.",
+            "cs": "Jen čtení. role_status a role_status_b obsahují stručný stav role běžící na rádiu A a B."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/ws",
+          "perm": "*",
+          "level": 1,
+          "summary": {
+            "en": "WebSocket push channel for Home Assistant: the gateway sends text frames, frames from the client are read and dropped.",
+            "cs": "Kanál WebSocket pro Home Assistant: brána posílá textové rámce, rámce od klienta se přečtou a zahodí."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "topic": "notify",
+            "payload": "{\"seq\":12,\"topic\":\"system\",\"level\":\"info\",\"text\":\"...\"}"
+          },
+          "errors": [
+            {
+              "code": 401,
+              "when": {
+                "en": "Handshake without valid sign-in.",
+                "cs": "Handshake bez platného přihlášení."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Upgrade request; the sign-in is checked in the handshake. Each frame is a JSON object with topic and payload (payload is a string). Up to 48 messages wait in a queue, newer ones are dropped when it is full.",
+            "cs": "Požadavek na upgrade; přihlášení se ověřuje při handshake. Každý rámec je JSON s topic a payload (payload je řetězec). Ve frontě čeká nejvýše 48 zpráv, při zaplnění se nové zahazují."
+          }
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "title": {
+        "en": "Sign-in and own account",
+        "cs": "Přihlášení a vlastní účet"
+      },
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "perm": "public",
+          "level": 0,
+          "summary": {
+            "en": "Signs in and sets the session cookie p4s (HttpOnly, SameSite=Strict).",
+            "cs": "Přihlásí uživatele a nastaví cookie relace p4s (HttpOnly, SameSite=Strict)."
+          },
+          "body": {
+            "user": "jiri",
+            "password": "secret-password",
+            "code": "123456",
+            "remember": true
+          },
+          "body_type": "json",
+          "response": {
+            "name": "jiri",
+            "role": "admin",
+            "must_change": false,
+            "totp": true,
+            "totp_required": false,
+            "recovery_left": 10,
+            "levels": {
+              "overview": 2,
+              "role": 2,
+              "system/maint": 2
+            }
+          },
+          "errors": [
+            {
+              "code": 401,
+              "when": {
+                "en": "Unknown user, wrong password or wrong code.",
+                "cs": "Neznámý uživatel, špatné heslo nebo špatný kód."
+              }
+            },
+            {
+              "code": 403,
+              "when": {
+                "en": "Account locked (body has error: locked and retry_s) or disabled.",
+                "cs": "Účet je zamčený (tělo má error: locked a retry_s) nebo vypnutý."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "No user exists, the gateway is open.",
+                "cs": "Žádný uživatel neexistuje, brána je otevřená."
+              }
+            }
+          ],
+          "effects": {
+            "en": "With two-factor on and no code the reply is {code_required: true, clock_set} and no session is created. code is a 6-digit authenticator code or a recovery code. remember keeps the session for the policy's remember_d days. Too many failures lock the account and send a notification; at most 24 sessions are kept, the oldest is dropped.",
+            "cs": "Při zapnutém dvoufázovém ověření a bez kódu je odpověď {code_required: true, clock_set} a relace se nevytvoří. code je 6místný kód z autentikátoru nebo záložní kód. remember drží relaci podle remember_d v zásadách. Příliš mnoho neúspěchů účet zamkne a pošle oznámení; drží se nejvýše 24 relací, nejstarší se zahodí."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/logout",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Ends the current session and clears the cookie.",
+            "cs": "Ukončí aktuální relaci a smaže cookie."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {},
+          "effects": {
+            "en": "Does nothing for token and Basic clients, they have no session.",
+            "cs": "U klientů s tokenem a Basic nic nedělá, nemají relaci."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "The signed-in identity with its page levels.",
+            "cs": "Přihlášená identita s úrovněmi stránek."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "name": "jiri",
+            "role": "admin",
+            "must_change": false,
+            "totp": false,
+            "totp_required": false,
+            "recovery_left": 0,
+            "levels": {
+              "overview": 2,
+              "system/maint": 2
+            },
+            "requests": 0
+          },
+          "effects": {
+            "en": "Token clients get {name, role, token: true, levels}. Without any user account: {name: \"\", role: \"admin\", open: true}. requests counts open password reset requests (admins only, else 0).",
+            "cs": "Klienti s tokenem dostanou {name, role, token: true, levels}. Bez jakéhokoli účtu: {name: \"\", role: \"admin\", open: true}. requests je počet otevřených žádostí o reset hesla (jen admin, jinak 0)."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/password",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Changes the own password.",
+            "cs": "Změní vlastní heslo."
+          },
+          "body": {
+            "old": "old-password",
+            "new": "new-password-123"
+          },
+          "body_type": "json",
+          "response": {
+            "name": "jiri",
+            "role": "admin",
+            "must_change": false,
+            "totp": false
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "New password outside the policy length (password_min to 64 characters).",
+                "cs": "Nové heslo mimo délku dle zásad (password_min až 64 znaků)."
+              }
+            },
+            {
+              "code": 403,
+              "when": {
+                "en": "Current password is wrong.",
+                "cs": "Současné heslo je špatné."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Not a signed-in user (token or open gateway).",
+                "cs": "Nejde o přihlášeného uživatele (token nebo otevřená brána)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Clears must_change, ends all other sessions of the user and sends a notification.",
+            "cs": "Zruší must_change, ukončí ostatní relace uživatele a pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/reset-request",
+          "perm": "public",
+          "level": 0,
+          "summary": {
+            "en": "Asks the admins to reset a forgotten password; no sign-in needed.",
+            "cs": "Požádá adminy o reset zapomenutého hesla; bez přihlášení."
+          },
+          "body": {
+            "user": "jiri"
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "More than 4 requests in 10 minutes from anyone.",
+                "cs": "Více než 4 žádosti za 10 minut od kohokoli."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The answer is the same for unknown names. For a known user it stores the request (name, time, client IP) and sends a security notification; an admin answers by setting a new password.",
+            "cs": "Odpověď je stejná i pro neznámá jména. Pro známého uživatele uloží žádost (jméno, čas, IP klienta) a pošle bezpečnostní oznámení; admin odpoví nastavením nového hesla."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/sessions",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Lists the own sessions.",
+            "cs": "Vypíše vlastní relace."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "id": 3,
+              "current": true,
+              "remember": false,
+              "idle_s": 12
+            }
+          ],
+          "effects": {
+            "en": "Empty for token clients and the open gateway.",
+            "cs": "Prázdné pro klienty s tokenem a otevřenou bránu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/sessions/revoke",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Ends all own sessions except the current one.",
+            "cs": "Ukončí všechny vlastní relace kromě aktuální."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/state",
+          "perm": "public",
+          "level": 0,
+          "summary": {
+            "en": "Login page state, no sign-in needed.",
+            "cs": "Stav pro přihlašovací stránku, bez přihlášení."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "enabled": true,
+            "clock_set": true,
+            "hostname": "p4gw-a1b2c3"
+          },
+          "effects": {
+            "en": "enabled is false while no user account exists (open gateway).",
+            "cs": "enabled je false, dokud neexistuje žádný účet (otevřená brána)."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/totp/disable",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Turns two-factor off for the own account.",
+            "cs": "Vypne dvoufázové ověření vlastního účtu."
+          },
+          "body": {
+            "password": "current-password"
+          },
+          "body_type": "json",
+          "response": {
+            "name": "jiri",
+            "role": "admin",
+            "must_change": false,
+            "totp": false
+          },
+          "errors": [
+            {
+              "code": 403,
+              "when": {
+                "en": "Wrong password.",
+                "cs": "Špatné heslo."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Two-factor is not on, or the policy requires it for the role.",
+                "cs": "Dvoufázové ověření není zapnuté, nebo ho zásady pro roli vyžadují."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Erases the secret and recovery codes; sends a warning notification.",
+            "cs": "Smaže klíč a záložní kódy; pošle varovné oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/totp/enable",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Confirms the pending secret with a code and turns two-factor on.",
+            "cs": "Potvrdí čekající klíč kódem a zapne dvoufázové ověření."
+          },
+          "body": {
+            "code": "123456"
+          },
+          "body_type": "json",
+          "response": {
+            "recovery_codes": [
+              "ABCD-EFGH",
+              "JKMN-PQRS"
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Invalid code.",
+                "cs": "Neplatný kód."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Setup not started, or the gateway clock is not set (no SNTP).",
+                "cs": "Nastavení nezačalo, nebo není nastaven čas brány (bez SNTP)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Returns 10 one-time recovery codes, shown only now. Ends the user's other sessions.",
+            "cs": "Vrátí 10 jednorázových záložních kódů, zobrazí se jen teď. Ukončí ostatní relace uživatele."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/totp/setup",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Starts two-factor setup: creates a pending secret and a QR code.",
+            "cs": "Zahájí nastavení dvoufázového ověření: vytvoří čekající tajný klíč a QR kód."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "secret": "JBSWY3DPEHPK3PXP",
+            "uri": "otpauth://totp/P4%20Gateway:jiri@p4gw-a1b2c3?secret=JBSWY3DPEHPK3PXP&issuer=P4%20Gateway&digits=6&period=30",
+            "qr_svg": "<svg ...>",
+            "clock_set": true
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Not a signed-in user.",
+                "cs": "Nejde o přihlášeného uživatele."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The secret takes effect only after /api/auth/totp/enable with a valid code.",
+            "cs": "Klíč začne platit až po /api/auth/totp/enable s platným kódem."
+          }
+        }
+      ]
+    },
+    {
+      "id": "users",
+      "title": {
+        "en": "Users, roles and tokens",
+        "cs": "Uživatelé, role a tokeny"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/auth/policy",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Sign-in policy: sessions, lockout, password length, required two-factor.",
+            "cs": "Zásady přihlášení: relace, zámek, délka hesla, vyžadované dvoufázové ověření."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "idle_h": 12,
+            "remember_d": 30,
+            "lock_attempts": 5,
+            "lock_min": 15,
+            "password_min": 8,
+            "totp_required": [
+              "admin"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/policy",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Changes the sign-in policy; send only the fields to change.",
+            "cs": "Změní zásady přihlášení; posílejte jen měněná pole."
+          },
+          "body": {
+            "idle_h": 12,
+            "remember_d": 30,
+            "lock_attempts": 5,
+            "lock_min": 15,
+            "password_min": 10,
+            "totp_required": [
+              "admin",
+              "user"
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "idle_h": 12,
+            "remember_d": 30,
+            "lock_attempts": 5,
+            "lock_min": 15,
+            "password_min": 10,
+            "totp_required": [
+              "admin",
+              "user"
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "A field is out of range (the message names it): idle_h 1..720, remember_d 0..365, lock_attempts 3..20, lock_min 1..1440, password_min 8..64; totp_required must list admin, user or viewer.",
+                "cs": "Pole je mimo rozsah (zpráva ho jmenuje): idle_h 1 až 720, remember_d 0 až 365, lock_attempts 3 až 20, lock_min 1 až 1440, password_min 8 až 64; totp_required smí obsahovat admin, user nebo viewer."
+              }
+            }
+          ],
+          "effects": {
+            "en": "totp_required replaces the whole list; users of such a role must set up two-factor before using the API (403 totp_setup_required). Nothing is applied when any field is invalid.",
+            "cs": "totp_required nahradí celý seznam; uživatelé takové role musí před použitím API nastavit dvoufázové ověření (403 totp_setup_required). Při neplatném poli se nepoužije nic."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/requests",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Open password reset requests.",
+            "cs": "Otevřené žádosti o reset hesla."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "name": "petr",
+              "time": 1793600000,
+              "ip": "192.168.1.20"
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/requests/dismiss",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Dismisses the reset request of a user.",
+            "cs": "Zamítne žádost uživatele o reset hesla."
+          },
+          "body": {
+            "name": "petr"
+          },
+          "body_type": "json",
+          "response": [],
+          "effects": {
+            "en": "Returns the remaining requests like GET.",
+            "cs": "Vrátí zbylé žádosti jako GET."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/roles",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Page levels of the roles user and viewer, with factory defaults.",
+            "cs": "Úrovně stránek rolí user a viewer, s výchozími hodnotami."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "user": {
+              "overview": 2,
+              "system/maint": 1
+            },
+            "viewer": {
+              "overview": 1,
+              "system/maint": 0
+            },
+            "defaults": {
+              "user": {
+                "overview": 2
+              },
+              "viewer": {
+                "overview": 1
+              }
+            }
+          },
+          "effects": {
+            "en": "Levels: 0 hidden, 1 read, 2 edit. The admin role always has full access and is not listed.",
+            "cs": "Úrovně: 0 skryté, 1 čtení, 2 úpravy. Role admin má vždy plný přístup a není uvedena."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/roles",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Sets page levels of the roles user and viewer.",
+            "cs": "Nastaví úrovně stránek rolí user a viewer."
+          },
+          "body": {
+            "user": {
+              "system/firmware": 1
+            },
+            "viewer": {
+              "thread/settings": 0
+            },
+            "reset": false
+          },
+          "body_type": "json",
+          "response": {
+            "user": {
+              "overview": 2
+            },
+            "viewer": {
+              "overview": 1
+            },
+            "defaults": {
+              "...": "..."
+            }
+          },
+          "effects": {
+            "en": "Only the listed pages with values 0..2 change; unknown pages are ignored. reset: true restores the factory levels of both roles. Sends a notification and returns the new state like GET.",
+            "cs": "Mění se jen uvedené stránky s hodnotami 0 až 2; neznámé stránky se ignorují. reset: true obnoví výchozí úrovně obou rolí. Pošle oznámení a vrátí nový stav jako GET."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tokens",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Lists API tokens (the secret value is never shown again).",
+            "cs": "Vypíše API tokeny (tajná hodnota se už nikdy nezobrazí)."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "name": "homeassistant",
+              "role": "admin",
+              "created": 1793000000,
+              "used_s_ago": 30
+            }
+          ],
+          "effects": {
+            "en": "used_s_ago is -1 for a token not used since the gateway started.",
+            "cs": "used_s_ago je -1 u tokenu nepoužitého od startu brány."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tokens",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Creates an API token.",
+            "cs": "Vytvoří API token."
+          },
+          "body": {
+            "name": "homeassistant",
+            "role": "admin"
+          },
+          "body_type": "json",
+          "response": {
+            "name": "homeassistant",
+            "token": "p4gw_0123456789abcdef0123456789abcdef01234567"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "name missing or longer than 31 characters, or role not admin, user or viewer.",
+                "cs": "Chybí name, má víc než 31 znaků, nebo role není admin, user ani viewer."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "A token with this name exists, or all 16 slots are used.",
+                "cs": "Token s tímto názvem existuje, nebo je všech 16 míst obsazeno."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The token value is returned only in this response, the gateway keeps only its SHA-256 hash. Use it as Authorization: Bearer <token>. Sends a notification.",
+            "cs": "Hodnota tokenu se vrací jen v této odpovědi, brána drží jen jeho hash SHA-256. Používá se jako Authorization: Bearer <token>. Pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tokens/delete",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Revokes an API token.",
+            "cs": "Zneplatní API token."
+          },
+          "body": {
+            "name": "homeassistant"
+          },
+          "body_type": "json",
+          "response": [],
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such token.",
+                "cs": "Takový token neexistuje."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Returns the remaining tokens like GET. Clients using it get 401 at once.",
+            "cs": "Vrátí zbylé tokeny jako GET. Klienti, kteří ho používají, dostanou ihned 401."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/users",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Lists user accounts and the page names used for levels.",
+            "cs": "Vypíše uživatelské účty a názvy stránek pro úrovně."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "users": [
+              {
+                "name": "jiri",
+                "role": "admin",
+                "disabled": false,
+                "must_change": false,
+                "totp": false,
+                "recovery_left": 0,
+                "locked": false,
+                "created": 1793000000,
+                "last_login": 1793600000,
+                "sessions": 1,
+                "levels": {
+                  "system/maint": 1
+                }
+              }
+            ],
+            "pages": [
+              "overview",
+              "role",
+              "thread/info"
+            ],
+            "max": 16
+          },
+          "effects": {
+            "en": "levels lists only the pages where this user has an own level instead of the role's.",
+            "cs": "levels obsahuje jen stránky, kde má uživatel vlastní úroveň místo úrovně role."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/users",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Creates a user, or changes an existing one (by name).",
+            "cs": "Vytvoří uživatele, nebo změní existujícího (podle jména)."
+          },
+          "body": {
+            "name": "petr",
+            "role": "user",
+            "password": "start-password-1",
+            "must_change": true,
+            "disabled": false,
+            "totp_reset": false,
+            "unlock": false,
+            "levels": {
+              "system/maint": 1,
+              "thread/settings": -1
+            }
+          },
+          "body_type": "json",
+          "response": {
+            "name": "petr",
+            "role": "user",
+            "disabled": false,
+            "must_change": true,
+            "totp": false,
+            "locked": false
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Invalid name (2 to 31 characters a-z, 0-9, . _ -), role (admin, user, viewer) or password length; first account must be an admin; no room (max 16); the last admin cannot lose the role or be disabled.",
+                "cs": "Neplatné jméno (2 až 31 znaků a-z, 0-9, . _ -), role (admin, user, viewer) nebo délka hesla; první účet musí být admin; není místo (max 16); poslední admin nesmí ztratit roli ani být vypnut."
+              }
+            }
+          ],
+          "effects": {
+            "en": "A new name creates the account (must_change defaults to true, except for the first account); role and password are required then. For an existing name every field is optional: password sets a new one (ends the user's sessions, answers a reset request), disabled blocks sign-in, totp_reset removes two-factor, unlock clears a lockout, levels maps page to 0 hidden, 1 read, 2 edit, or -1 for the role's level. Works without sign-in only to create the very first account on an open gateway. Sends a notification.",
+            "cs": "Nové jméno vytvoří účet (must_change je výchozí true, kromě prvního účtu); role a password jsou pak povinné. U existujícího jména je každé pole nepovinné: password nastaví nové heslo (ukončí relace uživatele, vyřídí žádost o reset), disabled zablokuje přihlášení, totp_reset odstraní dvoufázové ověření, unlock zruší zámek, levels mapuje stránku na 0 skrytá, 1 čtení, 2 úpravy, nebo -1 pro úroveň role. Bez přihlášení lze jen vytvořit úplně první účet na otevřené bráně. Pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/users/delete",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Deletes a user account.",
+            "cs": "Smaže uživatelský účet."
+          },
+          "body": {
+            "name": "petr"
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "The last admin cannot be deleted while other users exist.",
+                "cs": "Posledního admina nelze smazat, dokud existují další uživatelé."
+              }
+            },
+            {
+              "code": 404,
+              "when": {
+                "en": "No such user.",
+                "cs": "Takový uživatel neexistuje."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Ends the user's sessions and sends a warning notification. Deleting the only remaining account makes the gateway open again.",
+            "cs": "Ukončí relace uživatele a pošle varovné oznámení. Smazání posledního zbývajícího účtu otevře bránu bez přihlášení."
+          }
+        }
+      ]
+    },
+    {
+      "id": "roles",
+      "title": {
+        "en": "Roles and radios",
+        "cs": "Role a rádia"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/c6/backup",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Downloads a full flash dump of a radio.",
+            "cs": "Stáhne úplný výpis flash paměti rádia."
+          },
+          "query": [
+            {
+              "name": "radio",
+              "values": "a|b",
+              "desc": {
+                "en": "Radio, default a.",
+                "cs": "Rádio, výchozí a."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "application/octet-stream c6_flash_backup.bin (radio_b_flash_backup.bin for b)",
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "The radio has a role (maintenance mode only) or the radio is busy.",
+                "cs": "Rádio má roli (jen v režimu údržby) nebo je zaneprázdněné."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "Radio did not answer before the transfer started (message is the flasher's last error).",
+                "cs": "Rádio neodpovědělo před začátkem přenosu (zpráva je poslední chyba flasheru)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Reads the radio flash over the boot ROM, takes some minutes. A successful dump marks the radio's factory firmware as backed up (adopted), which unlocks role changes. A failure after the transfer started aborts the connection.",
+            "cs": "Čte flash rádia přes boot ROM, trvá několik minut. Úspěšný výpis označí tovární firmware rádia za zálohovaný (adopted), což odemkne změny rolí. Selhání po začátku přenosu přeruší spojení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/c6/reflash",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Marks a radio to be reflashed with the firmware of its role and restarts the gateway.",
+            "cs": "Označí rádio k přeflashování firmwarem jeho role a restartuje bránu."
+          },
+          "query": [
+            {
+              "name": "radio",
+              "values": "a|b",
+              "desc": {
+                "en": "Radio, default a.",
+                "cs": "Rádio, výchozí a."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {},
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Radio B has no role.",
+                "cs": "Rádio B nemá roli."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Sets a force flag in NVS and restarts after 0.5 s; the radio is flashed at the next start.",
+            "cs": "Nastaví v NVS příznak vynucení a po 0,5 s restartuje; rádio se nahraje při dalším startu."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/radios",
+          "perm": "system/maint",
+          "level": 1,
+          "summary": {
+            "en": "State of both radios: chip, flashed firmware, flashing progress, role.",
+            "cs": "Stav obou rádií: čip, nahraný firmware, průběh flashování, role."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "radio": "a",
+              "chip": "ESP32-C6",
+              "bundle": "ot_rcp",
+              "package_id": "1a2b3c4d",
+              "busy": false,
+              "percent": 0,
+              "stage": "",
+              "error": "",
+              "chip_info": {
+                "mac": "aa:bb:cc:dd:ee:01",
+                "revision": 0,
+                "flash_size": 4194304,
+                "flashes": 1
+              },
+              "images": [
+                {
+                  "name": "ot_rcp",
+                  "version": "1.2"
+                }
+              ],
+              "role": "thread_br",
+              "desired": "thread_br",
+              "maintenance": ""
+            },
+            {
+              "radio": "b",
+              "chip": "ESP32-C5",
+              "bundle": "",
+              "busy": false,
+              "role": "none",
+              "desired": "none",
+              "maintenance": "",
+              "wired": true,
+              "wiring": "...",
+              "package_in_psram": "c5",
+              "telemetry": {
+                "...": "..."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Array of two objects, radio a first. Radio B also has wired and wiring after a wiring test, telemetry and package_in_psram.",
+            "cs": "Pole dvou objektů, nejdřív rádio a. Rádio B má po testu zapojení i wired a wiring, dále telemetry a package_in_psram."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/radios/b/console",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Raw text the radio B prints on its UART (ROM banner, boot log, panic), for diagnostics.",
+            "cs": "Surový text, který rádio B vypisuje na UART (ROM banner, log startu, panika), pro diagnostiku."
+          },
+          "query": [
+            {
+              "name": "baud",
+              "values": "9600..2000000",
+              "desc": {
+                "en": "Baud rate, default 115200.",
+                "cs": "Přenosová rychlost, výchozí 115200."
+              }
+            },
+            {
+              "name": "ms",
+              "values": "100..10000",
+              "desc": {
+                "en": "How long to listen, default 3000.",
+                "cs": "Jak dlouho poslouchat, výchozí 3000."
+              }
+            },
+            {
+              "name": "reset",
+              "values": "0|1",
+              "desc": {
+                "en": "1 resets the radio first.",
+                "cs": "1 nejdřív rádio resetuje."
+              }
+            },
+            {
+              "name": "raw",
+              "values": "0|1",
+              "desc": {
+                "en": "1 keeps binary bytes; 0 replaces them with dots.",
+                "cs": "1 ponechá binární bajty; 0 je nahradí tečkami."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "text/plain console output (application/octet-stream with raw=1), up to 8 KB",
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "baud or ms out of range.",
+                "cs": "baud nebo ms mimo rozsah."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Radio B is in use (role, flashing).",
+                "cs": "Rádio B se používá (role, flashování)."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "UART unavailable.",
+                "cs": "UART není dostupný."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Holds the request for ms milliseconds.",
+            "cs": "Drží požadavek po dobu ms milisekund."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/radios/b/flash",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Flashes firmware of a chosen bundle into radio B (only while it has no role).",
+            "cs": "Nahraje do rádia B firmware zvoleného balíku (jen když nemá roli)."
+          },
+          "body": {
+            "bundle": "ot_rcp",
+            "force": false
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "bundle is not ot_rcp, zigbee_ncp, zigbee_router, scanner, esphome or wifi_uplink.",
+                "cs": "bundle není ot_rcp, zigbee_ncp, zigbee_router, scanner, esphome ani wifi_uplink."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Radio B runs a role, or is already being flashed.",
+                "cs": "Rádio B má roli, nebo se už flashuje."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "No memory for the flashing task.",
+                "cs": "Není paměť pro úlohu flashování."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Answers at once and flashes in a background task; follow it in GET /api/radios (busy, percent, stage, error). force: true flashes even when the bundle is already there.",
+            "cs": "Odpoví hned a flashuje v úloze na pozadí; průběh je v GET /api/radios (busy, percent, stage, error). force: true flashuje i když už balík v rádiu je."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/radios/b/probe",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Wiring test of radio B: resets it and listens on the UART.",
+            "cs": "Test zapojení rádia B: resetuje ho a poslouchá na UART."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "wired": true,
+            "banner": true,
+            "download_mode": false,
+            "verdict": "ESP32-C5 answers",
+            "chip": "ESP32-C5",
+            "mac": "aa:bb:cc:dd:ee:02",
+            "revision": 0,
+            "flash_size": 8388608
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Radio B has a role or is being flashed.",
+                "cs": "Rádio B má roli nebo se flashuje."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Blocks the web server for a few seconds. Stores the result (wired, chip) in the runtime state shown in /api/status.",
+            "cs": "Na několik sekund zablokuje webový server. Výsledek (wired, chip) uloží do běhového stavu zobrazeného v /api/status."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/radios/thread/forget",
+          "perm": "thread/settings",
+          "level": 2,
+          "summary": {
+            "en": "Erases the stored Thread network (dataset and settings) of a radio, so its next Thread role starts a new network.",
+            "cs": "Smaže uloženou síť Thread (dataset a nastavení) rádia, takže další role Thread na něm založí novou síť."
+          },
+          "body": {
+            "radio": "a"
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "radio missing or not a or b.",
+                "cs": "radio chybí nebo není a ani b."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Thread currently runs on that radio.",
+                "cs": "Na tom rádiu právě běží Thread."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Erases OpenThread settings in NVS and the stored dataset of that radio; sends a notification.",
+            "cs": "Smaže nastavení OpenThread v NVS a uložený dataset toho rádia; pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/role",
+          "perm": "role",
+          "level": 2,
+          "summary": {
+            "en": "Switches the role of a radio, or swaps the roles of the two radios.",
+            "cs": "Přepne roli rádia, nebo prohodí role obou rádií."
+          },
+          "body": {
+            "role": "zigbee_coordinator",
+            "radio": "a",
+            "skip_backup": false,
+            "swap": false
+          },
+          "body_type": "json",
+          "response": {
+            "role": "zigbee_coordinator",
+            "restarting": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Unknown role (none is allowed for radio B only) or radio not a or b.",
+                "cs": "Neznámá role (none jen pro rádio B) nebo rádio není a ani b."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Conflict between radios (one Thread network, one Zigbee network, one ESPHome proxy, one Wi-Fi uplink), c6_backup_required or radio_b_backup_required (factory firmware not backed up yet), radio flashing in progress, or swap without a Wi-Fi uplink / without radio B.",
+                "cs": "Konflikt mezi rádii (jedna síť Thread, jedna síť Zigbee, jeden proxy ESPHome, jeden Wi-Fi uplink), c6_backup_required nebo radio_b_backup_required (tovární firmware ještě není zálohován), probíhá flashování rádia, nebo swap bez Wi-Fi uplinku / bez rádia B."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Roles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome, wifi_uplink, none (radio B only). radio defaults to a. skip_backup: true accepts running without a backup of the factory firmware. swap: true ignores role and radio and exchanges the roles of A and B (needs the Wi-Fi uplink on one radio). Stores the role in NVS, sends a notification and restarts the gateway after 0.5 s; the radio is reflashed at start if its firmware differs.",
+            "cs": "Role: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome, wifi_uplink, none (jen rádio B). radio je výchozí a. skip_backup: true povolí běh bez zálohy továrního firmwaru. swap: true ignoruje role a radio a prohodí role A a B (vyžaduje Wi-Fi uplink na jednom rádiu). Uloží roli do NVS, pošle oznámení a po 0,5 s restartuje bránu; rádio se při startu přeflashuje, pokud se jeho firmware liší."
+          }
+        }
+      ]
+    },
+    {
+      "id": "thread",
+      "title": {
+        "en": "Thread",
+        "cs": "Thread"
+      },
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/thread/cli",
+          "perm": "thread/diag",
+          "level": 2,
+          "summary": {
+            "en": "Runs an OpenThread CLI command and returns its output.",
+            "cs": "Spustí příkaz CLI OpenThread a vrátí jeho výstup."
+          },
+          "body": {
+            "cmd": "state",
+            "wait_ms": 600
+          },
+          "body_type": "json",
+          "response": {
+            "output": "leader\r\nDone\r\n"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "cmd missing or longer than 200 characters.",
+                "cs": "cmd chybí nebo má víc než 200 znaků."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Another CLI command is running.",
+                "cs": "Běží jiný příkaz CLI."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "OpenThread not running.",
+                "cs": "OpenThread neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "wait_ms (100..15000, default 600) is how long the output is collected, for commands that answer later such as ping or scan. Any CLI command can change the network. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "wait_ms (100 až 15000, výchozí 600) je doba sběru výstupu, pro příkazy odpovídající později jako ping nebo scan. Libovolný příkaz CLI může síť změnit. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/thread/dataset",
+          "perm": "thread/settings",
+          "level": 2,
+          "summary": {
+            "en": "The active Thread dataset.",
+            "cs": "Aktivní dataset sítě Thread."
+          },
+          "query": [
+            {
+              "name": "reveal",
+              "values": "1",
+              "desc": {
+                "en": "1 includes the network key and the TLV hex string; without it network_key is \"hidden\".",
+                "cs": "1 přidá síťový klíč a hex řetězec TLV; bez něj je network_key \"hidden\"."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "network_key": "hidden",
+            "network_name": "OpenThread-1234",
+            "channel": 15,
+            "pan_id": "0x1234",
+            "ext_pan_id": "dead00beef00cafe",
+            "active_timestamp": 1
+          },
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No active dataset.",
+                "cs": "Není aktivní dataset."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "OpenThread not running.",
+                "cs": "OpenThread neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Needs edit level because it can reveal the network key. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "Vyžaduje úroveň úprav, protože může odhalit síťový klíč. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/thread/dataset",
+          "perm": "thread/settings",
+          "level": 2,
+          "summary": {
+            "en": "Applies a Thread dataset (join or replace the network).",
+            "cs": "Použije dataset Thread (připojení nebo výměna sítě)."
+          },
+          "body": {
+            "tlvs": "0e080000000000010000000300000f35060004001fffe0"
+          },
+          "body_type": "json",
+          "response": {
+            "network_name": "OpenThread-1234"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "tlvs missing or not hex, not a valid active dataset or without a network key, or OpenThread rejected it.",
+                "cs": "tlvs chybí nebo není hex, není platný aktivní dataset nebo nemá síťový klíč, nebo ho OpenThread odmítl."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "OpenThread not running.",
+                "cs": "OpenThread neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "tlvs is the hex active dataset (as in Home Assistant). A router role also stores it in NVS to join after restarts. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "tlvs je aktivní dataset v hex (jako v Home Assistantu). Role routeru ho navíc uloží do NVS, aby se po restartech připojila. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/thread/status",
+          "perm": "thread/info",
+          "level": 1,
+          "summary": {
+            "en": "Thread network and OpenThread state.",
+            "cs": "Stav sítě Thread a OpenThread."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "mode": "border_router",
+            "rcp_failures": 0,
+            "rest_port": 8081,
+            "phase": "running",
+            "role": "leader",
+            "rcp_version": "OPENTHREAD/...",
+            "tx_power": 8,
+            "tx_power_set": false,
+            "network_name": "OpenThread-1234",
+            "channel": 15,
+            "pan_id": "0x1234",
+            "ext_pan_id": "dead00beef00cafe",
+            "ext_address": "...",
+            "rloc16": "0x0800",
+            "partition_id": 123456,
+            "leader_router_id": 2,
+            "mesh_local_prefix": "fd00:db8::/64",
+            "border_router": {
+              "routing": "running",
+              "omr_prefix": "...",
+              "on_link_prefix": "...",
+              "nat64": "idle",
+              "border_agent": true,
+              "srp_server": "running",
+              "srp_hosts": 3,
+              "srp_services": 5
+            },
+            "neighbors": [
+              {
+                "ext_address": "...",
+                "rloc16": "0x0801",
+                "type": "router",
+                "avg_rssi": -60,
+                "lqi_in": 3
+              }
+            ],
+            "routers": [
+              {
+                "id": 2,
+                "rloc16": "0x0800",
+                "path_cost": 1,
+                "link": true
+              }
+            ],
+            "mac_counters": {
+              "tx_total": 100,
+              "rx_total": 120
+            }
+          },
+          "effects": {
+            "en": "Registered only while this role runs on a radio, otherwise the server answers 404. When OpenThread is not up, only mode, rcp_failures and phase are returned.",
+            "cs": "Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404. Když OpenThread neběží, vrací se jen mode, rcp_failures a phase."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/thread/topology",
+          "perm": "thread/topology",
+          "level": 1,
+          "summary": {
+            "en": "Discovers the Thread mesh: routers, their children and IPv6 addresses.",
+            "cs": "Zjistí topologii sítě Thread: routery, jejich děti a adresy IPv6."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "routers": [
+              {
+                "rloc16": "0x0800",
+                "ext_address": "...",
+                "children": [],
+                "ip6": [
+                  "fd00:db8::1"
+                ]
+              }
+            ],
+            "ms": 8200
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "OpenThread not running, or a discovery is already running.",
+                "cs": "OpenThread neběží, nebo už běží zjišťování."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Slow: takes seconds up to about 30 s plus child queries. If a router does not answer, the reply carries an error string and a partial map. The exact fields of each router are produced by OpenThread mesh diagnostics. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "Pomalé: trvá sekundy až zhruba 30 s plus dotazy na děti. Když router neodpoví, odpověď nese řetězec error a neúplnou mapu. Přesná pole každého routeru dodává diagnostika sítě OpenThread. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/thread/txpower",
+          "perm": "thread/settings",
+          "level": 2,
+          "summary": {
+            "en": "Sets the transmit power of the Thread radio.",
+            "cs": "Nastaví vysílací výkon rádia Thread."
+          },
+          "body": {
+            "dbm": 8
+          },
+          "body_type": "json",
+          "response": {
+            "tx_power": 8
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "dbm outside -15..20.",
+                "cs": "dbm mimo -15 až 20."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "OpenThread not running.",
+                "cs": "OpenThread neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Applied at once and stored in NVS (restored at start). Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "Použije se hned a uloží do NVS (obnoví se při startu). Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        }
+      ]
+    },
+    {
+      "id": "zigbee",
+      "title": {
+        "en": "Zigbee",
+        "cs": "Zigbee"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/c6/zigbee-snapshot",
+          "perm": "zigbee/backups",
+          "level": 2,
+          "summary": {
+            "en": "Downloads the stored backup (NVRAM snapshot) of the Zigbee network of a radio.",
+            "cs": "Stáhne uloženou zálohu (snímek NVRAM) sítě Zigbee rádia."
+          },
+          "query": [
+            {
+              "name": "radio",
+              "values": "a|b",
+              "desc": {
+                "en": "Radio, default a.",
+                "cs": "Rádio, výchozí a."
+              }
+            },
+            {
+              "name": "bundle",
+              "values": "zigbee_ncp|zigbee_router",
+              "desc": {
+                "en": "Which firmware's network, default zigbee_ncp.",
+                "cs": "Síť kterého firmwaru, výchozí zigbee_ncp."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "application/octet-stream <bundle>_nvram_<generation>.bin (radio_b_ prefix for b); it holds the network key",
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No Zigbee snapshot.",
+                "cs": "Snímek Zigbee neexistuje."
+              }
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/c6/zigbee-snapshot",
+          "perm": "zigbee/backups",
+          "level": 2,
+          "summary": {
+            "en": "Takes a new backup of the Zigbee network now.",
+            "cs": "Pořídí hned novou zálohu sítě Zigbee."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "restarting": true
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "No Zigbee role runs, or the radio is being flashed.",
+                "cs": "Neběží role Zigbee, nebo se rádio flashuje."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Sets a request flag and restarts the gateway after 1 s; the backup is taken at start before the role runs, so Zigbee is out for about a minute.",
+            "cs": "Nastaví příznak žádosti a po 1 s restartuje bránu; záloha se pořídí při startu před spuštěním role, takže Zigbee asi minutu nefunguje."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/zigbee/command",
+          "perm": "zigbee/diag",
+          "level": 2,
+          "summary": {
+            "en": "Sends a command to the Zigbee router firmware.",
+            "cs": "Pošle příkaz firmwaru routeru Zigbee."
+          },
+          "body": {
+            "cmd": "permit"
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "cmd not one of status, steer, permit, leave, factory_reset, txpower; for txpower value outside -15..20.",
+                "cs": "cmd není status, steer, permit, leave, factory_reset ani txpower; u txpower je value mimo -15 až 20."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Only in the zigbee_router role (not registered in the coordinator role). For txpower send {\"cmd\": \"txpower\", \"value\": 8}. leave and factory_reset remove the router from its network. The reply is empty; the result shows in /api/zigbee/status.",
+            "cs": "Jen v roli zigbee_router (v roli koordinátoru není registrován). Pro txpower pošlete {\"cmd\": \"txpower\", \"value\": 8}. leave a factory_reset odeberou router ze sítě. Odpověď je prázdná; výsledek je v /api/zigbee/status."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/zigbee/net",
+          "perm": "zigbee/network",
+          "level": 1,
+          "summary": {
+            "en": "Zigbee2MQTT view over MQTT: instances, devices, states and the last network map.",
+            "cs": "Pohled na Zigbee2MQTT přes MQTT: instance, zařízení, stavy a poslední mapa sítě."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "mqtt": true,
+            "instances": [
+              {
+                "...": "..."
+              }
+            ],
+            "base": "zigbee2mqtt",
+            "devices": [
+              {
+                "friendly_name": "lamp"
+              }
+            ],
+            "states": {
+              "lamp": {
+                "state": "ON"
+              }
+            },
+            "map": null,
+            "map_running": false,
+            "map_error": "",
+            "now": 1793610000
+          },
+          "effects": {
+            "en": "Always available (also when no Zigbee role runs); empty until Zigbee2MQTT publishes on the MQTT broker. The exact shape of devices and states follows Zigbee2MQTT.",
+            "cs": "Dostupné vždy (i bez role Zigbee); prázdné, dokud Zigbee2MQTT nepublikuje na brokeru MQTT. Přesný tvar devices a states se řídí Zigbee2MQTT."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/zigbee/net/base",
+          "perm": "zigbee/network",
+          "level": 2,
+          "summary": {
+            "en": "Sets the MQTT base topic of Zigbee2MQTT.",
+            "cs": "Nastaví základní téma MQTT pro Zigbee2MQTT."
+          },
+          "body": {
+            "base": "zigbee2mqtt"
+          },
+          "body_type": "json",
+          "response": {
+            "mqtt": true,
+            "base": "zigbee2mqtt",
+            "...": "same as GET /api/zigbee/net"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "base empty, too long or containing + or #.",
+                "cs": "base je prázdné, příliš dlouhé nebo obsahuje + nebo #."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Stored in NVS. A changed base clears the cached devices, states and map and resubscribes.",
+            "cs": "Uloží se do NVS. Změněné base vymaže uložená zařízení, stavy a mapu a znovu se přihlásí k odběru."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/zigbee/net/map",
+          "perm": "zigbee/network",
+          "level": 2,
+          "summary": {
+            "en": "Asks Zigbee2MQTT for a network map.",
+            "cs": "Požádá Zigbee2MQTT o mapu sítě."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "started": true
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "No Zigbee2MQTT found on the broker, or a map request is already running.",
+                "cs": "Na brokeru není Zigbee2MQTT, nebo už jedna žádost o mapu běží."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "MQTT not connected.",
+                "cs": "MQTT není připojeno."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Returns at once; the map arrives later in GET /api/zigbee/net (map, map_running, map_error). Gives up after 10 minutes.",
+            "cs": "Vrací se hned; mapa přijde později v GET /api/zigbee/net (map, map_running, map_error). Po 10 minutách se vzdá."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/zigbee/net/request",
+          "perm": "zigbee/network",
+          "level": 2,
+          "summary": {
+            "en": "Runs an operation through Zigbee2MQTT: permit join, rename, remove, interview, identify, firmware update.",
+            "cs": "Provede operaci přes Zigbee2MQTT: povolení párování, přejmenování, odebrání, interview, identifikace, aktualizace firmwaru."
+          },
+          "body": {
+            "action": "permit_join",
+            "time": 120,
+            "device": "lamp",
+            "to": "new-name",
+            "force": false
+          },
+          "body_type": "json",
+          "response": {
+            "status": "ok",
+            "data": {
+              "time": 120
+            },
+            "transaction": "p4gw-3"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Unknown action or a required device missing.",
+                "cs": "Neznámá akce nebo chybí povinné zařízení."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "No Zigbee2MQTT on the broker, or another operation is running.",
+                "cs": "Na brokeru není Zigbee2MQTT, nebo běží jiná operace."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "MQTT not connected.",
+                "cs": "MQTT není připojeno."
+              }
+            }
+          ],
+          "effects": {
+            "en": "action: permit_join (time 0..254 s, default 254; optional device to open one router), rename (device, to), remove (device, force), interview (device), ota_check (device), identify (device), ota_update (device). The reply is the Zigbee2MQTT response, or {status: \"sent\", error: \"no answer from Zigbee2MQTT yet\"} when it does not answer in time; identify and ota_update answer {status: \"sent\"} / {status: \"started\"} without waiting. remove deletes the device from the network.",
+            "cs": "action: permit_join (time 0 až 254 s, výchozí 254; volitelné device otevře jeden router), rename (device, to), remove (device, force), interview (device), ota_check (device), identify (device), ota_update (device). Odpovědí je odpověď Zigbee2MQTT, nebo {status: \"sent\", error: \"no answer from Zigbee2MQTT yet\"}, když včas neodpoví; identify a ota_update odpoví {status: \"sent\"} / {status: \"started\"} bez čekání. remove zařízení ze sítě odstraní."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/zigbee/reset",
+          "perm": "zigbee/diag",
+          "level": 2,
+          "summary": {
+            "en": "Resets the Zigbee radio.",
+            "cs": "Resetuje rádio Zigbee."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {},
+          "effects": {
+            "en": "Coordinator: drops the connected Zigbee2MQTT client, which has to reinitialise the NCP. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "Koordinátor: odpojí připojeného klienta Zigbee2MQTT, který musí NCP znovu inicializovat. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/zigbee/status",
+          "perm": "zigbee/info",
+          "level": 1,
+          "summary": {
+            "en": "Status of the Zigbee role (coordinator bridge or router).",
+            "cs": "Stav role Zigbee (most koordinátoru nebo router)."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "mode": "coordinator",
+            "uart_baud": 460800,
+            "rx_bytes": 123456,
+            "tx_bytes": 65432,
+            "uart_errors": 0,
+            "c6_resets": 1,
+            "tcp_port": 6638,
+            "client_connected": true,
+            "client": "192.168.1.10",
+            "session_s": 3600,
+            "sessions": 2,
+            "frames_rx": 5000,
+            "frames_tx": 4800,
+            "dropped_bytes": 0,
+            "telemetry_frames": 100,
+            "telemetry_bad": 0,
+            "last_rx_s": 0.5,
+            "last_tx_s": 1.2
+          },
+          "effects": {
+            "en": "Router mode returns mode, the UART counters, router (the last status object of the router firmware, or null) and router_status_age_s instead of the TCP bridge fields. Registered only while this role runs on a radio, otherwise the server answers 404.",
+            "cs": "Režim router vrací místo polí TCP mostu mode, čítače UART, router (poslední stavový objekt firmwaru routeru, nebo null) a router_status_age_s. Registrován jen dokud tuto roli některé rádio provozuje, jinak server odpoví 404."
+          }
+        }
+      ]
+    },
+    {
+      "id": "esphome",
+      "title": {
+        "en": "ESPHome",
+        "cs": "ESPHome"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/esphome/wifi",
+          "perm": "ha/esphome",
+          "level": 2,
+          "summary": {
+            "en": "Wi-Fi network given to the ESPHome proxy radio.",
+            "cs": "Síť Wi-Fi předávaná rádiu s proxy ESPHome."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "ssid": "MyWifi",
+            "password_set": true
+          },
+          "effects": {
+            "en": "The password is never returned.",
+            "cs": "Heslo se nikdy nevrací."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/esphome/wifi",
+          "perm": "ha/esphome",
+          "level": 2,
+          "summary": {
+            "en": "Sets the Wi-Fi network for the ESPHome proxy radio.",
+            "cs": "Nastaví síť Wi-Fi pro rádio s proxy ESPHome."
+          },
+          "body": {
+            "ssid": "MyWifi",
+            "password": "wifi-password"
+          },
+          "body_type": "json",
+          "response": {
+            "ssid": "MyWifi",
+            "password_set": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "ssid longer than 32 characters or missing, or password not 8..64 characters (empty for an open network).",
+                "cs": "ssid chybí nebo má víc než 32 znaků, nebo heslo nemá 8 až 64 znaků (prázdné pro otevřenou síť)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Stored in NVS; the radio is provisioned over Improv at its next start in the esphome role. Leaving password out keeps the old one. The Wi-Fi uplink role falls back to this network when it has none of its own.",
+            "cs": "Uloží se do NVS; rádio se zprovozní přes Improv při dalším startu v roli esphome. Vynechané password ponechá staré. Role Wi-Fi uplink použije tuto síť, když nemá vlastní."
+          }
+        }
+      ]
+    },
+    {
+      "id": "sound",
+      "title": {
+        "en": "Sound recognition",
+        "cs": "Rozpoznávání zvuku"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/sound/classes",
+          "perm": "*",
+          "level": 1,
+          "summary": {
+            "en": "Names of the 521 sound classes.",
+            "cs": "Názvy 521 tříd zvuku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": "application/json [[index, name, category, group], ...] (AudioSet classes)"
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/clip",
+          "perm": "sound/live",
+          "level": 2,
+          "summary": {
+            "en": "Downloads the latest seconds of microphone audio as a WAV file.",
+            "cs": "Stáhne posledních několik sekund zvuku z mikrofonu jako WAV."
+          },
+          "query": [
+            {
+              "name": "seconds",
+              "values": "1..9",
+              "desc": {
+                "en": "Length, default 5.",
+                "cs": "Délka, výchozí 5."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "audio/wav p4gw_clip.wav (16 kHz, mono, 16-bit)",
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Microphone is off.",
+                "cs": "Mikrofon je vypnutý."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Needs edit level because it is a recording of the room.",
+            "cs": "Vyžaduje úroveň úprav, protože jde o nahrávku místnosti."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sound/config",
+          "perm": "sound/live",
+          "level": 2,
+          "summary": {
+            "en": "Changes microphone and recognition settings and the noise level calibration; send only the fields to change.",
+            "cs": "Změní nastavení mikrofonu a rozpoznávání a kalibraci hladiny hluku; posílejte jen měněná pole."
+          },
+          "body": {
+            "enabled": true,
+            "gain_db": 30,
+            "gate_db": -60,
+            "inference": true,
+            "spl_reference": 45.0
+          },
+          "body_type": "json",
+          "response": {
+            "enabled": true,
+            "running": true,
+            "gain_db": 30,
+            "gate_db": -60,
+            "restart_required": false
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "spl_reference outside 20..130 dB(A) or spl_offset outside 60..220.",
+                "cs": "spl_reference mimo 20 až 130 dB(A) nebo spl_offset mimo 60 až 220."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "spl_reference given while the microphone is off.",
+                "cs": "spl_reference zadáno při vypnutém mikrofonu."
+              }
+            }
+          ],
+          "effects": {
+            "en": "enabled turns the microphone on or off in NVS; a change needs a restart (restart_required: true, the gateway does not restart by itself). gain_db 0..42 and gate_db -90..0 (quiet gate for recognition) apply at once and are clamped. inference switches recognition on or off. spl_reference is the reading of a sound level meter next to the gateway in dB(A) and calibrates the offset; spl_offset sets the offset directly; spl_reset: true drops the calibration. The reply is the status like GET /api/sound/status plus restart_required.",
+            "cs": "enabled zapne nebo vypne mikrofon v NVS; změna vyžaduje restart (restart_required: true, brána se sama nerestartuje). gain_db 0 až 42 a gate_db -90 až 0 (tichá brána pro rozpoznávání) se použijí hned a oříznou se do rozsahu. inference zapne nebo vypne rozpoznávání. spl_reference je hodnota z hlukoměru vedle brány v dB(A) a zkalibruje offset; spl_offset nastaví offset přímo; spl_reset: true kalibraci zruší. Odpovědí je stav jako GET /api/sound/status plus restart_required."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/events",
+          "perm": "sound/events",
+          "level": 1,
+          "summary": {
+            "en": "Configured sound events with live counters, plus the list of presets.",
+            "cs": "Nastavené zvukové události s živými čítači a seznam předvoleb."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "preset": "household",
+            "exclude": [
+              0,
+              1
+            ],
+            "events": [
+              {
+                "id": "doorbell",
+                "name": "Doorbell",
+                "name_cs": "Zvonek",
+                "kind": "impulse",
+                "device_class": "sound",
+                "profile": "",
+                "enabled": true,
+                "threshold": 0.5,
+                "windows": 1,
+                "hold_s": 3,
+                "cooldown_s": 0,
+                "classes": [
+                  380
+                ],
+                "suppress": [],
+                "active": false,
+                "count": 4,
+                "last_ago_s": 600
+              }
+            ],
+            "presets": [
+              {
+                "key": "household",
+                "name": "Household"
+              }
+            ]
+          },
+          "effects": {
+            "en": "active, count and last_ago_s are runtime values and are not stored.",
+            "cs": "active, count a last_ago_s jsou běhové hodnoty a neukládají se."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/sound/events",
+          "perm": "sound/events",
+          "level": 2,
+          "summary": {
+            "en": "Replaces the whole event configuration.",
+            "cs": "Nahradí celou konfiguraci událostí."
+          },
+          "body": {
+            "preset": "custom",
+            "exclude": [
+              0,
+              1
+            ],
+            "events": [
+              {
+                "id": "doorbell",
+                "name": "Doorbell",
+                "name_cs": "Zvonek",
+                "kind": "impulse",
+                "device_class": "sound",
+                "profile": "",
+                "enabled": true,
+                "threshold": 0.5,
+                "windows": 1,
+                "hold_s": 3,
+                "cooldown_s": 0,
+                "classes": [
+                  380
+                ],
+                "suppress": []
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "preset": "custom",
+            "events": [
+              "..."
+            ],
+            "presets": [
+              "..."
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Invalid JSON or configuration: events not an array of at most 32; id not a-z, 0-9, _ (max 23) or duplicated; class index outside 0..520; profile not a-z, 0-9, _.",
+                "cs": "Neplatný JSON nebo konfigurace: events není pole nejvýše 32; id není a-z, 0-9, _ (max 23) nebo je duplicitní; index třídy mimo 0 až 520; profile není a-z, 0-9, _."
+              }
+            },
+            {
+              "code": 413,
+              "when": {
+                "en": "Body empty or over 32 kB.",
+                "cs": "Tělo je prázdné nebo větší než 32 kB."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Per event: kind impulse|continuous, enabled (default true), threshold 0.05..1 (0.5), windows 1..20 (1), hold_s 1..600 (3), cooldown_s 0..3600 (0), classes and suppress are class indexes 0..520, profile names a learned sound. Stored in NVS. Events that disappear or get disabled are removed from Home Assistant discovery. The reply is the new state like GET.",
+            "cs": "Pro každou událost: kind impulse|continuous, enabled (výchozí true), threshold 0,05 až 1 (0,5), windows 1 až 20 (1), hold_s 1 až 600 (3), cooldown_s 0 až 3600 (0), classes a suppress jsou indexy tříd 0 až 520, profile pojmenuje naučený zvuk. Uloží se do NVS. Zaniklé nebo vypnuté události se odeberou z discovery Home Assistantu. Odpovědí je nový stav jako GET."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sound/events/preset",
+          "perm": "sound/events",
+          "level": 2,
+          "summary": {
+            "en": "Replaces the event configuration with a preset.",
+            "cs": "Nahradí konfiguraci událostí předvolbou."
+          },
+          "body": {
+            "preset": "household"
+          },
+          "body_type": "json",
+          "response": {
+            "preset": "household",
+            "events": [
+              "..."
+            ],
+            "presets": [
+              "..."
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Unknown preset (household, security, animals, minimal).",
+                "cs": "Neznámá předvolba (household, security, animals, minimal)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Overwrites all current events and stores the result. Returns the new state like GET /api/sound/events.",
+            "cs": "Přepíše všechny současné události a výsledek uloží. Vrací nový stav jako GET /api/sound/events."
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/sound/learn",
+          "perm": "sound/learn",
+          "level": 2,
+          "summary": {
+            "en": "Deletes one sample slot, or all samples of a profile.",
+            "cs": "Smaže jeden slot se vzorkem, nebo všechny vzorky profilu."
+          },
+          "query": [
+            {
+              "name": "slot",
+              "values": "0..63",
+              "desc": {
+                "en": "Slot number to delete.",
+                "cs": "Číslo slotu ke smazání."
+              }
+            },
+            {
+              "name": "profile",
+              "values": "profile id|_background",
+              "desc": {
+                "en": "Delete all samples of the profile, or all background recordings with _background. Used when slot is not given.",
+                "cs": "Smaže všechny vzorky profilu, nebo všechny nahrávky pozadí pomocí _background. Použije se, když chybí slot."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "deleted": 1
+          },
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such sample.",
+                "cs": "Takový vzorek neexistuje."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "A recording is running.",
+                "cs": "Probíhá nahrávání."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Erases flash sectors of the sounds partition and rebuilds the profiles.",
+            "cs": "Maže sektory flash v oddílu se zvuky a přepočítá profily."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/learn",
+          "perm": "sound/learn",
+          "level": 1,
+          "summary": {
+            "en": "Learned sounds: profiles, samples, background recordings and the recording state.",
+            "cs": "Naučené zvuky: profily, vzorky, nahrávky pozadí a stav nahrávání."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "slots_total": 64,
+            "slots_free": 58,
+            "ready": true,
+            "recording": {
+              "active": false,
+              "result": "sample saved (-30.2 dBFS)",
+              "ok": true
+            },
+            "profiles": [
+              {
+                "id": "my_bell",
+                "type": "embedding",
+                "samples": 3,
+                "self_min": 0.82,
+                "background_max": 0.61,
+                "threshold": 0.75,
+                "separable": true,
+                "slots": [
+                  {
+                    "slot": 4,
+                    "level_db": -30.2,
+                    "saved": 1793600000
+                  }
+                ]
+              }
+            ],
+            "background": [
+              {
+                "slot": 10,
+                "level_db": -50.1,
+                "saved": 1793600100
+              }
+            ]
+          },
+          "effects": {
+            "en": "ready is true only while the microphone, the model and recognition all run. Tone profiles also have tone_hz. score appears for 5 s after a profile matched.",
+            "cs": "ready je true jen když běží mikrofon, model i rozpoznávání. Tónové profily mají navíc tone_hz. score se objeví na 5 s po shodě profilu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/sound/learn/record",
+          "perm": "sound/learn",
+          "level": 2,
+          "summary": {
+            "en": "Starts recording a sample of a profile, or background recordings, from the microphone.",
+            "cs": "Spustí nahrání vzorku profilu, nebo pozadí, z mikrofonu."
+          },
+          "body": {
+            "profile": "my_bell",
+            "kind": "sample",
+            "type": "embedding"
+          },
+          "body_type": "json",
+          "response": {
+            "seconds": 4
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Recognition not running, a recording is running, invalid profile name (a-z, 0-9, _, max 23), profile exists with the other type, or no free sample slot.",
+                "cs": "Rozpoznávání neběží, nahrávání už běží, neplatné jméno profilu (a-z, 0-9, _, max 23), profil existuje s jiným typem, nebo není volný slot."
+              }
+            }
+          ],
+          "effects": {
+            "en": "kind sample (default) keeps the loudest 0.96 s window within about 4 s and needs profile; kind background records 5 windows (about 5 s) of room sound and ignores profile. type embedding (default) or tone. Returns at once; follow it in GET /api/sound/learn (recording).",
+            "cs": "kind sample (výchozí) uloží nejhlasitější okno 0,96 s během asi 4 s a vyžaduje profile; kind background nahraje 5 oken (asi 5 s) zvuku místnosti a profile ignoruje. type embedding (výchozí) nebo tone. Vrací se hned; průběh je v GET /api/sound/learn (recording)."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/learn/sample",
+          "perm": "sound/learn",
+          "level": 2,
+          "summary": {
+            "en": "Downloads a stored sample as a WAV file.",
+            "cs": "Stáhne uložený vzorek jako WAV."
+          },
+          "query": [
+            {
+              "name": "slot",
+              "values": "0..63",
+              "desc": {
+                "en": "Slot number.",
+                "cs": "Číslo slotu."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "audio/wav (16 kHz, mono, 16-bit, 0.96 s)",
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such sample.",
+                "cs": "Takový vzorek neexistuje."
+              }
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/sound/learn/upload",
+          "perm": "sound/learn",
+          "level": 2,
+          "summary": {
+            "en": "Adds a sample or background from an uploaded WAV, or tests a WAV against the profiles.",
+            "cs": "Přidá vzorek nebo pozadí z nahraného WAV, nebo WAV otestuje proti profilům."
+          },
+          "query": [
+            {
+              "name": "profile",
+              "values": "a-z, 0-9, _ (max 23)",
+              "desc": {
+                "en": "Profile id (not needed for background or test).",
+                "cs": "Id profilu (u pozadí a testu netřeba)."
+              }
+            },
+            {
+              "name": "type",
+              "values": "embedding|tone",
+              "desc": {
+                "en": "Profile type, default embedding.",
+                "cs": "Typ profilu, výchozí embedding."
+              }
+            },
+            {
+              "name": "kind",
+              "values": "sample|background",
+              "desc": {
+                "en": "Default sample.",
+                "cs": "Výchozí sample."
+              }
+            },
+            {
+              "name": "test",
+              "values": "1",
+              "desc": {
+                "en": "1 scores the WAV against all profiles and saves nothing.",
+                "cs": "1 ohodnotí WAV proti všem profilům a nic neuloží."
+              }
+            }
+          ],
+          "body": "sample.wav",
+          "body_type": "binary",
+          "response": {
+            "result": "sample saved (-28.4 dBFS)"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Not a 16 kHz mono 16-bit PCM WAV of 1 to 10 s, or processing failed.",
+                "cs": "Není to WAV PCM 16 kHz mono 16 bit o délce 1 až 10 s, nebo zpracování selhalo."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Same conditions as record: recognition not running, a recording running, bad profile, no free slot.",
+                "cs": "Stejné podmínky jako u record: rozpoznávání neběží, nahrávání běží, špatný profil, není volný slot."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "Recognition did not process the recording in 30 s.",
+                "cs": "Rozpoznávání nahrávku nezpracovalo do 30 s."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Raw WAV bytes as the request body (not JSON). Sample keeps the loudest window, background up to 5 windows. With test=1 the reply is {windows, scores: {profile: 0..1}} (best score per profile).",
+            "cs": "Tělem požadavku jsou surové bajty WAV (ne JSON). Vzorek uloží nejhlasitější okno, pozadí až 5 oken. S test=1 je odpověď {windows, scores: {profil: 0..1}} (nejlepší skóre každého profilu)."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/log",
+          "perm": "sound/log",
+          "level": 1,
+          "summary": {
+            "en": "Log of recent detections (up to 64), newest first.",
+            "cs": "Záznam posledních detekcí (nejvýše 64), nejnovější první."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "ago_s": 30,
+              "event": "doorbell",
+              "class": 380,
+              "class_name": "Doorbell",
+              "score": 0.91,
+              "level_db": -32.5,
+              "duration_s": 1.9
+            }
+          ],
+          "effects": {
+            "en": "event is empty for a strong class that no event covers. Ongoing detections have ongoing: true instead of duration_s.",
+            "cs": "event je prázdné u silné třídy, kterou žádná událost nepokrývá. Probíhající detekce mají místo duration_s ongoing: true."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/scores",
+          "perm": "sound/live",
+          "level": 1,
+          "summary": {
+            "en": "Latest scores of all 521 sound classes.",
+            "cs": "Poslední skóre všech 521 tříd zvuku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "age_s": 0.4,
+            "scores": [
+              0,
+              1,
+              85,
+              0
+            ]
+          },
+          "effects": {
+            "en": "scores is an array of 521 integers, 0..100 (percent), in class index order; age_s is -1 before the first recognition.",
+            "cs": "scores je pole 521 celých čísel 0 až 100 (procenta) v pořadí indexů tříd; age_s je -1 před prvním rozpoznáním."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/sound/status",
+          "perm": "sound/live",
+          "level": 1,
+          "summary": {
+            "en": "State of the microphone, noise level and sound recognition.",
+            "cs": "Stav mikrofonu, hladiny hluku a rozpoznávání zvuku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "enabled": true,
+            "running": true,
+            "error": "",
+            "gain_db": 30,
+            "gate_db": -60,
+            "level_db": -45.2,
+            "peak_db": -30.1,
+            "floor_db": -55.0,
+            "seconds": 3600.5,
+            "read_errors": 0,
+            "spl": {
+              "las": 38.2,
+              "laeq": 40.1,
+              "lamax": 62.3,
+              "overload": false,
+              "window_s": 60,
+              "partial": false,
+              "offset": 120.0,
+              "calibrated": false
+            },
+            "model": {
+              "stored_bytes": 4000000,
+              "loaded": true,
+              "load_ms": 900,
+              "error": ""
+            },
+            "inference": {
+              "enabled": true,
+              "runs": 1200,
+              "skipped_quiet": 300,
+              "avg_ms": 120.5,
+              "cpu_pct": 18.0,
+              "top": [
+                {
+                  "index": 0,
+                  "name": "Speech",
+                  "score": 0.82
+                }
+              ]
+            }
+          },
+          "effects": {
+            "en": "level_db, peak_db, floor_db and spl appear only while the microphone runs; inference.top only after the first recognition.",
+            "cs": "level_db, peak_db, floor_db a spl se objeví jen při běžícím mikrofonu; inference.top až po prvním rozpoznání."
+          }
+        }
+      ]
+    },
+    {
+      "id": "network",
+      "title": {
+        "en": "Network",
+        "cs": "Síť"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/net/lan",
+          "perm": "system/lan",
+          "level": 1,
+          "summary": {
+            "en": "Ethernet settings and the state of an unconfirmed change.",
+            "cs": "Nastavení Ethernetu a stav nepotvrzené změny."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "mode": "static",
+            "link": "auto",
+            "ip": "192.168.1.50",
+            "mask": "255.255.255.0",
+            "gw": "192.168.1.1",
+            "dns1": "192.168.1.1",
+            "confirm_s": 0
+          },
+          "effects": {
+            "en": "confirm_s is the time left to confirm a pending change, 0 when none waits. ip, mask, gw, dns1, dns2 appear only in static mode.",
+            "cs": "confirm_s je čas zbývající k potvrzení čekající změny, 0 když žádná nečeká. ip, mask, gw, dns1, dns2 jsou jen ve statickém režimu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/lan",
+          "perm": "system/lan",
+          "level": 2,
+          "summary": {
+            "en": "Changes Ethernet settings (DHCP or static, link speed). Must be confirmed or it is undone.",
+            "cs": "Změní nastavení Ethernetu (DHCP nebo statická adresa, rychlost linky). Je nutné potvrdit, jinak se vrátí."
+          },
+          "body": {
+            "mode": "static",
+            "ip": "192.168.1.50",
+            "mask": "255.255.255.0",
+            "gw": "192.168.1.1",
+            "dns1": "192.168.1.1",
+            "dns2": "",
+            "link": "auto"
+          },
+          "body_type": "json",
+          "response": {
+            "mode": "static",
+            "link": "auto",
+            "ip": "192.168.1.50",
+            "confirm_s": 120
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "mode not dhcp or static; address or netmask missing or invalid; gateway outside the subnet; link not auto, 100full, 100half, 10full or 10half.",
+                "cs": "mode není dhcp ani static; chybí nebo je neplatná adresa či maska; brána mimo podsíť; link není auto, 100full, 100half, 10full ani 10half."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The new settings apply after 0.5 s, so the connection may drop. They are stored only when POST /api/net/lan/confirm is called (from the new address) within 120 s; otherwise the previous settings return, also after a restart.",
+            "cs": "Nové nastavení se použije po 0,5 s, takže se spojení může přerušit. Uloží se až po POST /api/net/lan/confirm (z nové adresy) do 120 s; jinak se vrátí předchozí nastavení, i po restartu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/lan/confirm",
+          "perm": "system/lan",
+          "level": 2,
+          "summary": {
+            "en": "Confirms a pending LAN change and stores it.",
+            "cs": "Potvrdí čekající změnu LAN a uloží ji."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "mode": "static",
+            "link": "auto",
+            "ip": "192.168.1.50",
+            "confirm_s": 0
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "No LAN change waits for confirmation.",
+                "cs": "Žádná změna LAN nečeká na potvrzení."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Writes the settings to NVS and sends a notification.",
+            "cs": "Zapíše nastavení do NVS a pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/lan/outage",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Switches Ethernet off for a while, to test the Wi-Fi uplink taking over.",
+            "cs": "Na chvíli vypne Ethernet, aby se otestovalo převzetí přes Wi-Fi uplink."
+          },
+          "body": {
+            "seconds": 90
+          },
+          "body_type": "json",
+          "response": {
+            "seconds": 90
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "seconds outside 10..600.",
+                "cs": "seconds mimo 10 až 600."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Answers, then stops the Ethernet driver for the given time; the web UI is unreachable over LAN meanwhile.",
+            "cs": "Odpoví a poté na zadanou dobu zastaví ovladač Ethernetu; webové rozhraní přes LAN mezitím není dostupné."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/net/scan",
+          "perm": "system/netscan",
+          "level": 1,
+          "summary": {
+            "en": "State and result of the last radio environment scan (Wi-Fi, 802.15.4 channels).",
+            "cs": "Stav a výsledek posledního skenu rádiového prostředí (Wi-Fi, kanály 802.15.4)."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "state": "idle",
+            "last": {
+              "mode": "full",
+              "at": 1793600000,
+              "duration_ms": 90000,
+              "radio": "b",
+              "scanner": "1.0",
+              "wifi": [
+                {
+                  "ssid": "MyWifi",
+                  "rssi": -55,
+                  "channel": 6
+                }
+              ],
+              "beacons": [],
+              "channels": [],
+              "errors": []
+            },
+            "quick_available": true,
+            "now": 1793610000
+          },
+          "effects": {
+            "en": "last is null before the first scan. state is idle, quick or full. The exact contents of wifi, beacons and channels come from the scanner firmware and the Thread scan and are not fixed here.",
+            "cs": "last je null před prvním skenem. state je idle, quick nebo full. Přesný obsah wifi, beacons a channels pochází z firmwaru skeneru a ze skenu Thread a není zde pevně popsán."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/scan",
+          "perm": "system/netscan",
+          "level": 2,
+          "summary": {
+            "en": "Starts a quick scan (Thread role) or a full scan with the scanner firmware.",
+            "cs": "Spustí rychlý sken (role Thread) nebo plný sken firmwarem skeneru."
+          },
+          "body": {
+            "mode": "full",
+            "radio": "b"
+          },
+          "body_type": "json",
+          "response": {
+            "restarting": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "mode not quick or full, or radio not a or b.",
+                "cs": "mode není quick ani full, nebo radio není a ani b."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "A scan is running; quick needs a Thread role; full on radio B needs radio B detected first (wiring test).",
+                "cs": "Sken běží; quick vyžaduje roli Thread; plný sken na rádiu B vyžaduje nejdřív zjištěné rádio B (test zapojení)."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "No memory.",
+                "cs": "Nedostatek paměti."
+              }
+            }
+          ],
+          "effects": {
+            "en": "quick runs in the background and answers {started: true}. full stores a request in NVS and restarts the gateway after 0.8 s; at start the radio (a by default) is flashed with the scanner firmware, scans and the gateway restores the normal role. Takes minutes during which the radio's role is not running.",
+            "cs": "quick běží na pozadí a odpoví {started: true}. full uloží žádost do NVS a po 0,8 s restartuje bránu; při startu se do rádia (výchozí a) nahraje firmware skeneru, sken proběhne a brána obnoví běžnou roli. Trvá minuty, během nichž role rádia neběží."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/net/traffic",
+          "perm": "system/lan",
+          "level": 1,
+          "summary": {
+            "en": "Ethernet traffic counters per service, since boot.",
+            "cs": "Čítače provozu Ethernetu podle služeb od startu."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "uptime_ms": 3600000,
+            "services": {
+              "http": {
+                "rx": 1000,
+                "tx": 5000,
+                "rx_packets": 10,
+                "tx_packets": 12
+              }
+            },
+            "rx": 123456,
+            "tx": 234567,
+            "rx_packets": 900,
+            "tx_packets": 1000
+          },
+          "effects": {
+            "en": "services is keyed by service name; rx and tx are bytes.",
+            "cs": "services je klíčované názvem služby; rx a tx jsou bajty."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/net/wifi",
+          "perm": "system/lan",
+          "level": 1,
+          "summary": {
+            "en": "Settings and status of the Wi-Fi uplink.",
+            "cs": "Nastavení a stav Wi-Fi uplinku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "settings": {
+              "ssid": "MyWifi",
+              "password_set": true,
+              "from_esphome": false,
+              "mode": "dhcp"
+            },
+            "status": {
+              "mode": "wifi_uplink",
+              "state": "connected",
+              "error": "",
+              "radio": "b",
+              "cp_version": "1.0.0",
+              "ssid": "MyWifi",
+              "bssid": "aa:bb:cc:dd:ee:ff",
+              "rssi": -55,
+              "channel": 36,
+              "band": "5 GHz",
+              "phy": "11ax",
+              "connected_s": 600,
+              "connects": 1,
+              "disconnects": 0,
+              "ip_mode": "dhcp",
+              "default_route": false,
+              "ipv4": "192.168.1.60",
+              "gateway": "192.168.1.1",
+              "netmask": "255.255.255.0"
+            }
+          },
+          "effects": {
+            "en": "Always available. status describes the uplink even when it is not the active role (state then reflects that). The password is never returned.",
+            "cs": "Dostupné vždy. status popisuje uplink i když není aktivní role (state to odráží). Heslo se nikdy nevrací."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/wifi",
+          "perm": "system/lan",
+          "level": 2,
+          "summary": {
+            "en": "Sets the Wi-Fi network of the uplink.",
+            "cs": "Nastaví síť Wi-Fi uplinku."
+          },
+          "body": {
+            "ssid": "MyWifi",
+            "password": "wifi-password",
+            "mode": "static",
+            "ip": "192.168.1.60",
+            "mask": "255.255.255.0",
+            "gw": "192.168.1.1",
+            "dns1": "192.168.1.1",
+            "dns2": ""
+          },
+          "body_type": "json",
+          "response": {
+            "settings": {
+              "ssid": "MyWifi",
+              "password_set": true,
+              "mode": "static"
+            },
+            "status": {
+              "...": "..."
+            }
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "ssid missing or over 32 characters, password not 8..64 characters (empty for open), or invalid IP settings.",
+                "cs": "ssid chybí nebo má víc než 32 znaků, heslo nemá 8 až 64 znaků (prázdné pro otevřenou síť), nebo jsou neplatná nastavení IP."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Stored in NVS and applied at once when the uplink runs. password left out keeps the old one. ssid: \"\" drops the own setting so the ESPHome Wi-Fi is used again. Sends a notification.",
+            "cs": "Uloží se do NVS a použije se hned, když uplink běží. Vynechané password ponechá staré. ssid: \"\" zruší vlastní nastavení, takže se znovu použije Wi-Fi z ESPHome. Pošle oznámení."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/net/wifi/restart",
+          "perm": "system/lan",
+          "level": 2,
+          "summary": {
+            "en": "Restarts the Wi-Fi uplink radio.",
+            "cs": "Restartuje rádio Wi-Fi uplinku."
+          },
+          "body": {},
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "hang_test_s outside 0..60.",
+                "cs": "hang_test_s mimo 0 až 60."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "The Wi-Fi uplink does not run.",
+                "cs": "Wi-Fi uplink neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The body is optional. {\"hang_test_s\": 20} holds the radio in reset for that many seconds without telling the host, to test the watchdog; the host then restarts it by itself.",
+            "cs": "Tělo je nepovinné. {\"hang_test_s\": 20} podrží rádio v resetu zadaný počet sekund, aniž by to hostitel věděl, pro test watchdogu; hostitel ho pak sám restartuje."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/net/wifi/scan",
+          "perm": "system/lan",
+          "level": 2,
+          "summary": {
+            "en": "Wi-Fi networks in range, seen by the uplink radio.",
+            "cs": "Sítě Wi-Fi v dosahu, viděné rádiem uplinku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "ssid": "MyWifi",
+              "rssi": -55,
+              "channel": 36,
+              "open": false
+            }
+          ],
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "The Wi-Fi uplink does not run.",
+                "cs": "Wi-Fi uplink neběží."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "Scan failed.",
+                "cs": "Sken selhal."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Blocking scan, at most 40 networks.",
+            "cs": "Blokující sken, nejvýše 40 sítí."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/net/wifi/traffic",
+          "perm": "system/lan",
+          "level": 1,
+          "summary": {
+            "en": "Traffic counters of the Wi-Fi uplink.",
+            "cs": "Čítače provozu Wi-Fi uplinku."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "uptime_ms": 600000,
+            "services": {
+              "mqtt": {
+                "rx": 100,
+                "tx": 200,
+                "rx_packets": 3,
+                "tx_packets": 4
+              }
+            },
+            "rx": 1000,
+            "tx": 2000,
+            "rx_packets": 20,
+            "tx_packets": 25
+          },
+          "effects": {
+            "en": "Same shape as /api/net/traffic; uptime_ms counts from the first uplink start and is 0 if it never started.",
+            "cs": "Stejný tvar jako /api/net/traffic; uptime_ms se počítá od prvního startu uplinku a je 0, pokud nikdy nenaběhl."
+          }
+        }
+      ]
+    },
+    {
+      "id": "mqtt",
+      "title": {
+        "en": "MQTT and Home Assistant",
+        "cs": "MQTT a Home Assistant"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/ha/discover",
+          "perm": "*",
+          "level": 1,
+          "summary": {
+            "en": "Finds Home Assistant instances on the LAN (mDNS _home-assistant._tcp).",
+            "cs": "Najde instance Home Assistantu v LAN (mDNS _home-assistant._tcp)."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": [
+            {
+              "name": "Home",
+              "port": 8123,
+              "ip": "192.168.1.10",
+              "version": "2026.10.0",
+              "internal_url": "http://192.168.1.10:8123",
+              "location_name": "Home"
+            }
+          ],
+          "effects": {
+            "en": "Waits up to 3 s for answers; the list is empty when none answer. The web UI uses it to suggest the Matter server address.",
+            "cs": "Čeká na odpovědi až 3 s; seznam je prázdný, když nikdo neodpoví. Web ho využívá k návrhu adresy serveru Matter."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/mqtt",
+          "perm": "ha/mqtt",
+          "level": 1,
+          "summary": {
+            "en": "MQTT client settings and connection state.",
+            "cs": "Nastavení klienta MQTT a stav spojení."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "enabled": true,
+            "uri": "mqtt://192.168.1.10:1883",
+            "user": "p4gw",
+            "password_set": true,
+            "prefix": "homeassistant",
+            "tls": "bundle",
+            "ca": "",
+            "skip_cn_check": false,
+            "client_id": "",
+            "keepalive": 60,
+            "base": "",
+            "discovery": true,
+            "discovery_groups": [
+              "roles",
+              "system",
+              "update",
+              "sound",
+              "sound_events",
+              "sound_triggers"
+            ],
+            "interval": 60,
+            "base_topic": "p4gw/p4gw-a1b2c3",
+            "connected": true,
+            "last_error": "",
+            "publishes": 120
+          },
+          "effects": {
+            "en": "The password is never returned (password_set). base_topic is the topic prefix actually used.",
+            "cs": "Heslo se nikdy nevrací (password_set). base_topic je skutečně použitý prefix témat."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/mqtt",
+          "perm": "ha/mqtt",
+          "level": 2,
+          "summary": {
+            "en": "Changes MQTT settings; send only the fields to change. Reconnects the client.",
+            "cs": "Změní nastavení MQTT; posílejte jen měněná pole. Znovu připojí klienta."
+          },
+          "body": {
+            "enabled": true,
+            "uri": "mqtt://192.168.1.10:1883",
+            "user": "p4gw",
+            "password": "mqtt-password",
+            "prefix": "homeassistant",
+            "tls": "bundle",
+            "ca": "",
+            "skip_cn_check": false,
+            "client_id": "p4gw",
+            "base": "",
+            "keepalive": 60,
+            "interval": 60,
+            "discovery": true,
+            "discovery_groups": [
+              "roles",
+              "system",
+              "sound"
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "enabled": true,
+            "uri": "mqtt://192.168.1.10:1883",
+            "connected": true,
+            "...": "same as GET /api/mqtt"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers.",
+                "cs": "Neplatné pole (zpráva říká které): uri musí začínat mqtt://, mqtts://, ws:// nebo wss:// (max 120); user, password, client_id max 63; prefix 1 až 31 znaků bez zástupných znaků, mezer a krajních lomítek; základní téma bez #, +, mezer a krajních lomítek (max 63); tls bundle nebo ca; ca certifikát PEM do 3999 znaků, povinný při tls ca; keepalive 10 až 240; interval 10 až 3600; discovery_groups z roles, system, update, sound, sound_events, sound_triggers."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.",
+            "cs": "Tělo do 8 kB. Uloží do NVS, pak klienta MQTT zastaví a znovu spustí. Vypnutí discovery nebo skupiny nejdřív odebere ty entity z Home Assistantu. interval je perioda publikace stavu v sekundách. Vrací nový stav jako GET."
+          }
+        }
+      ]
+    },
+    {
+      "id": "updates",
+      "title": {
+        "en": "Updates and firmware",
+        "cs": "Aktualizace a firmware"
+      },
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/ota/c6fw",
+          "perm": "system/firmware",
+          "level": 2,
+          "summary": {
+            "en": "Uploads the radio firmware package (all bundles of one chip type).",
+            "cs": "Nahraje balík firmwaru rádií (všechny balíky jednoho typu čipu)."
+          },
+          "body": "c6fw.bin",
+          "body_type": "binary",
+          "response": {
+            "ok": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Not a valid package (bad directory header or format version, size mismatch) or it does not match the chip.",
+                "cs": "Neplatný balík (špatná hlavička adresáře nebo verze formátu, nesedí velikost) nebo nesedí k čipu."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Another upload or a radio flash is running.",
+                "cs": "Běží jiný upload nebo flashování rádia."
+              }
+            },
+            {
+              "code": 413,
+              "when": {
+                "en": "Not a package of a plausible size.",
+                "cs": "Není to balík rozumné velikosti."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Raw binary body. The package is staged in PSRAM; it does not restart the gateway. A radio whose bundle changed is reflashed at the next start (restart the gateway, not a power cut, which would lose the PSRAM copy).",
+            "cs": "Tělem jsou surová binární data. Balík se uloží do PSRAM; bránu nerestartuje. Rádio, jehož balík se změnil, se přeflashuje při dalším startu (restartujte bránu, ne odpojením napájení, to by kopii v PSRAM ztratilo)."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/ota/gateway",
+          "perm": "system/firmware",
+          "level": 2,
+          "summary": {
+            "en": "Uploads a gateway firmware image into the inactive slot and boots it.",
+            "cs": "Nahraje obraz firmwaru brány do neaktivního slotu a spustí ho."
+          },
+          "body": "p4gw.bin",
+          "body_type": "binary",
+          "response": {
+            "slot": "ota_1",
+            "version": "v1.9",
+            "restarting": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Not an ESP application image, no application description, or not a p4gw image (checked in the first block before anything is erased); write or validation error.",
+                "cs": "Není to aplikační obraz ESP, chybí popis aplikace, nebo to není obraz p4gw (kontroluje se v prvním bloku, než se cokoli smaže); chyba zápisu nebo ověření."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Another upload or a radio flash is running, or the running image is not confirmed yet (retry in a minute).",
+                "cs": "Běží jiný upload nebo flashování rádia, nebo běžící obraz ještě není potvrzen (zkuste za minutu)."
+              }
+            },
+            {
+              "code": 413,
+              "when": {
+                "en": "Image empty or larger than the slot.",
+                "cs": "Obraz je prázdný nebo větší než slot."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Raw binary body, not JSON. Writes the other OTA slot, sets it as the boot slot and restarts the gateway after 0.8 s. If the new image does not start properly it rolls back to the previous one.",
+            "cs": "Tělem jsou surová binární data, ne JSON. Zapíše do druhého slotu OTA, nastaví ho jako zaváděcí a po 0,8 s restartuje bránu. Pokud nový obraz správně nenaběhne, vrátí se předchozí."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/ota/model",
+          "perm": "system/firmware",
+          "level": 2,
+          "summary": {
+            "en": "Uploads the sound recognition model into the model partition.",
+            "cs": "Nahraje model rozpoznávání zvuku do oddílu model."
+          },
+          "body": "yamnet_p4.espdl",
+          "body_type": "binary",
+          "response": {
+            "bytes": 4000000,
+            "restart_required": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Not an ESP-DL model (EDL2 header and size are checked before erasing), or a write error.",
+                "cs": "Není to model ESP-DL (hlavička EDL2 a velikost se kontrolují před mazáním), nebo chyba zápisu."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Model in use: turn sound recognition off and restart first.",
+                "cs": "Model se používá: nejdřív vypněte rozpoznávání zvuku a restartujte."
+              }
+            },
+            {
+              "code": 413,
+              "when": {
+                "en": "Model empty or larger than the partition.",
+                "cs": "Model je prázdný nebo větší než oddíl."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Raw binary body. Erases and rewrites the model partition. The gateway does not restart by itself; the new model loads after a restart.",
+            "cs": "Tělem jsou surová binární data. Smaže a přepíše oddíl s modelem. Brána se sama nerestartuje; nový model se načte po restartu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/update/check",
+          "perm": "system/firmware",
+          "level": 2,
+          "summary": {
+            "en": "Triggers a check of the update manifest.",
+            "cs": "Spustí kontrolu manifestu aktualizací."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "installed_version": "v1.9",
+            "latest_version": "v1.10",
+            "title": "P4 gateway firmware",
+            "release_summary": "...",
+            "in_progress": false,
+            "available": true,
+            "checking": true,
+            "checked": 1793600000,
+            "error": "",
+            "url": "https://example.com/p4gw/manifest.json",
+            "percent": 0,
+            "releases": [
+              {
+                "version": "v1.9",
+                "date": "2026-11-01"
+              }
+            ],
+            "c6": {
+              "offered": true,
+              "available": false,
+              "in_progress": false,
+              "percent": 0
+            },
+            "c5": {
+              "offered": false,
+              "available": false,
+              "in_progress": false,
+              "percent": 0
+            }
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "No update URL set.",
+                "cs": "Není nastavena URL aktualizací."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Returns the current update state at once; the check runs in a background task, so poll the same state (also in /api/status, update) until checking is false. Fields not shown here: layout, build, default_url, release_url.",
+            "cs": "Vrací hned aktuální stav aktualizací; kontrola běží v úloze na pozadí, takže stav opakovaně čtěte (též v /api/status, update), dokud checking není false. Neuvedená pole: layout, build, default_url, release_url."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/update/install",
+          "perm": "system/firmware",
+          "level": 2,
+          "summary": {
+            "en": "Installs the offered or a chosen release: gateway firmware or a radio package.",
+            "cs": "Nainstaluje nabízené nebo zvolené vydání: firmware brány nebo balík rádia."
+          },
+          "body": {
+            "target": "gateway",
+            "version": "v1.10"
+          },
+          "body_type": "json",
+          "response": {
+            "installed_version": "v1.9",
+            "in_progress": true,
+            "percent": 0,
+            "c6": {
+              "in_progress": false
+            },
+            "c5": {
+              "in_progress": false
+            }
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Nothing offered (check first), release not offered for this gateway, radio B is not an ESP32-C5 (target c5), or an installation is already running.",
+                "cs": "Nic není nabízeno (nejdřív zkontrolujte), vydání není pro tuto bránu nabízeno, rádio B není ESP32-C5 (target c5), nebo už instalace běží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The body is optional. target: gateway (default), c6 (radio package of radio A) or c5 (package of radio B); version picks one of the listed releases, else the offered one is used. Returns the update state at once and downloads in the background (percent). Gateway: writes the other slot and restarts. c6 and c5: stores the package and restarts the gateway, which then reflashes the radio.",
+            "cs": "Tělo je nepovinné. target: gateway (výchozí), c6 (balík rádia A) nebo c5 (balík rádia B); version vybere jedno z uvedených vydání, jinak se použije nabízené. Vrací stav aktualizací hned a stahuje na pozadí (percent). Gateway: zapíše druhý slot a restartuje. c6 a c5: uloží balík a restartuje bránu, která pak rádio přeflashuje."
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "title": {
+        "en": "Settings and maintenance",
+        "cs": "Nastavení a údržba"
+      },
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/reboot",
+          "perm": "system/maint",
+          "level": 2,
+          "summary": {
+            "en": "Restarts the gateway.",
+            "cs": "Restartuje bránu."
+          },
+          "body": {
+            "full": false
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "full requested while radio A is being flashed.",
+                "cs": "full zadáno při flashování rádia A."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The body is optional. Restarts after 0.5 s. full: true also resets the radio A chip just before the restart.",
+            "cs": "Tělo je nepovinné. Restart nastane po 0,5 s. full: true těsně před restartem resetuje i čip rádia A."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/settings",
+          "perm": "system/settings",
+          "level": 2,
+          "summary": {
+            "en": "Changes basic gateway settings; send only the fields to change.",
+            "cs": "Změní základní nastavení brány; posílejte jen měněná pole."
+          },
+          "body": {
+            "hostname": "p4gw-livingroom",
+            "matter_url": "ws://192.168.1.10:5580/ws",
+            "zigbee_backup_days": 1,
+            "update_url": "https://example.com/p4gw/manifest.json"
+          },
+          "body_type": "json",
+          "response": {
+            "restart_required": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "hostname not lowercase letters, digits and inner dashes (max 31); matter_url not ws:// (max 120); zigbee_backup_days not 0, 1 or 7; update_url not http(s):// (max 200); or password given (use /api/users).",
+                "cs": "hostname není z malých písmen, číslic a vnitřních pomlček (max 31); matter_url nezačíná ws:// (max 120); zigbee_backup_days není 0, 1 ani 7; update_url nezačíná http(s):// (max 200); nebo bylo zadáno password (použijte /api/users)."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "Storing to NVS failed.",
+                "cs": "Uložení do NVS selhalo."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Writes to NVS. Empty matter_url or update_url clears it; changing update_url starts an update check. zigbee_backup_days is the automatic Zigbee backup period (0 off). A new hostname takes effect after a restart (restart_required: true); the gateway does not restart by itself. Fields before an invalid one may already be stored.",
+            "cs": "Zapisuje do NVS. Prázdné matter_url nebo update_url hodnotu smaže; změna update_url spustí kontrolu aktualizací. zigbee_backup_days je perioda automatické zálohy Zigbee (0 vypnuto). Nový hostname se projeví po restartu (restart_required: true); brána se sama nerestartuje. Pole před neplatným už mohou být uložena."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/settings/export",
+          "perm": "system/settings",
+          "level": 2,
+          "summary": {
+            "en": "Exports the gateway settings as a JSON file.",
+            "cs": "Exportuje nastavení brány jako soubor JSON."
+          },
+          "query": [
+            {
+              "name": "secrets",
+              "values": "1",
+              "desc": {
+                "en": "1 includes passwords, tokens and keys; without it they are left out.",
+                "cs": "1 zahrne hesla, tokeny a klíče; bez něj se vynechají."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "format": "p4gw-settings",
+            "version": 1,
+            "hostname": "p4gw-a1b2c3",
+            "firmware": "v1.9",
+            "exported": 1793610000,
+            "secrets": false,
+            "keys": {
+              "...": "NVS keys and values"
+            }
+          },
+          "effects": {
+            "en": "Sent as a download (Content-Disposition: <hostname>-settings.json). With secrets=1 the file holds the keys of the networks, so keep it private.",
+            "cs": "Posílá se jako stažení (Content-Disposition: <hostname>-settings.json). Se secrets=1 soubor obsahuje klíče sítí, uchovejte ho v soukromí."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/settings/import",
+          "perm": "system/settings",
+          "level": 2,
+          "summary": {
+            "en": "Imports a settings file made by the export.",
+            "cs": "Naimportuje soubor nastavení vytvořený exportem."
+          },
+          "body": {
+            "format": "p4gw-settings",
+            "version": 1,
+            "keys": {
+              "...": "as exported"
+            }
+          },
+          "body_type": "json",
+          "response": {
+            "keys": 42,
+            "restarting": true
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Not a p4gw-settings file, keys not an object, or an entry is invalid (nothing is written then).",
+                "cs": "Není to soubor p4gw-settings, keys není objekt, nebo je položka neplatná (pak se nezapíše nic)."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Radio A flashing in progress.",
+                "cs": "Probíhá flashování rádia A."
+              }
+            },
+            {
+              "code": 413,
+              "when": {
+                "en": "Body over 64 kB.",
+                "cs": "Tělo je větší než 64 kB."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Send the exported JSON as the body. Everything is validated first, then written to NVS (board-specific keys are skipped), and the gateway restarts after 1 s.",
+            "cs": "Jako tělo pošlete exportovaný JSON. Vše se nejdřív ověří, pak zapíše do NVS (klíče vázané na desku se přeskočí) a brána se po 1 s restartuje."
+          }
+        }
+      ]
+    },
+    {
+      "id": "diag",
+      "title": {
+        "en": "Logs and diagnostics",
+        "cs": "Logy a diagnostika"
+      },
+      "endpoints": [
+        {
+          "method": "DELETE",
+          "path": "/api/coredump",
+          "perm": "system/diag",
+          "level": 2,
+          "summary": {
+            "en": "Erases the stored core dump.",
+            "cs": "Smaže uložený core dump."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {},
+          "errors": [
+            {
+              "code": 500,
+              "when": {
+                "en": "Erase failed.",
+                "cs": "Mazání selhalo."
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/coredump",
+          "perm": "system/diag",
+          "level": 1,
+          "summary": {
+            "en": "Downloads the stored core dump (ELF) of the last crash.",
+            "cs": "Stáhne uložený core dump (ELF) posledního pádu."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": "application/octet-stream coredump.elf",
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No core dump.",
+                "cs": "Core dump neexistuje."
+              }
+            }
+          ]
+        },
+        {
+          "method": "GET",
+          "path": "/api/logs",
+          "perm": "system/diag",
+          "level": 1,
+          "summary": {
+            "en": "Gateway log lines since a sequence number.",
+            "cs": "Řádky logu brány od určitého pořadového čísla."
+          },
+          "query": [
+            {
+              "name": "since",
+              "values": "number",
+              "desc": {
+                "en": "Sequence returned in the previous X-Log-Seq header; 0 or missing returns the buffered log.",
+                "cs": "Pořadové číslo z hlavičky X-Log-Seq předchozí odpovědi; 0 nebo chybějící vrátí uložený log."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": "text/plain log lines; header X-Log-Seq holds the sequence to pass as since next time (up to 16 KB per call)"
+        },
+        {
+          "method": "GET",
+          "path": "/api/logs/previous",
+          "perm": "system/diag",
+          "level": 1,
+          "summary": {
+            "en": "Log of the run before the last restart.",
+            "cs": "Log běhu před posledním restartem."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": "text/plain log lines",
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No log from before the last restart.",
+                "cs": "Není log z doby před posledním restartem."
+              }
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/tools/ping",
+          "perm": "system/diag",
+          "level": 2,
+          "summary": {
+            "en": "Pings a host from the gateway.",
+            "cs": "Pošle z brány ping na zadaného hostitele."
+          },
+          "body": {
+            "host": "192.168.1.1",
+            "count": 4
+          },
+          "body_type": "json",
+          "response": {
+            "target": "192.168.1.1",
+            "sent": 4,
+            "received": 4,
+            "replies": [
+              {
+                "seq": 1,
+                "ms": 1
+              },
+              {
+                "seq": 2,
+                "timeout": true
+              }
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "Cannot resolve host.",
+                "cs": "Hostitele nelze přeložit."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "Ping session failed.",
+                "cs": "Relace pingu selhala."
+              }
+            }
+          ],
+          "effects": {
+            "en": "host is a name or an IPv4/IPv6 address; count 1..10 (default 4, clamped). The request waits until the pings finish, up to count * 2 + 2 s.",
+            "cs": "host je jméno nebo adresa IPv4/IPv6; count 1 až 10 (výchozí 4, ořízne se). Požadavek čeká na dokončení pingů, nejvýše count * 2 + 2 s."
+          }
+        }
+      ]
+    },
+    {
+      "id": "notify",
+      "title": {
+        "en": "Notifications and Telegram",
+        "cs": "Oznámení a Telegram"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/auth/telegram",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Own Telegram notification preferences and pairing state.",
+            "cs": "Vlastní předvolby oznámení Telegram a stav spárování."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "bot_enabled": true,
+            "bot": "my_p4gw_bot",
+            "paired": true,
+            "levels": {
+              "security": 3,
+              "system": 2,
+              "network": 1,
+              "sound": 0
+            },
+            "allowed": {
+              "security": true,
+              "system": true,
+              "network": true,
+              "sound": false
+            },
+            "quiet_from": 22,
+            "quiet_to": 7,
+            "lang": "cs",
+            "sound_muted_s": 0
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Only for signed-in users (not for tokens or an open gateway).",
+                "cs": "Jen pro přihlášené uživatele (ne pro tokeny ani otevřenou bránu)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "levels per topic: 0 off up to 3 (the exact meaning of 1 and 2 is set in the bot code). allowed shows which topics the user may receive by page permission. quiet_from and quiet_to are hours 0..23, -1 none.",
+            "cs": "levels podle tématu: 0 vypnuto až 3 (přesný význam 1 a 2 určuje kód bota). allowed ukazuje, která témata smí uživatel dostávat podle oprávnění stránek. quiet_from a quiet_to jsou hodiny 0 až 23, -1 žádná."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/telegram",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Changes own Telegram notification preferences.",
+            "cs": "Změní vlastní předvolby oznámení Telegram."
+          },
+          "body": {
+            "levels": {
+              "security": 3,
+              "system": 2,
+              "network": 1,
+              "sound": 0
+            },
+            "quiet_from": 22,
+            "quiet_to": 7,
+            "lang": "cs"
+          },
+          "body_type": "json",
+          "response": {
+            "bot_enabled": true,
+            "paired": true,
+            "levels": {
+              "security": 3
+            },
+            "quiet_from": 22,
+            "quiet_to": 7,
+            "lang": "cs"
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Only for signed-in users.",
+                "cs": "Jen pro přihlášené uživatele."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Values outside the range (levels 0..3, quiet hours -1..23, lang cs or en) are ignored silently. Returns the new state like GET.",
+            "cs": "Hodnoty mimo rozsah (levels 0 až 3, tiché hodiny -1 až 23, lang cs nebo en) se tiše ignorují. Vrací nový stav jako GET."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/telegram/pair",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Creates a code to pair the own Telegram chat with the bot.",
+            "cs": "Vytvoří kód ke spárování vlastního chatu Telegramu s botem."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "code": 12345678,
+            "bot": "my_p4gw_bot",
+            "link": "https://t.me/my_p4gw_bot?start=12345678",
+            "expires_s": 600
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Only for signed-in users, or the Telegram bot is not running.",
+                "cs": "Jen pro přihlášené uživatele, nebo bot Telegram neběží."
+              }
+            }
+          ],
+          "effects": {
+            "en": "The code is valid for 10 minutes; open the link or send /start <code> to the bot.",
+            "cs": "Kód platí 10 minut; otevřete odkaz nebo pošlete botovi /start <kód>."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/telegram/test",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Sends a test message to the own paired Telegram chat.",
+            "cs": "Pošle zkušební zprávu do vlastního spárovaného chatu Telegramu."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {},
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Not paired, the bot is off, or not a signed-in user.",
+                "cs": "Není spárováno, bot je vypnutý, nebo nejde o přihlášeného uživatele."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "Outgoing queue full.",
+                "cs": "Odchozí fronta je plná."
+              }
+            }
+          ]
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/telegram/unpair",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Removes the pairing of the own Telegram chat.",
+            "cs": "Zruší spárování vlastního chatu Telegramu."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "bot_enabled": true,
+            "paired": false
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Only for signed-in users.",
+                "cs": "Jen pro přihlášené uživatele."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Returns the preferences like GET /api/auth/telegram.",
+            "cs": "Vrací předvolby jako GET /api/auth/telegram."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/notify",
+          "perm": "*",
+          "level": 1,
+          "summary": {
+            "en": "Recent gateway notifications, oldest first.",
+            "cs": "Poslední oznámení brány, nejstarší první."
+          },
+          "query": [
+            {
+              "name": "since",
+              "values": "number",
+              "desc": {
+                "en": "Return only notifications with a higher seq; default 0.",
+                "cs": "Vrátí jen oznámení s vyšším seq; výchozí 0."
+              }
+            }
+          ],
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "notifications": [
+              {
+                "seq": 12,
+                "boot": 123456,
+                "topic": "system",
+                "level": "info",
+                "text": "Gateway restarted, v1.9",
+                "time": 1793600000
+              }
+            ],
+            "seq": 12,
+            "boot": 123456
+          },
+          "effects": {
+            "en": "topic is security, system, network or sound; level is info, warning or critical. The gateway keeps a limited ring in memory. boot changes on every restart, which resets seq.",
+            "cs": "topic je security, system, network nebo sound; level je info, warning nebo critical. Brána drží v paměti omezený kruhový buffer. boot se mění při každém restartu, který vynuluje seq."
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/telegram",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Telegram bot settings and state (admin).",
+            "cs": "Nastavení a stav bota Telegram (admin)."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "enabled": true,
+            "token_set": true,
+            "bot": "my_p4gw_bot",
+            "state": "running",
+            "error": "",
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+            "paired": 2
+          },
+          "effects": {
+            "en": "state is off, connecting, running or error. The token is never returned.",
+            "cs": "state je off, connecting, running nebo error. Token se nikdy nevrací."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/telegram",
+          "perm": "admin",
+          "level": 2,
+          "summary": {
+            "en": "Changes Telegram bot settings (admin); send only the fields to change.",
+            "cs": "Změní nastavení bota Telegram (admin); posílejte jen měněná pole."
+          },
+          "body": {
+            "token": "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+            "enabled": true,
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3"
+          },
+          "body_type": "json",
+          "response": {
+            "enabled": true,
+            "token_set": true,
+            "bot": "my_p4gw_bot",
+            "state": "connecting",
+            "error": "",
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+            "paired": 0
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "token without a colon (the BotFather format 123456:ABC...) or too long; tz empty or too long.",
+                "cs": "token bez dvojtečky (formát BotFather 123456:ABC...) nebo příliš dlouhý; tz prázdné nebo příliš dlouhé."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Stored in NVS and the bot restarts its connection. tz is a POSIX time zone used for quiet hours. An empty token removes it. Sends a notification.",
+            "cs": "Uloží se do NVS a bot znovu naváže spojení. tz je časové pásmo POSIX pro tiché hodiny. Prázdný token ho odstraní. Pošle oznámení."
+          }
+        }
+      ]
+    }
+  ]
+}

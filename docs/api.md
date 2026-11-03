@@ -1,0 +1,2691 @@
+# HTTP API
+
+Generated from [firmware/gateway/web/api.json](../firmware/gateway/web/api.json) by `tools/docs/api_md.py`; do not edit by hand. The gateway serves the same description at `GET /api/help`, and its web UI shows it under System › API with examples built for that gateway (its address, a token typed in there, its radios and roles) and a button that tries GET requests.
+
+## Authentication
+
+A gateway without any user account is open: no sign-in is needed and every endpoint works (create the first admin with POST /api/users). Once an account exists, every endpoint except /api/help, /api/auth/state, /api/auth/login and /api/auth/reset-request needs one of three proofs, tried in this order: an API token sent as Authorization: Bearer <token> (an admin creates it in System > User management > API tokens, or with POST /api/tokens, and it has the role chosen then), HTTP Basic with user name and password (for clients of older versions; works only for users without two-factor sign-in), or the session cookie p4s that POST /api/auth/login sets for the web UI. Missing or wrong credentials give 401; insufficient rights give 403 forbidden; an account that must change its password or set up two-factor gets 403 password_change_required or totp_setup_required. Each endpoint's perm is the page of the web UI it belongs to and level 1 (read) or 2 (edit); GET needs the read level, other methods edit, admin means admins only, public means no sign-in, * means any signed-in user, self means the own account. All errors are JSON {"error": "message"}; successful replies are JSON unless noted.
+
+Errors come as `{"error": "..."}` with 400 (invalid input), 401 (sign-in needed), 403 (permission), 404, 409 (not possible in the current state) or 413 (upload too large). Permissions name the web UI page whose right a user needs (read or edit); see [users.md](users.md).
+
+```sh
+curl -s -H 'Authorization: Bearer p4gw_...' http://192.168.1.10/api/status
+```
+
+## Endpoints
+
+### Status and system
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/help` | This API description (the content of api.json), no sign-in needed. | no sign-in |
+| POST | `/api/identify` | Makes the identify icon blink in the web UI header, to find the gateway. | page `overview`, edit |
+| GET | `/api/status` | Full gateway state: firmware, uptime, memory, roles of both radios, Ethernet, flash slots, radio firmware, hardware, update and link state. | any signed-in client |
+| GET | `/api/ws` | WebSocket push channel for Home Assistant: the gateway sends text frames, frames from the client are read and dropped. | any signed-in client |
+
+#### GET `/api/help`
+
+Response:
+
+```json
+{
+  "version": 1,
+  "auth": {
+    "en": "...",
+    "cs": "..."
+  },
+  "groups": [
+    {
+      "id": "status",
+      "title": {
+        "en": "Status and system",
+        "cs": "Stav a systém"
+      },
+      "endpoints": [
+        "..."
+      ]
+    }
+  ]
+}
+```
+
+Effects: Sent gzip-compressed (Content-Encoding: gzip), cached for an hour. It contains no secrets.
+
+#### POST `/api/identify`
+
+Body:
+
+```json
+{
+  "seconds": 10
+}
+```
+
+Response:
+
+```json
+{
+  "identify_s": 10
+}
+```
+
+Effects: seconds is clamped to 0..120 (default 10); 0 stops the blinking.
+
+#### GET `/api/status`
+
+Response:
+
+```json
+{
+  "hostname": "p4gw-a1b2c3",
+  "version": "v1.9",
+  "idf": "v5.5.1",
+  "built": "Nov  2 2026",
+  "built_time": "10:15:00",
+  "time": 1793610000,
+  "matter_url": "ws://192.168.1.10:5580/ws",
+  "chip_revision": 301,
+  "uptime_s": 120,
+  "reset_reason": "software",
+  "auth": true,
+  "temperature_c": 48.3,
+  "heap": {
+    "internal_free": 120000,
+    "internal_min": 90000,
+    "internal_largest": 65536,
+    "psram_free": 20000000,
+    "psram_heap": 30000000,
+    "psram_parts": [
+      {
+        "name": "c6fw",
+        "bytes": 2097152
+      }
+    ]
+  },
+  "role": {
+    "active": "thread_br",
+    "desired": "thread_br",
+    "maintenance": "",
+    "stable": true,
+    "b": {
+      "active": "none",
+      "desired": "none",
+      "maintenance": "",
+      "wired": true,
+      "chip": "ESP32-C5",
+      "bundle": "",
+      "chip_info": {
+        "flashes": 0
+      }
+    }
+  },
+  "eth": {
+    "...": "link, speed, IP addresses"
+  },
+  "slots": [
+    {
+      "label": "ota_0",
+      "size": 3145728,
+      "project": "p4gw",
+      "version": "v1.9",
+      "state": "valid",
+      "running": true,
+      "boot": true
+    }
+  ],
+  "c6": {
+    "bundle": "ot_rcp",
+    "adopted": true,
+    "images": [
+      {
+        "name": "ot_rcp",
+        "version": "1.2",
+        "size": 600000
+      }
+    ],
+    "chip": {
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "revision": 0,
+      "flash_size": 4194304,
+      "flashes": 1
+    },
+    "flash": {
+      "busy": false,
+      "percent": 0,
+      "stage": "",
+      "last_error": ""
+    },
+    "snapshot_days": 1,
+    "snapshots": []
+  },
+  "hw": {
+    "cpu_mhz": 360,
+    "cores": 2,
+    "cpu_load": [
+      12.5,
+      8.1
+    ],
+    "tasks": 40,
+    "flash_size": 16777216,
+    "psram_size": 33554432,
+    "mac_base": "aa:bb:cc:dd:ee:ff",
+    "app_slot": "ota_0",
+    "nvs": {
+      "used": 300,
+      "total": 700,
+      "namespaces": 12
+    },
+    "http_register_errors": 0
+  },
+  "update": {
+    "installed_version": "v1.9",
+    "latest_version": "v1.9",
+    "available": false
+  },
+  "identify_s": 0,
+  "links": {
+    "mqtt": "connected",
+    "ha_clients": 1,
+    "internet": true,
+    "internet_age_s": 20
+  },
+  "role_status": {
+    "mode": "border_router",
+    "phase": "running"
+  },
+  "role_status_b": {
+    "...": "status summary of the role on radio B, when it has one"
+  }
+}
+```
+
+Effects: Read only. role_status and role_status_b hold the short status of the role running on radio A and B.
+
+#### GET `/api/ws`
+
+Response:
+
+```json
+{
+  "topic": "notify",
+  "payload": "{\"seq\":12,\"topic\":\"system\",\"level\":\"info\",\"text\":\"...\"}"
+}
+```
+
+Errors: 401 Handshake without valid sign-in.
+
+Effects: Upgrade request; the sign-in is checked in the handshake. Each frame is a JSON object with topic and payload (payload is a string). Up to 48 messages wait in a queue, newer ones are dropped when it is full.
+
+### Sign-in and own account
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| POST | `/api/auth/login` | Signs in and sets the session cookie p4s (HttpOnly, SameSite=Strict). | no sign-in |
+| POST | `/api/auth/logout` | Ends the current session and clears the cookie. | own account |
+| GET | `/api/auth/me` | The signed-in identity with its page levels. | own account |
+| POST | `/api/auth/password` | Changes the own password. | own account |
+| POST | `/api/auth/reset-request` | Asks the admins to reset a forgotten password; no sign-in needed. | no sign-in |
+| GET | `/api/auth/sessions` | Lists the own sessions. | own account |
+| POST | `/api/auth/sessions/revoke` | Ends all own sessions except the current one. | own account |
+| GET | `/api/auth/state` | Login page state, no sign-in needed. | no sign-in |
+| POST | `/api/auth/totp/disable` | Turns two-factor off for the own account. | own account |
+| POST | `/api/auth/totp/enable` | Confirms the pending secret with a code and turns two-factor on. | own account |
+| POST | `/api/auth/totp/setup` | Starts two-factor setup: creates a pending secret and a QR code. | own account |
+
+#### POST `/api/auth/login`
+
+Body:
+
+```json
+{
+  "user": "jiri",
+  "password": "secret-password",
+  "code": "123456",
+  "remember": true
+}
+```
+
+Response:
+
+```json
+{
+  "name": "jiri",
+  "role": "admin",
+  "must_change": false,
+  "totp": true,
+  "totp_required": false,
+  "recovery_left": 10,
+  "levels": {
+    "overview": 2,
+    "role": 2,
+    "system/maint": 2
+  }
+}
+```
+
+Errors: 401 Unknown user, wrong password or wrong code.; 403 Account locked (body has error: locked and retry_s) or disabled.; 409 No user exists, the gateway is open.
+
+Effects: With two-factor on and no code the reply is {code_required: true, clock_set} and no session is created. code is a 6-digit authenticator code or a recovery code. remember keeps the session for the policy's remember_d days. Too many failures lock the account and send a notification; at most 24 sessions are kept, the oldest is dropped.
+
+#### POST `/api/auth/logout`
+
+Response:
+
+```json
+{}
+```
+
+Effects: Does nothing for token and Basic clients, they have no session.
+
+#### GET `/api/auth/me`
+
+Response:
+
+```json
+{
+  "name": "jiri",
+  "role": "admin",
+  "must_change": false,
+  "totp": false,
+  "totp_required": false,
+  "recovery_left": 0,
+  "levels": {
+    "overview": 2,
+    "system/maint": 2
+  },
+  "requests": 0
+}
+```
+
+Effects: Token clients get {name, role, token: true, levels}. Without any user account: {name: "", role: "admin", open: true}. requests counts open password reset requests (admins only, else 0).
+
+#### POST `/api/auth/password`
+
+Body:
+
+```json
+{
+  "old": "old-password",
+  "new": "new-password-123"
+}
+```
+
+Response:
+
+```json
+{
+  "name": "jiri",
+  "role": "admin",
+  "must_change": false,
+  "totp": false
+}
+```
+
+Errors: 400 New password outside the policy length (password_min to 64 characters).; 403 Current password is wrong.; 409 Not a signed-in user (token or open gateway).
+
+Effects: Clears must_change, ends all other sessions of the user and sends a notification.
+
+#### POST `/api/auth/reset-request`
+
+Body:
+
+```json
+{
+  "user": "jiri"
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 409 More than 4 requests in 10 minutes from anyone.
+
+Effects: The answer is the same for unknown names. For a known user it stores the request (name, time, client IP) and sends a security notification; an admin answers by setting a new password.
+
+#### GET `/api/auth/sessions`
+
+Response:
+
+```json
+[
+  {
+    "id": 3,
+    "current": true,
+    "remember": false,
+    "idle_s": 12
+  }
+]
+```
+
+Effects: Empty for token clients and the open gateway.
+
+#### POST `/api/auth/sessions/revoke`
+
+Response:
+
+```json
+{}
+```
+
+#### GET `/api/auth/state`
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "clock_set": true,
+  "hostname": "p4gw-a1b2c3"
+}
+```
+
+Effects: enabled is false while no user account exists (open gateway).
+
+#### POST `/api/auth/totp/disable`
+
+Body:
+
+```json
+{
+  "password": "current-password"
+}
+```
+
+Response:
+
+```json
+{
+  "name": "jiri",
+  "role": "admin",
+  "must_change": false,
+  "totp": false
+}
+```
+
+Errors: 403 Wrong password.; 409 Two-factor is not on, or the policy requires it for the role.
+
+Effects: Erases the secret and recovery codes; sends a warning notification.
+
+#### POST `/api/auth/totp/enable`
+
+Body:
+
+```json
+{
+  "code": "123456"
+}
+```
+
+Response:
+
+```json
+{
+  "recovery_codes": [
+    "ABCD-EFGH",
+    "JKMN-PQRS"
+  ]
+}
+```
+
+Errors: 400 Invalid code.; 409 Setup not started, or the gateway clock is not set (no SNTP).
+
+Effects: Returns 10 one-time recovery codes, shown only now. Ends the user's other sessions.
+
+#### POST `/api/auth/totp/setup`
+
+Response:
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "uri": "otpauth://totp/P4%20Gateway:jiri@p4gw-a1b2c3?secret=JBSWY3DPEHPK3PXP&issuer=P4%20Gateway&digits=6&period=30",
+  "qr_svg": "<svg ...>",
+  "clock_set": true
+}
+```
+
+Errors: 409 Not a signed-in user.
+
+Effects: The secret takes effect only after /api/auth/totp/enable with a valid code.
+
+### Users, roles and tokens
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/auth/policy` | Sign-in policy: sessions, lockout, password length, required two-factor. | administrators |
+| POST | `/api/auth/policy` | Changes the sign-in policy; send only the fields to change. | administrators |
+| GET | `/api/auth/requests` | Open password reset requests. | administrators |
+| POST | `/api/auth/requests/dismiss` | Dismisses the reset request of a user. | administrators |
+| GET | `/api/auth/roles` | Page levels of the roles user and viewer, with factory defaults. | administrators |
+| POST | `/api/auth/roles` | Sets page levels of the roles user and viewer. | administrators |
+| GET | `/api/tokens` | Lists API tokens (the secret value is never shown again). | administrators |
+| POST | `/api/tokens` | Creates an API token. | administrators |
+| POST | `/api/tokens/delete` | Revokes an API token. | administrators |
+| GET | `/api/users` | Lists user accounts and the page names used for levels. | administrators |
+| POST | `/api/users` | Creates a user, or changes an existing one (by name). | administrators |
+| POST | `/api/users/delete` | Deletes a user account. | administrators |
+
+#### GET `/api/auth/policy`
+
+Response:
+
+```json
+{
+  "idle_h": 12,
+  "remember_d": 30,
+  "lock_attempts": 5,
+  "lock_min": 15,
+  "password_min": 8,
+  "totp_required": [
+    "admin"
+  ]
+}
+```
+
+#### POST `/api/auth/policy`
+
+Body:
+
+```json
+{
+  "idle_h": 12,
+  "remember_d": 30,
+  "lock_attempts": 5,
+  "lock_min": 15,
+  "password_min": 10,
+  "totp_required": [
+    "admin",
+    "user"
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "idle_h": 12,
+  "remember_d": 30,
+  "lock_attempts": 5,
+  "lock_min": 15,
+  "password_min": 10,
+  "totp_required": [
+    "admin",
+    "user"
+  ]
+}
+```
+
+Errors: 400 A field is out of range (the message names it): idle_h 1..720, remember_d 0..365, lock_attempts 3..20, lock_min 1..1440, password_min 8..64; totp_required must list admin, user or viewer.
+
+Effects: totp_required replaces the whole list; users of such a role must set up two-factor before using the API (403 totp_setup_required). Nothing is applied when any field is invalid.
+
+#### GET `/api/auth/requests`
+
+Response:
+
+```json
+[
+  {
+    "name": "petr",
+    "time": 1793600000,
+    "ip": "192.168.1.20"
+  }
+]
+```
+
+#### POST `/api/auth/requests/dismiss`
+
+Body:
+
+```json
+{
+  "name": "petr"
+}
+```
+
+Response:
+
+```json
+[]
+```
+
+Effects: Returns the remaining requests like GET.
+
+#### GET `/api/auth/roles`
+
+Response:
+
+```json
+{
+  "user": {
+    "overview": 2,
+    "system/maint": 1
+  },
+  "viewer": {
+    "overview": 1,
+    "system/maint": 0
+  },
+  "defaults": {
+    "user": {
+      "overview": 2
+    },
+    "viewer": {
+      "overview": 1
+    }
+  }
+}
+```
+
+Effects: Levels: 0 hidden, 1 read, 2 edit. The admin role always has full access and is not listed.
+
+#### POST `/api/auth/roles`
+
+Body:
+
+```json
+{
+  "user": {
+    "system/firmware": 1
+  },
+  "viewer": {
+    "thread/settings": 0
+  },
+  "reset": false
+}
+```
+
+Response:
+
+```json
+{
+  "user": {
+    "overview": 2
+  },
+  "viewer": {
+    "overview": 1
+  },
+  "defaults": {
+    "...": "..."
+  }
+}
+```
+
+Effects: Only the listed pages with values 0..2 change; unknown pages are ignored. reset: true restores the factory levels of both roles. Sends a notification and returns the new state like GET.
+
+#### GET `/api/tokens`
+
+Response:
+
+```json
+[
+  {
+    "name": "homeassistant",
+    "role": "admin",
+    "created": 1793000000,
+    "used_s_ago": 30
+  }
+]
+```
+
+Effects: used_s_ago is -1 for a token not used since the gateway started.
+
+#### POST `/api/tokens`
+
+Body:
+
+```json
+{
+  "name": "homeassistant",
+  "role": "admin"
+}
+```
+
+Response:
+
+```json
+{
+  "name": "homeassistant",
+  "token": "p4gw_0123456789abcdef0123456789abcdef01234567"
+}
+```
+
+Errors: 400 name missing or longer than 31 characters, or role not admin, user or viewer.; 409 A token with this name exists, or all 16 slots are used.
+
+Effects: The token value is returned only in this response, the gateway keeps only its SHA-256 hash. Use it as Authorization: Bearer <token>. Sends a notification.
+
+#### POST `/api/tokens/delete`
+
+Body:
+
+```json
+{
+  "name": "homeassistant"
+}
+```
+
+Response:
+
+```json
+[]
+```
+
+Errors: 404 No such token.
+
+Effects: Returns the remaining tokens like GET. Clients using it get 401 at once.
+
+#### GET `/api/users`
+
+Response:
+
+```json
+{
+  "users": [
+    {
+      "name": "jiri",
+      "role": "admin",
+      "disabled": false,
+      "must_change": false,
+      "totp": false,
+      "recovery_left": 0,
+      "locked": false,
+      "created": 1793000000,
+      "last_login": 1793600000,
+      "sessions": 1,
+      "levels": {
+        "system/maint": 1
+      }
+    }
+  ],
+  "pages": [
+    "overview",
+    "role",
+    "thread/info"
+  ],
+  "max": 16
+}
+```
+
+Effects: levels lists only the pages where this user has an own level instead of the role's.
+
+#### POST `/api/users`
+
+Body:
+
+```json
+{
+  "name": "petr",
+  "role": "user",
+  "password": "start-password-1",
+  "must_change": true,
+  "disabled": false,
+  "totp_reset": false,
+  "unlock": false,
+  "levels": {
+    "system/maint": 1,
+    "thread/settings": -1
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "name": "petr",
+  "role": "user",
+  "disabled": false,
+  "must_change": true,
+  "totp": false,
+  "locked": false
+}
+```
+
+Errors: 400 Invalid name (2 to 31 characters a-z, 0-9, . _ -), role (admin, user, viewer) or password length; first account must be an admin; no room (max 16); the last admin cannot lose the role or be disabled.
+
+Effects: A new name creates the account (must_change defaults to true, except for the first account); role and password are required then. For an existing name every field is optional: password sets a new one (ends the user's sessions, answers a reset request), disabled blocks sign-in, totp_reset removes two-factor, unlock clears a lockout, levels maps page to 0 hidden, 1 read, 2 edit, or -1 for the role's level. Works without sign-in only to create the very first account on an open gateway. Sends a notification.
+
+#### POST `/api/users/delete`
+
+Body:
+
+```json
+{
+  "name": "petr"
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 The last admin cannot be deleted while other users exist.; 404 No such user.
+
+Effects: Ends the user's sessions and sends a warning notification. Deleting the only remaining account makes the gateway open again.
+
+### Roles and radios
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/c6/backup` | Downloads a full flash dump of a radio. | page `system/maint`, edit |
+| POST | `/api/c6/reflash` | Marks a radio to be reflashed with the firmware of its role and restarts the gateway. | page `system/maint`, edit |
+| GET | `/api/radios` | State of both radios: chip, flashed firmware, flashing progress, role. | page `system/maint`, read |
+| GET | `/api/radios/b/console` | Raw text the radio B prints on its UART (ROM banner, boot log, panic), for diagnostics. | page `system/maint`, edit |
+| POST | `/api/radios/b/flash` | Flashes firmware of a chosen bundle into radio B (only while it has no role). | page `system/maint`, edit |
+| POST | `/api/radios/b/probe` | Wiring test of radio B: resets it and listens on the UART. | page `system/maint`, edit |
+| POST | `/api/radios/thread/forget` | Erases the stored Thread network (dataset and settings) of a radio, so its next Thread role starts a new network. | page `thread/settings`, edit |
+| POST | `/api/role` | Switches the role of a radio, or swaps the roles of the two radios. | page `role`, edit |
+
+#### GET `/api/c6/backup`
+
+Query: `radio=a|b` Radio, default a.
+
+Response: application/octet-stream c6_flash_backup.bin (radio_b_flash_backup.bin for b).
+
+Errors: 409 The radio has a role (maintenance mode only) or the radio is busy.; 503 Radio did not answer before the transfer started (message is the flasher's last error).
+
+Effects: Reads the radio flash over the boot ROM, takes some minutes. A successful dump marks the radio's factory firmware as backed up (adopted), which unlocks role changes. A failure after the transfer started aborts the connection.
+
+#### POST `/api/c6/reflash`
+
+Query: `radio=a|b` Radio, default a.
+
+Response:
+
+```json
+{}
+```
+
+Errors: 409 Radio B has no role.
+
+Effects: Sets a force flag in NVS and restarts after 0.5 s; the radio is flashed at the next start.
+
+#### GET `/api/radios`
+
+Response:
+
+```json
+[
+  {
+    "radio": "a",
+    "chip": "ESP32-C6",
+    "bundle": "ot_rcp",
+    "package_id": "1a2b3c4d",
+    "busy": false,
+    "percent": 0,
+    "stage": "",
+    "error": "",
+    "chip_info": {
+      "mac": "aa:bb:cc:dd:ee:01",
+      "revision": 0,
+      "flash_size": 4194304,
+      "flashes": 1
+    },
+    "images": [
+      {
+        "name": "ot_rcp",
+        "version": "1.2"
+      }
+    ],
+    "role": "thread_br",
+    "desired": "thread_br",
+    "maintenance": ""
+  },
+  {
+    "radio": "b",
+    "chip": "ESP32-C5",
+    "bundle": "",
+    "busy": false,
+    "role": "none",
+    "desired": "none",
+    "maintenance": "",
+    "wired": true,
+    "wiring": "...",
+    "package_in_psram": "c5",
+    "telemetry": {
+      "...": "..."
+    }
+  }
+]
+```
+
+Effects: Array of two objects, radio a first. Radio B also has wired and wiring after a wiring test, telemetry and package_in_psram.
+
+#### GET `/api/radios/b/console`
+
+Query: `baud=9600..2000000` Baud rate, default 115200., `ms=100..10000` How long to listen, default 3000., `reset=0|1` 1 resets the radio first., `raw=0|1` 1 keeps binary bytes; 0 replaces them with dots.
+
+Response: text/plain console output (application/octet-stream with raw=1), up to 8 KB.
+
+Errors: 400 baud or ms out of range.; 409 Radio B is in use (role, flashing).; 500 UART unavailable.
+
+Effects: Holds the request for ms milliseconds.
+
+#### POST `/api/radios/b/flash`
+
+Body:
+
+```json
+{
+  "bundle": "ot_rcp",
+  "force": false
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 bundle is not ot_rcp, zigbee_ncp, zigbee_router, scanner, esphome or wifi_uplink.; 409 Radio B runs a role, or is already being flashed.; 500 No memory for the flashing task.
+
+Effects: Answers at once and flashes in a background task; follow it in GET /api/radios (busy, percent, stage, error). force: true flashes even when the bundle is already there.
+
+#### POST `/api/radios/b/probe`
+
+Response:
+
+```json
+{
+  "wired": true,
+  "banner": true,
+  "download_mode": false,
+  "verdict": "ESP32-C5 answers",
+  "chip": "ESP32-C5",
+  "mac": "aa:bb:cc:dd:ee:02",
+  "revision": 0,
+  "flash_size": 8388608
+}
+```
+
+Errors: 409 Radio B has a role or is being flashed.
+
+Effects: Blocks the web server for a few seconds. Stores the result (wired, chip) in the runtime state shown in /api/status.
+
+#### POST `/api/radios/thread/forget`
+
+Body:
+
+```json
+{
+  "radio": "a"
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 radio missing or not a or b.; 409 Thread currently runs on that radio.
+
+Effects: Erases OpenThread settings in NVS and the stored dataset of that radio; sends a notification.
+
+#### POST `/api/role`
+
+Body:
+
+```json
+{
+  "role": "zigbee_coordinator",
+  "radio": "a",
+  "skip_backup": false,
+  "swap": false
+}
+```
+
+Response:
+
+```json
+{
+  "role": "zigbee_coordinator",
+  "restarting": true
+}
+```
+
+Errors: 400 Unknown role (none is allowed for radio B only) or radio not a or b.; 409 Conflict between radios (one Thread network, one Zigbee network, one ESPHome proxy, one Wi-Fi uplink), c6_backup_required or radio_b_backup_required (factory firmware not backed up yet), radio flashing in progress, or swap without a Wi-Fi uplink / without radio B.
+
+Effects: Roles: thread_br, thread_router, zigbee_coordinator, zigbee_router, esphome, wifi_uplink, none (radio B only). radio defaults to a. skip_backup: true accepts running without a backup of the factory firmware. swap: true ignores role and radio and exchanges the roles of A and B (needs the Wi-Fi uplink on one radio). Stores the role in NVS, sends a notification and restarts the gateway after 0.5 s; the radio is reflashed at start if its firmware differs.
+
+### Thread
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| POST | `/api/thread/cli` | Runs an OpenThread CLI command and returns its output. | page `thread/diag`, edit |
+| GET | `/api/thread/dataset` | The active Thread dataset. | page `thread/settings`, edit |
+| POST | `/api/thread/dataset` | Applies a Thread dataset (join or replace the network). | page `thread/settings`, edit |
+| GET | `/api/thread/status` | Thread network and OpenThread state. | page `thread/info`, read |
+| GET | `/api/thread/topology` | Discovers the Thread mesh: routers, their children and IPv6 addresses. | page `thread/topology`, read |
+| POST | `/api/thread/txpower` | Sets the transmit power of the Thread radio. | page `thread/settings`, edit |
+
+#### POST `/api/thread/cli`
+
+Body:
+
+```json
+{
+  "cmd": "state",
+  "wait_ms": 600
+}
+```
+
+Response:
+
+```json
+{
+  "output": "leader\r\nDone\r\n"
+}
+```
+
+Errors: 400 cmd missing or longer than 200 characters.; 409 Another CLI command is running.; 503 OpenThread not running.
+
+Effects: wait_ms (100..15000, default 600) is how long the output is collected, for commands that answer later such as ping or scan. Any CLI command can change the network. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+#### GET `/api/thread/dataset`
+
+Query: `reveal=1` 1 includes the network key and the TLV hex string; without it network_key is "hidden".
+
+Response:
+
+```json
+{
+  "network_key": "hidden",
+  "network_name": "OpenThread-1234",
+  "channel": 15,
+  "pan_id": "0x1234",
+  "ext_pan_id": "dead00beef00cafe",
+  "active_timestamp": 1
+}
+```
+
+Errors: 404 No active dataset.; 503 OpenThread not running.
+
+Effects: Needs edit level because it can reveal the network key. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+#### POST `/api/thread/dataset`
+
+Body:
+
+```json
+{
+  "tlvs": "0e080000000000010000000300000f35060004001fffe0"
+}
+```
+
+Response:
+
+```json
+{
+  "network_name": "OpenThread-1234"
+}
+```
+
+Errors: 400 tlvs missing or not hex, not a valid active dataset or without a network key, or OpenThread rejected it.; 503 OpenThread not running.
+
+Effects: tlvs is the hex active dataset (as in Home Assistant). A router role also stores it in NVS to join after restarts. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+#### GET `/api/thread/status`
+
+Response:
+
+```json
+{
+  "mode": "border_router",
+  "rcp_failures": 0,
+  "rest_port": 8081,
+  "phase": "running",
+  "role": "leader",
+  "rcp_version": "OPENTHREAD/...",
+  "tx_power": 8,
+  "tx_power_set": false,
+  "network_name": "OpenThread-1234",
+  "channel": 15,
+  "pan_id": "0x1234",
+  "ext_pan_id": "dead00beef00cafe",
+  "ext_address": "...",
+  "rloc16": "0x0800",
+  "partition_id": 123456,
+  "leader_router_id": 2,
+  "mesh_local_prefix": "fd00:db8::/64",
+  "border_router": {
+    "routing": "running",
+    "omr_prefix": "...",
+    "on_link_prefix": "...",
+    "nat64": "idle",
+    "border_agent": true,
+    "srp_server": "running",
+    "srp_hosts": 3,
+    "srp_services": 5
+  },
+  "neighbors": [
+    {
+      "ext_address": "...",
+      "rloc16": "0x0801",
+      "type": "router",
+      "avg_rssi": -60,
+      "lqi_in": 3
+    }
+  ],
+  "routers": [
+    {
+      "id": 2,
+      "rloc16": "0x0800",
+      "path_cost": 1,
+      "link": true
+    }
+  ],
+  "mac_counters": {
+    "tx_total": 100,
+    "rx_total": 120
+  }
+}
+```
+
+Effects: Registered only while this role runs on a radio, otherwise the server answers 404. When OpenThread is not up, only mode, rcp_failures and phase are returned.
+
+#### GET `/api/thread/topology`
+
+Response:
+
+```json
+{
+  "routers": [
+    {
+      "rloc16": "0x0800",
+      "ext_address": "...",
+      "children": [],
+      "ip6": [
+        "fd00:db8::1"
+      ]
+    }
+  ],
+  "ms": 8200
+}
+```
+
+Errors: 409 OpenThread not running, or a discovery is already running.
+
+Effects: Slow: takes seconds up to about 30 s plus child queries. If a router does not answer, the reply carries an error string and a partial map. The exact fields of each router are produced by OpenThread mesh diagnostics. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+#### POST `/api/thread/txpower`
+
+Body:
+
+```json
+{
+  "dbm": 8
+}
+```
+
+Response:
+
+```json
+{
+  "tx_power": 8
+}
+```
+
+Errors: 400 dbm outside -15..20.; 409 OpenThread not running.
+
+Effects: Applied at once and stored in NVS (restored at start). Registered only while this role runs on a radio, otherwise the server answers 404.
+
+### Zigbee
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/c6/zigbee-snapshot` | Downloads the stored backup (NVRAM snapshot) of the Zigbee network of a radio. | page `zigbee/backups`, edit |
+| POST | `/api/c6/zigbee-snapshot` | Takes a new backup of the Zigbee network now. | page `zigbee/backups`, edit |
+| POST | `/api/zigbee/command` | Sends a command to the Zigbee router firmware. | page `zigbee/diag`, edit |
+| GET | `/api/zigbee/net` | Zigbee2MQTT view over MQTT: instances, devices, states and the last network map. | page `zigbee/network`, read |
+| POST | `/api/zigbee/net/base` | Sets the MQTT base topic of Zigbee2MQTT. | page `zigbee/network`, edit |
+| POST | `/api/zigbee/net/map` | Asks Zigbee2MQTT for a network map. | page `zigbee/network`, edit |
+| POST | `/api/zigbee/net/request` | Runs an operation through Zigbee2MQTT: permit join, rename, remove, interview, identify, firmware update. | page `zigbee/network`, edit |
+| POST | `/api/zigbee/reset` | Resets the Zigbee radio. | page `zigbee/diag`, edit |
+| GET | `/api/zigbee/status` | Status of the Zigbee role (coordinator bridge or router). | page `zigbee/info`, read |
+
+#### GET `/api/c6/zigbee-snapshot`
+
+Query: `radio=a|b` Radio, default a., `bundle=zigbee_ncp|zigbee_router` Which firmware's network, default zigbee_ncp.
+
+Response: application/octet-stream <bundle>_nvram_<generation>.bin (radio_b_ prefix for b); it holds the network key.
+
+Errors: 404 No Zigbee snapshot.
+
+#### POST `/api/c6/zigbee-snapshot`
+
+Response:
+
+```json
+{
+  "restarting": true
+}
+```
+
+Errors: 409 No Zigbee role runs, or the radio is being flashed.
+
+Effects: Sets a request flag and restarts the gateway after 1 s; the backup is taken at start before the role runs, so Zigbee is out for about a minute.
+
+#### POST `/api/zigbee/command`
+
+Body:
+
+```json
+{
+  "cmd": "permit"
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 cmd not one of status, steer, permit, leave, factory_reset, txpower; for txpower value outside -15..20.
+
+Effects: Only in the zigbee_router role (not registered in the coordinator role). For txpower send {"cmd": "txpower", "value": 8}. leave and factory_reset remove the router from its network. The reply is empty; the result shows in /api/zigbee/status.
+
+#### GET `/api/zigbee/net`
+
+Response:
+
+```json
+{
+  "mqtt": true,
+  "instances": [
+    {
+      "...": "..."
+    }
+  ],
+  "base": "zigbee2mqtt",
+  "devices": [
+    {
+      "friendly_name": "lamp"
+    }
+  ],
+  "states": {
+    "lamp": {
+      "state": "ON"
+    }
+  },
+  "map": null,
+  "map_running": false,
+  "map_error": "",
+  "now": 1793610000
+}
+```
+
+Effects: Always available (also when no Zigbee role runs); empty until Zigbee2MQTT publishes on the MQTT broker. The exact shape of devices and states follows Zigbee2MQTT.
+
+#### POST `/api/zigbee/net/base`
+
+Body:
+
+```json
+{
+  "base": "zigbee2mqtt"
+}
+```
+
+Response:
+
+```json
+{
+  "mqtt": true,
+  "base": "zigbee2mqtt",
+  "...": "same as GET /api/zigbee/net"
+}
+```
+
+Errors: 400 base empty, too long or containing + or #.
+
+Effects: Stored in NVS. A changed base clears the cached devices, states and map and resubscribes.
+
+#### POST `/api/zigbee/net/map`
+
+Response:
+
+```json
+{
+  "started": true
+}
+```
+
+Errors: 409 No Zigbee2MQTT found on the broker, or a map request is already running.; 503 MQTT not connected.
+
+Effects: Returns at once; the map arrives later in GET /api/zigbee/net (map, map_running, map_error). Gives up after 10 minutes.
+
+#### POST `/api/zigbee/net/request`
+
+Body:
+
+```json
+{
+  "action": "permit_join",
+  "time": 120,
+  "device": "lamp",
+  "to": "new-name",
+  "force": false
+}
+```
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "time": 120
+  },
+  "transaction": "p4gw-3"
+}
+```
+
+Errors: 400 Unknown action or a required device missing.; 409 No Zigbee2MQTT on the broker, or another operation is running.; 503 MQTT not connected.
+
+Effects: action: permit_join (time 0..254 s, default 254; optional device to open one router), rename (device, to), remove (device, force), interview (device), ota_check (device), identify (device), ota_update (device). The reply is the Zigbee2MQTT response, or {status: "sent", error: "no answer from Zigbee2MQTT yet"} when it does not answer in time; identify and ota_update answer {status: "sent"} / {status: "started"} without waiting. remove deletes the device from the network.
+
+#### POST `/api/zigbee/reset`
+
+Response:
+
+```json
+{}
+```
+
+Effects: Coordinator: drops the connected Zigbee2MQTT client, which has to reinitialise the NCP. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+#### GET `/api/zigbee/status`
+
+Response:
+
+```json
+{
+  "mode": "coordinator",
+  "uart_baud": 460800,
+  "rx_bytes": 123456,
+  "tx_bytes": 65432,
+  "uart_errors": 0,
+  "c6_resets": 1,
+  "tcp_port": 6638,
+  "client_connected": true,
+  "client": "192.168.1.10",
+  "session_s": 3600,
+  "sessions": 2,
+  "frames_rx": 5000,
+  "frames_tx": 4800,
+  "dropped_bytes": 0,
+  "telemetry_frames": 100,
+  "telemetry_bad": 0,
+  "last_rx_s": 0.5,
+  "last_tx_s": 1.2
+}
+```
+
+Effects: Router mode returns mode, the UART counters, router (the last status object of the router firmware, or null) and router_status_age_s instead of the TCP bridge fields. Registered only while this role runs on a radio, otherwise the server answers 404.
+
+### ESPHome
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/esphome/wifi` | Wi-Fi network given to the ESPHome proxy radio. | page `ha/esphome`, edit |
+| POST | `/api/esphome/wifi` | Sets the Wi-Fi network for the ESPHome proxy radio. | page `ha/esphome`, edit |
+
+#### GET `/api/esphome/wifi`
+
+Response:
+
+```json
+{
+  "ssid": "MyWifi",
+  "password_set": true
+}
+```
+
+Effects: The password is never returned.
+
+#### POST `/api/esphome/wifi`
+
+Body:
+
+```json
+{
+  "ssid": "MyWifi",
+  "password": "wifi-password"
+}
+```
+
+Response:
+
+```json
+{
+  "ssid": "MyWifi",
+  "password_set": true
+}
+```
+
+Errors: 400 ssid longer than 32 characters or missing, or password not 8..64 characters (empty for an open network).
+
+Effects: Stored in NVS; the radio is provisioned over Improv at its next start in the esphome role. Leaving password out keeps the old one. The Wi-Fi uplink role falls back to this network when it has none of its own.
+
+### Sound recognition
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/sound/classes` | Names of the 521 sound classes. | any signed-in client |
+| GET | `/api/sound/clip` | Downloads the latest seconds of microphone audio as a WAV file. | page `sound/live`, edit |
+| POST | `/api/sound/config` | Changes microphone and recognition settings and the noise level calibration; send only the fields to change. | page `sound/live`, edit |
+| GET | `/api/sound/events` | Configured sound events with live counters, plus the list of presets. | page `sound/events`, read |
+| PUT | `/api/sound/events` | Replaces the whole event configuration. | page `sound/events`, edit |
+| POST | `/api/sound/events/preset` | Replaces the event configuration with a preset. | page `sound/events`, edit |
+| DELETE | `/api/sound/learn` | Deletes one sample slot, or all samples of a profile. | page `sound/learn`, edit |
+| GET | `/api/sound/learn` | Learned sounds: profiles, samples, background recordings and the recording state. | page `sound/learn`, read |
+| POST | `/api/sound/learn/record` | Starts recording a sample of a profile, or background recordings, from the microphone. | page `sound/learn`, edit |
+| GET | `/api/sound/learn/sample` | Downloads a stored sample as a WAV file. | page `sound/learn`, edit |
+| POST | `/api/sound/learn/upload` | Adds a sample or background from an uploaded WAV, or tests a WAV against the profiles. | page `sound/learn`, edit |
+| GET | `/api/sound/log` | Log of recent detections (up to 64), newest first. | page `sound/log`, read |
+| GET | `/api/sound/scores` | Latest scores of all 521 sound classes. | page `sound/live`, read |
+| GET | `/api/sound/status` | State of the microphone, noise level and sound recognition. | page `sound/live`, read |
+
+#### GET `/api/sound/classes`
+
+Response: application/json [[index, name, category, group], ...] (AudioSet classes).
+
+#### GET `/api/sound/clip`
+
+Query: `seconds=1..9` Length, default 5.
+
+Response: audio/wav p4gw_clip.wav (16 kHz, mono, 16-bit).
+
+Errors: 409 Microphone is off.
+
+Effects: Needs edit level because it is a recording of the room.
+
+#### POST `/api/sound/config`
+
+Body:
+
+```json
+{
+  "enabled": true,
+  "gain_db": 30,
+  "gate_db": -60,
+  "inference": true,
+  "spl_reference": 45.0
+}
+```
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "running": true,
+  "gain_db": 30,
+  "gate_db": -60,
+  "restart_required": false
+}
+```
+
+Errors: 400 spl_reference outside 20..130 dB(A) or spl_offset outside 60..220.; 409 spl_reference given while the microphone is off.
+
+Effects: enabled turns the microphone on or off in NVS; a change needs a restart (restart_required: true, the gateway does not restart by itself). gain_db 0..42 and gate_db -90..0 (quiet gate for recognition) apply at once and are clamped. inference switches recognition on or off. spl_reference is the reading of a sound level meter next to the gateway in dB(A) and calibrates the offset; spl_offset sets the offset directly; spl_reset: true drops the calibration. The reply is the status like GET /api/sound/status plus restart_required.
+
+#### GET `/api/sound/events`
+
+Response:
+
+```json
+{
+  "preset": "household",
+  "exclude": [
+    0,
+    1
+  ],
+  "events": [
+    {
+      "id": "doorbell",
+      "name": "Doorbell",
+      "name_cs": "Zvonek",
+      "kind": "impulse",
+      "device_class": "sound",
+      "profile": "",
+      "enabled": true,
+      "threshold": 0.5,
+      "windows": 1,
+      "hold_s": 3,
+      "cooldown_s": 0,
+      "classes": [
+        380
+      ],
+      "suppress": [],
+      "active": false,
+      "count": 4,
+      "last_ago_s": 600
+    }
+  ],
+  "presets": [
+    {
+      "key": "household",
+      "name": "Household"
+    }
+  ]
+}
+```
+
+Effects: active, count and last_ago_s are runtime values and are not stored.
+
+#### PUT `/api/sound/events`
+
+Body:
+
+```json
+{
+  "preset": "custom",
+  "exclude": [
+    0,
+    1
+  ],
+  "events": [
+    {
+      "id": "doorbell",
+      "name": "Doorbell",
+      "name_cs": "Zvonek",
+      "kind": "impulse",
+      "device_class": "sound",
+      "profile": "",
+      "enabled": true,
+      "threshold": 0.5,
+      "windows": 1,
+      "hold_s": 3,
+      "cooldown_s": 0,
+      "classes": [
+        380
+      ],
+      "suppress": []
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "preset": "custom",
+  "events": [
+    "..."
+  ],
+  "presets": [
+    "..."
+  ]
+}
+```
+
+Errors: 400 Invalid JSON or configuration: events not an array of at most 32; id not a-z, 0-9, _ (max 23) or duplicated; class index outside 0..520; profile not a-z, 0-9, _.; 413 Body empty or over 32 kB.
+
+Effects: Per event: kind impulse|continuous, enabled (default true), threshold 0.05..1 (0.5), windows 1..20 (1), hold_s 1..600 (3), cooldown_s 0..3600 (0), classes and suppress are class indexes 0..520, profile names a learned sound. Stored in NVS. Events that disappear or get disabled are removed from Home Assistant discovery. The reply is the new state like GET.
+
+#### POST `/api/sound/events/preset`
+
+Body:
+
+```json
+{
+  "preset": "household"
+}
+```
+
+Response:
+
+```json
+{
+  "preset": "household",
+  "events": [
+    "..."
+  ],
+  "presets": [
+    "..."
+  ]
+}
+```
+
+Errors: 400 Unknown preset (household, security, animals, minimal).
+
+Effects: Overwrites all current events and stores the result. Returns the new state like GET /api/sound/events.
+
+#### DELETE `/api/sound/learn`
+
+Query: `slot=0..63` Slot number to delete., `profile=profile id|_background` Delete all samples of the profile, or all background recordings with _background. Used when slot is not given.
+
+Response:
+
+```json
+{
+  "deleted": 1
+}
+```
+
+Errors: 404 No such sample.; 409 A recording is running.
+
+Effects: Erases flash sectors of the sounds partition and rebuilds the profiles.
+
+#### GET `/api/sound/learn`
+
+Response:
+
+```json
+{
+  "slots_total": 64,
+  "slots_free": 58,
+  "ready": true,
+  "recording": {
+    "active": false,
+    "result": "sample saved (-30.2 dBFS)",
+    "ok": true
+  },
+  "profiles": [
+    {
+      "id": "my_bell",
+      "type": "embedding",
+      "samples": 3,
+      "self_min": 0.82,
+      "background_max": 0.61,
+      "threshold": 0.75,
+      "separable": true,
+      "slots": [
+        {
+          "slot": 4,
+          "level_db": -30.2,
+          "saved": 1793600000
+        }
+      ]
+    }
+  ],
+  "background": [
+    {
+      "slot": 10,
+      "level_db": -50.1,
+      "saved": 1793600100
+    }
+  ]
+}
+```
+
+Effects: ready is true only while the microphone, the model and recognition all run. Tone profiles also have tone_hz. score appears for 5 s after a profile matched.
+
+#### POST `/api/sound/learn/record`
+
+Body:
+
+```json
+{
+  "profile": "my_bell",
+  "kind": "sample",
+  "type": "embedding"
+}
+```
+
+Response:
+
+```json
+{
+  "seconds": 4
+}
+```
+
+Errors: 409 Recognition not running, a recording is running, invalid profile name (a-z, 0-9, _, max 23), profile exists with the other type, or no free sample slot.
+
+Effects: kind sample (default) keeps the loudest 0.96 s window within about 4 s and needs profile; kind background records 5 windows (about 5 s) of room sound and ignores profile. type embedding (default) or tone. Returns at once; follow it in GET /api/sound/learn (recording).
+
+#### GET `/api/sound/learn/sample`
+
+Query: `slot=0..63` Slot number.
+
+Response: audio/wav (16 kHz, mono, 16-bit, 0.96 s).
+
+Errors: 404 No such sample.
+
+#### POST `/api/sound/learn/upload`
+
+Query: `profile=a-z, 0-9, _ (max 23)` Profile id (not needed for background or test)., `type=embedding|tone` Profile type, default embedding., `kind=sample|background` Default sample., `test=1` 1 scores the WAV against all profiles and saves nothing.
+
+Body: the raw file (`sample.wav`).
+
+Response:
+
+```json
+{
+  "result": "sample saved (-28.4 dBFS)"
+}
+```
+
+Errors: 400 Not a 16 kHz mono 16-bit PCM WAV of 1 to 10 s, or processing failed.; 409 Same conditions as record: recognition not running, a recording running, bad profile, no free slot.; 503 Recognition did not process the recording in 30 s.
+
+Effects: Raw WAV bytes as the request body (not JSON). Sample keeps the loudest window, background up to 5 windows. With test=1 the reply is {windows, scores: {profile: 0..1}} (best score per profile).
+
+#### GET `/api/sound/log`
+
+Response:
+
+```json
+[
+  {
+    "ago_s": 30,
+    "event": "doorbell",
+    "class": 380,
+    "class_name": "Doorbell",
+    "score": 0.91,
+    "level_db": -32.5,
+    "duration_s": 1.9
+  }
+]
+```
+
+Effects: event is empty for a strong class that no event covers. Ongoing detections have ongoing: true instead of duration_s.
+
+#### GET `/api/sound/scores`
+
+Response:
+
+```json
+{
+  "age_s": 0.4,
+  "scores": [
+    0,
+    1,
+    85,
+    0
+  ]
+}
+```
+
+Effects: scores is an array of 521 integers, 0..100 (percent), in class index order; age_s is -1 before the first recognition.
+
+#### GET `/api/sound/status`
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "running": true,
+  "error": "",
+  "gain_db": 30,
+  "gate_db": -60,
+  "level_db": -45.2,
+  "peak_db": -30.1,
+  "floor_db": -55.0,
+  "seconds": 3600.5,
+  "read_errors": 0,
+  "spl": {
+    "las": 38.2,
+    "laeq": 40.1,
+    "lamax": 62.3,
+    "overload": false,
+    "window_s": 60,
+    "partial": false,
+    "offset": 120.0,
+    "calibrated": false
+  },
+  "model": {
+    "stored_bytes": 4000000,
+    "loaded": true,
+    "load_ms": 900,
+    "error": ""
+  },
+  "inference": {
+    "enabled": true,
+    "runs": 1200,
+    "skipped_quiet": 300,
+    "avg_ms": 120.5,
+    "cpu_pct": 18.0,
+    "top": [
+      {
+        "index": 0,
+        "name": "Speech",
+        "score": 0.82
+      }
+    ]
+  }
+}
+```
+
+Effects: level_db, peak_db, floor_db and spl appear only while the microphone runs; inference.top only after the first recognition.
+
+### Network
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/net/lan` | Ethernet settings and the state of an unconfirmed change. | page `system/lan`, read |
+| POST | `/api/net/lan` | Changes Ethernet settings (DHCP or static, link speed). Must be confirmed or it is undone. | page `system/lan`, edit |
+| POST | `/api/net/lan/confirm` | Confirms a pending LAN change and stores it. | page `system/lan`, edit |
+| POST | `/api/net/lan/outage` | Switches Ethernet off for a while, to test the Wi-Fi uplink taking over. | page `system/maint`, edit |
+| GET | `/api/net/scan` | State and result of the last radio environment scan (Wi-Fi, 802.15.4 channels). | page `system/netscan`, read |
+| POST | `/api/net/scan` | Starts a quick scan (Thread role) or a full scan with the scanner firmware. | page `system/netscan`, edit |
+| GET | `/api/net/traffic` | Ethernet traffic counters per service, since boot. | page `system/lan`, read |
+| GET | `/api/net/wifi` | Settings and status of the Wi-Fi uplink. | page `system/lan`, read |
+| POST | `/api/net/wifi` | Sets the Wi-Fi network of the uplink. | page `system/lan`, edit |
+| POST | `/api/net/wifi/restart` | Restarts the Wi-Fi uplink radio. | page `system/lan`, edit |
+| GET | `/api/net/wifi/scan` | Wi-Fi networks in range, seen by the uplink radio. | page `system/lan`, edit |
+| GET | `/api/net/wifi/traffic` | Traffic counters of the Wi-Fi uplink. | page `system/lan`, read |
+
+#### GET `/api/net/lan`
+
+Response:
+
+```json
+{
+  "mode": "static",
+  "link": "auto",
+  "ip": "192.168.1.50",
+  "mask": "255.255.255.0",
+  "gw": "192.168.1.1",
+  "dns1": "192.168.1.1",
+  "confirm_s": 0
+}
+```
+
+Effects: confirm_s is the time left to confirm a pending change, 0 when none waits. ip, mask, gw, dns1, dns2 appear only in static mode.
+
+#### POST `/api/net/lan`
+
+Body:
+
+```json
+{
+  "mode": "static",
+  "ip": "192.168.1.50",
+  "mask": "255.255.255.0",
+  "gw": "192.168.1.1",
+  "dns1": "192.168.1.1",
+  "dns2": "",
+  "link": "auto"
+}
+```
+
+Response:
+
+```json
+{
+  "mode": "static",
+  "link": "auto",
+  "ip": "192.168.1.50",
+  "confirm_s": 120
+}
+```
+
+Errors: 400 mode not dhcp or static; address or netmask missing or invalid; gateway outside the subnet; link not auto, 100full, 100half, 10full or 10half.
+
+Effects: The new settings apply after 0.5 s, so the connection may drop. They are stored only when POST /api/net/lan/confirm is called (from the new address) within 120 s; otherwise the previous settings return, also after a restart.
+
+#### POST `/api/net/lan/confirm`
+
+Response:
+
+```json
+{
+  "mode": "static",
+  "link": "auto",
+  "ip": "192.168.1.50",
+  "confirm_s": 0
+}
+```
+
+Errors: 409 No LAN change waits for confirmation.
+
+Effects: Writes the settings to NVS and sends a notification.
+
+#### POST `/api/net/lan/outage`
+
+Body:
+
+```json
+{
+  "seconds": 90
+}
+```
+
+Response:
+
+```json
+{
+  "seconds": 90
+}
+```
+
+Errors: 400 seconds outside 10..600.
+
+Effects: Answers, then stops the Ethernet driver for the given time; the web UI is unreachable over LAN meanwhile.
+
+#### GET `/api/net/scan`
+
+Response:
+
+```json
+{
+  "state": "idle",
+  "last": {
+    "mode": "full",
+    "at": 1793600000,
+    "duration_ms": 90000,
+    "radio": "b",
+    "scanner": "1.0",
+    "wifi": [
+      {
+        "ssid": "MyWifi",
+        "rssi": -55,
+        "channel": 6
+      }
+    ],
+    "beacons": [],
+    "channels": [],
+    "errors": []
+  },
+  "quick_available": true,
+  "now": 1793610000
+}
+```
+
+Effects: last is null before the first scan. state is idle, quick or full. The exact contents of wifi, beacons and channels come from the scanner firmware and the Thread scan and are not fixed here.
+
+#### POST `/api/net/scan`
+
+Body:
+
+```json
+{
+  "mode": "full",
+  "radio": "b"
+}
+```
+
+Response:
+
+```json
+{
+  "restarting": true
+}
+```
+
+Errors: 400 mode not quick or full, or radio not a or b.; 409 A scan is running; quick needs a Thread role; full on radio B needs radio B detected first (wiring test).; 500 No memory.
+
+Effects: quick runs in the background and answers {started: true}. full stores a request in NVS and restarts the gateway after 0.8 s; at start the radio (a by default) is flashed with the scanner firmware, scans and the gateway restores the normal role. Takes minutes during which the radio's role is not running.
+
+#### GET `/api/net/traffic`
+
+Response:
+
+```json
+{
+  "uptime_ms": 3600000,
+  "services": {
+    "http": {
+      "rx": 1000,
+      "tx": 5000,
+      "rx_packets": 10,
+      "tx_packets": 12
+    }
+  },
+  "rx": 123456,
+  "tx": 234567,
+  "rx_packets": 900,
+  "tx_packets": 1000
+}
+```
+
+Effects: services is keyed by service name; rx and tx are bytes.
+
+#### GET `/api/net/wifi`
+
+Response:
+
+```json
+{
+  "settings": {
+    "ssid": "MyWifi",
+    "password_set": true,
+    "from_esphome": false,
+    "mode": "dhcp"
+  },
+  "status": {
+    "mode": "wifi_uplink",
+    "state": "connected",
+    "error": "",
+    "radio": "b",
+    "cp_version": "1.0.0",
+    "ssid": "MyWifi",
+    "bssid": "aa:bb:cc:dd:ee:ff",
+    "rssi": -55,
+    "channel": 36,
+    "band": "5 GHz",
+    "phy": "11ax",
+    "connected_s": 600,
+    "connects": 1,
+    "disconnects": 0,
+    "ip_mode": "dhcp",
+    "default_route": false,
+    "ipv4": "192.168.1.60",
+    "gateway": "192.168.1.1",
+    "netmask": "255.255.255.0"
+  }
+}
+```
+
+Effects: Always available. status describes the uplink even when it is not the active role (state then reflects that). The password is never returned.
+
+#### POST `/api/net/wifi`
+
+Body:
+
+```json
+{
+  "ssid": "MyWifi",
+  "password": "wifi-password",
+  "mode": "static",
+  "ip": "192.168.1.60",
+  "mask": "255.255.255.0",
+  "gw": "192.168.1.1",
+  "dns1": "192.168.1.1",
+  "dns2": ""
+}
+```
+
+Response:
+
+```json
+{
+  "settings": {
+    "ssid": "MyWifi",
+    "password_set": true,
+    "mode": "static"
+  },
+  "status": {
+    "...": "..."
+  }
+}
+```
+
+Errors: 400 ssid missing or over 32 characters, password not 8..64 characters (empty for open), or invalid IP settings.
+
+Effects: Stored in NVS and applied at once when the uplink runs. password left out keeps the old one. ssid: "" drops the own setting so the ESPHome Wi-Fi is used again. Sends a notification.
+
+#### POST `/api/net/wifi/restart`
+
+Body:
+
+```json
+{}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 hang_test_s outside 0..60.; 409 The Wi-Fi uplink does not run.
+
+Effects: The body is optional. {"hang_test_s": 20} holds the radio in reset for that many seconds without telling the host, to test the watchdog; the host then restarts it by itself.
+
+#### GET `/api/net/wifi/scan`
+
+Response:
+
+```json
+[
+  {
+    "ssid": "MyWifi",
+    "rssi": -55,
+    "channel": 36,
+    "open": false
+  }
+]
+```
+
+Errors: 409 The Wi-Fi uplink does not run.; 500 Scan failed.
+
+Effects: Blocking scan, at most 40 networks.
+
+#### GET `/api/net/wifi/traffic`
+
+Response:
+
+```json
+{
+  "uptime_ms": 600000,
+  "services": {
+    "mqtt": {
+      "rx": 100,
+      "tx": 200,
+      "rx_packets": 3,
+      "tx_packets": 4
+    }
+  },
+  "rx": 1000,
+  "tx": 2000,
+  "rx_packets": 20,
+  "tx_packets": 25
+}
+```
+
+Effects: Same shape as /api/net/traffic; uptime_ms counts from the first uplink start and is 0 if it never started.
+
+### MQTT and Home Assistant
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/ha/discover` | Finds Home Assistant instances on the LAN (mDNS _home-assistant._tcp). | any signed-in client |
+| GET | `/api/mqtt` | MQTT client settings and connection state. | page `ha/mqtt`, read |
+| POST | `/api/mqtt` | Changes MQTT settings; send only the fields to change. Reconnects the client. | page `ha/mqtt`, edit |
+
+#### GET `/api/ha/discover`
+
+Response:
+
+```json
+[
+  {
+    "name": "Home",
+    "port": 8123,
+    "ip": "192.168.1.10",
+    "version": "2026.10.0",
+    "internal_url": "http://192.168.1.10:8123",
+    "location_name": "Home"
+  }
+]
+```
+
+Effects: Waits up to 3 s for answers; the list is empty when none answer. The web UI uses it to suggest the Matter server address.
+
+#### GET `/api/mqtt`
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "uri": "mqtt://192.168.1.10:1883",
+  "user": "p4gw",
+  "password_set": true,
+  "prefix": "homeassistant",
+  "tls": "bundle",
+  "ca": "",
+  "skip_cn_check": false,
+  "client_id": "",
+  "keepalive": 60,
+  "base": "",
+  "discovery": true,
+  "discovery_groups": [
+    "roles",
+    "system",
+    "update",
+    "sound",
+    "sound_events",
+    "sound_triggers"
+  ],
+  "interval": 60,
+  "base_topic": "p4gw/p4gw-a1b2c3",
+  "connected": true,
+  "last_error": "",
+  "publishes": 120
+}
+```
+
+Effects: The password is never returned (password_set). base_topic is the topic prefix actually used.
+
+#### POST `/api/mqtt`
+
+Body:
+
+```json
+{
+  "enabled": true,
+  "uri": "mqtt://192.168.1.10:1883",
+  "user": "p4gw",
+  "password": "mqtt-password",
+  "prefix": "homeassistant",
+  "tls": "bundle",
+  "ca": "",
+  "skip_cn_check": false,
+  "client_id": "p4gw",
+  "base": "",
+  "keepalive": 60,
+  "interval": 60,
+  "discovery": true,
+  "discovery_groups": [
+    "roles",
+    "system",
+    "sound"
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "uri": "mqtt://192.168.1.10:1883",
+  "connected": true,
+  "...": "same as GET /api/mqtt"
+}
+```
+
+Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers.
+
+Effects: Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.
+
+### Updates and firmware
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| POST | `/api/ota/c6fw` | Uploads the radio firmware package (all bundles of one chip type). | page `system/firmware`, edit |
+| POST | `/api/ota/gateway` | Uploads a gateway firmware image into the inactive slot and boots it. | page `system/firmware`, edit |
+| POST | `/api/ota/model` | Uploads the sound recognition model into the model partition. | page `system/firmware`, edit |
+| POST | `/api/update/check` | Triggers a check of the update manifest. | page `system/firmware`, edit |
+| POST | `/api/update/install` | Installs the offered or a chosen release: gateway firmware or a radio package. | page `system/firmware`, edit |
+
+#### POST `/api/ota/c6fw`
+
+Body: the raw file (`c6fw.bin`).
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Errors: 400 Not a valid package (bad directory header or format version, size mismatch) or it does not match the chip.; 409 Another upload or a radio flash is running.; 413 Not a package of a plausible size.
+
+Effects: Raw binary body. The package is staged in PSRAM; it does not restart the gateway. A radio whose bundle changed is reflashed at the next start (restart the gateway, not a power cut, which would lose the PSRAM copy).
+
+#### POST `/api/ota/gateway`
+
+Body: the raw file (`p4gw.bin`).
+
+Response:
+
+```json
+{
+  "slot": "ota_1",
+  "version": "v1.9",
+  "restarting": true
+}
+```
+
+Errors: 400 Not an ESP application image, no application description, or not a p4gw image (checked in the first block before anything is erased); write or validation error.; 409 Another upload or a radio flash is running, or the running image is not confirmed yet (retry in a minute).; 413 Image empty or larger than the slot.
+
+Effects: Raw binary body, not JSON. Writes the other OTA slot, sets it as the boot slot and restarts the gateway after 0.8 s. If the new image does not start properly it rolls back to the previous one.
+
+#### POST `/api/ota/model`
+
+Body: the raw file (`yamnet_p4.espdl`).
+
+Response:
+
+```json
+{
+  "bytes": 4000000,
+  "restart_required": true
+}
+```
+
+Errors: 400 Not an ESP-DL model (EDL2 header and size are checked before erasing), or a write error.; 409 Model in use: turn sound recognition off and restart first.; 413 Model empty or larger than the partition.
+
+Effects: Raw binary body. Erases and rewrites the model partition. The gateway does not restart by itself; the new model loads after a restart.
+
+#### POST `/api/update/check`
+
+Response:
+
+```json
+{
+  "installed_version": "v1.9",
+  "latest_version": "v1.10",
+  "title": "P4 gateway firmware",
+  "release_summary": "...",
+  "in_progress": false,
+  "available": true,
+  "checking": true,
+  "checked": 1793600000,
+  "error": "",
+  "url": "https://example.com/p4gw/manifest.json",
+  "percent": 0,
+  "releases": [
+    {
+      "version": "v1.9",
+      "date": "2026-11-01"
+    }
+  ],
+  "c6": {
+    "offered": true,
+    "available": false,
+    "in_progress": false,
+    "percent": 0
+  },
+  "c5": {
+    "offered": false,
+    "available": false,
+    "in_progress": false,
+    "percent": 0
+  }
+}
+```
+
+Errors: 409 No update URL set.
+
+Effects: Returns the current update state at once; the check runs in a background task, so poll the same state (also in /api/status, update) until checking is false. Fields not shown here: layout, build, default_url, release_url.
+
+#### POST `/api/update/install`
+
+Body:
+
+```json
+{
+  "target": "gateway",
+  "version": "v1.10"
+}
+```
+
+Response:
+
+```json
+{
+  "installed_version": "v1.9",
+  "in_progress": true,
+  "percent": 0,
+  "c6": {
+    "in_progress": false
+  },
+  "c5": {
+    "in_progress": false
+  }
+}
+```
+
+Errors: 409 Nothing offered (check first), release not offered for this gateway, radio B is not an ESP32-C5 (target c5), or an installation is already running.
+
+Effects: The body is optional. target: gateway (default), c6 (radio package of radio A) or c5 (package of radio B); version picks one of the listed releases, else the offered one is used. Returns the update state at once and downloads in the background (percent). Gateway: writes the other slot and restarts. c6 and c5: stores the package and restarts the gateway, which then reflashes the radio.
+
+### Settings and maintenance
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| POST | `/api/reboot` | Restarts the gateway. | page `system/maint`, edit |
+| POST | `/api/settings` | Changes basic gateway settings; send only the fields to change. | page `system/settings`, edit |
+| GET | `/api/settings/export` | Exports the gateway settings as a JSON file. | page `system/settings`, edit |
+| POST | `/api/settings/import` | Imports a settings file made by the export. | page `system/settings`, edit |
+
+#### POST `/api/reboot`
+
+Body:
+
+```json
+{
+  "full": false
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 409 full requested while radio A is being flashed.
+
+Effects: The body is optional. Restarts after 0.5 s. full: true also resets the radio A chip just before the restart.
+
+#### POST `/api/settings`
+
+Body:
+
+```json
+{
+  "hostname": "p4gw-livingroom",
+  "matter_url": "ws://192.168.1.10:5580/ws",
+  "zigbee_backup_days": 1,
+  "update_url": "https://example.com/p4gw/manifest.json"
+}
+```
+
+Response:
+
+```json
+{
+  "restart_required": true
+}
+```
+
+Errors: 400 hostname not lowercase letters, digits and inner dashes (max 31); matter_url not ws:// (max 120); zigbee_backup_days not 0, 1 or 7; update_url not http(s):// (max 200); or password given (use /api/users).; 500 Storing to NVS failed.
+
+Effects: Writes to NVS. Empty matter_url or update_url clears it; changing update_url starts an update check. zigbee_backup_days is the automatic Zigbee backup period (0 off). A new hostname takes effect after a restart (restart_required: true); the gateway does not restart by itself. Fields before an invalid one may already be stored.
+
+#### GET `/api/settings/export`
+
+Query: `secrets=1` 1 includes passwords, tokens and keys; without it they are left out.
+
+Response:
+
+```json
+{
+  "format": "p4gw-settings",
+  "version": 1,
+  "hostname": "p4gw-a1b2c3",
+  "firmware": "v1.9",
+  "exported": 1793610000,
+  "secrets": false,
+  "keys": {
+    "...": "NVS keys and values"
+  }
+}
+```
+
+Effects: Sent as a download (Content-Disposition: <hostname>-settings.json). With secrets=1 the file holds the keys of the networks, so keep it private.
+
+#### POST `/api/settings/import`
+
+Body:
+
+```json
+{
+  "format": "p4gw-settings",
+  "version": 1,
+  "keys": {
+    "...": "as exported"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "keys": 42,
+  "restarting": true
+}
+```
+
+Errors: 400 Not a p4gw-settings file, keys not an object, or an entry is invalid (nothing is written then).; 409 Radio A flashing in progress.; 413 Body over 64 kB.
+
+Effects: Send the exported JSON as the body. Everything is validated first, then written to NVS (board-specific keys are skipped), and the gateway restarts after 1 s.
+
+### Logs and diagnostics
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| DELETE | `/api/coredump` | Erases the stored core dump. | page `system/diag`, edit |
+| GET | `/api/coredump` | Downloads the stored core dump (ELF) of the last crash. | page `system/diag`, read |
+| GET | `/api/logs` | Gateway log lines since a sequence number. | page `system/diag`, read |
+| GET | `/api/logs/previous` | Log of the run before the last restart. | page `system/diag`, read |
+| POST | `/api/tools/ping` | Pings a host from the gateway. | page `system/diag`, edit |
+
+#### DELETE `/api/coredump`
+
+Response:
+
+```json
+{}
+```
+
+Errors: 500 Erase failed.
+
+#### GET `/api/coredump`
+
+Response: application/octet-stream coredump.elf.
+
+Errors: 404 No core dump.
+
+#### GET `/api/logs`
+
+Query: `since=number` Sequence returned in the previous X-Log-Seq header; 0 or missing returns the buffered log.
+
+Response: text/plain log lines; header X-Log-Seq holds the sequence to pass as since next time (up to 16 KB per call).
+
+#### GET `/api/logs/previous`
+
+Response: text/plain log lines.
+
+Errors: 404 No log from before the last restart.
+
+#### POST `/api/tools/ping`
+
+Body:
+
+```json
+{
+  "host": "192.168.1.1",
+  "count": 4
+}
+```
+
+Response:
+
+```json
+{
+  "target": "192.168.1.1",
+  "sent": 4,
+  "received": 4,
+  "replies": [
+    {
+      "seq": 1,
+      "ms": 1
+    },
+    {
+      "seq": 2,
+      "timeout": true
+    }
+  ]
+}
+```
+
+Errors: 400 Cannot resolve host.; 500 Ping session failed.
+
+Effects: host is a name or an IPv4/IPv6 address; count 1..10 (default 4, clamped). The request waits until the pings finish, up to count * 2 + 2 s.
+
+### Notifications and Telegram
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/auth/telegram` | Own Telegram notification preferences and pairing state. | own account |
+| POST | `/api/auth/telegram` | Changes own Telegram notification preferences. | own account |
+| POST | `/api/auth/telegram/pair` | Creates a code to pair the own Telegram chat with the bot. | own account |
+| POST | `/api/auth/telegram/test` | Sends a test message to the own paired Telegram chat. | own account |
+| POST | `/api/auth/telegram/unpair` | Removes the pairing of the own Telegram chat. | own account |
+| GET | `/api/notify` | Recent gateway notifications, oldest first. | any signed-in client |
+| GET | `/api/telegram` | Telegram bot settings and state (admin). | administrators |
+| POST | `/api/telegram` | Changes Telegram bot settings (admin); send only the fields to change. | administrators |
+
+#### GET `/api/auth/telegram`
+
+Response:
+
+```json
+{
+  "bot_enabled": true,
+  "bot": "my_p4gw_bot",
+  "paired": true,
+  "levels": {
+    "security": 3,
+    "system": 2,
+    "network": 1,
+    "sound": 0
+  },
+  "allowed": {
+    "security": true,
+    "system": true,
+    "network": true,
+    "sound": false
+  },
+  "quiet_from": 22,
+  "quiet_to": 7,
+  "lang": "cs",
+  "sound_muted_s": 0
+}
+```
+
+Errors: 409 Only for signed-in users (not for tokens or an open gateway).
+
+Effects: levels per topic: 0 off up to 3 (the exact meaning of 1 and 2 is set in the bot code). allowed shows which topics the user may receive by page permission. quiet_from and quiet_to are hours 0..23, -1 none.
+
+#### POST `/api/auth/telegram`
+
+Body:
+
+```json
+{
+  "levels": {
+    "security": 3,
+    "system": 2,
+    "network": 1,
+    "sound": 0
+  },
+  "quiet_from": 22,
+  "quiet_to": 7,
+  "lang": "cs"
+}
+```
+
+Response:
+
+```json
+{
+  "bot_enabled": true,
+  "paired": true,
+  "levels": {
+    "security": 3
+  },
+  "quiet_from": 22,
+  "quiet_to": 7,
+  "lang": "cs"
+}
+```
+
+Errors: 409 Only for signed-in users.
+
+Effects: Values outside the range (levels 0..3, quiet hours -1..23, lang cs or en) are ignored silently. Returns the new state like GET.
+
+#### POST `/api/auth/telegram/pair`
+
+Response:
+
+```json
+{
+  "code": 12345678,
+  "bot": "my_p4gw_bot",
+  "link": "https://t.me/my_p4gw_bot?start=12345678",
+  "expires_s": 600
+}
+```
+
+Errors: 409 Only for signed-in users, or the Telegram bot is not running.
+
+Effects: The code is valid for 10 minutes; open the link or send /start <code> to the bot.
+
+#### POST `/api/auth/telegram/test`
+
+Response:
+
+```json
+{}
+```
+
+Errors: 409 Not paired, the bot is off, or not a signed-in user.; 503 Outgoing queue full.
+
+#### POST `/api/auth/telegram/unpair`
+
+Response:
+
+```json
+{
+  "bot_enabled": true,
+  "paired": false
+}
+```
+
+Errors: 409 Only for signed-in users.
+
+Effects: Returns the preferences like GET /api/auth/telegram.
+
+#### GET `/api/notify`
+
+Query: `since=number` Return only notifications with a higher seq; default 0.
+
+Response:
+
+```json
+{
+  "notifications": [
+    {
+      "seq": 12,
+      "boot": 123456,
+      "topic": "system",
+      "level": "info",
+      "text": "Gateway restarted, v1.9",
+      "time": 1793600000
+    }
+  ],
+  "seq": 12,
+  "boot": 123456
+}
+```
+
+Effects: topic is security, system, network or sound; level is info, warning or critical. The gateway keeps a limited ring in memory. boot changes on every restart, which resets seq.
+
+#### GET `/api/telegram`
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "token_set": true,
+  "bot": "my_p4gw_bot",
+  "state": "running",
+  "error": "",
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "paired": 2
+}
+```
+
+Effects: state is off, connecting, running or error. The token is never returned.
+
+#### POST `/api/telegram`
+
+Body:
+
+```json
+{
+  "token": "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+  "enabled": true,
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3"
+}
+```
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "token_set": true,
+  "bot": "my_p4gw_bot",
+  "state": "connecting",
+  "error": "",
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "paired": 0
+}
+```
+
+Errors: 400 token without a colon (the BotFather format 123456:ABC...) or too long; tz empty or too long.
+
+Effects: Stored in NVS and the bot restarts its connection. tz is a POSIX time zone used for quiet hours. An empty token removes it. Sends a notification.
