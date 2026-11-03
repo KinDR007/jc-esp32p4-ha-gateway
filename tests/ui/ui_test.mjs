@@ -7,6 +7,7 @@
 // --token signs in with an admin API token (Authorization: Bearer on every request), for a user
 // with 2FA, where Basic is refused. P4GW_TOKEN in the environment does the same.
 //
+// --only UI24,UI26 runs only these tests
 // --html serves the page from a local file while the API stays on the board (test a UI change
 // before flashing it, or check that a test fails on the old page).
 import { readFileSync } from 'node:fs';
@@ -27,6 +28,7 @@ function check(cond, msg) {
 }
 
 async function test(id, title, fn) {
+  if (args.only && !String(args.only).split(',').includes(id)) return;
   console.log(`${id} ${title}`);
   try {
     await fn();
@@ -618,6 +620,15 @@ await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certific
   await page.fill('#mq-uri', 'wss://10.0.0.1:8884');
   check(await shown('#mq-tls'), 'wss://: TLS options');
   check(['#mq-cid', '#mq-ka', '#mq-base', '#mq-int', '#mq-disc'].every(async s => await page.$(s)), 'advanced options present');
+  const groups = () => page.$$eval('[data-mqg]', cs => cs.filter(c => c.checked).map(c => c.dataset.mqg).join(','));
+  const stored = (await (await page.request.get(base + 'api/mqtt')).json()).discovery_groups.join(',');
+  const shownGroups = await groups();
+  check(shownGroups === stored, `discovery groups as stored: ${stored} (page: ${shownGroups})`);
+  await page.$eval('#mq-disc', c => c.closest('details').open = true);
+  await page.click('[data-mqp="integration"]');
+  check(await groups() === 'sound_events', 'preset Only what the integration lacks: sound events only');
+  await page.click('[data-mqp="all"]');
+  check(await groups() === 'roles,system,update,sound,sound_events', 'preset All: every group');
   await page.fill('#mq-uri', uri);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });

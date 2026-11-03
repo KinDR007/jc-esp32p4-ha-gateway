@@ -679,6 +679,60 @@ def tc29_mqtt_options():
     check(m['uri'] == backup['keys']['mqtt_uri']['str'] and m['tls'] == 'bundle' and m['base'] == '', f'original broker {m["uri"]} connected')
 
 
+def tc46_mqtt_discovery_groups():
+    """MQTT discovery groups against a plain test broker (--mqtt-broker host:port, anonymous): every group
+    by default, a left out group is removed from Home Assistant (empty retained config), the preset of
+    the P4 Gateway integration keeps only the per-event sound entities; then the original settings."""
+    if not ARGS.mqtt_broker:
+        raise Skip('needs --mqtt-broker <host>:<port> (anonymous mosquitto, e.g. mosquitto -p 18883)')
+    import subprocess
+    host, port = ARGS.mqtt_broker.rsplit(':', 1)
+    code, backup = http('GET', '/api/settings/export?secrets=1')
+    check(code == 200, 'original settings exported (restored by import at the end)')
+    name = status()['hostname']
+
+    def retained(component, object_id):
+        out = subprocess.run(['mosquitto_sub', '-h', host, '-p', port, '-t', f'homeassistant/{component}/{name}/{object_id}/config',
+                              '-v', '-W', '3', '-C', '1'], capture_output=True, text=True).stdout.strip()
+        return out.split(' ', 1)[1] if ' ' in out else ''
+
+    def connected():
+        return wait_until('connected', lambda: (lambda m: m if m['connected'] else None)(http('GET', '/api/mqtt')[1]), 25, 1)
+
+    try:
+        for bad in (['bogus'], 'roles', [1]):
+            check(http('POST', '/api/mqtt', {'discovery_groups': bad})[0] == 400, f'refused: discovery_groups {bad!r}')
+        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events']
+        code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle',
+                                             'base': '', 'prefix': 'homeassistant', 'discovery': True,
+                                             'discovery_groups': all_groups, 'enabled': True})
+        check(code == 200 and connected()['discovery_groups'] == all_groups, 'test broker, every group')
+        time.sleep(2)
+        entities = {('sensor', 'role'): 'roles', ('sensor', 'uptime'): 'system', ('update', 'firmware'): 'update'}
+        check(all(retained(c, o) for c, o in entities), 'role, uptime and firmware entities published')
+        events = subprocess.run(['mosquitto_sub', '-h', host, '-p', port, '-t', f'homeassistant/binary_sensor/{name}/+/config',
+                                 '-v', '-W', '3'], capture_output=True, text=True).stdout.split()
+        sound_events = [t.split('/')[3] for t in events if t.startswith('homeassistant/') and '/snd_' in t]
+        check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_events']})[0] == 200, 'preset: only what the integration lacks')
+        check(connected()['discovery_groups'] == ['sound_events'], 'stored: sound_events')
+        time.sleep(2)
+        check(all(not retained(c, o) for c, o in entities), 'role, uptime and firmware entities removed (empty retained config)')
+        if sound_events:
+            check(retained('binary_sensor', sound_events[0]), f'sound event entity {sound_events[0]} kept')
+        else:
+            log('no sound event configured: the kept group is not visible')
+        check(http('POST', '/api/mqtt', {'discovery_groups': all_groups})[0] == 200 and connected(), 'every group again')
+        time.sleep(2)
+        check(all(retained(c, o) for c, o in entities), 'entities published again')
+    finally:
+        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events']})
+        code, r = http('POST', '/api/settings/import', backup)
+        check(code == 200, 'original settings imported, the gateway restarts')
+        wait_restart(status()['role']['desired'])
+    m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] or not m['enabled'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
+    check(m['uri'] == backup['keys'].get('mqtt_uri', {}).get('str', m['uri']), f'original broker {m["uri"]}')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -1916,7 +1970,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -1930,6 +1984,7 @@ def main():
     p.add_argument('--list', action='store_true')
     p.add_argument('--report', help='write results as JSON')
     p.add_argument('--play', action='store_true', help='TC15: play test sounds on this computer')
+    p.add_argument('--mqtt-broker', metavar='HOST:PORT', help='TC46: plain anonymous test broker (mosquitto)')
     p.add_argument('--mqtt-test', metavar='HOST:DIR', help='TC29: test mosquitto (anonymous, TLS with DIR/ca.crt) on HOST')
     p.add_argument('--packages', help='TC45: directory with c6fw.bin and c5fw.bin holding the wifi_uplink bundle (before a release has it)')
     p.add_argument('--wifi-iface', help='TC44: Wi-Fi interface of this macOS host that joins the setup access point (e.g. en0)')
@@ -1942,7 +1997,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

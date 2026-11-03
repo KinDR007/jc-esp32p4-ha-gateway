@@ -32,6 +32,7 @@ static const char *TAG = "gw_mqtt";
 #define KEY_KEEPALIVE "mqtt_ka"  /* u8 seconds, 0 = default */
 #define KEY_BASE "mqtt_base"     /* str, empty = p4gw/<hostname> */
 #define KEY_DISCOVERY "mqtt_disc" /* u8, 0 = no Home Assistant discovery (entities removed) */
+#define KEY_GROUPS "mqtt_grp"     /* u8, gw_mqtt_group_t mask of the discovery groups, default all */
 #define KEY_INTERVAL "mqtt_int"  /* str seconds, state publish interval, empty = default */
 #define DEFAULT_KEEPALIVE 30
 #define DEFAULT_INTERVAL_S 30
@@ -46,6 +47,14 @@ static char s_last_error[96];
 static uint32_t s_publishes;
 static char *s_ca;          /* esp-mqtt keeps the pointer, not a copy */
 static bool s_discovery = true;
+static uint8_t s_groups = GW_MQTT_ALL;
+static const struct {
+    gw_mqtt_group_t group;
+    const char *name;
+} s_group_names[] = {
+    {GW_MQTT_ROLES, "roles"}, {GW_MQTT_SYSTEM, "system"}, {GW_MQTT_UPDATE, "update"},
+    {GW_MQTT_SOUND, "sound"}, {GW_MQTT_SOUND_EVENTS, "sound_events"},
+};
 static uint32_t s_interval_s = DEFAULT_INTERVAL_S;
 static TaskHandle_t s_publish_task;
 
@@ -181,7 +190,7 @@ const char *gw_mqtt_base_topic(void)
     return s_base;
 }
 
-void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
+void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char *object_id, cJSON *cfg)
 {
     gw_state_t *st = gw_state();
     char buf[160];
@@ -191,9 +200,9 @@ void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
         return;
     }
     snprintf(buf, sizeof(buf), "%s/%s/%s/%s/config", s_prefix, component, st->hostname, object_id);
-    if (!s_discovery) {
+    if (!s_discovery || !(s_groups & group)) {
         cJSON_Delete(cfg);
-        cfg = NULL; /* discovery switched off: remove what an earlier run created */
+        cfg = NULL; /* discovery or its group switched off: remove what an earlier run created */
     }
     if (!cfg) {
         /* Empty retained config removes the entity from Home Assistant. */
@@ -216,8 +225,8 @@ void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg)
     cJSON_free(payload);
 }
 
-void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
-                           void (*extra)(cJSON *))
+void gw_mqtt_entity(gw_mqtt_group_t group, const char *component, const char *object_id, const char *name,
+                    const char *value_template, void (*extra)(cJSON *))
 {
     char buf[128];
     cJSON *cfg = cJSON_CreateObject();
@@ -231,7 +240,7 @@ void gw_mqtt_entity(const char *component, const char *object_id, const char *na
     if (extra) {
         extra(cfg);
     }
-    gw_mqtt_discovery(component, object_id, cfg); /* adds ids, availability and device */
+    gw_mqtt_discovery(group, component, object_id, cfg); /* adds ids, availability and device */
 }
 
 static void diag(cJSON *cfg)
@@ -292,19 +301,23 @@ static void restart_extra(cJSON *cfg)
 
 static void publish_discovery(void)
 {
-    gw_mqtt_entity("sensor", "role", "Active role", "{{ value_json.role }}", NULL);
-    gw_mqtt_entity("select", "desired_role", "Role", "{{ value_json.desired }}", role_select_extra);
-    gw_mqtt_entity("sensor", "maintenance", "Maintenance reason", "{{ value_json.maintenance }}", diag);
-    gw_mqtt_entity("sensor", "uptime", "Uptime", "{{ value_json.uptime }}", uptime_extra);
-    gw_mqtt_entity("sensor", "temperature", "Chip temperature", "{{ value_json.temperature }}", temp_extra);
-    gw_mqtt_entity("sensor", "heap_free", "Free internal heap", "{{ value_json.heap_free }}", heap_extra);
-    gw_mqtt_entity("binary_sensor", "ethernet", "Ethernet", "{{ value_json.eth_link }}", connectivity_extra);
-    gw_mqtt_entity("sensor", "ip", "IP address", "{{ value_json.ipv4 }}", diag);
-    gw_mqtt_entity("sensor", "c6_firmware", "C6 firmware", "{{ value_json.c6 }}", diag);
-    gw_mqtt_entity("sensor", "thread_state", "Thread state", "{{ value_json.thread_role | default('n/a') }}", NULL);
-    gw_mqtt_entity("binary_sensor", "zigbee_client", "Zigbee host connected", "{{ value_json.zigbee_client }}",
+    gw_mqtt_entity(GW_MQTT_ROLES, "sensor", "role", "Active role", "{{ value_json.role }}", NULL);
+    gw_mqtt_entity(GW_MQTT_ROLES, "select", "desired_role", "Role", "{{ value_json.desired }}", role_select_extra);
+    gw_mqtt_entity(GW_MQTT_ROLES, "sensor", "maintenance", "Maintenance reason", "{{ value_json.maintenance }}", diag);
+    gw_mqtt_entity(GW_MQTT_ROLES, "sensor", "thread_state", "Thread state",
+                   "{{ value_json.thread_role | default('n/a') }}", NULL);
+    gw_mqtt_entity(GW_MQTT_ROLES, "binary_sensor", "zigbee_client", "Zigbee host connected",
+                   "{{ value_json.zigbee_client }}", connectivity_extra);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "uptime", "Uptime", "{{ value_json.uptime }}", uptime_extra);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "temperature", "Chip temperature", "{{ value_json.temperature }}",
+                   temp_extra);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "heap_free", "Free internal heap", "{{ value_json.heap_free }}",
+                   heap_extra);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "binary_sensor", "ethernet", "Ethernet", "{{ value_json.eth_link }}",
                    connectivity_extra);
-    gw_mqtt_entity("button", "restart", "Restart", NULL, restart_extra);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "ip", "IP address", "{{ value_json.ipv4 }}", diag);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "sensor", "c6_firmware", "C6 firmware", "{{ value_json.c6 }}", diag);
+    gw_mqtt_entity(GW_MQTT_SYSTEM, "button", "restart", "Restart", NULL, restart_extra);
     gw_update_mqtt_discovery();
     if (s_ext_discovery) {
         s_ext_discovery();
@@ -500,6 +513,7 @@ static void start_client(void)
         strlcpy(client_id, st->hostname, sizeof(client_id));
     }
     s_discovery = gw_config_get_u8(KEY_DISCOVERY, 1);
+    s_groups = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL) & GW_MQTT_ALL;
     s_interval_s = gw_config_get_str(KEY_INTERVAL, interval, sizeof(interval)) && atoi(interval) >= 10
                        ? atoi(interval) : DEFAULT_INTERVAL_S;
     uint8_t keepalive = gw_config_get_u8(KEY_KEEPALIVE, 0);
@@ -580,6 +594,13 @@ static esp_err_t mqtt_get(httpd_req_t *req)
     gw_config_get_str(KEY_BASE, buf, sizeof(buf));
     cJSON_AddStringToObject(json, "base", buf);
     cJSON_AddBoolToObject(json, "discovery", gw_config_get_u8(KEY_DISCOVERY, 1));
+    cJSON *groups = cJSON_AddArrayToObject(json, "discovery_groups");
+    uint8_t mask = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL);
+    for (size_t i = 0; i < sizeof(s_group_names) / sizeof(s_group_names[0]); i++) {
+        if (mask & s_group_names[i].group) {
+            cJSON_AddItemToArray(groups, cJSON_CreateString(s_group_names[i].name));
+        }
+    }
     cJSON_AddNumberToObject(json, "interval", s_interval_s);
     cJSON_AddStringToObject(json, "base_topic", s_base);
     cJSON_AddBoolToObject(json, "connected", s_connected);
@@ -603,6 +624,28 @@ static bool ca_stored(void)
 }
 
 
+/* ["roles", "sound_events", ...] -> group mask; -1 for an unknown name or not an array of strings */
+static int groups_mask(const cJSON *list)
+{
+    int mask = 0;
+    const cJSON *item;
+    if (!cJSON_IsArray(list)) {
+        return -1;
+    }
+    cJSON_ArrayForEach(item, list)
+    {
+        size_t i = 0, n = sizeof(s_group_names) / sizeof(s_group_names[0]);
+        while (i < n && !(cJSON_IsString(item) && strcmp(item->valuestring, s_group_names[i].name) == 0)) {
+            i++;
+        }
+        if (i == n) {
+            return -1;
+        }
+        mask |= s_group_names[i].group;
+    }
+    return mask;
+}
+
 static esp_err_t mqtt_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json_max(req, 8192); /* the CA certificate */
@@ -620,6 +663,8 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     cJSON *enabled = cJSON_GetObjectItem(body, "enabled");
     cJSON *no_cn = cJSON_GetObjectItem(body, "skip_cn_check");
     cJSON *discovery = cJSON_GetObjectItem(body, "discovery");
+    cJSON *groups = cJSON_GetObjectItem(body, "discovery_groups");
+    int mask = groups ? groups_mask(groups) : -1;
     cJSON *keepalive = cJSON_GetObjectItem(body, "keepalive");
     cJSON *interval = cJSON_GetObjectItem(body, "interval");
     const char *error = NULL;
@@ -644,6 +689,8 @@ static esp_err_t mqtt_post(httpd_req_t *req)
         error = "keepalive: 10-240 s";
     } else if (interval && (!cJSON_IsNumber(interval) || interval->valueint < 10 || interval->valueint > 3600)) {
         error = "interval: 10-3600 s";
+    } else if (groups && mask < 0) {
+        error = "discovery_groups: list of roles, system, update, sound, sound_events";
     }
     if (error) {
         cJSON_Delete(body);
@@ -687,15 +734,21 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     if (cJSON_IsBool(discovery)) {
         gw_config_set_u8(KEY_DISCOVERY, cJSON_IsTrue(discovery));
     }
+    if (mask >= 0) {
+        gw_config_set_u8(KEY_GROUPS, mask);
+    }
     if (cJSON_IsBool(enabled)) {
         gw_config_set_u8(KEY_ENABLED, cJSON_IsTrue(enabled));
     }
     cJSON_Delete(body);
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    /* Discovery switched off: remove the entities while still connected with the old settings. */
-    if (cJSON_IsBool(discovery) && !gw_config_get_u8(KEY_DISCOVERY, 1) && s_discovery && gw_mqtt_connected()) {
-        s_discovery = false;
+    /* Discovery or groups switched off: remove the entities while still connected with the old settings. */
+    bool on = gw_config_get_u8(KEY_DISCOVERY, 1);
+    uint8_t now = gw_config_get_u8(KEY_GROUPS, GW_MQTT_ALL) & GW_MQTT_ALL;
+    if (s_discovery && gw_mqtt_connected() && (!on || (s_groups & ~now))) {
+        s_discovery = on;
+        s_groups = now;
         publish_discovery();
         vTaskDelay(pdMS_TO_TICKS(500)); /* let the removals go out before the client stops */
     }

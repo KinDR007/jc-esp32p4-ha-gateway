@@ -295,14 +295,25 @@ typedef struct {
 
 /* Optional MQTT link with Home Assistant discovery, configured via /api/mqtt. */
 esp_err_t gw_mqtt_start(void);
+/* Discovery groups: each can be left out of Home Assistant discovery (e.g. what the P4 Gateway
+ * integration already shows); the state topics are published regardless. */
+typedef enum {
+    GW_MQTT_ROLES = 1 << 0,        /* role, role select, maintenance, Thread state, Zigbee host */
+    GW_MQTT_SYSTEM = 1 << 1,       /* uptime, temperature, heap, Ethernet, IP, C6 firmware, restart */
+    GW_MQTT_UPDATE = 1 << 2,       /* firmware update entity */
+    GW_MQTT_SOUND = 1 << 3,        /* sound level and noise */
+    GW_MQTT_SOUND_EVENTS = 1 << 4, /* event, binary sensor and device trigger per sound event */
+    GW_MQTT_ALL = 0x1f,
+} gw_mqtt_group_t;
 /* Extra discovery entities (called on every connect) and extra keys in the state JSON. */
 void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state));
 /* One retained discovery config; value_template reads the shared state topic, extra adds fields. */
-void gw_mqtt_entity(const char *component, const char *object_id, const char *name, const char *value_template,
-                    void (*extra)(cJSON *cfg));
+void gw_mqtt_entity(gw_mqtt_group_t group, const char *component, const char *object_id, const char *name,
+                    const char *value_template, void (*extra)(cJSON *cfg));
 /* Publishes a discovery config (unique_id, availability and device are added); cfg is consumed.
- * cfg NULL removes the entity. component "device_automation" for device triggers. */
-void gw_mqtt_discovery(const char *component, const char *object_id, cJSON *cfg);
+ * cfg NULL, discovery off or the group left out removes the entity. component "device_automation"
+ * for device triggers. */
+void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char *object_id, cJSON *cfg);
 bool gw_mqtt_connected(void);
 /* "off" (not configured or disabled), "connected" or "disconnected" */
 const char *gw_mqtt_link(void);

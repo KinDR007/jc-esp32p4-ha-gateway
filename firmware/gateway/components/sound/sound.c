@@ -717,9 +717,9 @@ static void noise_extra(cJSON *cfg)
 static void mqtt_discovery(void)
 {
     if (s.running) {
-        gw_mqtt_entity("sensor", "sound_level", "Sound level", "{{ value_json.sound_level }}", level_extra);
-        gw_mqtt_entity("sensor", "noise", "Noise", "{{ value_json.noise_laeq }}", noise_extra);
-        gw_mqtt_entity("sensor", "noise_max", "Noise max", "{{ value_json.noise_max }}", noise_extra);
+        gw_mqtt_entity(GW_MQTT_SOUND, "sensor", "sound_level", "Sound level", "{{ value_json.sound_level }}", level_extra);
+        gw_mqtt_entity(GW_MQTT_SOUND, "sensor", "noise", "Noise", "{{ value_json.noise_laeq }}", noise_extra);
+        gw_mqtt_entity(GW_MQTT_SOUND, "sensor", "noise_max", "Noise max", "{{ value_json.noise_max }}", noise_extra);
         sound_events_mqtt_discovery();
     }
 }

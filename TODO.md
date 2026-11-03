@@ -114,7 +114,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] Oprava: instalace staré nabídky po změně nebo smazání URL manifestu, než ji úloha znovu zkontroluje (TC27 instaloval v1.9 z GitHubu)
 
 **F1 MQTT a HA**
-- [ ] F1.1 Výběr expozice MQTT po kategoriích s předvolbou „jen co integrace nemá“ (UI, API, NVS, odstranění retained configů), test TC
+- [x] F1.1 Výběr expozice MQTT po skupinách (roles, system, update, sound, sound_events) s předvolbou „Jen co integrace nemá“ (UI, API `discovery_groups`, NVS `mqtt_grp`, odstranění retained configů), TC46, UI24
 - [ ] F1.2 Aktualizace v HA i pro C5 a ESPHome proxy (průběh, poznámky, instalace), úpravy fw dle potřeby, test TC a ověření v UI HA
 
 **F2 BLE proxy a rádia**

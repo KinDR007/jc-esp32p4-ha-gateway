@@ -996,7 +996,7 @@ void gw_update_mqtt_discovery(void)
     snprintf(buf, sizeof(buf), "%s/update/install", gw_mqtt_base_topic());
     cJSON_AddStringToObject(cfg, "command_topic", buf);
     cJSON_AddStringToObject(cfg, "payload_install", "install");
-    gw_mqtt_discovery("update", "firmware", cfg);
+    gw_mqtt_discovery(GW_MQTT_UPDATE, "update", "firmware", cfg);
 }
 
 void gw_update_mqtt_state(void)

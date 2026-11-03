@@ -592,7 +592,10 @@ const CS = {
   'Delete background': 'Smazat pozadí', 'all sources': 'všechny zdroje', 'system': 'systém', 'network, MQTT, web': 'síť, MQTT, web', 'sound': 'zvuk',
   'C6 flashing': 'flashování C6', 'all levels': 'všechny úrovně', 'warnings and errors': 'varování a chyby', 'errors': 'chyby', 'search (/regex/)': 'hledat (/regex/)', 'Server certificate': 'Certifikát serveru', "public CA (Let's Encrypt and others)": 'veřejná CA (Let\'s Encrypt a další)', 'own CA or self-signed certificate': 'vlastní CA nebo self-signed certifikát',
   'CA certificate (PEM)': 'Certifikát CA (PEM)', 'Do not check the server name': 'Nekontrolovat jméno serveru', 'Advanced': 'Pokročilé', 'Client ID': 'Client ID', 'Keepalive (s)': 'Keepalive (s)',
-  'Base topic': 'Základní topic', 'State interval (s)': 'Interval stavu (s)', 'Home Assistant discovery': 'Discovery pro Home Assistant', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
+  'Base topic': 'Základní topic', 'State interval (s)': 'Interval stavu (s)', 'Home Assistant discovery': 'Discovery pro Home Assistant',
+  'Entities in Home Assistant': 'Entity v Home Assistant', 'Roles and networks': 'Role a sítě', 'Firmware update entity': 'Entita aktualizace firmwaru',
+  'Sound level and noise': 'Hladina zvuku a hluk', 'Sound events (per event)': 'Zvukové události (po událostech)', 'All': 'Vše',
+  'Only what the integration lacks': 'Jen co integrace nemá', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
   'Firmware slots': 'Sloty firmwaru', 'Slot': 'Slot', 'Project': 'Projekt', 'Version': 'Verze', 'Built': 'Sestaveno',
@@ -1094,6 +1097,7 @@ const TIPS = {
   'Keepalive': ['How often the client shows the broker it is alive; the broker marks the gateway offline after 1.5 times this. 10-240 s.', 'Jak často klient dává brokeru vědět, že žije; broker označí bránu offline po 1,5násobku. 10-240 s.'],
   'Base topic': ['Topics of the gateway: <base>/state, /availability, /role/set, sound and update. Empty: p4gw/<hostname>.', 'Topicy brány: <base>/state, /availability, /role/set, zvuk a aktualizace. Prázdné: p4gw/<hostname>.'],
   'State interval': ['How often the state (uptime, temperature, role, memory) is published. 10-3600 s.', 'Jak často se publikuje stav (uptime, teplota, role, paměť). 10-3600 s.'],
+  'Entities in Home Assistant': ['Groups of entities sent by discovery; a group switched off is removed from Home Assistant, its topics are still published. With the P4 Gateway integration choose Only what the integration lacks: then MQTT adds just the per-event sound entities (binary sensor and device trigger of each event) and no entity shows up twice.', 'Skupiny entit posílané přes discovery; vypnutá skupina se z Home Assistant odebere, její topicy se publikují dál. S integrací P4 Gateway zvolte Jen co integrace nemá: MQTT pak přidá jen zvukové entity po událostech (binární senzor a spouštěč zařízení každé události) a žádná entita nebude dvakrát.'],
   'Home Assistant discovery': ['Entities appear in Home Assistant by themselves. Off: only the plain topics (Node-RED and others); the entities are removed from Home Assistant. Discovery is sent again whenever Home Assistant comes online.', 'Entity se v Home Assistant objeví samy. Vypnuto: jen holé topicy (Node-RED a další); entity se z Home Assistant odeberou. Discovery se pošle znovu pokaždé, když se Home Assistant připojí.'],
   'Learned sound ID': ['Name of the learned sound, also the ID of the event created from it (a-z, 0-9, _). More samples under the same name improve it.', 'Název naučeného zvuku a zároveň ID události z něj vytvořené (a-z, 0-9, _). Další vzorky pod stejným názvem ho zpřesní.'],
   'Learned sound type': ['Any sound: compared with what YAMNet hears (cosine similarity of embeddings), for barking of your dog, a door, a voice. Beep or tone: share of energy at the dominant frequency of the samples, for appliance beeps and piezo alarms.', 'Jakýkoli zvuk: porovnává se s tím, co slyší YAMNet (kosinová podobnost embeddingů), pro štěkot vašeho psa, dveře, hlas. Pípnutí nebo tón: podíl energie na dominantní frekvenci vzorků, pro pípání spotřebičů a piezo alarmy.'],
@@ -2043,12 +2047,12 @@ function haIntegration() {
     <p>Vlastní integrace brány pro Home Assistant: role, zvukové události, teploty, aktualizace firmwaru a tlačítka přímo v HA, bez MQTT brokeru. Tlačítka otevřou vaši instanci HA na správném místě (My Home Assistant).</p>${links}<ol class="steps">
     <li><b>Otevřít repozitář HACS</b> → <i>Stáhnout</i>, pak restartujte Home Assistant. Bez HACS: zkopírujte složku <code>custom_components/p4gw</code> z repozitáře do <code>/config/custom_components/</code>.</li>
     <li>Brána se sama objeví v <b>Nastavení → Zařízení a služby → Objeveno</b>; nebo <b>Přidat integraci</b> a adresa <code>${host}</code>. Je-li nastavené heslo webového rozhraní, HA se na něj zeptá.</li>
-    <li>Používáte i MQTT? Vypněte v <b>Home Assistant → MQTT</b> volbu <i>Home Assistant discovery</i>, jinak budou entity v HA dvakrát.</li></ol>`
+    <li>Používáte i MQTT? V <b>Home Assistant → MQTT → Pokročilé</b> zvolte u <i>Entity v Home Assistant</i> <i>Jen co integrace nemá</i>, jinak budou entity v HA dvakrát.</li></ol>`
   : `<h3>P4 Gateway integration</h3>
     <p>The gateway's own Home Assistant integration: role, sound events, temperatures, firmware updates and buttons right in HA, no MQTT broker needed. The buttons open your HA instance at the right place (My Home Assistant).</p>${links}<ol class="steps">
     <li><b>Open HACS repository</b> → <i>Download</i>, then restart Home Assistant. Without HACS: copy the folder <code>custom_components/p4gw</code> from the repository into <code>/config/custom_components/</code>.</li>
     <li>The gateway shows up under <b>Settings → Devices &amp; services → Discovered</b>; or <b>Add integration</b> with the address <code>${host}</code>. With a web UI password set, HA asks for it.</li>
-    <li>Using MQTT as well? Switch off <i>Home Assistant discovery</i> under <b>Home Assistant → MQTT</b>, or every entity shows up twice.</li></ol>`;
+    <li>Using MQTT as well? Under <b>Home Assistant → MQTT → Advanced</b> pick <i>Only what the integration lacks</i> for <i>Entities in Home Assistant</i>, or every entity shows up twice.</li></ol>`;
 }
 views['ha/guide'] = () => `<div class="card guide" data-notr>${haIntegration()}</div>
   <div class="card guide" data-notr>${haSteps()[threadRole() || zigbeeRole() || activeRole()] || haSteps().none}</div>`;
@@ -2126,6 +2130,9 @@ document.addEventListener('change', e => {
   if (e.target.id === 'log-tag') { logView.tag = e.target.value; renderLog(); }
 });
 
+/* discovery groups of /api/mqtt (gw_mqtt_group_t) */
+const MQTT_GROUPS = [['roles', 'Roles and networks'], ['system', 'System'], ['update', 'Firmware update entity'],
+  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)']];
 async function loadMqtt() {
   const box = $('#mqtt-box');
   if (!box) return;
@@ -2150,6 +2157,9 @@ async function loadMqtt() {
         <label class="field"><span>State interval (s)${tip('State interval')}</span><input type="number" id="mq-int" min="10" max="3600" value="${m.interval}"></label>
         <label class="field"><span>Discovery prefix${tip('Discovery prefix')}</span><input type="text" id="mq-prefix" value="${esc(m.prefix)}"></label>
         <label><input type="checkbox" id="mq-disc" ${m.discovery ? 'checked' : ''}> Home Assistant discovery${tip('Home Assistant discovery')}</label>
+        <div class="field" style="display:flex;flex-direction:column;gap:4px;margin-top:8px"><span>Entities in Home Assistant${tip('Entities in Home Assistant')}</span>
+          ${MQTT_GROUPS.map(([g, label]) => `<label><input type="checkbox" data-mqg="${g}" ${(m.discovery_groups || []).includes(g) ? 'checked' : ''}> ${label}</label>`).join('')}
+          <div class="row"><button class="btn" data-mqp="all">All</button><button class="btn" data-mqp="integration">Only what the integration lacks</button></div></div>
       </details>
       <div class="row" style="margin-top:10px"><label><input type="checkbox" id="mq-en" ${m.enabled ? 'checked' : ''}> Enabled</label><button class="btn primary" id="mq-save">${ic('check')}Save</button></div>
     </div><div>${dl([['Connection', m.connected ? pill('ok', 'connected') : m.enabled ? pill('bad', 'disconnected') : pill('', 'disabled')],
@@ -4205,6 +4215,8 @@ document.addEventListener('click', async e => {
       else await api('/api/zigbee/command', { json: { cmd: 'txpower', value: v } });
       t.blur();
       toast(L(`Transmit power ${v} dBm`, `Vysílací výkon ${v} dBm`));
+    } else if (t.dataset.mqp) {
+      document.querySelectorAll('[data-mqg]').forEach(c => { c.checked = t.dataset.mqp === 'all' || c.dataset.mqg === 'sound_events'; });
     } else if (t.dataset.zr) {
       const cmd = t.dataset.zr;
       if (['leave', 'factory_reset'].includes(cmd) && !await confirmDialog('Run ' + cmd + '?', 'The router leaves its Zigbee network.')) return;
@@ -4215,7 +4227,8 @@ document.addEventListener('click', async e => {
     } else if (t.id === 'mq-save') {
       const body = { uri: $('#mq-uri').value.trim(), user: $('#mq-user').value, prefix: $('#mq-prefix').value.trim(), enabled: $('#mq-en').checked,
         tls: $('#mq-tls').value, ca: $('#mq-ca').value.trim(), skip_cn_check: $('#mq-nocn').checked, client_id: $('#mq-cid').value.trim(),
-        keepalive: +$('#mq-ka').value, base: $('#mq-base').value.trim(), interval: +$('#mq-int').value, discovery: $('#mq-disc').checked };
+        keepalive: +$('#mq-ka').value, base: $('#mq-base').value.trim(), interval: +$('#mq-int').value, discovery: $('#mq-disc').checked,
+        discovery_groups: [...document.querySelectorAll('[data-mqg]')].filter(c => c.checked).map(c => c.dataset.mqg) };
       if ($('#mq-pass').value) body.password = $('#mq-pass').value;
       await api('/api/mqtt', { json: body });
       toast('MQTT saved');

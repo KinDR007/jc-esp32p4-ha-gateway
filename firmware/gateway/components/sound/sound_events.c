@@ -344,11 +344,11 @@ static void publish_discovery(const sevent_t *x, bool remove)
         cJSON_AddStringToObject(trig, "type", "sound");
         cJSON_AddStringToObject(trig, "subtype", x->name);
     }
-    gw_mqtt_discovery("event", oid, ev);
+    gw_mqtt_discovery(GW_MQTT_SOUND_EVENTS, "event", oid, ev);
     object_id(oid, sizeof(oid), x->id, "_active");
-    gw_mqtt_discovery("binary_sensor", oid, bin);
+    gw_mqtt_discovery(GW_MQTT_SOUND_EVENTS, "binary_sensor", oid, bin);
     object_id(oid, sizeof(oid), x->id, "");
-    gw_mqtt_discovery("device_automation", oid, trig);
+    gw_mqtt_discovery(GW_MQTT_SOUND_EVENTS, "device_automation", oid, trig);
     if (!remove) {
         publish_state(x);
     }
