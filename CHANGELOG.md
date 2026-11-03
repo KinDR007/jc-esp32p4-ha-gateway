@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.10.1 (2026-11-03)
+
+Summary: fix of the C6 update offered again after its install; documentation with v1.10 screenshots.
 
 - Fix: after the C6 package was installed (the radio is flashed at the next start) the update state
   kept the previous package as installed until another restart, so the web UI and Home Assistant
