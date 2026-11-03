@@ -302,8 +302,9 @@ typedef enum {
     GW_MQTT_SYSTEM = 1 << 1,       /* uptime, temperature, heap, Ethernet, IP, C6 firmware, restart */
     GW_MQTT_UPDATE = 1 << 2,       /* firmware update entity */
     GW_MQTT_SOUND = 1 << 3,        /* sound level and noise */
-    GW_MQTT_SOUND_EVENTS = 1 << 4, /* event, binary sensor and device trigger per sound event */
-    GW_MQTT_ALL = 0x1f,
+    GW_MQTT_SOUND_EVENTS = 1 << 4, /* event and binary sensor per sound event */
+    GW_MQTT_SOUND_TRIGGERS = 1 << 5, /* device trigger per sound event (the integration has none) */
+    GW_MQTT_ALL = 0x3f,
 } gw_mqtt_group_t;
 /* Extra discovery entities (called on every connect) and extra keys in the state JSON. */
 void gw_mqtt_set_extension(void (*discovery)(void), void (*state)(cJSON *state));

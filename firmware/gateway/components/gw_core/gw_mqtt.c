@@ -53,7 +53,7 @@ static const struct {
     const char *name;
 } s_group_names[] = {
     {GW_MQTT_ROLES, "roles"}, {GW_MQTT_SYSTEM, "system"}, {GW_MQTT_UPDATE, "update"},
-    {GW_MQTT_SOUND, "sound"}, {GW_MQTT_SOUND_EVENTS, "sound_events"},
+    {GW_MQTT_SOUND, "sound"}, {GW_MQTT_SOUND_EVENTS, "sound_events"}, {GW_MQTT_SOUND_TRIGGERS, "sound_triggers"},
 };
 static uint32_t s_interval_s = DEFAULT_INTERVAL_S;
 static TaskHandle_t s_publish_task;
@@ -690,7 +690,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     } else if (interval && (!cJSON_IsNumber(interval) || interval->valueint < 10 || interval->valueint > 3600)) {
         error = "interval: 10-3600 s";
     } else if (groups && mask < 0) {
-        error = "discovery_groups: list of roles, system, update, sound, sound_events";
+        error = "discovery_groups: list of roles, system, update, sound, sound_events, sound_triggers";
     }
     if (error) {
         cJSON_Delete(body);

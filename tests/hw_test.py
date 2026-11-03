@@ -682,7 +682,7 @@ def tc29_mqtt_options():
 def tc46_mqtt_discovery_groups():
     """MQTT discovery groups against a plain test broker (--mqtt-broker host:port, anonymous): every group
     by default, a left out group is removed from Home Assistant (empty retained config), the preset of
-    the P4 Gateway integration keeps only the per-event sound entities; then the original settings."""
+    the P4 Gateway integration keeps only the device triggers of the sound events; then the original settings."""
     if not ARGS.mqtt_broker:
         raise Skip('needs --mqtt-broker <host>:<port> (anonymous mosquitto, e.g. mosquitto -p 18883)')
     import subprocess
@@ -702,7 +702,7 @@ def tc46_mqtt_discovery_groups():
     try:
         for bad in (['bogus'], 'roles', [1]):
             check(http('POST', '/api/mqtt', {'discovery_groups': bad})[0] == 400, f'refused: discovery_groups {bad!r}')
-        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events']
+        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers']
         code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle',
                                              'base': '', 'prefix': 'homeassistant', 'discovery': True,
                                              'discovery_groups': all_groups, 'enabled': True})
@@ -713,19 +713,21 @@ def tc46_mqtt_discovery_groups():
         events = subprocess.run(['mosquitto_sub', '-h', host, '-p', port, '-t', f'homeassistant/binary_sensor/{name}/+/config',
                                  '-v', '-W', '3'], capture_output=True, text=True).stdout.split()
         sound_events = [t.split('/')[3] for t in events if t.startswith('homeassistant/') and '/snd_' in t]
-        check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_events']})[0] == 200, 'preset: only what the integration lacks')
-        check(connected()['discovery_groups'] == ['sound_events'], 'stored: sound_events')
+        check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_triggers']})[0] == 200, 'preset: only what the integration lacks')
+        check(connected()['discovery_groups'] == ['sound_triggers'], 'stored: sound_triggers')
         time.sleep(2)
         check(all(not retained(c, o) for c, o in entities), 'role, uptime and firmware entities removed (empty retained config)')
         if sound_events:
-            check(retained('binary_sensor', sound_events[0]), f'sound event entity {sound_events[0]} kept')
+            check(not retained('binary_sensor', sound_events[0]), f'sound event binary sensor {sound_events[0]} removed')
+            trigger = sound_events[0][:-len('_active')]
+            check(retained('device_automation', trigger), f'device trigger {trigger} kept')
         else:
             log('no sound event configured: the kept group is not visible')
         check(http('POST', '/api/mqtt', {'discovery_groups': all_groups})[0] == 200 and connected(), 'every group again')
         time.sleep(2)
         check(all(retained(c, o) for c, o in entities), 'entities published again')
     finally:
-        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events']})
+        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers']})
         code, r = http('POST', '/api/settings/import', backup)
         check(code == 200, 'original settings imported, the gateway restarts')
         wait_restart(status()['role']['desired'])

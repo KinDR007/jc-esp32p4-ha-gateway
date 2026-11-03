@@ -55,7 +55,8 @@
 - [ ] Ověřit pojistku startů a 3s pojistku telemetrie na skutečném selhání
 - [ ] Ověřit entity a události zvuku v Home Assistant (MQTT broker vyžaduje přihlášení)
 - [x] Integrace P4 Gateway nasazena do HA (192.168.88.201), brána přidána ze zeroconf, 65 entit, trvalé push spojení
-- [ ] Integrace P4 Gateway: ověřit v HA UI událost zvuku a průběh aktualizace; vypnout MQTT discovery a přegenerovat ID entit s příponou `_2` (kolidovala s MQTT entitami)
+- [ ] Integrace P4 Gateway: ověřit v HA UI událost zvuku a průběh aktualizace
+- [x] MQTT discovery na předvolbě „Jen co integrace nemá“, 25 entit integrace přejmenováno bez přípony `_2` (2026-11-03, na `_2` nic neodkazovalo)
 - [ ] Hlučnost: kalibrovat hlukoměrem nebo aplikací (Zvuk › Živě › Hlučnost); do té doby odhad ±6 dB
 - [ ] Ověřit instalaci integrace přes HACS z veřejného repozitáře
 - [x] Zvuk fáze 4: naučené zvuky (vzorky v oddílu `sounds`, profily embedding a tón, pozadí, kalibrace, nahrání WAV), TC28
@@ -114,9 +115,9 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] Oprava: instalace staré nabídky po změně nebo smazání URL manifestu, než ji úloha znovu zkontroluje (TC27 instaloval v1.9 z GitHubu)
 
 **F1 MQTT a HA**
-- [x] F1.1 Výběr expozice MQTT po skupinách (roles, system, update, sound, sound_events) s předvolbou „Jen co integrace nemá“ (UI, API `discovery_groups`, NVS `mqtt_grp`, odstranění retained configů), TC46, UI24
+- [x] F1.1 Výběr expozice MQTT po skupinách (roles, system, update, sound, sound_events, sound_triggers) s předvolbou „Jen co integrace nemá“ (= sound_triggers; integrace má event i binary_sensor po událostech) (UI, API `discovery_groups`, NVS `mqtt_grp`, odstranění retained configů), TC46, UI24
 - [x] F1.2 Aktualizace v HA i pro C5 (entita *C5 radio firmware*, integrace 1.5.0); ESPHome proxy je v balících rádií, změna jeho verze je ve shrnutí; testy `tests/ha_integration` (test_c5_update)
-- [ ] F1.2b Nasadit integraci 1.5.0 do HA a ověřit entity aktualizací v UI HA (s uživatelem)
+- [x] F1.2b Integrace 1.5.0 nasazena do HA (záloha 1.4.0 v /config/p4gw_backup_1.4.0), entita `update.…_firmware_radia_c5` ukazuje balík C5
 
 **F2 BLE proxy a rádia**
 - [ ] F2.1 ESPHome proxy 1.1.0: aktivní, `connection_slots: 5`, diagnostika (Wi-Fi signál, uptime, teplota, volná RAM a největší blok, verze, IP, síť, restart); build C6/C5 OK (RAM 41 %). Volné sloty ESPHome neexponuje (HA je vidí v diagnostice adaptéru). Zbývá: nahrát na rádio B a ověřit v HA (přeflashování smaže klíč API, nové převzetí v HA)

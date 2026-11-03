@@ -127,9 +127,9 @@ warnings, sounds off (they have their own event entities).
 
 The integration and MQTT discovery can run side by side, but every entity would then exist twice.
 With the integration in use, pick **Only what the integration lacks** under *Entities in Home
-Assistant* in the gateway MQTT settings: MQTT then adds only the per-event sound entities (event,
-binary sensor and device trigger of each sound event) and keeps the plain topics (e.g. for the
-Zigbee2MQTT network view). Switching off **Home Assistant discovery** removes every MQTT entity.
+Assistant* in the gateway MQTT settings: MQTT then adds only the device triggers of the sound events
+(the integration has their event and binary sensor entities) and keeps the plain topics (e.g. for
+the Zigbee2MQTT network view). Switching off **Home Assistant discovery** removes every MQTT entity.
 
 Tests: `tests/ha_integration` (pytest-homeassistant-custom-component against a fake gateway,
 also in CI), hardware test TC30 (mDNS, WebSocket push, account and token on the handshake).
@@ -155,7 +155,7 @@ Connection options (Home Assistant › MQTT):
 | State interval | 10–3600 s | 30 s |
 | Discovery prefix | as configured in the HA MQTT integration | `homeassistant` |
 | Home Assistant discovery | off: plain topics only, the entities are removed from HA | on |
-| Entities in Home Assistant | groups sent by discovery (`discovery_groups` of `/api/mqtt`): `roles` (role, role select, maintenance, Thread state, Zigbee host), `system` (uptime, temperature, heap, Ethernet, IP, C6 firmware, restart), `update` (firmware update), `sound` (sound level, noise), `sound_events` (per sound event); a group left out is removed from HA, its state topics stay | all |
+| Entities in Home Assistant | groups sent by discovery (`discovery_groups` of `/api/mqtt`): `roles` (role, role select, maintenance, Thread state, Zigbee host), `system` (uptime, temperature, heap, Ethernet, IP, C6 firmware, restart), `update` (firmware update), `sound` (sound level, noise), `sound_events` (event and binary sensor per sound event), `sound_triggers` (device trigger per sound event); a group left out is removed from HA, its state topics stay | all |
 
 TLS always verifies the broker; there is no "insecure" mode (it would weaken the TLS of online
 updates as well). Connection errors name the cause, e.g. `TLS: server certificate not accepted (CA or

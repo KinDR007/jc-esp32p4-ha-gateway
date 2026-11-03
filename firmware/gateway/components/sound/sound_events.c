@@ -348,7 +348,7 @@ static void publish_discovery(const sevent_t *x, bool remove)
     object_id(oid, sizeof(oid), x->id, "_active");
     gw_mqtt_discovery(GW_MQTT_SOUND_EVENTS, "binary_sensor", oid, bin);
     object_id(oid, sizeof(oid), x->id, "");
-    gw_mqtt_discovery(GW_MQTT_SOUND_EVENTS, "device_automation", oid, trig);
+    gw_mqtt_discovery(GW_MQTT_SOUND_TRIGGERS, "device_automation", oid, trig);
     if (!remove) {
         publish_state(x);
     }

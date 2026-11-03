@@ -594,7 +594,7 @@ const CS = {
   'CA certificate (PEM)': 'Certifikát CA (PEM)', 'Do not check the server name': 'Nekontrolovat jméno serveru', 'Advanced': 'Pokročilé', 'Client ID': 'Client ID', 'Keepalive (s)': 'Keepalive (s)',
   'Base topic': 'Základní topic', 'State interval (s)': 'Interval stavu (s)', 'Home Assistant discovery': 'Discovery pro Home Assistant',
   'Entities in Home Assistant': 'Entity v Home Assistant', 'Roles and networks': 'Role a sítě', 'Firmware update entity': 'Entita aktualizace firmwaru',
-  'Sound level and noise': 'Hladina zvuku a hluk', 'Sound events (per event)': 'Zvukové události (po událostech)', 'All': 'Vše',
+  'Sound level and noise': 'Hladina zvuku a hluk', 'Sound events (per event)': 'Zvukové události (po událostech)', 'Sound event device triggers': 'Spouštěče zařízení pro zvukové události', 'All': 'Vše',
   'Only what the integration lacks': 'Jen co integrace nemá', 'Upload as sample': 'Nahrát jako vzorek', 'Upload as background': 'Nahrát jako pozadí', 'Test recording': 'Test nahrávky', 'Delete the samples?': 'Smazat vzorky?', 'recording': 'nahrávám', 'done': 'hotovo', 'Online update': 'Online aktualizace', 'Check': 'Zkontrolovat', 'Install': 'Instalovat', 'Off.': 'Vypnuto.', 'Not checked yet.': 'Zatím nezkontrolováno.',
   'available': 'k dispozici', 'up to date': 'aktuální', 'error': 'chyba', 'Install the update?': 'Instalovat aktualizaci?', 'Update installed: the gateway restarts': 'Aktualizace nainstalována: brána se restartuje', 'Settings backup': 'Záloha nastavení', 'Include passwords': 'Včetně hesel', 'Import settings?': 'Importovat nastavení?', 'Settings imported: the gateway restarts': 'Nastavení importováno: brána se restartuje', 'Log before the last restart': 'Log před posledním restartem', 'Erase core dump': 'Smazat core dump', 'Core dump erased': 'Core dump smazán', 'Log': 'Log',
   // system
@@ -1097,7 +1097,7 @@ const TIPS = {
   'Keepalive': ['How often the client shows the broker it is alive; the broker marks the gateway offline after 1.5 times this. 10-240 s.', 'Jak často klient dává brokeru vědět, že žije; broker označí bránu offline po 1,5násobku. 10-240 s.'],
   'Base topic': ['Topics of the gateway: <base>/state, /availability, /role/set, sound and update. Empty: p4gw/<hostname>.', 'Topicy brány: <base>/state, /availability, /role/set, zvuk a aktualizace. Prázdné: p4gw/<hostname>.'],
   'State interval': ['How often the state (uptime, temperature, role, memory) is published. 10-3600 s.', 'Jak často se publikuje stav (uptime, teplota, role, paměť). 10-3600 s.'],
-  'Entities in Home Assistant': ['Groups of entities sent by discovery; a group switched off is removed from Home Assistant, its topics are still published. With the P4 Gateway integration choose Only what the integration lacks: then MQTT adds just the per-event sound entities (binary sensor and device trigger of each event) and no entity shows up twice.', 'Skupiny entit posílané přes discovery; vypnutá skupina se z Home Assistant odebere, její topicy se publikují dál. S integrací P4 Gateway zvolte Jen co integrace nemá: MQTT pak přidá jen zvukové entity po událostech (binární senzor a spouštěč zařízení každé události) a žádná entita nebude dvakrát.'],
+  'Entities in Home Assistant': ['Groups of entities sent by discovery; a group switched off is removed from Home Assistant, its topics are still published. With the P4 Gateway integration choose Only what the integration lacks: then MQTT adds just the device triggers of the sound events (for automations by device) and no entity shows up twice.', 'Skupiny entit posílané přes discovery; vypnutá skupina se z Home Assistant odebere, její topicy se publikují dál. S integrací P4 Gateway zvolte Jen co integrace nemá: MQTT pak přidá jen spouštěče zařízení pro zvukové události (pro automatizace podle zařízení) a žádná entita nebude dvakrát.'],
   'Home Assistant discovery': ['Entities appear in Home Assistant by themselves. Off: only the plain topics (Node-RED and others); the entities are removed from Home Assistant. Discovery is sent again whenever Home Assistant comes online.', 'Entity se v Home Assistant objeví samy. Vypnuto: jen holé topicy (Node-RED a další); entity se z Home Assistant odeberou. Discovery se pošle znovu pokaždé, když se Home Assistant připojí.'],
   'Learned sound ID': ['Name of the learned sound, also the ID of the event created from it (a-z, 0-9, _). More samples under the same name improve it.', 'Název naučeného zvuku a zároveň ID události z něj vytvořené (a-z, 0-9, _). Další vzorky pod stejným názvem ho zpřesní.'],
   'Learned sound type': ['Any sound: compared with what YAMNet hears (cosine similarity of embeddings), for barking of your dog, a door, a voice. Beep or tone: share of energy at the dominant frequency of the samples, for appliance beeps and piezo alarms.', 'Jakýkoli zvuk: porovnává se s tím, co slyší YAMNet (kosinová podobnost embeddingů), pro štěkot vašeho psa, dveře, hlas. Pípnutí nebo tón: podíl energie na dominantní frekvenci vzorků, pro pípání spotřebičů a piezo alarmy.'],
@@ -2132,7 +2132,7 @@ document.addEventListener('change', e => {
 
 /* discovery groups of /api/mqtt (gw_mqtt_group_t) */
 const MQTT_GROUPS = [['roles', 'Roles and networks'], ['system', 'System'], ['update', 'Firmware update entity'],
-  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)']];
+  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)'], ['sound_triggers', 'Sound event device triggers']];
 async function loadMqtt() {
   const box = $('#mqtt-box');
   if (!box) return;
@@ -4216,7 +4216,7 @@ document.addEventListener('click', async e => {
       t.blur();
       toast(L(`Transmit power ${v} dBm`, `Vysílací výkon ${v} dBm`));
     } else if (t.dataset.mqp) {
-      document.querySelectorAll('[data-mqg]').forEach(c => { c.checked = t.dataset.mqp === 'all' || c.dataset.mqg === 'sound_events'; });
+      document.querySelectorAll('[data-mqg]').forEach(c => { c.checked = t.dataset.mqp === 'all' || c.dataset.mqg === 'sound_triggers'; });
     } else if (t.dataset.zr) {
       const cmd = t.dataset.zr;
       if (['leave', 'factory_reset'].includes(cmd) && !await confirmDialog('Run ' + cmd + '?', 'The router leaves its Zigbee network.')) return;

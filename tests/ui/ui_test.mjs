@@ -626,9 +626,9 @@ await test('UI24', 'MQTT: TLS options only for mqtts:// and wss://, the certific
   check(shownGroups === stored, `discovery groups as stored: ${stored} (page: ${shownGroups})`);
   await page.$eval('#mq-disc', c => c.closest('details').open = true);
   await page.click('[data-mqp="integration"]');
-  check(await groups() === 'sound_events', 'preset Only what the integration lacks: sound events only');
+  check(await groups() === 'sound_triggers', 'preset Only what the integration lacks: sound event device triggers only');
   await page.click('[data-mqp="all"]');
-  check(await groups() === 'roles,system,update,sound,sound_events', 'preset All: every group');
+  check(await groups() === 'roles,system,update,sound,sound_events,sound_triggers', 'preset All: every group');
   await page.fill('#mq-uri', uri);
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
 });

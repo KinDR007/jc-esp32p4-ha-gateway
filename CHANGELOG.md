@@ -11,9 +11,9 @@
   output bit for bit).
 - mbedTLS allocates from PSRAM: a TLS session (update check, OTA, Telegram, MQTT over TLS) no longer
   takes about 40 kB of internal RAM; the lowest free internal RAM since start went from 85 to 145 kB.
-- MQTT: Home Assistant discovery per group (roles, system, update, sound, sound events), `discovery_groups`
-  of `/api/mqtt`; the web UI offers the preset "Only what the integration lacks" (only the per-event
-  sound entities), so the P4 Gateway integration and MQTT no longer show entities twice. A group left
+- MQTT: Home Assistant discovery per group (roles, system, update, sound, sound events, sound event
+  device triggers), `discovery_groups` of `/api/mqtt`; the web UI offers the preset "Only what the
+  integration lacks" (only the device triggers of the sound events), so the P4 Gateway integration and MQTT no longer show entities twice. A group left
   out is removed from Home Assistant, the state topics stay. Test TC46, UI24.
 - Home Assistant integration 1.5.0: update entity *C5 radio firmware* for an ESP32-C5 as radio B (the
   C5 package with its firmwares, the ESPHome Bluetooth proxy included; install, progress, rollback to
