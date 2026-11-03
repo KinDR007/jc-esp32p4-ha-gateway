@@ -143,21 +143,27 @@ static int fetch(const char *url, int max, char **body, esp_err_t *err)
     return status;
 }
 
-/* Flash layout of this board (docs/installation.md): v3 keeps only a part of the C6 package in a
- * c6fw partition of 64 kB, v2 the whole package. */
+/* Flash layout of this board (docs/installation.md): v4 has gateway slots of 4 MB, v3 keeps only a
+ * part of the C6 package in a c6fw partition of 64 kB, v2 the whole package. */
 static int flash_layout(void)
 {
+    const esp_partition_t *app = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+    if (app && app->size >= 0x400000) {
+        return 4;
+    }
     const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, C6FW_SUBTYPE, NULL);
     return part && part->size < 0x200000 ? 3 : 2;
 }
 
-/* "layouts" of a manifest or of a releases.json entry names the layout of this board */
+/* "layouts" of a manifest or of a releases.json entry names the layout of this board. v4 only grew
+ * the gateway slots, so a release for v3 (image within 3 MB) runs on v4 as well. */
 static bool runs_here(const cJSON *layouts)
 {
+    int own = flash_layout();
     const cJSON *l;
     cJSON_ArrayForEach(l, layouts)
     {
-        if (cJSON_IsNumber(l) && l->valueint == flash_layout()) {
+        if (cJSON_IsNumber(l) && (l->valueint == own || (own == 4 && l->valueint == 3))) {
             return true;
         }
     }
@@ -818,6 +824,14 @@ static esp_err_t request(const char *version, bool offered)
     char url[URL_MAX];
     bool pick = version && version[0];
     if (!s_up.task || (pick ? !release_manifest(version, url, sizeof(url)) : !offered)) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    /* the URL changed (or was cleared) and the task has not checked it yet: the offer is of the old one */
+    bool stale = !manifest_url(url, sizeof(url));
+    xSemaphoreTake(s_up.lock, portMAX_DELAY);
+    stale = stale || strcmp(url, s_up.source) != 0;
+    xSemaphoreGive(s_up.lock);
+    if (stale) {
         return ESP_ERR_NOT_FOUND;
     }
     if (busy()) {

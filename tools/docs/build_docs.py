@@ -137,7 +137,8 @@ INSTALL = T(
     <li><b>Radios › Status and maintenance › Back up C6 flash</b> (about 3.5 min) and keep the file: it is the only copy of the factory C6 firmware.</li>
     <li><b>System › User management › Users › New user</b>: the first account is the admin. From then on the gateway asks for sign-in.</li>
     <li><b>Role</b>: choose the role. Zigbee roles flash the C6 (about 25 s), Thread roles take about 15 s.</li></ol>
-    <p class="note"><b>Flash layout v3</b> (from v1.6): the P4 keeps only the small C6 bundles; the large C6 firmwares come from the release package, which the gateway downloads when the C6 needs them (or an upload of <code>c6fw.bin</code>). Boards with the older layout move once over USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (settings, Thread network, users and recordings stay).</p>""",
+    <p class="note"><b>Flash layout v3</b> (from v1.6): the P4 keeps only the small C6 bundles; the large C6 firmwares come from the release package, which the gateway downloads when the C6 needs them (or an upload of <code>c6fw.bin</code>). Boards with the older layout move once over USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (settings, Thread network, users and recordings stay).</p>
+    <p class="note"><b>Flash layout v4</b>: gateway slots of 4 MB instead of 3 MB (the unused ESPHome slot is gone). Boards with layout v3 move once over USB: <code>scripts/migrate_layout_v4.sh &lt;port&gt;</code> (everything stays; <code>--rollback &lt;stamp&gt;</code> goes back).</p>""",
     """<ol>
     <li>Zazálohujte tovární flash P4 (obsahuje i tovární aplikaci C6):<br><code>scripts/backup_flash.sh /dev/cu.wchusbserial* esp32p4 backups/p4_backup.bin</code></li>
     <li>Zapojte tři propojky JP1 (viz výše).</li>
@@ -146,7 +147,8 @@ INSTALL = T(
     <li><b>Rádia › Stav a údržba › Záloha flash C6</b> (asi 3,5 min) a soubor si uschovejte: je to jediná kopie továrního firmwaru C6.</li>
     <li><b>Systém › Správa uživatelů › Uživatelé › Nový uživatel</b>: první účet je správce. Od té chvíle brána vyžaduje přihlášení.</li>
     <li><b>Role</b>: zvolte roli. Role Zigbee nahrají firmware do C6 (asi 25 s), role Thread trvají asi 15 s.</li></ol>
-    <p class="note"><b>Rozložení flash v3</b> (od v1.6): P4 drží jen malé balíky C6; velké firmwary C6 pocházejí z balíku vydání, který brána stáhne, když je C6 potřebuje (nebo nahrání <code>c6fw.bin</code>). Desky se starším rozložením se jednorázově převedou přes USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (nastavení, síť Thread, uživatelé i nahrávky zůstanou).</p>""")
+    <p class="note"><b>Rozložení flash v3</b> (od v1.6): P4 drží jen malé balíky C6; velké firmwary C6 pocházejí z balíku vydání, který brána stáhne, když je C6 potřebuje (nebo nahrání <code>c6fw.bin</code>). Desky se starším rozložením se jednorázově převedou přes USB: <code>scripts/migrate_layout_v3.sh &lt;port&gt;</code> (nastavení, síť Thread, uživatelé i nahrávky zůstanou).</p>
+    <p class="note"><b>Rozložení flash v4</b>: sloty brány po 4 MB místo 3 MB (nevyužitý slot ESPHome zrušen). Desky s rozložením v3 se jednorázově převedou přes USB: <code>scripts/migrate_layout_v4.sh &lt;port&gt;</code> (vše zůstane; <code>--rollback &lt;stamp&gt;</code> vrátí zpět).</p>""")
 
 UI_BASICS = T(
     """<p><b>Header</b>: status tags, outlined when the link works and grey when it is off. Point at a tag (or tap it) for

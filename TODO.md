@@ -109,8 +109,9 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 
 **F0 Příprava**
 - [x] F0.1 Rozpracované změny zacommitované (707a67a); `dependencies.lock` s absolutní cestou zůstává mimo commit (viz Wi-Fi uplink)
-- [ ] F0.2 Rozpočet RAM/PSRAM: mapa využití, kandidáti na přesun do PSRAM s ohledem na stabilitu
-- [ ] F0.3 Layout v4a: `partitions.csv` (gw_a 0x20000 4 MB, gw_b 0x420000 4 MB, od `c6fw` beze změny), migrační skript přes USB, kontrola layoutu u OTA a releases.json, test upgradu z v1.9 a rollbacku, dokumentace
+- [ ] F0.2 Rozpočet RAM/PSRAM: mapa využití, kandidáti na přesun do PSRAM s ohledem na stabilitu. Změřeno 2026-11-03: interní RAM volná 108–129 kB (minimum 75 kB, největší blok 64 kB), statická 279 kB; PSRAM volná 24 MB z 32 MB. Kandidáti: `s_bands` zvuku (66 kB .bss), mbedTLS alokace do PSRAM, `s_kept` (16 kB); OpenThread instance zůstává interně
+- [x] F0.3 Layout v4a (gw_a 0x20000 4 MB, gw_b 0x420000 4 MB, od `c6fw` beze změny, 28 % volného místa), `scripts/migrate_layout_v4.sh` (s `--rollback`), deska převedena 2026-11-03, TC10 (OTA do nového gw_b), TC14, TC27, TC37 (vydání pro v3 na v4) prošly; v1.9 nastartovala na v4
+- [x] Oprava: instalace staré nabídky po změně nebo smazání URL manifestu, než ji úloha znovu zkontroluje (TC27 instaloval v1.9 z GitHubu)
 
 **F1 MQTT a HA**
 - [ ] F1.1 Výběr expozice MQTT po kategoriích s předvolbou „jen co integrace nemá“ (UI, API, NVS, odstranění retained configů), test TC

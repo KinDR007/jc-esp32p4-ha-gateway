@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Flash layout v4: the `esphome` slot (unused since v1.8) goes to the gateway slots, 3 -> 4 MB each
+  (28 % free with the current image instead of 4.5 %). Migration over USB once with
+  `scripts/migrate_layout_v4.sh <port>` (settings, Thread network, users, Zigbee snapshots, model and
+  sounds stay; `--rollback <stamp>` goes back). `update.layout` reports 4; releases for layout 3 are
+  still offered on v4, a manifest names only layout 4 when `p4gw.bin` is larger than 3 MB.
+- Fix: right after the manifest URL was changed or cleared, the offer of the old URL could still be
+  installed until the update task checked again (TC27 installed the GitHub release). The install
+  is refused until the current URL was checked.
 - Wi-Fi uplink through a radio (docs/wifi-uplink.md): new radio role `wifi_uplink`. The radio runs
   the ESP-Hosted co-processor (package bundle `wifi_uplink`, C6 and C5), the gateway gets an
   ordinary Wi-Fi interface over the radio UART (own address, IPv6, mDNS), about 0.7 Mbit/s.

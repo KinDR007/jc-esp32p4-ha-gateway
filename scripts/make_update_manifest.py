@@ -26,8 +26,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 # flash layouts (docs/installation.md) the gateway firmware of this tree runs on; the gateway installs
-# a release only when its layout is listed (an older release on a newer layout loses the C6 firmware)
-LAYOUTS = [2, 3]
+# a release only when its layout is listed (an older release on a newer layout loses the C6 firmware).
+# Layouts 2 and 3 have gateway slots of 3 MB: a larger image runs only on layout 4.
+LAYOUTS = [2, 3, 4]
+SLOT_V3 = 0x300000
 
 
 def app_version(path: Path) -> str:
@@ -75,7 +77,8 @@ def main() -> None:
         raise SystemExit(f"{gateway} missing, run scripts/build_all.sh")
     url = lambda name: f"{a.base_url.rstrip('/')}/{name}" if a.base_url else name
     notes = Path(a.notes_file).read_text().strip() if a.notes_file else a.notes
-    m = {"version": app_version(gateway), "p4gw": url("p4gw.bin"), "layouts": LAYOUTS}
+    layouts = LAYOUTS if gateway.stat().st_size <= SLOT_V3 else [l for l in LAYOUTS if l >= 4]
+    m = {"version": app_version(gateway), "p4gw": url("p4gw.bin"), "layouts": layouts}
     if notes:
         m["notes"] = notes if len(notes) <= 1000 else notes[:998].rsplit(" ", 1)[0] + " …"
     if a.release_url:

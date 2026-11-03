@@ -488,7 +488,7 @@ def tc27_online_update_checks():
     check(http('POST', '/api/update/install')[0] == 409, 'install without an offer refused')
     u = checked(f'http://{ARGS.host}/nope.json')
     check(u['error'] == 'manifest: HTTP 404' and not u['available'], f'missing manifest: {u["error"]}')
-    u = checked(f'http://{ARGS.host}/api/mqtt')
+    u = checked(f'http://{ARGS.host}/')  # the web UI page: no sign-in, not JSON
     check('expected' in u['error'] and not u['available'], f'not a manifest: {u["error"]}')
     u = checked('https://example.com/p4gw/manifest.json')
     check(u['error'] == 'manifest: HTTP 404', f'HTTPS reaches the server (certificate bundle): {u["error"]}')
@@ -1456,8 +1456,9 @@ def tc36_c6_online_update():
 
 
 def tc37_release_list():
-    """releases.json: only releases that name the board's flash layout are listed; a picked release whose
-    manifest does not run on the layout, or an unlisted one, is refused without a restart."""
+    """releases.json: only releases that name the board's flash layout are listed (on layout 4 also those
+    of layout 3: v4 only grew the gateway slots); a picked release whose manifest does not run on the
+    layout, or an unlisted one, is refused without a restart."""
     import shutil, socketserver, tempfile, threading
     from http.server import SimpleHTTPRequestHandler
     s0 = status()
@@ -1486,13 +1487,15 @@ def tc37_release_list():
     write('releases.json', {'releases': [
         {'version': current, 'manifest': f'{base}/manifest.json', 'layouts': [layout]},
         {'version': 'v0.0-other', 'manifest': f'{base}/manifest.json', 'layouts': [99]},
+        {'version': 'v0.0-v3', 'manifest': f'{base}/manifest.json', 'layouts': [3]},
         {'version': 'v0.0-nolayout', 'manifest': f'{base}/nolayout.json', 'layouts': [layout]}]})
     before_url = s0['update']['url']
     try:
         check(http('POST', '/api/settings', {'update_url': f'{base}/manifest.json'})[0] == 200, 'manifest URL set')
         u = checked()
         versions = [r['version'] for r in u['releases']]
-        check(versions == [current, 'v0.0-nolayout'], f'listed for layout {layout}: {versions}')
+        expected = [current] + (['v0.0-v3'] if layout in (3, 4) else []) + ['v0.0-nolayout']
+        check(versions == expected, f'listed for layout {layout}: {versions}')
         check(http('POST', '/api/update/install', {'version': 'v0.0-other'})[0] == 409, 'release of another layout refused (409)')
         check(http('POST', '/api/update/install', {'version': 'v9.9'})[0] == 409, 'unlisted release refused (409)')
         up = status()['uptime_s']

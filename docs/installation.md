@@ -28,10 +28,10 @@ Third-party sources are pinned in [deps.lock](../deps.lock) and fetched into `th
 Single parts: `scripts/build_c6.sh <name> [esp32c6|esp32c5]`, `scripts/build_gateway.sh`,
 `scripts/build_esphome_radio.sh [esp32c6|esp32c5]`, `scripts/pack_c6fw.py`.
 
-## Flash layout (v3)
+## Flash layout (v4)
 
 [firmware/partitions.csv](../firmware/partitions.csv): `nvs` (settings, Thread network, users), `gw_a`/`gw_b`
-(3 MB each, gateway A/B with rollback), `esphome` (2 MB, unused since v1.8), `c6fw` (64 kB: Zigbee
+(4 MB each, gateway A/B with rollback; 3 MB each before v4, then a 2 MB `esphome` slot unused since v1.8), `c6fw` (64 kB: Zigbee
 snapshots of radio B; before v1.8 the directory of the C6 package), `c6data` (Zigbee network snapshots
 of radio A, one slot per Zigbee firmware), `model`
 (6 MB, YAMNet uses 4), `sounds` (1.56 MB, learning mode recordings), `coredump`.
@@ -51,6 +51,16 @@ v1.6 or later). It backs up NVS and the Zigbee snapshots, writes the v3 partitio
 c6fw image (`scripts/c6fw_local.py`), the snapshots at their new place and the model; settings, the
 Thread network, users, both gateway slots, ESPHome and the learned sounds stay. Gateway v1.6 also runs
 on layout v2 (the whole package then stays in c6fw as before).
+
+Migration v3 → v4 over USB, once: `scripts/migrate_layout_v4.sh <port>`. It backs up the partition
+table, NVS and otadata, writes the v4 partition table, the gateway of `build/gateway` to `gw_a` and an
+empty otadata (the board starts from `gw_a`). Offsets of `gw_a` and of everything from `c6fw` on do
+not change, so settings, the Thread network, users, Zigbee snapshots, the model and the learned
+sounds stay; `gw_b` moves and is filled by the next update. Back to v3:
+`scripts/migrate_layout_v4.sh <port> --rollback <stamp>` (partition table and otadata from the
+backups; the old firmware in the former `gw_b` area is still there). A release for v3 runs on v4
+too (only the slots grew): the gateway on v4 accepts manifests naming layout 3 or 4.
+`scripts/make_update_manifest.py` names layouts 2–4 while `p4gw.bin` fits 3 MB, only 4 above.
 
 Migration from v1 (first install on 2026-10-28): `scripts/flash_p4.sh <port>` writes every image but
 keeps NVS, so the role, Thread network, password and MQTT survive. The C6 is reflashed on the next
