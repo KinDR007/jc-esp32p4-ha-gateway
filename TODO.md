@@ -120,7 +120,7 @@ Rozhodnutí: MQTT po kategoriích, BLE proxy jen aktivní (5 slotů), layout P4 
 - [x] F1.2b Integrace 1.5.0 nasazena do HA (záloha 1.4.0 v /config/p4gw_backup_1.4.0), entita `update.…_firmware_radia_c5` ukazuje balík C5
 
 **F2 BLE proxy a rádia**
-- [ ] F2.1 ESPHome proxy 1.1.0: aktivní, `connection_slots: 5`, diagnostika (Wi-Fi signál, uptime, teplota, volná RAM a největší blok, verze, IP, síť, restart); build C6/C5 OK (RAM 41 %). Volné sloty ESPHome neexponuje (HA je vidí v diagnostice adaptéru). Zbývá: nahrát na rádio B a ověřit v HA (přeflashování smaže klíč API, nové převzetí v HA)
+- [x] F2.1 ESPHome proxy 1.1.0 na rádiu B (C5): HA vidí 5 slotů (bluetooth connection allocations), diagnostika v HA (Wi-Fi −36 dBm, 35,9 °C, volná RAM 90 kB, verze, IP, síť, restart). Záznam ESPHome v HA byl „Door Sensor“ (stejná MAC XIAO), přejmenován na „P4 Gateway BLE proxy“. Volné sloty ESPHome neexponuje jako entitu
 - [ ] F2.2 Rozbor flash rádií: co se vejde do slotu, přepíná se slotem; ESPHome (1,45–1,5 MB) celým flashem; na C5 (8 MB) zvážit ESPHome jako slot
 - [ ] F2.3 Testy: TC09 rozšířený (aktivní připojení, sloty), regrese rolí
 
