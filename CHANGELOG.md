@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fix: after the C6 package was installed (the radio is flashed at the next start) the update state
+  kept the previous package as installed until another restart, so the web UI and Home Assistant
+  offered the same C6 update again. The installed package is now read with every state. TC36 checks it.
+
 ## v1.10 (2026-11-03)
 
 Summary: Data flows page, setup wizard, HTTP API reference (System › API, `/api/help`, docs/api.md),

@@ -908,16 +908,18 @@ static cJSON *state_json(void)
         cJSON_AddNumberToObject(j, "update_percentage", s_up.percent);
     }
     cJSON *c6 = cJSON_AddObjectToObject(j, "c6");
-    cJSON_AddBoolToObject(c6, "offered", s_up.c6.offered);
-    cJSON_AddBoolToObject(c6, "available", s_up.c6.offered && !s_up.c6.current);
-    cJSON_AddBoolToObject(c6, "in_progress", s_up.c6.installing);
-    cJSON_AddNumberToObject(c6, "percent", s_up.c6.percent);
-    cJSON_AddStringToObject(c6, "installed_id", s_up.c6.installed_id);
+    /* the radio is flashed at start, after the update task read its package: read it again now */
+    c6_installed_id();
     char offered[9] = "";
     if (s_up.c6.offered) {
         snprintf(offered, sizeof(offered), "%02x%02x%02x%02x", s_up.c6.sha256[0], s_up.c6.sha256[1], s_up.c6.sha256[2],
                  s_up.c6.sha256[3]);
     }
+    cJSON_AddBoolToObject(c6, "offered", s_up.c6.offered);
+    cJSON_AddBoolToObject(c6, "available", s_up.c6.offered && strcmp(s_up.c6.installed_id, offered) != 0);
+    cJSON_AddBoolToObject(c6, "in_progress", s_up.c6.installing);
+    cJSON_AddNumberToObject(c6, "percent", s_up.c6.percent);
+    cJSON_AddStringToObject(c6, "installed_id", s_up.c6.installed_id);
     cJSON_AddStringToObject(c6, "offered_id", offered);
     cJSON *c5 = cJSON_AddObjectToObject(j, "c5");
     cJSON_AddBoolToObject(c5, "offered", s_up.c5.offered);

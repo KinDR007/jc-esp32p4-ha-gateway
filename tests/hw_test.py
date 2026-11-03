@@ -1509,6 +1509,8 @@ def tc36_c6_online_update():
         offered()
         s = install_and_wait()
         check(s['update']['c6']['installed_versions'].get('slots') == 'tc36 label', 'new package stored after the restart')
+        c6 = s['update']['c6']
+        check(c6['installed_id'] == c6['offered_id'] and not c6['available'], f'installed {c6["installed_id"]} = offered {c6["offered_id"]}, nothing more to install')
         check(not s['c6']['flash']['busy'] and s['role']['active'] == s0['role']['active'], 'role back, the C6 was not rewritten')
         manifest('orig.bin', original)
         offered()
