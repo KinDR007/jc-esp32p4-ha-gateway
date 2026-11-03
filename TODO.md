@@ -165,12 +165,12 @@ Sběrnice: konektor CN3 (1 GND, 2 3V3, 3 SCL, 4 SDA) nebo JP1 pin 23 SDA (GPIO7)
 - [x] S2 Sdílená sběrnice v gw_core (`gw_i2c`), zvuk ji převezme; mikrofon běží (TC47, TC14 se sníženým prahem)
 - [x] S3 Komponenta `sensors`: ovladače nad abstrakcí sběrnice (testovatelné na hostu), sken, identifikace s jistotou, konfigurace v NVS, úloha čtení, `/api/sensors*`, Telegram `/sensors`
 - [x] S4 MQTT: skupina `sensors`, seznam rozšíření, nová discovery při změně; opraven deadlock (discovery jen v publikační úloze), TC46
-- [x] S5 HA integrace 1.6.0: entity senzorů dynamicky, testy (24 prošlo); do HA zatím nenasazeno (žádný senzor připojen)
+- [x] S5 HA integrace 1.6.0: entity senzorů dynamicky, testy
 - [x] S6 Web UI Systém › Hardware: sběrnice a zapojení, senzory (jméno, expozice, hodnoty), sken s volbou při konfliktu, ruční přidání, interval; UI test
 - [x] S7 Testy: unit (ovladače se simulovanými čipy, CI), křížová kontrola BME680/BMP3 proti Adafruit, HW TC47, TC46, UI31, UI24
 - [x] S8 Dokumentace (sensors.md, hardware.md s CN3 a RS485, api.json, users, home-assistant, GitHub Pages), CHANGELOG
 - [ ] S9 Test se skutečnými senzory (BME280/BMP280, SHT4x, AHT20, BH1750 …): převody zatím ověřené jen simulací
-- [ ] S10 Nasadit integraci 1.6.0 do HA, až bude senzor připojený
+- [x] S10 Integrace 1.6.0 nasazena do HA 2026-11-03 (záloha 1.5.0 v /config/p4gw_backup_1.5.0), záznam načten, 135 entit
 
 ## RS485 / Modbus (zadání 2026-11-03)
 Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr) + Modbus TCP klient; šablony JSON pro čtení i zápis (number/switch/select/button jen kde to šablona povolí); vestavěné šablony ve firmwaru, uživatelské v NVS (~50 kB volných); každé zařízení jako samostatné zařízení v HA, volitelně přes integraci nebo MQTT; menu Systém › RS485. Testovací zařízení zatím není: ověření simulací (Modbus TCP slave na Macu).
@@ -184,4 +184,5 @@ Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr)
 - [x] M7 Web UI Systém › RS485: sběrnice, zařízení s hodnotami, přidání ze šablony, hledání adresy/rychlosti, editor a import/export šablon, ruční čtení/zápis registrů
 - [x] M8 Testy: vlastní Modbus TCP simulátor (tools/modbus/sim_tcp.py, bez závislostí), HW TC48 (vč. MQTT), UI32, HA testy (26); dokumentace docs/modbus.md
 - [ ] M9 Test se skutečným zařízením na RS485 (časování, mapy označené „komunita“: ORNO 504, 516/517)
+- [x] Vydání v1.11 (2026-11-03): CI zelené, release na GitHubu, deska na v1.11 z online aktualizace, integrace 1.6.0 v HA
 - [ ] M10 Ověřit zásobník úlohy modbus (6 kB) a volnou interní RAM (203 kB po přidání I2C a Modbus)

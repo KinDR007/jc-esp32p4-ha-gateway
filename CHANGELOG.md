@@ -4,6 +4,9 @@
 
 Summary: I2C sensors on connector CN3 (24 chip families, recognised by the gateway) and Modbus devices on RS485 and Modbus TCP with JSON templates (Eastron SDM, ORNO, Hiking, Chint, Peacefair built in), each shown in Home Assistant through the integration or MQTT.
 
+- **Needs flash layout v4**: the image is larger than 3 MB, so the online update offers v1.11 only to
+  gateways on layout v4 (System › Information, `update.layout`). A gateway on layout v3 migrates once
+  over USB with `scripts/migrate_layout_v4.sh <port>` (settings, networks, users and recordings stay).
 - Modbus, System › RS485: devices on the board's RS485 port (J4, UART3) and over Modbus TCP, described
   by JSON templates (read and write: number, switch, select, button). Built-in templates after research
   and counter-research: Eastron SDM120, SDM230, SDM630 V2, SDM72D-M V1/V2, ORNO OR-WE-504, 514/515,
