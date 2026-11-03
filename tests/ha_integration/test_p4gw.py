@@ -369,3 +369,37 @@ async def test_radio_b_role(hass: HomeAssistant, gateway) -> None:
     assert hass.states.get(select).state == "zigbee_coordinator"
     await hass.services.async_call("select", "select_option", {"entity_id": select, "option": "none"}, blocking=True)
     assert ("/api/role", {"role": "none", "radio": "b"}) in gateway.posts
+
+
+async def test_i2c_sensors(hass: HomeAssistant, gateway) -> None:
+    """Exposed I2C sensors become sensor entities named after the gateway's name; later ones are added,
+    renaming follows, a sensor without a value or no longer exposed is unavailable."""
+    entry = await setup_entry(hass, gateway)
+    temp = entity_id(hass, "sensor", "i2c_76_temperature")
+    state = hass.states.get(temp)
+    assert state.state == "21.4" and state.attributes["unit_of_measurement"] == "°C"
+    assert state.attributes["device_class"] == "temperature" and state.attributes["friendly_name"].endswith("Obývák Temperature")
+    assert state.attributes["chip"] == "BME280" and state.attributes["address"] == "0x76"
+    assert hass.states.get(entity_id(hass, "sensor", "i2c_76_pressure")).attributes["device_class"] == "atmospheric_pressure"
+    assert entity_id(hass, "sensor", "i2c_23_illuminance") is None  # not exposed
+
+    gateway.sensors["sensors"][1]["expose"] = True
+    gateway.sensors["sensors"][0]["name"] = "Ložnice"
+    gateway.sensors["sensors"][0]["values"].pop("humidity")
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id(hass, "sensor", "i2c_23_illuminance")).state == "120.0"
+    assert hass.states.get(entity_id(hass, "sensor", "i2c_76_humidity")).state == STATE_UNAVAILABLE
+
+    gateway.sensors["sensors"][0]["expose"] = False
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(temp).state == STATE_UNAVAILABLE
+
+
+async def test_firmware_without_sensors(hass: HomeAssistant, gateway) -> None:
+    """Older firmware (404 on /api/sensors): the entry loads, no I2C sensor entities."""
+    gateway.sensors = None
+    entry = await setup_entry(hass, gateway)
+    assert entry.state is ConfigEntryState.LOADED
+    assert entity_id(hass, "sensor", "i2c_76_temperature") is None

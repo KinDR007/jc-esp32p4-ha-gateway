@@ -54,6 +54,8 @@ class P4Client:
             ) as resp:
                 if resp.status == 401:
                     raise P4AuthError
+                if resp.status == 404:
+                    raise P4RequestError(f"{path} not found (older firmware)")
                 data = await resp.json(content_type=None)
                 if resp.status == 403:
                     raise P4RequestError("the API token has no right to do this (role of the token)")
@@ -71,6 +73,10 @@ class P4Client:
 
     async def sound_events(self) -> list[dict[str, Any]]:
         return (await self._request("GET", "/api/sound/events"))["events"]
+
+    async def sensors(self) -> dict[str, Any]:
+        """I2C sensors with their values (firmware 1.11 on; older answers 404)."""
+        return await self._request("GET", "/api/sensors")
 
     async def notifications(self, since: int) -> dict[str, Any]:
         """Notifications the gateway keeps, newer than seq since: {"notifications": [...], "seq"}."""

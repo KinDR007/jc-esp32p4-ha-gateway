@@ -151,6 +151,72 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     async_add_entities(P4Sensor(coordinator, d) for d in SENSORS)
 
+    # I2C sensors (System › Hardware): one entity per exposed sensor and quantity, also those added later
+    known: set[tuple[str, str]] = set()
+
+    def add_new() -> None:
+        new = [
+            (sid, key)
+            for sid, s in coordinator.data.sensors.items()
+            if s["expose"] and s["enabled"]
+            for key in s["quantities"]
+            if (sid, key) not in known
+        ]
+        known.update(new)
+        if new:
+            async_add_entities(P4I2CSensor(coordinator, sid, key) for sid, key in new)
+
+    add_new()
+    entry.async_on_unload(coordinator.async_add_listener(add_new))
+
+
+class P4I2CSensor(P4Entity, SensorEntity):
+    """One quantity of an I2C sensor; named after the sensor's name on the gateway."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_id: str, key: str) -> None:
+        super().__init__(coordinator, f"{sensor_id}_{key}")
+        self.sensor_id, self.key = sensor_id, key
+        quantity = coordinator.data.quantities.get(key, {})
+        try:
+            self._attr_device_class = SensorDeviceClass(quantity["device_class"])
+        except (KeyError, ValueError):
+            self._attr_device_class = None
+        self._attr_native_unit_of_measurement = quantity.get("unit")
+        self._attr_suggested_display_precision = quantity.get("precision")
+        self._quantity_name = quantity.get("name", key)
+
+    @property
+    def _sensor(self) -> dict[str, Any] | None:
+        return self.coordinator.data.sensors.get(self.sensor_id)
+
+    @property
+    def name(self) -> str:
+        sensor = self._sensor
+        return f"{sensor['name'] if sensor else self.sensor_id} {self._quantity_name}"
+
+    @property
+    def available(self) -> bool:
+        sensor = self._sensor
+        return (
+            super().available
+            and sensor is not None
+            and sensor["expose"]
+            and sensor["enabled"]
+            and self.key in sensor["values"]
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        sensor = self._sensor
+        return sensor["values"].get(self.key) if sensor else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        sensor = self._sensor or {}
+        return {"chip": sensor.get("chip"), "address": f"0x{sensor.get('addr', 0):02x}"}
+
 
 class P4Sensor(P4Entity, SensorEntity):
     entity_description: P4SensorDescription

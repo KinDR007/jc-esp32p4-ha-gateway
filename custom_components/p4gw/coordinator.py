@@ -15,7 +15,7 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, Device
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import P4AuthError, P4Client, P4Error
+from .api import P4AuthError, P4Client, P4Error, P4RequestError
 from .const import (
     DOMAIN,
     LOGGER,
@@ -36,6 +36,8 @@ class P4Data:
     status: dict[str, Any]
     sound: dict[str, Any]
     events: dict[str, dict[str, Any]]  # sound events by id
+    sensors: dict[str, dict[str, Any]]  # I2C sensors by id ("i2c_76")
+    quantities: dict[str, dict[str, Any]]  # what the sensors measure, by key
 
 
 class P4Coordinator(DataUpdateCoordinator[P4Data]):
@@ -79,11 +81,21 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
             status = await self.client.status()
             sound = await self.client.sound_status()
             events = await self.client.sound_events()
+            try:
+                sensors = await self.client.sensors()
+            except P4RequestError:
+                sensors = {}  # firmware without I2C sensors, or a token without the right to System › Hardware
         except P4AuthError as err:
             raise ConfigEntryAuthFailed from err
         except P4Error as err:
             raise UpdateFailed(f"Gateway {self.client.host} unreachable: {err}") from err
-        return P4Data(status=status, sound=sound, events={e["id"]: e for e in events})
+        return P4Data(
+            status=status,
+            sound=sound,
+            events={e["id"]: e for e in events},
+            sensors={s["id"]: s for s in sensors.get("sensors", [])},
+            quantities={q["key"]: q for q in sensors.get("quantities", [])},
+        )
 
     @callback
     def _on_push(self, topic: str, payload: str) -> None:
