@@ -14,6 +14,19 @@ cc -std=c11 -Wall -Wextra -Werror -I firmware/gateway/components/sound -o "$tmp/
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -I firmware/gateway/components/sensors -o "$tmp/sensor_drv_test" \
     tests/unit/sensor_drv_test.c -lm
 "$tmp/sensor_drv_test"
+# cJSON as in ESP-IDF v5.5 (its copy when IDF_PATH is set, else the same release from GitHub)
+cjson=${IDF_PATH:+$IDF_PATH/components/json/cJSON}
+if [ ! -f "${cjson:-/nonexistent}/cJSON.c" ]; then
+    cjson="$tmp/cjson"
+    mkdir -p "$cjson"
+    for f in cJSON.c cJSON.h; do
+        curl -fsSL "https://raw.githubusercontent.com/DaveGamble/cJSON/v1.7.18/$f" -o "$cjson/$f"
+    done
+fi
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -I firmware/gateway/components/modbus -I "$cjson" -o "$tmp/modbus_test" \
+    tests/unit/modbus_test.c firmware/gateway/components/modbus/mb_proto.c firmware/gateway/components/modbus/mb_template.c \
+    "$cjson/cJSON.c" -lm
+"$tmp/modbus_test" firmware/gateway/components/modbus/templates/*.json
 
 echo "== API description matches the firmware"
 python3 tests/unit/api_spec_test.py

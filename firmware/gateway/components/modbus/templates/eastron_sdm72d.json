@@ -1,0 +1,94 @@
+{
+ "schema": 1,
+ "id": "eastron_sdm72d",
+ "manufacturer": "Eastron",
+ "model": "SDM72D-M (V1)",
+ "category": "energy_meter",
+ "notes": "First version: only total power and energy (no voltages); the registers come from open source drivers (no Eastron map found).",
+ "source": "https://github.com/volkszaehler/mbmd/blob/master/meters/rs485/sdm72.go",
+ "serial": {
+  "baud": 9600,
+  "parity": "N",
+  "stop": 1
+ },
+ "slave": 1,
+ "timeout_ms": 500,
+ "gap_ms": 200,
+ "poll_s": 10,
+ "max_regs": 40,
+ "max_gap": 20,
+ "entities": [
+  {
+   "key": "total_power",
+   "name": "Total power",
+   "name_cs": "Celkový výkon",
+   "reg": "input",
+   "addr": "0x0034",
+   "type": "f32",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "import_energy",
+   "name": "Import energy",
+   "name_cs": "Odebraná energie",
+   "reg": "input",
+   "addr": "0x0048",
+   "type": "f32",
+   "precision": 3,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  },
+  {
+   "key": "export_energy",
+   "name": "Export energy",
+   "name_cs": "Dodaná energie",
+   "reg": "input",
+   "addr": "0x004a",
+   "type": "f32",
+   "precision": 3,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  },
+  {
+   "key": "total_energy",
+   "name": "Total energy",
+   "name_cs": "Celková energie",
+   "reg": "input",
+   "addr": "0x0156",
+   "type": "f32",
+   "precision": 3,
+   "unit": "kWh",
+   "class": "energy",
+   "state": "total_increasing"
+  },
+  {
+   "key": "import_power",
+   "name": "Import power",
+   "name_cs": "Odebíraný výkon",
+   "reg": "input",
+   "addr": "0x0500",
+   "type": "f32",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  },
+  {
+   "key": "export_power",
+   "name": "Export power",
+   "name_cs": "Dodávaný výkon",
+   "reg": "input",
+   "addr": "0x0502",
+   "type": "f32",
+   "precision": 0,
+   "unit": "W",
+   "class": "power",
+   "state": "measurement"
+  }
+ ]
+}

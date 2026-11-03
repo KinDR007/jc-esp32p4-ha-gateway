@@ -1,0 +1,327 @@
+/* Modbus protocol layer (CRC, RTU and TCP framing, answer checks, value coding in every word order) and
+ * device templates (validation, read planning); every built-in template given as an argument must parse.
+ *   cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -I firmware/gateway/components/modbus -I <cJSON dir> \
+ *      -o /tmp/modbus_test tests/unit/modbus_test.c firmware/gateway/components/modbus/mb_proto.c \
+ *      firmware/gateway/components/modbus/mb_template.c <cJSON dir>/cJSON.c -lm \
+ *      && /tmp/modbus_test firmware/gateway/components/modbus/templates/<every>.json
+ * scripts/ci_checks.sh takes cJSON from ESP-IDF or downloads it. */
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mb_proto.h"
+#include "mb_template.h"
+
+static int failures;
+
+#define CHECK(cond, ...)                                                                                               \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            printf("FAIL %s:%d ", __FILE__, __LINE__);                                                                 \
+            printf(__VA_ARGS__);                                                                                       \
+            printf("\n");                                                                                              \
+            failures++;                                                                                                \
+        }                                                                                                              \
+    } while (0)
+
+static void test_crc_rtu(void)
+{
+    /* Modbus over serial line V1.02, and the common "01 03 00 00 00 0A C5 CD" example */
+    uint8_t pdu[8], frame[16];
+    mb_req_t r = {.fc = MB_FC_READ_HOLDING, .addr = 0, .count = 10};
+    size_t n = mb_pdu_encode(&r, pdu, sizeof(pdu));
+    size_t f = mb_rtu_frame(1, pdu, n, frame, sizeof(frame));
+    CHECK(f == 8 && frame[6] == 0xc5 && frame[7] == 0xcd, "read holding frame CRC %02x %02x", frame[6], frame[7]);
+    /* Eastron SDM: read input 0x0000, 2 registers -> 01 04 00 00 00 02 71 CB */
+    r = (mb_req_t){.fc = MB_FC_READ_INPUT, .addr = 0, .count = 2};
+    n = mb_pdu_encode(&r, pdu, sizeof(pdu));
+    f = mb_rtu_frame(1, pdu, n, frame, sizeof(frame));
+    CHECK(f == 8 && frame[6] == 0x71 && frame[7] == 0xcb, "read input frame CRC %02x %02x", frame[6], frame[7]);
+
+    /* its answer (Eastron SDM120 protocol 2.1: 230.2 V = 43 66 33 34) */
+    uint8_t ans[9] = {0x01, 0x04, 0x04, 0x43, 0x66, 0x33, 0x34};
+    uint16_t crc = mb_crc16(ans, 7);
+    ans[7] = crc & 0xff, ans[8] = crc >> 8;
+    CHECK(mb_rtu_expected(ans, 2) == 0 && mb_rtu_expected(ans, 3) == 9, "expected length of a read answer");
+    const uint8_t *p, *data;
+    size_t plen, dlen;
+    CHECK(mb_rtu_unframe(1, ans, 9, &p, &plen) == MB_OK, "unframe");
+    CHECK(mb_pdu_check(&r, p, plen, &data, &dlen) == MB_OK && dlen == 4, "answer checked");
+    double v;
+    CHECK(mb_decode(data, MB_T_F32, MB_ORDER_ABCD, -1, &v) && fabs(v - 230.2) < 1e-4, "230.2 V decoded: %f", v);
+    ans[8] ^= 1;
+    CHECK(mb_rtu_unframe(1, ans, 9, &p, &plen) == MB_ERR_CRC, "bad CRC detected");
+    ans[8] ^= 1;
+    CHECK(mb_rtu_unframe(2, ans, 9, &p, &plen) == MB_ERR_FRAME, "answer of another slave refused");
+
+    /* exception answer: 01 84 02 + CRC */
+    uint8_t ex[5] = {0x01, 0x84, 0x02};
+    crc = mb_crc16(ex, 3);
+    ex[3] = crc & 0xff, ex[4] = crc >> 8;
+    CHECK(mb_rtu_expected(ex, 2) == 5, "exception length");
+    CHECK(mb_rtu_unframe(1, ex, 5, &p, &plen) == MB_OK && mb_pdu_check(&r, p, plen, NULL, NULL) == 2, "exception 2 reported");
+    CHECK(strstr(mb_err_name(2), "illegal data address") != NULL, "exception name");
+
+    /* wrong byte count for the request */
+    uint8_t short_pdu[4] = {0x04, 0x02, 0x00, 0x01};
+    CHECK(mb_pdu_check(&r, short_pdu, 4, NULL, NULL) == MB_ERR_FRAME, "short answer refused");
+    CHECK(mb_rtu_gap_us(9600) > 4000 && mb_rtu_gap_us(9600) < 4020 && mb_rtu_gap_us(115200) == 1750, "3.5 character gap");
+}
+
+static void test_writes(void)
+{
+    uint8_t pdu[32];
+    uint16_t regs[2];
+    int n;
+    /* SDM: address register written as float32 60.0 = 42 70 00 00 (Eastron SDM120 protocol 2.3) */
+    CHECK(mb_encode(60.0, MB_T_F32, MB_ORDER_ABCD, regs, &n) && n == 2 && regs[0] == 0x4270 && regs[1] == 0, "60.0 as float32");
+    mb_req_t w = {.fc = MB_FC_WRITE_REGS, .addr = 0x0014, .count = 2, .regs = regs};
+    size_t len = mb_pdu_encode(&w, pdu, sizeof(pdu));
+    uint8_t want[] = {0x10, 0x00, 0x14, 0x00, 0x02, 0x04, 0x42, 0x70, 0x00, 0x00};
+    CHECK(len == sizeof(want) && memcmp(pdu, want, len) == 0, "write multiple registers PDU");
+    uint8_t echo[5] = {0x10, 0x00, 0x14, 0x00, 0x02};
+    CHECK(mb_pdu_check(&w, echo, 5, NULL, NULL) == MB_OK, "write multiple echo");
+    echo[4] = 1;
+    CHECK(mb_pdu_check(&w, echo, 5, NULL, NULL) == MB_ERR_FRAME, "wrong echo refused");
+
+    mb_req_t c = {.fc = MB_FC_WRITE_COIL, .addr = 7, .value = 0xff00};
+    len = mb_pdu_encode(&c, pdu, sizeof(pdu));
+    CHECK(len == 5 && pdu[3] == 0xff && pdu[4] == 0x00, "write coil on");
+    CHECK(mb_pdu_check(&c, pdu, 5, NULL, NULL) == MB_OK, "write coil echo");
+
+    /* PZEM energy reset: function 0x42 without data, answer the function alone */
+    mb_req_t z = {.fc = 0x42};
+    len = mb_pdu_encode(&z, pdu, sizeof(pdu));
+    CHECK(len == 1 && pdu[0] == 0x42 && mb_pdu_answer_len(&z) == 1, "device specific function");
+    mb_req_t bad = {.fc = MB_FC_READ_INPUT, .count = 126};
+    CHECK(mb_pdu_encode(&bad, pdu, sizeof(pdu)) == 0, "126 registers refused");
+}
+
+static void test_tcp(void)
+{
+    uint8_t pdu[8], adu[16];
+    mb_req_t r = {.fc = MB_FC_READ_HOLDING, .addr = 0x2006, .count = 2};
+    size_t n = mb_pdu_encode(&r, pdu, sizeof(pdu));
+    size_t len = mb_tcp_frame(0x1234, 3, pdu, n, adu, sizeof(adu));
+    uint8_t want[] = {0x12, 0x34, 0x00, 0x00, 0x00, 0x06, 0x03, 0x03, 0x20, 0x06, 0x00, 0x02};
+    CHECK(len == sizeof(want) && memcmp(adu, want, len) == 0, "MBAP + PDU");
+    uint8_t ans[] = {0x12, 0x34, 0x00, 0x00, 0x00, 0x07, 0x03, 0x03, 0x04, 0x43, 0x66, 0x33, 0x34};
+    const uint8_t *p, *data;
+    size_t plen, dlen;
+    CHECK(mb_tcp_expected(ans) == sizeof(ans), "length from MBAP");
+    CHECK(mb_tcp_unframe(0x1234, 3, ans, sizeof(ans), &p, &plen) == MB_OK && mb_pdu_check(&r, p, plen, &data, &dlen) == MB_OK,
+          "TCP answer");
+    CHECK(mb_tcp_unframe(0x1235, 3, ans, sizeof(ans), &p, &plen) == MB_ERR_FRAME, "other transaction refused");
+    ans[2] = 1;
+    CHECK(mb_tcp_expected(ans) == 0, "protocol id not 0 refused");
+}
+
+static void test_values(void)
+{
+    /* 0x12345678 in the four orders as they come over the wire */
+    const uint8_t abcd[] = {0x12, 0x34, 0x56, 0x78}, cdab[] = {0x56, 0x78, 0x12, 0x34}, badc[] = {0x34, 0x12, 0x78, 0x56},
+                  dcba[] = {0x78, 0x56, 0x34, 0x12};
+    const uint8_t *wire[] = {abcd, cdab, badc, dcba};
+    for (int o = 0; o < 4; o++) {
+        double v;
+        CHECK(mb_decode(wire[o], MB_T_U32, (mb_order_t)o, -1, &v) && v == 0x12345678, "u32 %s: %f", mb_order_name(o), v);
+        uint16_t regs[4];
+        int n;
+        CHECK(mb_encode(0x12345678, MB_T_U32, (mb_order_t)o, regs, &n) && n == 2 && regs[0] == (wire[o][0] << 8 | wire[o][1]) &&
+                  regs[1] == (wire[o][2] << 8 | wire[o][3]),
+              "u32 %s encoded", mb_order_name(o));
+    }
+    double v;
+    /* PZEM: current u32 low word first (CDAB), 0x0001 0x0000 -> wait: low word 0x86A0, high 0x0001 = 100000 mA */
+    const uint8_t pz[] = {0x86, 0xa0, 0x00, 0x01};
+    CHECK(mb_decode(pz, MB_T_U32, MB_ORDER_CDAB, -1, &v) && v == 100000, "low word first: %f", v);
+    const uint8_t s16[] = {0xff, 0xfe};
+    CHECK(mb_decode(s16, MB_T_S16, MB_ORDER_ABCD, -1, &v) && v == -2, "s16 -2");
+    CHECK(mb_decode(s16, MB_T_S16, MB_ORDER_CDAB, -1, &v) && v == -2, "word order ignored for one register");
+    const uint8_t sw[] = {0x34, 0x12};
+    CHECK(mb_decode(sw, MB_T_U16, MB_ORDER_BADC, -1, &v) && v == 0x1234, "byte swapped u16");
+    const uint8_t bits[] = {0x00, 0x24};
+    CHECK(mb_decode(bits, MB_T_U16, MB_ORDER_ABCD, 2, &v) && v == 1 && mb_decode(bits, MB_T_U16, MB_ORDER_ABCD, 3, &v) && v == 0,
+          "bit of a register");
+    /* ABB u64 import energy 0x0000000000BC614E = 12345678 (x0.01 kWh) */
+    const uint8_t u64[] = {0, 0, 0, 0, 0x00, 0xbc, 0x61, 0x4e};
+    CHECK(mb_decode(u64, MB_T_U64, MB_ORDER_ABCD, -1, &v) && v == 12345678, "u64");
+    const uint8_t s32n[] = {0xff, 0xff, 0xff, 0x9c};
+    CHECK(mb_decode(s32n, MB_T_S32, MB_ORDER_ABCD, -1, &v) && v == -100, "s32 -100");
+    const uint8_t nan[] = {0x7f, 0xc0, 0x00, 0x00};
+    CHECK(!mb_decode(nan, MB_T_F32, MB_ORDER_ABCD, -1, &v), "NaN refused");
+    uint16_t regs[4];
+    int n;
+    CHECK(mb_encode(-1.5, MB_T_F64, MB_ORDER_ABCD, regs, &n) && n == 4 && regs[0] == 0xbff8, "f64 -1.5");
+    CHECK(!mb_encode(70000, MB_T_U16, MB_ORDER_ABCD, regs, &n), "70000 does not fit u16");
+    CHECK(!mb_encode(-1, MB_T_U32, MB_ORDER_ABCD, regs, &n), "-1 does not fit u32");
+    mb_type_t t;
+    mb_order_t o;
+    CHECK(mb_type_from_name("f32", &t) && t == MB_T_F32 && !mb_type_from_name("float", &t), "type names");
+    CHECK(mb_order_from_name("CDAB", &o) && o == MB_ORDER_CDAB && !mb_order_from_name("cdab", &o), "order names");
+}
+
+static bool parse_text(const char *text, mb_template_t *t, char *err, size_t len)
+{
+    cJSON *j = cJSON_Parse(text);
+    bool ok = mb_template_parse(j, t, err, len);
+    cJSON_Delete(j);
+    return ok;
+}
+
+static void expect_refused(const char *text, const char *why)
+{
+    mb_template_t t;
+    char err[160] = "";
+    bool ok = parse_text(text, &t, err, sizeof(err));
+    CHECK(!ok && strstr(err, why), "refused (%s): got \"%s\"", why, ok ? "accepted" : err);
+    if (ok) {
+        mb_template_free(&t);
+    }
+}
+
+#define T_HEAD "{\"id\":\"x\",\"manufacturer\":\"M\",\"model\":\"X\",\"entities\":["
+
+static void test_templates(void)
+{
+    mb_template_t t;
+    char err[160];
+    const char *ok =
+        T_HEAD "{\"key\":\"v\",\"name\":\"Voltage\",\"reg\":\"input\",\"addr\":\"0x0000\",\"type\":\"f32\",\"unit\":\"V\"},"
+               "{\"key\":\"i\",\"name\":\"Current\",\"reg\":\"input\",\"addr\":6,\"type\":\"u32\",\"order\":\"CDAB\",\"scale\":0.001},"
+               "{\"key\":\"far\",\"name\":\"Far\",\"reg\":\"input\",\"addr\":\"0x0100\",\"type\":\"u16\"},"
+               "{\"key\":\"relay\",\"name\":\"Relay\",\"reg\":\"coil\",\"addr\":3,\"write\":{\"kind\":\"switch\"}},"
+               "{\"key\":\"alarm\",\"name\":\"Alarm\",\"reg\":\"holding\",\"addr\":16,\"bit\":3},"
+               "{\"key\":\"mode\",\"name\":\"Mode\",\"reg\":\"holding\",\"addr\":17,\"map\":{\"0\":\"off\",\"1\":\"auto\"},\"write\":{\"kind\":\"select\"}},"
+               "{\"key\":\"set\",\"name\":\"Setpoint\",\"reg\":\"holding\",\"addr\":18,\"type\":\"s16\",\"scale\":0.1,\"write\":{\"kind\":\"number\",\"min\":5,\"max\":30,\"step\":0.5}},"
+               "{\"key\":\"reset\",\"name\":\"Reset\",\"reg\":\"none\",\"write\":{\"kind\":\"button\",\"fc\":66}}]}";
+    CHECK(parse_text(ok, &t, err, sizeof(err)), "valid template: %s", err);
+    CHECK(t.nent == 8 && t.baud == 9600 && t.parity == 'N' && t.slave == 1 && t.max_regs == 40, "defaults");
+    const mb_entity_t *e = mb_template_entity(&t, "i");
+    CHECK(e && e->order == MB_ORDER_CDAB && e->scale == 0.001 && e->precision == 0, "entity fields");
+    CHECK(mb_entity_value(e, 12345) == 12, "value rounded to precision 0");
+    e = mb_template_entity(&t, "mode");
+    CHECK(e && mb_entity_label(e, 1) && strcmp(mb_entity_label(e, 1), "auto") == 0 && !mb_entity_label(e, 5), "map labels");
+    e = mb_template_entity(&t, "alarm");
+    CHECK(e && e->type == MB_T_BOOL && e->bit == 3, "bit entity is bool");
+
+    /* planning: v (0-1) and i (6-7) join with max_gap 4, far (0x100) alone; coil and holding apart; reset never read */
+    t.max_gap = 4;
+    uint16_t idx[8];
+    bool single[8] = {false};
+    for (int i = 0; i < 8; i++) {
+        idx[i] = (uint16_t)(7 - i);
+    }
+    mb_block_t b[8];
+    int nb = mb_plan(&t, idx, 8, single, b, 8);
+    CHECK(nb == 4, "4 blocks, got %d", nb);
+    CHECK(b[0].space == MB_SPACE_COIL && b[0].addr == 3 && b[0].count == 1, "coil block");
+    CHECK(b[1].space == MB_SPACE_INPUT && b[1].addr == 0 && b[1].count == 8 && b[1].n == 2, "joined input block %u+%u", b[1].addr, b[1].count);
+    CHECK(b[2].addr == 0x100 && b[2].n == 1, "far register alone");
+    CHECK(b[3].space == MB_SPACE_HOLDING && b[3].addr == 16 && b[3].count == 3 && b[3].n == 3, "holding block");
+    t.max_gap = 0;
+    for (int i = 0; i < 8; i++) {
+        idx[i] = (uint16_t)i;
+    }
+    nb = mb_plan(&t, idx, 8, single, b, 8);
+    CHECK(nb == 5, "no gap allowed: 5 blocks, got %d", nb);
+    single[(int)(mb_template_entity(&t, "set") - t.ent)] = true;
+    for (int i = 0; i < 8; i++) {
+        idx[i] = (uint16_t)i;
+    }
+    nb = mb_plan(&t, idx, 8, single, b, 8);
+    CHECK(nb == 6, "an entity marked single splits its block: %d", nb);
+    t.max_gap = 4;
+    t.max_regs = 4;
+    for (int i = 0; i < 8; i++) {
+        idx[i] = (uint16_t)i;
+    }
+    single[(int)(mb_template_entity(&t, "set") - t.ent)] = false;
+    nb = mb_plan(&t, idx, 8, single, b, 8);
+    CHECK(nb == 5 && b[1].count == 2 && b[2].addr == 6, "max_regs 4 keeps v and i apart (%d blocks)", nb);
+
+    /* back to JSON and again */
+    cJSON *j = mb_template_json(&t);
+    mb_template_t t2;
+    CHECK(mb_template_parse(j, &t2, err, sizeof(err)) && t2.nent == t.nent, "round trip: %s", err);
+    cJSON_Delete(j);
+    mb_template_free(&t2);
+    mb_template_free(&t);
+
+    expect_refused("{\"id\":\"x\"}", "manufacturer");
+    expect_refused("{\"id\":\"Bad Id\",\"manufacturer\":\"M\",\"model\":\"X\",\"entities\":[]}", "id:");
+    expect_refused(T_HEAD "]}", "entities: 1-");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"input\",\"addr\":70000}]}", "addr 0-65535");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"input\",\"addr\":1,\"type\":\"float\"}]}", "type bool");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"input\",\"addr\":1,\"write\":{\"kind\":\"number\",\"min\":0,\"max\":1}}]}",
+                   "cannot be written");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"holding\",\"addr\":1,\"write\":{\"kind\":\"select\"}}]}", "needs map");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"holding\",\"addr\":1,\"write\":{\"kind\":\"number\"}}]}", "needs write.min");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"holding\",\"addr\":1},{\"key\":\"v\",\"name\":\"W\",\"reg\":\"holding\",\"addr\":2}]}",
+                   "used twice");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"input\",\"addr\":1,\"type\":\"f32\",\"bit\":2}]}", "bit only");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"coil\",\"addr\":1,\"type\":\"u16\"}]}", "coils and discrete");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"none\"}]}", "reg none only");
+    expect_refused(T_HEAD "{\"key\":\"v\",\"name\":\"V\",\"reg\":\"holding\",\"addr\":1,\"write\":{\"kind\":\"button\",\"fc\":66}}]}",
+                   "device function");
+    expect_refused("{\"id\":\"x\",\"manufacturer\":\"M\",\"model\":\"X\",\"serial\":{\"parity\":\"X\"},\"entities\":[{\"key\":\"v\",\"name\":\"V\",\"reg\":\"input\",\"addr\":1}]}",
+                   "parity");
+}
+
+/* every built-in template parses, and its registers are what the source says about the family */
+static void test_builtin(int argc, char **argv)
+{
+    for (int i = 1; i < argc; i++) {
+        FILE *f = fopen(argv[i], "rb");
+        static char text[65536];
+        size_t n = f ? fread(text, 1, sizeof(text) - 1, f) : 0;
+        if (f) {
+            fclose(f);
+        }
+        text[n] = '\0';
+        mb_template_t t;
+        char err[160] = "";
+        CHECK(n && parse_text(text, &t, err, sizeof(err)), "%s: %s", argv[i], err);
+        if (!n || err[0]) {
+            continue;
+        }
+        const char *base = strrchr(argv[i], '/') ? strrchr(argv[i], '/') + 1 : argv[i];
+        char want[48];
+        snprintf(want, sizeof(want), "%s.json", t.id);
+        CHECK(strcmp(base, want) == 0, "%s: file name is not the id %s", argv[i], t.id);
+        /* all entities read in one cycle stay within max_regs per request */
+        uint16_t idx[MB_ENTITIES_MAX];
+        bool single[MB_ENTITIES_MAX] = {false};
+        mb_block_t b[MB_ENTITIES_MAX];
+        for (int k = 0; k < t.nent; k++) {
+            idx[k] = (uint16_t)k;
+        }
+        int nb = mb_plan(&t, idx, t.nent, single, b, MB_ENTITIES_MAX);
+        for (int k = 0; k < nb; k++) {
+            CHECK(b[k].count <= t.max_regs, "%s: block of %u registers", t.id, b[k].count);
+        }
+        if (strncmp(t.id, "eastron_", 8) == 0) {
+            for (int k = 0; k < t.nent; k++) {
+                const mb_entity_t *e = &t.ent[k];
+                CHECK(e->space != MB_SPACE_INPUT || (e->type == MB_T_F32 && e->addr % 2 == 0), "%s %s: SDM input registers are f32 at even addresses",
+                      t.id, e->key);
+            }
+            CHECK(t.ent[0].addr == 0 || strcmp(t.id, "eastron_sdm72d") == 0, "%s: starts at 0x0000", t.id);
+        }
+        printf("  %s: %d entities, %d requests per full poll\n", t.id, t.nent, nb);
+        mb_template_free(&t);
+    }
+}
+
+int main(int argc, char **argv)
+{
+    test_crc_rtu();
+    test_writes();
+    test_tcp();
+    test_values();
+    test_templates();
+    test_builtin(argc, argv);
+    printf("%s\n", failures ? "FAILED" : "all passed");
+    return failures ? 1 : 0;
+}

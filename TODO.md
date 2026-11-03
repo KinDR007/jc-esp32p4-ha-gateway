@@ -171,3 +171,15 @@ Sběrnice: konektor CN3 (1 GND, 2 3V3, 3 SCL, 4 SDA) nebo JP1 pin 23 SDA (GPIO7)
 - [x] S8 Dokumentace (sensors.md, hardware.md s CN3 a RS485, api.json, users, home-assistant, GitHub Pages), CHANGELOG
 - [ ] S9 Test se skutečnými senzory (BME280/BMP280, SHT4x, AHT20, BH1750 …): převody zatím ověřené jen simulací
 - [ ] S10 Nasadit integraci 1.6.0 do HA, až bude senzor připojený
+
+## RS485 / Modbus (zadání 2026-11-03)
+Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr) + Modbus TCP klient; šablony JSON pro čtení i zápis (number/switch/select/button jen kde to šablona povolí); vestavěné šablony ve firmwaru, uživatelské v NVS (~50 kB volných); každé zařízení jako samostatné zařízení v HA, volitelně přes integraci nebo MQTT; menu Systém › RS485. Testovací zařízení zatím není: ověření simulací (Modbus TCP slave na Macu).
+
+- [x] M1 Rešerše a kontra-rešerše: Eastron SDM (oficiální protokoly + manuály, ESPHome, mbmd, evcc, Tasmota, sdm_modbus), systémy šablon (evcc, ESPHome, HA modbus, Tasmota, jollyjinx), ORNO/DDS238/DTSU666/EM340/ABB/PZEM; poznámky v build/research
+- [x] M2 Protokol (CRC, RTU, TCP/MBAP, výjimky, typy a pořadí slov) a model šablon s validací a plánem blokových čtení; unit testy v CI
+- [x] M3 Šablony Eastron SDM120, SDM230, SDM630 V2, SDM72D-M V2 a V1 (generované z jedné tabulky, tools/modbus/gen_sdm.py)
+- [ ] M4 Šablony ORNO OR-WE-5xx, Hiking DDS238/DTS238, Chint DDSU666/DTSU666, Peacefair PZEM-016/017 po kontra-rešerši
+- [ ] M5 Komponenta `modbus`: UART3 RTU, TCP klient, zařízení, polling s dělením bloků při výjimce, zápis, offline/backoff, uživatelské šablony v NVS, API, Telegram
+- [ ] M6 MQTT: samostatné zařízení v HA (via_device brána), příkazy pro zápis; integrace 1.7.0: zařízení a entity sensor/number/switch/select/button
+- [ ] M7 Web UI Systém › RS485: sběrnice, zařízení s hodnotami, přidání ze šablony, hledání adresy/rychlosti, editor a import/export šablon, ruční čtení/zápis registrů
+- [ ] M8 Testy: Modbus TCP simulátor SDM na Macu (pymodbus), HW TC48, UI32, HA testy; dokumentace docs/modbus.md
