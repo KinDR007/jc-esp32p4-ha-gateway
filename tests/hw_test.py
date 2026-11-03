@@ -690,6 +690,7 @@ def tc46_mqtt_discovery_groups():
     host, port = ARGS.mqtt_broker.rsplit(':', 1)
     code, backup = http('GET', '/api/settings/export?secrets=1')
     check(code == 200, 'original settings exported (restored by import at the end)')
+    groups_before = http('GET', '/api/mqtt')[1]['discovery_groups']
     name = status()['hostname']
 
     def retained(component, object_id):
@@ -703,7 +704,7 @@ def tc46_mqtt_discovery_groups():
     try:
         for bad in (['bogus'], 'roles', [1]):
             check(http('POST', '/api/mqtt', {'discovery_groups': bad})[0] == 400, f'refused: discovery_groups {bad!r}')
-        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors']
+        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors', 'modbus']
         # an I2C sensor to expose (need not be connected: its entity exists, unavailable)
         sensors = http('GET', '/api/sensors')[1]['sensors']
         if not any(x['addr'] == 0x76 for x in sensors):
@@ -737,12 +738,14 @@ def tc46_mqtt_discovery_groups():
         time.sleep(2)
         check(all(retained(c, o) for c, o in entities), 'entities published again')
     finally:
-        http('POST', '/api/mqtt', {'discovery_groups': ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors']})
+        # the groups of before explicitly: a backup without the key of the groups would keep the test's
+        http('POST', '/api/mqtt', {'discovery_groups': groups_before})
         code, r = http('POST', '/api/settings/import', backup)
         check(code == 200, 'original settings imported, the gateway restarts')
         wait_restart(status()['role']['desired'])
     m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] or not m['enabled'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
     check(m['uri'] == backup['keys'].get('mqtt_uri', {}).get('str', m['uri']), f'original broker {m["uri"]}')
+    check(m['discovery_groups'] == groups_before, f'discovery groups of before: {groups_before}')
 
 
 def tc47_i2c_sensors():
@@ -886,6 +889,7 @@ def tc48_modbus():
         if ARGS.mqtt_broker:
             host, mport = ARGS.mqtt_broker.rsplit(':', 1)
             code, backup = http('GET', '/api/settings/export?secrets=1')
+            groups_before = http('GET', '/api/mqtt')[1]['discovery_groups']
             name = status()['hostname']
             try:
                 http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{mport}', 'user': '', 'password': '', 'tls': 'bundle', 'base': '',
@@ -908,8 +912,10 @@ def tc48_modbus():
                                                                 if d['id'] == dev2)['values'].get('alarm_threshold') == 1234, 15, 1)
                 check(True, 'write over MQTT read back')
             finally:
+                http('POST', '/api/mqtt', {'discovery_groups': groups_before})
                 http('POST', '/api/settings/import', backup)
                 wait_restart(status()['role']['desired'])
+                check(http('GET', '/api/mqtt')[1]['discovery_groups'] == groups_before, f'MQTT discovery groups of before: {groups_before}')
     finally:
         http('PUT', '/api/modbus', keep)
         http('DELETE', f'/api/modbus/template?id={tpl_id}')

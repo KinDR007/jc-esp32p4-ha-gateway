@@ -310,6 +310,11 @@ esp_err_t gw_config_import(const cJSON *keys, char *err, size_t err_len)
             }
         }
     }
+    /* a backup of v1.10 or older has the MQTT discovery groups only under their old key: it applies when
+     * the new one is gone (keys missing in a backup otherwise stay) */
+    if (cJSON_GetObjectItem(keys, "mqtt_grp") && !cJSON_GetObjectItem(keys, "mqtt_groups")) {
+        nvs_erase_key(s_nvs, "mqtt_groups");
+    }
     ESP_LOGI(TAG, "settings imported");
     return nvs_commit(s_nvs);
 }
