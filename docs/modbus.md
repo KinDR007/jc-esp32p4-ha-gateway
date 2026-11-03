@@ -160,6 +160,9 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/
   addresses. TC48 runs it: all values of four templates match, writes of each kind are read back,
   the search finds the units, a user template works, an unreachable device goes offline, MQTT
   discovery creates the device via the gateway and a write over MQTT arrives.
+- `tests/modbus_tcp/`: a Modbus TCP simulator of a Huawei SUN2000 hybrid inverter (battery, meter)
+  with changing data along a simulated day, and its template `huawei_sun2000.json` to import as an
+  own template; a sample for simulating other devices ([README](../tests/modbus_tcp/README.md)).
 - Integration tests (`tests/ha_integration`), UI32.
 - **Not yet tested on a real RS485 device**: the RS485 path ran only without a device (timeouts);
   real meters will confirm the serial timing and the maps marked "community" above.

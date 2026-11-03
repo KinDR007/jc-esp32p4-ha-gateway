@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Tests: Modbus TCP simulator of a Huawei SUN2000 hybrid PV inverter with battery and meter (simulated
+  day, power limit, start/stop) and its template to import (`tests/modbus_tcp/`).
+
 ## v1.11 (2026-11-03)
 
 Summary: I2C sensors on connector CN3 (24 chip families, recognised by the gateway) and Modbus devices on RS485 and Modbus TCP with JSON templates (Eastron SDM, ORNO, Hiking, Chint, Peacefair built in), each shown in Home Assistant through the integration or MQTT.
