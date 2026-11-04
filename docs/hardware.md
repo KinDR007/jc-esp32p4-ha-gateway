@@ -6,6 +6,9 @@ Schematics: [schematics/](schematics/), source
 All eight sheets (also USB and RS485, MIPI DSI/CSI, RJ45, touch) with an ESPHome example:
 [p1ngb4ck/unofficial_guition_esp32p4_repo](https://github.com/p1ngb4ck/unofficial_guition_esp32p4_repo/tree/main/JC-ESP32P4-M3-Dev).
 
+3D printable case (two shells, connector openings, buttons, room for the XIAO radio):
+[hardware/enclosure](../hardware/enclosure/README.md).
+
 ## Chip revision
 
 The tested board reports **ESP32-P4 v1.3** (engineering sample, `esptool flash-id`). Builds are set

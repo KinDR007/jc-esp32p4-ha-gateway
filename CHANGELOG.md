@@ -4,6 +4,8 @@
 
 - Tests: Modbus TCP simulator of a Huawei SUN2000 hybrid PV inverter with battery and meter (simulated
   day, power limit, start/stop) and its template to import (`tests/modbus_tcp/`).
+- 3D printable case for the board (OpenSCAD, two shells, flexible BOOT/RST/PWR buttons, bay for the
+  XIAO radio; `hardware/enclosure/`).
 
 ## v1.11 (2026-11-03)
 
