@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v1.12 (2026-11-04)
+
+Summary: Modbus TCP search in a network, Victron GX and GoodWe XS templates, Modbus over UDP for GoodWe Wi-Fi modules.
 
 - Modbus TCP search in a network (System › Modbus TCP search, `/api/modbus/scan`): connects to the
   chosen ports of every address of a range (up to /22), asks each open one a few unit ids, recognises
