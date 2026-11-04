@@ -13,6 +13,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -926,6 +927,77 @@ def tc48_modbus():
     check(code == 200 and len(r['devices']) == len(keep['devices']) and tpl_id not in [t['id'] for t in http('GET', '/api/modbus/templates')[1]['templates']],
           'configuration of before restored, test template deleted')
 
+
+def tc49_modbus_scan():
+    """Modbus TCP search in a network (/api/modbus/scan) against the simulator of this computer playing a Victron GX
+    (system on unit 100, VE.Bus on 228) and an Eastron meter (unit 1): request checks, the simulator found and
+    recognised by its serial number with both Victron units, an open port without Modbus (the gateway's web server)
+    not listed, a /24 search refusing a second one and stopping, the Victron templates reading every value as the
+    simulator encodes it. The configuration of before comes back."""
+    import subprocess
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    port = 1503
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    units = {100: 'victron_gx_system', 228: 'victron_vebus', 1: 'eastron_sdm630'}
+    sim = subprocess.Popen([sys.executable, sim_py, '--port', str(port)] + [f'{t}:{u}' for u, t in units.items()],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+
+    def search(body, limit=120):
+        code, r = http('POST', '/api/modbus/scan', body)
+        check(code == 200, f'search of {body["net"]} started')
+        return wait_until(f'search of {body["net"]} done', lambda: (lambda r: r if not r['running'] else None)(http('GET', '/api/modbus/scan')[1]), limit, 2)
+
+    try:
+        time.sleep(1)
+        r = http('GET', '/api/modbus/scan')[1]
+        check(re.fullmatch(r'\d+\.\d+\.\d+\.0/(2[2-9]|3[0-2])', r['default_net'] or '') is not None, f'default network {r["default_net"]}')
+        for bad, why in (({}, 'no net'), ({'net': 'x'}, 'net not an address'), ({'net': '10.0.0.0/21'}, 'more than 1024 addresses'),
+                         ({'net': f'{my_ip}/32', 'ports': [1, 2, 3, 4, 5]}, 'five ports'), ({'net': f'{my_ip}/32', 'units': [300]}, 'unit 300')):
+            check(http('POST', '/api/modbus/scan', bad)[0] == 400, f'refused: {why}')
+
+        r = search({'net': f'{my_ip}/32', 'ports': [port], 'udp': False})
+        f = r['found'][0] if len(r['found']) == 1 else {}
+        check(r['addresses'] == 1 and r['open'] == 1 and f.get('host') == my_ip and f.get('port') == port, f'the simulator found: {r["found"]}')
+        check(f.get('unit') == 1 and f.get('answer') == 2, 'first unit: the meter, exception 2 at holding register 0')
+        check(f.get('manufacturer') == 'Victron Energy' and f.get('template') == 'victron_gx_system' and f.get('device_unit') == 100
+              and f.get('serial') == 'SERIAL-01234' and f.get('vebus_unit') == 228, 'recognised as a Victron GX by its serial number, VE.Bus on unit 228')
+
+        r = search({'net': f'{ARGS.host}/32', 'ports': [80], 'udp': False})
+        check(r['open'] == 1 and not r['found'], 'the web server of the gateway: open, not Modbus, not listed')
+
+        net = http('GET', '/api/modbus/scan')[1]['default_net']
+        check(http('POST', '/api/modbus/scan', {'net': net, 'ports': [port]})[0] == 200, f'search of {net} started')
+        check(http('POST', '/api/modbus/scan', {'net': net})[0] == 409, 'a second search refused while one runs')
+        time.sleep(4)
+        check(http('POST', '/api/modbus/scan', {'stop': True})[0] == 200, 'stop')
+        r = wait_until('search stopped', lambda: (lambda r: r if not r['running'] else None)(http('GET', '/api/modbus/scan')[1]), 15, 1)
+        check(r['stopped'] and r['progress'] < 100, f'stopped at {r["progress"]} %')
+
+        devs = keep['devices'] + [{'name': f'TC49 {t}', 'template': t, 'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': u,
+                                   'poll_s': 3, 'expose': 'none'} for u, t in units.items() if t.startswith('victron')]
+        check(http('PUT', '/api/modbus', {'devices': devs})[0] == 200, 'the two Victron devices added')
+        for u, t in units.items():
+            if not t.startswith('victron'):
+                continue
+            exp = json.loads(subprocess.run([sys.executable, sim_py, '--expect', t], capture_output=True, text=True).stdout)
+            dev = lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['host'] == my_ip and d['slave'] == u)
+            d = wait_until(f'values of {t}', lambda: (lambda d: d if len(d['values']) >= len(exp) else None)(dev()), 30, 2)
+            bad = {k: (v, d['values'].get(k)) for k, v in exp.items()
+                   if not (d['values'].get(k) == v or isinstance(v, (int, float)) and abs(d['values'].get(k, 1e18) - v) <= 1e-6 + abs(v) * 1e-6)}
+            check(not bad and d['state'] == 'ok', f'{t}: all {len(exp)} values as encoded' + (f', different {bad}' if bad else ''))
+    finally:
+        http('POST', '/api/modbus/scan', {'stop': True})
+        http('PUT', '/api/modbus', keep)
+        sim.terminate()
+        sim.communicate(timeout=5)
+    code, r = http('GET', '/api/modbus')
+    check(code == 200 and len(r['devices']) == len(keep['devices']), 'configuration of before restored')
 
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
@@ -2174,7 +2246,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2201,7 +2273,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

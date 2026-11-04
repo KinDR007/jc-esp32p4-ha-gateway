@@ -186,3 +186,5 @@ Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr)
 - [ ] M9 Test se skutečným zařízením na RS485 (časování, mapy označené „komunita“: ORNO 504, 516/517)
 - [x] Vydání v1.11 (2026-11-03): CI zelené, release na GitHubu, deska na v1.11 z online aktualizace, integrace 1.6.0 v HA
 - [ ] M10 Ověřit zásobník úlohy modbus (6 kB) a volnou interní RAM (203 kB po přidání I2C a Modbus)
+- [x] M11 Hledání Modbus TCP v síti (Systém › Hledání Modbus TCP, `/api/modbus/scan`), rozpoznání Victron GX/VE.Bus a GoodWe, TC49, UI33; šablony Victron GX a VE.Bus ověřené na MultiPlus-II GX (192.168.88.240)
+- [ ] M12 GoodWe GW3000-XS (192.168.1.x): brána do 192.168.1.0/24 nevidí (0 otevřených portů, Mac tam jde jen přes VPN) a z Macu přes VPN v 5:48 nic na 502/8899/48899 (modul FV střídače v noci bez napájení?). Zopakovat přes den; mít trasu z 192.168.88.x; XS se starým Wi-Fi modulem mluví jen UDP 8899 → šablona GoodWe DT/XS (unit 0x7F, 30100+) má smysl až s TCP 502 (Kit-20) nebo s UDP transportem v bráně

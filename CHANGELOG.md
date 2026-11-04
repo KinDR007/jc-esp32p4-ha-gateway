@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Modbus TCP search in a network (System › Modbus TCP search, `/api/modbus/scan`): connects to the
+  chosen ports of every address of a range (up to /22), asks each open one a few unit ids, recognises
+  Victron GX (with its VE.Bus unit) and GoodWe by their serial numbers and adds a recognised device with
+  one click; GoodWe Wi-Fi dongles answering only on UDP 8899 are listed too. Runs beside the polling.
+- Modbus templates of a Victron GX: `victron_gx_system` (unit 100) and `victron_vebus` (MultiPlus /
+  Quattro), from Victron's register list 3.81, checked on a MultiPlus-II GX.
+- Tests: TC49, UI33; the Modbus simulator plays text registers as serial numbers (no spaces).
 - Tests: Modbus TCP simulator of a Huawei SUN2000 hybrid PV inverter with battery and meter (simulated
   day, power limit, start/stop) and its template to import (`tests/modbus_tcp/`).
 - 3D printable case for the board (OpenSCAD, two shells, flexible BOOT/RST/PWR buttons, bay for the

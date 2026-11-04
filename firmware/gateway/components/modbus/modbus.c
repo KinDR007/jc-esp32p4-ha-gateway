@@ -16,6 +16,7 @@
 #include "freertos/task.h"
 #include "gw.h"
 #include "mb_bus.h"
+#include "mb_scan.h"
 #include "mb_template.h"
 #include "sdkconfig.h"
 
@@ -1690,6 +1691,7 @@ esp_err_t modbus_init(void)
     gw_http_register("/api/modbus/raw", HTTP_POST, raw_post);
     gw_http_register("/api/modbus/probe", HTTP_GET, probe_get);
     gw_http_register("/api/modbus/probe", HTTP_POST, probe_post);
+    mb_scan_init();
     gw_bot_command("modbus", "values of the Modbus devices", "hodnoty zařízení Modbus", "system/rs485", 1, false, bot_modbus);
     gw_mqtt_set_extension(mqtt_discovery, NULL);
     gw_mqtt_add_command("modbus/+/+/set", mqtt_command);

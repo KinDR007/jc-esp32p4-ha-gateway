@@ -3899,6 +3899,103 @@
             "en": "Reads the template's first register (without a template holding register 0) at every address; an exception counts as an answer. RS485 devices are not polled while it runs (about 150 ms per address and baud rate). {\"stop\": true} ends it.",
             "cs": "Čte první registr šablony (bez šablony holding registr 0) na každé adrese; i výjimka je odpověď. Zařízení na RS485 se během hledání nečtou (asi 150 ms na adresu a rychlost). {\"stop\": true} ho ukončí."
           }
+        },
+        {
+          "method": "GET",
+          "path": "/api/modbus/scan",
+          "perm": "system/rs485",
+          "level": 1,
+          "summary": {
+            "en": "State and result of the Modbus TCP search in a network.",
+            "cs": "Stav a výsledek hledání Modbus TCP v síti."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "default_net": "192.168.88.0/24",
+            "running": false,
+            "net": "192.168.88.0/24",
+            "progress": 100,
+            "addresses": 254,
+            "open": 1,
+            "stopped": false,
+            "duration_ms": 41250,
+            "found": [
+              {
+                "host": "192.168.88.240",
+                "port": 502,
+                "unit": 1,
+                "answer": 2,
+                "manufacturer": "Victron Energy",
+                "model": "GX device",
+                "device_unit": 100,
+                "template": "victron_gx_system",
+                "serial": "c0619ab3d745",
+                "vebus_unit": 228
+              }
+            ],
+            "udp": [
+              {
+                "host": "192.168.1.60",
+                "info": "Modbus RTU on UDP 8899"
+              }
+            ]
+          },
+          "effects": {
+            "en": "default_net is the network of the interface carrying the traffic. answer: 0 data, else the Modbus exception code of the first unit that answered. manufacturer, model, template: a device recognised by its serial number; vebus_unit: the VE.Bus unit of a Victron GX. udp: GoodWe dongles answering on UDP 8899 or the discovery port 48899 (the gateway reads Modbus TCP only).",
+            "cs": "default_net je síť rozhraní, kterým jde provoz. answer: 0 data, jinak kód výjimky Modbus první jednotky, která odpověděla. manufacturer, model, template: zařízení poznané podle sériového čísla; vebus_unit: jednotka VE.Bus u Victron GX. udp: moduly GoodWe odpovídající na UDP 8899 nebo na port hledání 48899 (brána čte jen Modbus TCP)."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/modbus/scan",
+          "perm": "system/rs485",
+          "level": 2,
+          "summary": {
+            "en": "Starts a Modbus TCP search in a network, or stops it.",
+            "cs": "Spustí hledání Modbus TCP v síti, nebo ho zastaví."
+          },
+          "body": {
+            "net": "192.168.1.0/24",
+            "ports": [
+              502
+            ],
+            "units": [
+              1,
+              247,
+              255
+            ],
+            "udp": true
+          },
+          "body_type": "json",
+          "response": {},
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "net not a.b.c.d/n or prefix out of 22-32, ports not a list of 1-4, units not a list of 1-8 ids 0-255.",
+                "cs": "net není a.b.c.d/n nebo prefix mimo 22-32, ports není seznam 1-4, units není seznam 1-8 čísel 0-255."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "A search is running.",
+                "cs": "Hledání už běží."
+              }
+            },
+            {
+              "code": 503,
+              "when": {
+                "en": "No memory for the search task.",
+                "cs": "Málo paměti pro úlohu hledání."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Connects to the ports of every address (4 at a time, 300 ms each), reads holding register 0 of the units on each open port (an exception is an answer too), then recognises Victron GX and GoodWe by their serial numbers. With udp (default) also asks GoodWe dongles on UDP 8899 and sends their discovery broadcast. Runs beside the device polling; a /24 takes about 20-60 s. Ports default [502], units [1, 247, 255]. {\"stop\": true} ends it.",
+            "cs": "Připojí se na porty každé adresy (4 najednou, 300 ms), na otevřeném portu čte holding registr 0 zadaných jednotek (i výjimka je odpověď) a pak pozná Victron GX a GoodWe podle sériového čísla. S udp (výchozí) se ptá i modulů GoodWe na UDP 8899 a pošle jejich broadcast hledání. Běží vedle čtení zařízení; /24 trvá asi 20-60 s. Výchozí ports [502], units [1, 247, 255]. {\"stop\": true} ho ukončí."
+          }
         }
       ]
     },

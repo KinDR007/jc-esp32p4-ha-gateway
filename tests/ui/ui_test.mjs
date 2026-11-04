@@ -897,6 +897,26 @@ await test('UI32', 'System › RS485: bus settings, templates, add a device from
   }
 });
 
+await test('UI33', 'System › Modbus TCP search: menu item, the gateway network filled in, an invalid network refused, a search of the gateway itself (web server open, not Modbus) runs to the end', async () => {
+  const host = new URL(base).hostname;
+  check(await tab('system/mbscan') && await page.$('#side a[data-route="system/mbscan"]') !== null, 'menu item System › Modbus TCP search');
+  await page.waitForFunction(() => document.querySelector('#ms-net')?.value, null, { timeout: 10000 });
+  const scan = await (await page.request.get(base + 'api/modbus/scan')).json();
+  check(await page.inputValue('#ms-net') === (scan.net || scan.default_net), `network filled in: ${await page.inputValue('#ms-net')}`);
+  await page.fill('#ms-net', '10.0.0.0/8');
+  await page.click('#ms-start');
+  await page.waitForFunction(() => /prefix/.test(document.querySelector('#toast').textContent), null, { timeout: 5000 });
+  check(true, `invalid network refused: ${await page.textContent('#toast')}`);
+  await page.fill('#ms-net', `${host}/32`);
+  await page.fill('#ms-ports', '80');
+  await page.uncheck('#ms-udp');
+  await page.click('#ms-start');
+  await page.waitForFunction(() => /Done|Hotovo/.test(document.querySelector('#ms-state').textContent), null, { timeout: 30000 });
+  check((await page.textContent('#ms-state')).includes('1 open') || (await page.textContent('#ms-state')).includes('1 otevřených'), `state: ${(await page.textContent('#ms-state')).trim()}`);
+  check(!(await page.$('#ms-found table')), 'nothing listed: the web server does not speak Modbus');
+  check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it
 async function legendClear(box) {
   return page.evaluate(box => {

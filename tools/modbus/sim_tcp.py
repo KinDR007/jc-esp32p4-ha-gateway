@@ -93,19 +93,19 @@ class Unit:
         for e in self.t['entities']:
             if e['reg'] == 'none':
                 continue
-            raw = raw_value(self.t, e)
             addr = num(e['addr'])
             typ = e.get('type', 'bool' if e['reg'] in ('coil', 'discrete') else 'u16')
+            raw = 0 if typ == 'str' else raw_value(self.t, e)
             sp = self.space[e['reg']]
             if e['reg'] in ('coil', 'discrete'):
                 sp[addr] = raw
             elif 'bit' in e:
                 sp[addr] = (sp.get(addr, 0) & ~(1 << e['bit'])) | (raw << e['bit'])
             elif typ == 'str':
-                text = (e['key'].upper() + ' ' * 128)[:2 * e['count']]
+                text = (e['key'].upper() + '-' + '0123456789' * 26)[:2 * e['count']]  # no spaces: a serial number
                 for i in range(e['count']):
                     sp[addr + i] = ord(text[2 * i]) << 8 | ord(text[2 * i + 1])
-                self.expect[e['key']] = e['key'].upper()
+                self.expect[e['key']] = text
                 continue
             else:
                 for i, w in enumerate(encode(typ, e.get('order', 'ABCD'), raw)):

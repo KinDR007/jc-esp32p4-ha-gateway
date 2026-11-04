@@ -501,7 +501,7 @@ let me = null;
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
   'Roles': 'Role', 'Status and maintenance': 'Stav a údržba', 'Radio surroundings': 'Rádiové okolí', 'Integration': 'Integrace',
-  'Maintenance and backup': 'Údržba a záloha',
+  'Maintenance and backup': 'Údržba a záloha', 'Modbus TCP search': 'Hledání Modbus TCP',
   'Notifications': 'Notifikace', 'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
   'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
   'Overview': 'Přehled', 'Data flows': 'Toky dat', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Hardware': 'Hardware', 'I2C sensors': 'I2C senzory', 'Modbus devices': 'Zařízení Modbus', 'Zigbee2MQTT': 'Zigbee2MQTT',
@@ -1408,7 +1408,7 @@ const NAV = [
   { id: 'system', label: 'System', icon: 'developer-board', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
     { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' }, { id: 'hw', label: 'Hardware', icon: 'expansion-card-variant' },
-    { id: 'rs485', label: 'RS485', icon: 'serial-port' },
+    { id: 'rs485', label: 'RS485', icon: 'serial-port' }, { id: 'mbscan', label: 'Modbus TCP search', icon: 'lan-pending' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
     { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
@@ -1426,7 +1426,7 @@ const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbe
   role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
   'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
 /* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
-const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
+const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'system/mbscan': 'system/rs485', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -4477,7 +4477,7 @@ views['system/rs485'] = () => `<div class="grid">
 </div>`;
 
 const MB_EXPOSE = () => [['integration', L('integration', 'integrace')], ['mqtt', 'MQTT'], ['both', L('integration and MQTT', 'integrace a MQTT')], ['none', L('not shown', 'nezobrazovat')]];
-let mb = null, mbTpls = [], mbTimer = null, mbOpen = new Set(), mbFull = {};
+let mb = null, mbTpls = [], mbTimer = null, mbOpen = new Set(), mbFull = {}, mbPrefill = null;
 const mbTpl = id => mbTpls.find(t => t.id === id);
 const mbConn = d => d.transport === 'tcp' ? `TCP ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
 const mbState = d => ({ ok: pill('ok', L('ok', 'v pořádku')), partial: pill('warn', L('partly', 'částečně')), offline: pill('bad', L('offline', 'nedostupné')),
@@ -4587,6 +4587,18 @@ async function loadModbus(full = true) {
     mbAddNote();
     mbRenderDevices();
     mbRenderTemplates();
+    if (mbPrefill) {
+      $('#mb-add-tr').value = 'tcp';
+      $('#mb-add-host').value = $('#mb-raw-host').value = mbPrefill.host;
+      $('#mb-add-port').value = mbPrefill.port;
+      $('#mb-add-slave').value = $('#mb-raw-slave').value = mbPrefill.unit;
+      $('#mb-raw-tr').value = 'tcp';
+      $('#mb-add-tcp').classList.remove('hidden');
+      $('#mb-raw-hostf').classList.remove('hidden');
+      mbAddNote();
+      mbPrefill = null;
+      $('#mb-add-tpl').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
   mbRefresh();
   if (!mbTimer) mbTimer = setInterval(() => loadModbus(false), 3000);
@@ -4738,6 +4750,82 @@ document.addEventListener('click', async e => {
       await api(`/api/modbus/template?id=${encodeURIComponent(t.dataset.mbTplDel)}`, { method: 'DELETE' });
       await loadModbus(true);
       toast(L('Deleted', 'Smazáno'));
+    }
+  } catch (err) {
+    toast(L('Error: ', 'Chyba: ') + err.message);
+  }
+});
+
+/* ---------------- Modbus TCP search in a network ---------------- */
+views['system/mbscan'] = () => `<div class="grid">
+  <div class="card">${h3('lan-pending', L('Search the network', 'Prohledat síť'))}
+    <p class="muted">${L('Connects to the port of every address of the range and asks each open one a few unit ids; an exception counts as an answer too. Victron GX and GoodWe are recognised by their serial numbers. Only reads; the Modbus devices keep being read. A /24 takes about 20-60 s.',
+      'Připojí se na port každé adresy rozsahu a otevřeného se zeptá na několik jednotek; i výjimka je odpověď. Victron GX a GoodWe pozná podle sériového čísla. Jen čte; zařízení Modbus se dál čtou. Rozsah /24 trvá asi 20-60 s.')}</p>
+    <div class="row">
+      <label class="field" style="margin:0;flex:1;min-width:170px"><span>${L('Network', 'Síť')}</span><input type="text" id="ms-net" placeholder="192.168.1.0/24" data-notr></label>
+      <label class="field" style="margin:0"><span>${L('Ports', 'Porty')}</span><input type="text" id="ms-ports" value="502" style="width:110px" data-notr></label>
+      <label class="field" style="margin:0"><span>${L('Units', 'Jednotky')}</span><input type="text" id="ms-units" value="1, 247, 255" style="width:110px" data-notr></label></div>
+    <div class="row"><label><input type="checkbox" id="ms-udp" checked> ${L('GoodWe dongles on UDP 8899', 'Moduly GoodWe na UDP 8899')}</label></div>
+    <div class="row"><button class="btn primary" id="ms-start">${ic('magnify-scan')}${L('Search', 'Hledat')}</button><button class="btn hidden" id="ms-stop">${L('Stop', 'Zastavit')}</button></div>
+    <div id="ms-state" class="muted" style="margin-top:8px"></div></div>
+  <div class="card wide">${h3('lan-connect', L('Found', 'Nalezeno'))}<div class="table-wrap" id="ms-found"><p class="muted">${L('No search yet.', 'Zatím bez hledání.')}</p></div></div>
+</div>`;
+
+let msTimer = null, msLast = '';
+const msAnswer = f => f.answer ? L(`exception ${f.answer}`, `výjimka ${f.answer}`) : L('data', 'data');
+async function loadMbScan(first) {
+  if (route() !== 'system/mbscan') { clearInterval(msTimer); msTimer = null; return; }
+  let d;
+  try { d = await api('/api/modbus/scan'); } catch (e) { if ($('#ms-state')) $('#ms-state').textContent = e.message; return; }
+  if (!$('#ms-state')) return;
+  if (first && !$('#ms-net').value) $('#ms-net').value = d.net || d.default_net || '';
+  $('#ms-start').classList.toggle('hidden', d.running);
+  $('#ms-stop').classList.toggle('hidden', !d.running);
+  $('#ms-state').innerHTML = !d.net ? '' : `${d.running ? `${pill('warn', L('searching', 'hledám'))} ${d.progress} % · ` : d.stopped ? `${L('Stopped', 'Zastaveno')} · ` : `${L('Done', 'Hotovo')} · `}`
+    + `${esc(d.net)} · ${L(`${d.addresses} addresses, ${d.open} open`, `${d.addresses} adres, ${d.open} otevřených`)} · ${(d.duration_ms / 1000).toFixed(0)} s`;
+  if (d.running && !msTimer) msTimer = setInterval(loadMbScan, 2000);
+  if (!d.running && msTimer) { clearInterval(msTimer); msTimer = null; }
+  const key = JSON.stringify([d.found, d.udp, d.running]);
+  if (key === msLast && !first) return;
+  msLast = key;
+  if (!d.net) return;
+  const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  const rows = d.found.map(f => {
+    const dev = f.manufacturer ? `<b>${esc(f.manufacturer)}</b> ${esc(f.model)}${f.serial ? ` <span class="muted">${esc(f.serial)}</span>` : ''}` : `<span class="muted">${L('unknown device', 'neznámé zařízení')}</span>`;
+    const units = [f.device_unit !== undefined ? f.device_unit : f.unit, f.vebus_unit].filter(u => u !== undefined);
+    const acts = (f.template ? `<button class="btn" data-ms-add="${f.host}|${f.port}|${f.device_unit}|${f.template}" ${ro}>${ic('plus')}${L('Add', 'Přidat')}</button>` : '')
+      + (f.vebus_unit ? `<button class="btn" data-ms-add="${f.host}|${f.port}|${f.vebus_unit}|victron_vebus" ${ro}>${ic('plus')}VE.Bus</button>` : '')
+      + `<button class="btn" data-ms-use="${f.host}|${f.port}|${f.device_unit !== undefined ? f.device_unit : f.unit}" title="${L('Open in RS485 › Add a device and Manual request', 'Otevřít v RS485 › Přidat zařízení a Ruční dotaz')}">${ic('chevron-right')}RS485</button>`;
+    return `<tr><td data-notr>${esc(f.host)}:${f.port}</td><td class="hw-wrap">${dev}</td><td data-notr>${units.join(', ')}</td><td>${L('unit', 'jednotka')} ${f.unit}: ${msAnswer(f)}</td><td>${acts}</td></tr>`;
+  }).join('');
+  const udp = d.udp.map(u => `<tr><td data-notr>${esc(u.host)}</td><td class="hw-wrap"><b>GoodWe</b> <span class="muted" data-notr>${esc(u.info)}</span></td><td>UDP</td>
+    <td colspan="2" class="hw-wrap">${L('Modbus only on UDP: the gateway reads Modbus TCP. A WiFi/LAN Kit-20 or the LAN+WiFi kit 2.0 offers TCP port 502.', 'Modbus jen přes UDP: brána čte Modbus TCP. WiFi/LAN Kit-20 nebo LAN+WiFi kit 2.0 nabízí TCP port 502.')}</td></tr>`).join('');
+  $('#ms-found').innerHTML = rows || udp ? `<table class="hw-stack"><tr>${[L('Address', 'Adresa'), L('Device', 'Zařízení'), L('Units', 'Jednotky'), L('Answer', 'Odpověď'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${rows}${udp}</table>`
+    : `<p class="muted">${d.running ? L('Nothing yet.', 'Zatím nic.') : L('No Modbus TCP device answered. A routed network needs a route from the gateway; an inverter\'s dongle may be off at night.', 'Žádné zařízení Modbus TCP neodpovědělo. Do jiné sítě musí z brány vést trasa; modul střídače může být v noci vypnutý.')}</p>`;
+}
+const msList = t => t.split(/[\s,;]+/).filter(Boolean).map(Number);
+document.addEventListener('click', async e => {
+  const t = e.target.closest('#ms-start, #ms-stop, [data-ms-add], [data-ms-use]');
+  if (!t) return;
+  try {
+    if (t.id === 'ms-start') {
+      await api('/api/modbus/scan', { json: { net: $('#ms-net').value.trim(), ports: msList($('#ms-ports').value), units: msList($('#ms-units').value), udp: $('#ms-udp').checked } });
+      loadMbScan();
+    } else if (t.id === 'ms-stop') {
+      await api('/api/modbus/scan', { json: { stop: true } });
+    } else if (t.dataset.msAdd) {
+      const [host, port, unit, template] = t.dataset.msAdd.split('|');
+      mb = await api('/api/modbus');
+      mbTpls = (await api('/api/modbus/templates')).templates;
+      const tp = mbTpl(template);
+      if (mb.devices.some(d => d.transport === 'tcp' && d.host === host && d.port === +port && d.slave === +unit)) { toast(L('Already added', 'Už je přidané')); return; }
+      const name = `${tp ? tp.manufacturer.split(' ')[0] + ' ' + tp.model.split(' (')[0] : template}`.slice(0, 32);
+      await api('/api/modbus', { method: 'PUT', json: { devices: [...mbList(), { name, template, transport: 'tcp', host, port: +port, slave: +unit, poll_s: 0, expose: 'integration' }] } });
+      toast(L(`Added ${name}: System › RS485`, `Přidáno ${name}: Systém › RS485`));
+    } else if (t.dataset.msUse) {
+      const [host, port, unit] = t.dataset.msUse.split('|');
+      mbPrefill = { host, port: +port, unit: +unit };
+      go('system/rs485');
     }
   } catch (err) {
     toast(L('Error: ', 'Chyba: ') + err.message);
@@ -5816,6 +5904,7 @@ function render(full) {
     if (route() === 'radios/status') loadRadios();
     if (route() === 'system/hw') loadHw();
     if (route() === 'system/rs485') loadModbus();
+    if (route() === 'system/mbscan') loadMbScan(true);
     if (route() === 'esphome') loadEsphomeWifi();
     if (route().startsWith('system/users/')) loadUsersPage();
     if (route() === 'profile') loadProfile();

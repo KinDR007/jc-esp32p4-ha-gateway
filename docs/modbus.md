@@ -3,7 +3,7 @@
 The gateway reads and writes Modbus devices, on the board's RS485 port and over the network
 (Modbus TCP), and shows each one in Home Assistant as its own device. What to read from a device
 and how to show it is a **template** (JSON): built-in ones come with the firmware, own ones are
-added in the web UI. Web UI: System › RS485. API: [api.md](api.md#modbus-rs485-and-tcp). Code:
+added in the web UI. Web UI: System › RS485 and System › Modbus TCP search. API: [api.md](api.md#modbus-rs485-and-tcp). Code:
 `firmware/gateway/components/modbus`.
 
 ## Wiring
@@ -40,6 +40,31 @@ Home Assistant (integration, MQTT, both, none), enabled. Up to 16 devices.
 - **Manual request** reads or writes registers and coils of any address and shows registers as
   u16, s16, u32 and float32 in both word orders, for writing a template.
 - Telegram: `/modbus` lists the devices with their measurements.
+
+## Modbus TCP search in a network
+
+System › Modbus TCP search (`/api/modbus/scan`, `mb_scan.c`) looks for Modbus TCP devices in an
+address range (a.b.c.d/n, up to /22 = 1024 addresses; default the network of the interface carrying
+the traffic):
+
+1. Connects to the chosen ports (default 502; up to 4, e.g. 502, 503, 1502) of every address, 4 at a
+   time with 300 ms each. A /24 with one port takes about 23 s on the LAN, 80 s with four ports in a
+   network without answers.
+2. On each open port reads holding register 0 of the chosen units (default 1, 247, 255). Data or any
+   exception (2 illegal address, 10/11 of a gateway without that unit) means a Modbus server; a port that
+   closes or answers something else (a web server) is not listed.
+3. Recognises known devices by a serial number (at least 8 characters, so a device answering every unit
+   id the same is not taken for one): Victron GX (unit 100, register 800) and its VE.Bus inverter/charger
+   (units 228, 227, 242, 246, register 3), GoodWe ET/EH/BT (unit 247, 35003) and DT/XS/D-NS (unit 127 or
+   247, 30004). A recognised device with a template is added with one click.
+4. With "GoodWe dongles on UDP 8899" (default on) also sends the GoodWe discovery broadcast (port 48899)
+   and a Modbus RTU read on UDP 8899 to every address. Older GoodWe Wi-Fi dongles speak Modbus only there;
+   the gateway reads Modbus TCP, so such an inverter is listed but cannot be added (a WiFi/LAN Kit-20 or
+   the LAN+WiFi kit 2.0 offers TCP 502).
+
+The search runs in its own task beside the polling, only reads, and is started by hand. Another network
+is reached only through a route of the gateway's router (broadcasts do not cross it); a PV inverter's
+dongle is often powered from the panels and off at night.
 
 ## Home Assistant
 
@@ -135,8 +160,11 @@ checked by a second, independent research (sources below). "Not confirmed" items
 | `chint_ddsu666` | Chint DDSU666 | 9600, 1 or 2 stop bits | power in kW (shown in W); export energy not documented |
 | `peacefair_pzem016` | Peacefair PZEM-016 / 014 (AC) | 9600 8N1 | current, power, energy low word first; energy reset (0x42) |
 | `peacefair_pzem017` | Peacefair PZEM-017 / 003 (DC) | 9600 **8N2** | shunt range select, alarm thresholds, energy reset |
+| `victron_gx_system` | Victron GX (Cerbo, MultiPlus-II GX, Venus OS), system values | TCP, unit 100 | consumption, grid, generator, AC-coupled PV, battery V/A/W/SOC/state, DC PV, serial; L1 only |
+| `victron_vebus` | Victron MultiPlus / Quattro via a GX | TCP, unit 228 (MultiPlus-II GX; 227 Cerbo, 242 Venus GX, 246 CCGX) | AC in/out V, A, Hz, W, battery, state, switch position, alarms; read only; L1 only |
 
-The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/modbus/gen_other.py`.
+The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/modbus/gen_other.py` and
+`tools/modbus/gen_victron.py`.
 
 ### Findings worth knowing
 
@@ -146,6 +174,12 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/
   (2400 → 9600). Meter code at 0xFC02: SDM120 and SDM120-M both 0x0020, SDM72D-M V2 0x0089.
 - Word order differs between families: Eastron, Chint, ORNO, ABB big endian; Carlo Gavazzi EM340
   and Peacefair low word first.
+- Victron GX (Venus OS): Modbus TCP must be enabled on the GX (Settings › Integrations › Modbus TCP
+  server); since Venus 2.60 unit ids are assigned dynamically, the GX lists them under Available
+  services. Unavailable values read 0xFFFF (u16) or 0x7FFF (s16), mapped to no value; reserved
+  registers answer too, so reads span gaps. A unit without a device answers exception 10 or 11. The
+  "Scalefactor" column divides (10 → ×0.1, 0.1 → ×10, -10 → ×-0.1). VE.Bus state of charge stays 0
+  when a BMS or the GX computes it: use the system's. Checked on a MultiPlus-II GX (2026-11-04).
 - The Adafruit/evcc/mbmd/Tasmota sources sometimes disagree on parity (ORNO 516: 8E1 by three
   sources, odd by one); the template follows the majority with a note.
 
@@ -163,6 +197,9 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/
 - `tests/modbus_tcp/`: a Modbus TCP simulator of a Huawei SUN2000 hybrid inverter (battery, meter)
   with changing data along a simulated day, and its template `huawei_sun2000.json` to import as an
   own template; a sample for simulating other devices ([README](../tests/modbus_tcp/README.md)).
+- TC49: the search finds the simulator playing a Victron GX and recognises it by its serial number with
+  both units, leaves out an open port without Modbus, refuses a second search and stops; both Victron
+  templates read every value as encoded. UI33: the page of the search.
 - Integration tests (`tests/ha_integration`), UI32.
 - **Not yet tested on a real RS485 device**: the RS485 path ran only without a device (timeouts);
   real meters will confirm the serial timing and the maps marked "community" above.
@@ -170,6 +207,10 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py` and `tools/
 ## Sources
 
 Eastron: SDM120-MODBUS protocol V2.4, SDM230-MODBUS protocol V1.1, SDM630 Modbus protocol V1.8
+Victron: CCGX Modbus TCP register list 3.81 (victronenergy.com, technical information). GoodWe:
+marcelblijleven/goodwe (`dt.py`, `et.py`, discovery `WIFIKIT-214028-READ` on port 48899), its 0.4.3
+notes (Modbus TCP 502 on the LAN+WiFi kit 2.0), Home Assistant issue 176918 and the Homey forum (unit
+247 or 1, Kit-20 on 502).
 (eastroneurope.com), SDM72DM-V2 user manual V1.1, SDM630-Modbus V2 manuals V1.5/V1.6B, SDM230
 manuals v1.6/v1.8, SDM120-M manual; nmakel/sdm_modbus, reaper7/SDM_Energy_Meter, ESPHome
 `sdm_meter`, volkszaehler/mbmd, evcc templates, Tasmota energy drivers. Chint DTSU666/DDSU666 user

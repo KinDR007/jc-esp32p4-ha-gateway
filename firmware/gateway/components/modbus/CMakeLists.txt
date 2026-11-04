@@ -1,6 +1,6 @@
-idf_component_register(SRCS "modbus.c" "mb_bus.c" "mb_proto.c" "mb_template.c"
+idf_component_register(SRCS "modbus.c" "mb_bus.c" "mb_proto.c" "mb_scan.c" "mb_template.c"
                        INCLUDE_DIRS "include"
-                       PRIV_REQUIRES gw_core esp_driver_uart esp_timer json lwip)
+                       PRIV_REQUIRES gw_core esp_driver_uart esp_netif esp_timer json lwip)
 
 # The built-in device templates (templates/*.json, one file per device) as one JSON array in the firmware.
 file(GLOB templates CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/templates/*.json)

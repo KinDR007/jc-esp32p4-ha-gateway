@@ -2384,6 +2384,8 @@ Effects: Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors an
 | POST | `/api/modbus/raw` | Manual request: reads or writes registers or coils. | page `system/rs485`, edit |
 | GET | `/api/modbus/probe` | State and result of the address search. | page `system/rs485`, read |
 | POST | `/api/modbus/probe` | Starts a search of addresses (and baud rates), or stops it. | page `system/rs485`, edit |
+| GET | `/api/modbus/scan` | State and result of the Modbus TCP search in a network. | page `system/rs485`, read |
+| POST | `/api/modbus/scan` | Starts a Modbus TCP search in a network, or stops it. | page `system/rs485`, edit |
 
 #### GET `/api/modbus`
 
@@ -2732,6 +2734,74 @@ Response:
 Errors: 400 from/to out of range, tcp without host, unknown template, bauds not a list of 1-8.
 
 Effects: Reads the template's first register (without a template holding register 0) at every address; an exception counts as an answer. RS485 devices are not polled while it runs (about 150 ms per address and baud rate). {"stop": true} ends it.
+
+#### GET `/api/modbus/scan`
+
+Response:
+
+```json
+{
+  "default_net": "192.168.88.0/24",
+  "running": false,
+  "net": "192.168.88.0/24",
+  "progress": 100,
+  "addresses": 254,
+  "open": 1,
+  "stopped": false,
+  "duration_ms": 41250,
+  "found": [
+    {
+      "host": "192.168.88.240",
+      "port": 502,
+      "unit": 1,
+      "answer": 2,
+      "manufacturer": "Victron Energy",
+      "model": "GX device",
+      "device_unit": 100,
+      "template": "victron_gx_system",
+      "serial": "c0619ab3d745",
+      "vebus_unit": 228
+    }
+  ],
+  "udp": [
+    {
+      "host": "192.168.1.60",
+      "info": "Modbus RTU on UDP 8899"
+    }
+  ]
+}
+```
+
+Effects: default_net is the network of the interface carrying the traffic. answer: 0 data, else the Modbus exception code of the first unit that answered. manufacturer, model, template: a device recognised by its serial number; vebus_unit: the VE.Bus unit of a Victron GX. udp: GoodWe dongles answering on UDP 8899 or the discovery port 48899 (the gateway reads Modbus TCP only).
+
+#### POST `/api/modbus/scan`
+
+Body:
+
+```json
+{
+  "net": "192.168.1.0/24",
+  "ports": [
+    502
+  ],
+  "units": [
+    1,
+    247,
+    255
+  ],
+  "udp": true
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 net not a.b.c.d/n or prefix out of 22-32, ports not a list of 1-4, units not a list of 1-8 ids 0-255.; 409 A search is running.; 503 No memory for the search task.
+
+Effects: Connects to the ports of every address (4 at a time, 300 ms each), reads holding register 0 of the units on each open port (an exception is an answer too), then recognises Victron GX and GoodWe by their serial numbers. With udp (default) also asks GoodWe dongles on UDP 8899 and sends their discovery broadcast. Runs beside the device polling; a /24 takes about 20-60 s. Ports default [502], units [1, 247, 255]. {"stop": true} ends it.
 
 ### Updates and firmware
 
