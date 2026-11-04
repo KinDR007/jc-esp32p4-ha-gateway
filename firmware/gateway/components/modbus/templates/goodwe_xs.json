@@ -27,19 +27,6 @@
    "nan": 4294967295
   },
   {
-   "key": "pv_power",
-   "name": "PV power",
-   "name_cs": "Výkon FV",
-   "reg": "holding",
-   "addr": 30137,
-   "type": "s16",
-   "precision": 0,
-   "unit": "W",
-   "class": "power",
-   "state": "measurement",
-   "nan": 32767
-  },
-  {
    "key": "pv1_voltage",
    "name": "PV1 voltage",
    "name_cs": "Napětí FV1",

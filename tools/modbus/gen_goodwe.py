@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Built-in template of GoodWe single phase grid inverters (XS, MS, D-NS) (firmware/gateway/components/modbus/templates/).
 Registers from the goodwe library (DT family, unit 0x7F), checked against a GW3000-XS whose Wi-Fi module speaks
-Modbus RTU over UDP 8899 only (transport "udp"): docs/modbus.md. Usage: gen_goodwe.py"""
+Modbus RTU over UDP 8899 only (transport "udp"): docs/modbus.md. Total input power (30137) is
+left out: the XS answers 0xffff there. Usage: gen_goodwe.py"""
 import json
 from pathlib import Path
 
@@ -39,7 +40,6 @@ T = [{'id': 'goodwe_xs', 'manufacturer': 'GoodWe', 'model': 'XS / MS / D-NS (sin
       'notes_cs': 'Řada DT, jednotka 127. Modul Wi-Fi odpovídá jen na UDP 8899: připojení GoodWe UDP. Modul LAN nebo Kit-20: Modbus TCP 502. V noci offline.',
       'source': SOURCE, 'slave': 127, 'poll_s': 10, 'max_regs': 50, 'max_gap': 10, 'timeout_ms': 2000, 'entities': [
           W('power', 'Power', 'Výkon', 30127, 'u32'),
-          W('pv_power', 'PV power', 'Výkon FV', 30137, 's16'),
           V('pv1_voltage', 'PV1 voltage', 'Napětí FV1', 30103),
           A('pv1_current', 'PV1 current', 'Proud FV1', 30104),
           V('pv2_voltage', 'PV2 voltage', 'Napětí FV2', 30105),

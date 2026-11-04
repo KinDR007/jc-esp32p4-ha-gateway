@@ -78,7 +78,9 @@ dropped before the next one. Same timeouts, offline handling and writes as Modbu
 GW3000-XS checked on 2026-11-04 from a computer (the gateway has no route to that network yet): unit 127
 answers 30001 (model `GW3000-XS`, serial at 30004) and 30100+ (PV 230.5 V 1.0 A, grid 233.3 V 1.7 A
 50.01 Hz, about 280 W); unit 247 and all TCP ports stay silent. The module is powered from the panels and
-does not answer at night.
+does not answer at night. Through `tools/modbus/udp_relay.py` on that computer the gateway read all values (power 585 W, grid
+234.9 V 2.4 A, energy total 15145.4 kWh, serial, model); the total input power register (30137) reads
+0xFFFF on the XS and is left out of the template.
 
 ## Home Assistant
 
