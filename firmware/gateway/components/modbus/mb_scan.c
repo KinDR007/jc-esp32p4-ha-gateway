@@ -77,6 +77,7 @@ static struct {
     struct {
         uint32_t ip;
         char info[48];
+        uint8_t unit; /* answered Modbus RTU on UDP 8899 (0: not) */
     } udp_found[UDP_MAX];
 } s_scan;
 
@@ -226,19 +227,26 @@ static void probe_port(uint32_t ip, uint16_t port)
 
 /* ---------------------------------------------------------------- UDP (GoodWe) */
 
-static void udp_note(uint32_t ip, const char *info)
+/* info: the discovery answer, unit: the unit that answered on UDP 8899 (each may come first) */
+static void udp_note(uint32_t ip, const char *info, uint8_t unit)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    for (int i = 0; i < s_scan.nudp; i++) {
-        if (s_scan.udp_found[i].ip == ip) {
-            xSemaphoreGive(s_lock);
-            return;
-        }
+    int i = 0;
+    while (i < s_scan.nudp && s_scan.udp_found[i].ip != ip) {
+        i++;
     }
-    if (s_scan.nudp < UDP_MAX) {
-        s_scan.udp_found[s_scan.nudp].ip = ip;
-        strlcpy(s_scan.udp_found[s_scan.nudp].info, info, sizeof(s_scan.udp_found[0].info));
+    if (i == s_scan.nudp && s_scan.nudp < UDP_MAX) {
+        memset(&s_scan.udp_found[i], 0, sizeof(s_scan.udp_found[i]));
+        s_scan.udp_found[i].ip = ip;
         s_scan.nudp++;
+    }
+    if (i < s_scan.nudp) {
+        if (info) {
+            strlcpy(s_scan.udp_found[i].info, info, sizeof(s_scan.udp_found[i].info));
+        }
+        if (unit && !s_scan.udp_found[i].unit) {
+            s_scan.udp_found[i].unit = unit;
+        }
     }
     xSemaphoreGive(s_lock);
 }
@@ -289,10 +297,12 @@ static void udp_probe(void)
                 continue;
             }
             buf[n] = '\0';
+            const uint8_t *pdu;
+            size_t pdu_len;
             if (ntohs(from.sin_port) == GOODWE_DISCOVERY_PORT) {
-                udp_note(from.sin_addr.s_addr, (const char *)buf); /* "ip,mac,name" */
-            } else if (n >= 2 && buf[0] == 0xaa && buf[1] == 0x55) {
-                udp_note(from.sin_addr.s_addr, "Modbus RTU on UDP 8899");
+                udp_note(from.sin_addr.s_addr, (const char *)buf, 0); /* "ip,mac,name" */
+            } else if (n > MB_AA55_HEAD + 2 && mb_aa55_unframe(buf[MB_AA55_HEAD], buf, n, &pdu, &pdu_len) == MB_OK) {
+                udp_note(from.sin_addr.s_addr, NULL, buf[MB_AA55_HEAD]);
             }
         } while (esp_timer_get_time() < until && !s_scan.stop);
     }
@@ -494,6 +504,9 @@ static esp_err_t scan_get(httpd_req_t *req)
         ip_text(s_scan.udp_found[i].ip, text, sizeof(text));
         cJSON_AddStringToObject(o, "host", text);
         cJSON_AddStringToObject(o, "info", s_scan.udp_found[i].info);
+        if (s_scan.udp_found[i].unit) {
+            cJSON_AddNumberToObject(o, "unit", s_scan.udp_found[i].unit);
+        }
         cJSON_AddItemToArray(udp, o);
     }
     xSemaphoreGive(s_lock);

@@ -54,7 +54,8 @@ typedef struct {
     char id[8];
     char name[NAME_CHARS * 3 + 1];
     char tpl[32];
-    bool tcp;
+    bool tcp; /* a network device: Modbus TCP, or GoodWe AA55 over UDP when udp */
+    bool udp;
     char host[64];
     uint16_t port;
     uint8_t slave;
@@ -265,14 +266,15 @@ static const char *parse_device(const cJSON *j, mbdev_t *d)
     if (name && (utf8_chars(name) > NAME_CHARS || strlen(name) >= sizeof(d->name) || strpbrk(name, "\"\\{}"))) {
         return "name: up to 32 characters, no quotes, braces or backslash";
     }
-    d->tcp = transport && strcmp(transport, "tcp") == 0;
+    d->udp = transport && strcmp(transport, "udp") == 0;
+    d->tcp = d->udp || (transport && strcmp(transport, "tcp") == 0);
     if (transport && !d->tcp && strcmp(transport, "rtu") != 0) {
-        return "transport: rtu or tcp";
+        return "transport: rtu, tcp or udp";
     }
     if (d->tcp && (!host || !host[0] || strlen(host) >= sizeof(d->host) || strpbrk(host, " /"))) {
-        return "host: the address of the Modbus TCP device";
+        return "host: the address of the Modbus TCP or GoodWe UDP device";
     }
-    int p = cJSON_IsNumber(port) ? port->valueint : 502;
+    int p = cJSON_IsNumber(port) ? port->valueint : d->udp ? 8899 : 502;
     if (port && (!cJSON_IsNumber(port) || p < 1 || p > 65535)) {
         return "port: 1-65535";
     }
@@ -358,7 +360,7 @@ static cJSON *config_json(void)
         cJSON_AddStringToObject(j, "id", d->id);
         cJSON_AddStringToObject(j, "name", d->name);
         cJSON_AddStringToObject(j, "template", d->tpl);
-        cJSON_AddStringToObject(j, "transport", d->tcp ? "tcp" : "rtu");
+        cJSON_AddStringToObject(j, "transport", d->udp ? "udp" : d->tcp ? "tcp" : "rtu");
         cJSON_AddNumberToObject(j, "slave", d->slave);
         if (d->tcp) {
             cJSON_AddStringToObject(j, "host", d->host);
@@ -413,7 +415,7 @@ static void apply_config(const cJSON *root)
                 }
             }
         }
-        if (old && old->t == d->t && old->tcp == d->tcp && !strcmp(old->host, d->host) && old->port == d->port && old->slave == d->slave &&
+        if (old && old->t == d->t && old->tcp == d->tcp && old->udp == d->udp && !strcmp(old->host, d->host) && old->port == d->port && old->slave == d->slave &&
             old->enabled && d->enabled) {
             /* same device: keep its runtime */
             memcpy(&d->t, &old->t, sizeof(*d) - offsetof(mbdev_t, t));
@@ -453,6 +455,9 @@ static int request(mbdev_t *d, const mb_req_t *req, uint8_t *data, size_t *len)
 {
     const mb_template_t *t = &d->t->t;
     uint16_t timeout = t->timeout_ms > s_timeout_ms ? t->timeout_ms : s_timeout_ms;
+    if (d->udp) {
+        return mb_udp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len);
+    }
     return d->tcp ? mb_tcp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len)
                   : mb_rtu_request(d->slave, req, timeout, t->gap_ms, data, len);
 }
@@ -1274,7 +1279,7 @@ static esp_err_t write_post(httpd_req_t *req)
     return gw_http_send_json(req, j);
 }
 
-/* Manual request: {"transport": "rtu"|"tcp", "host", "port", "slave", "fc", "addr", "count", "values": [..]} */
+/* Manual request: {"transport": "rtu"|"tcp"|"udp", "host", "port", "slave", "fc", "addr", "count", "values": [..]} */
 static esp_err_t raw_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -1284,14 +1289,15 @@ static esp_err_t raw_post(httpd_req_t *req)
     const char *transport = GW_JSON_STR(body, "transport"), *host = GW_JSON_STR(body, "host");
     const cJSON *slave = cJSON_GetObjectItem(body, "slave"), *fc = cJSON_GetObjectItem(body, "fc"), *addr = cJSON_GetObjectItem(body, "addr");
     const cJSON *count = cJSON_GetObjectItem(body, "count"), *values = cJSON_GetObjectItem(body, "values"), *port = cJSON_GetObjectItem(body, "port");
-    bool tcp = transport && strcmp(transport, "tcp") == 0;
+    bool udp = transport && strcmp(transport, "udp") == 0;
+    bool tcp = udp || (transport && strcmp(transport, "tcp") == 0);
     const char *why = NULL;
     int f = cJSON_IsNumber(fc) ? fc->valueint : 0;
     int n = cJSON_IsNumber(count) ? count->valueint : 1;
     if (!cJSON_IsNumber(slave) || slave->valueint < 0 || slave->valueint > 255) {
         why = "slave: 1-247 (TCP unit 0-255)";
     } else if (tcp && (!host || !host[0] || strlen(host) >= 64)) {
-        why = "host required for tcp";
+        why = "host required for tcp and udp";
     } else if (!(f >= 1 && f <= 6) && f != 15 && f != 16) {
         why = "fc: 1, 2, 3, 4, 5, 6, 15 or 16";
     } else if (!cJSON_IsNumber(addr) || addr->valueint < 0 || addr->valueint > 65535) {
@@ -1319,10 +1325,11 @@ static esp_err_t raw_post(httpd_req_t *req)
     s_job.raw_t.t = s_job.raw_tpl;
     s_job.raw.t = &s_job.raw_t;
     s_job.raw.tcp = tcp;
+    s_job.raw.udp = udp;
     if (tcp) {
         strcpy(s_job.raw.host, host);
     }
-    s_job.raw.port = (uint16_t)(cJSON_IsNumber(port) ? port->valueint : 502);
+    s_job.raw.port = (uint16_t)(cJSON_IsNumber(port) ? port->valueint : udp ? 8899 : 502);
     s_job.raw.slave = (uint8_t)slave->valueint;
     s_job.req = (mb_req_t){.fc = (uint8_t)f, .addr = (uint16_t)addr->valueint, .count = (uint16_t)n};
     int k = 0;

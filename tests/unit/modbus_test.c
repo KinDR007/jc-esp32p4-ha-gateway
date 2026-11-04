@@ -117,6 +117,30 @@ static void test_tcp(void)
     CHECK(mb_tcp_expected(ans) == 0, "protocol id not 0 refused");
 }
 
+static void test_aa55(void)
+{
+    /* GoodWe DT/XS device info over UDP 8899: request 7F 03 75 31 00 28 04 09 (goodwe library), answer
+     * AA 55 7F 03 50 + 80 bytes + CRC, as a GW3000-XS sent it */
+    uint8_t pdu[8], frame[16];
+    mb_req_t r = {.fc = MB_FC_READ_HOLDING, .addr = 30001, .count = 40};
+    size_t f = mb_rtu_frame(0x7f, pdu, mb_pdu_encode(&r, pdu, sizeof(pdu)), frame, sizeof(frame));
+    CHECK(f == 8 && frame[6] == 0x04 && frame[7] == 0x09, "GoodWe request CRC %02x %02x", frame[6], frame[7]);
+    uint8_t ans[2 + 3 + 80 + 2] = {0xaa, 0x55, 0x7f, 0x03, 80, 0x00, 0x02, 0xff, 0xff, 0xff, 0xff};
+    memcpy(ans + 11, "53000SSX211W0019GW3000-XS", 25);
+    uint16_t crc = mb_crc16(ans + 2, sizeof(ans) - 4);
+    ans[sizeof(ans) - 2] = crc & 0xff, ans[sizeof(ans) - 1] = crc >> 8;
+    CHECK(mb_rtu_expected(ans + MB_AA55_HEAD, 3) == sizeof(ans) - MB_AA55_HEAD, "expected length after the AA 55 head");
+    const uint8_t *p, *data = ans;
+    size_t plen, dlen;
+    CHECK(mb_aa55_unframe(0x7f, ans, sizeof(ans), &p, &plen) == MB_OK && mb_pdu_check(&r, p, plen, &data, &dlen) == MB_OK && dlen == 80,
+          "AA 55 answer unframed");
+    CHECK(memcmp(data + 6, "53000SSX211W0019", 16) == 0, "serial number at 30004");
+    CHECK(mb_aa55_unframe(0xf7, ans, sizeof(ans), &p, &plen) == MB_ERR_FRAME, "answer of another unit refused");
+    CHECK(mb_aa55_unframe(0x7f, ans + MB_AA55_HEAD, sizeof(ans) - MB_AA55_HEAD, &p, &plen) == MB_ERR_FRAME, "plain RTU without the head refused");
+    ans[20] ^= 1;
+    CHECK(mb_aa55_unframe(0x7f, ans, sizeof(ans), &p, &plen) == MB_ERR_CRC, "bad CRC detected");
+}
+
 static void test_values(void)
 {
     /* 0x12345678 in the four orders as they come over the wire */
@@ -319,6 +343,7 @@ int main(int argc, char **argv)
     test_crc_rtu();
     test_writes();
     test_tcp();
+    test_aa55();
     test_values();
     test_templates();
     test_builtin(argc, argv);

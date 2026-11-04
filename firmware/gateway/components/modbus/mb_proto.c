@@ -190,6 +190,14 @@ int mb_rtu_unframe(uint8_t slave, const uint8_t *frame, size_t len, const uint8_
     return MB_OK;
 }
 
+int mb_aa55_unframe(uint8_t slave, const uint8_t *frame, size_t len, const uint8_t **pdu, size_t *pdu_len)
+{
+    if (len < MB_AA55_HEAD || frame[0] != 0xaa || frame[1] != 0x55) {
+        return MB_ERR_FRAME;
+    }
+    return mb_rtu_unframe(slave, frame + MB_AA55_HEAD, len - MB_AA55_HEAD, pdu, pdu_len);
+}
+
 size_t mb_rtu_expected(const uint8_t *frame, size_t len)
 {
     if (len < 2) {

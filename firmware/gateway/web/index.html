@@ -4429,7 +4429,7 @@ views['system/rs485'] = () => `<div class="grid">
     <div id="mb-add-note" class="muted"></div>
     <div class="row">
       <label class="field" style="margin:0;flex:1"><span>${L('Name', 'Jméno')}</span><input type="text" id="mb-add-name" maxlength="32"></label>
-      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-add-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option></select></label>
+      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-add-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option><option value="udp">GoodWe UDP</option></select></label>
       <label class="field" style="margin:0"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-add-slave" min="0" max="255" value="1" style="width:70px"></label></div>
     <div class="row hidden" id="mb-add-tcp">
       <label class="field" style="margin:0;flex:1"><span>${L('Host', 'Host')}</span><input type="text" id="mb-add-host" placeholder="192.168.1.50"></label>
@@ -4453,7 +4453,7 @@ views['system/rs485'] = () => `<div class="grid">
     <div id="mb-pr-state" class="muted"></div></div>
   <div class="card">${h3('console-line', L('Manual request', 'Ruční dotaz'))}
     <p class="muted">${L('Reads or writes registers directly, e.g. to find a device\'s layout for a template. Values are shown in the usual encodings.', 'Čte nebo zapisuje registry přímo, např. při hledání rozložení pro šablonu. Hodnoty se ukážou v obvyklých kódováních.')}</p>
-    <div class="row"><label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-raw-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option></select></label>
+    <div class="row"><label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-raw-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option><option value="udp">GoodWe UDP</option></select></label>
       <label class="field hidden" style="margin:0;flex:1" id="mb-raw-hostf"><span>Host</span><input type="text" id="mb-raw-host"></label>
       <label class="field" style="margin:0"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-raw-slave" value="1" min="0" max="255" style="width:70px"></label></div>
     <div class="row"><label class="field" style="margin:0"><span>${L('Function', 'Funkce')}</span><select id="mb-raw-fc">
@@ -4479,7 +4479,7 @@ views['system/rs485'] = () => `<div class="grid">
 const MB_EXPOSE = () => [['integration', L('integration', 'integrace')], ['mqtt', 'MQTT'], ['both', L('integration and MQTT', 'integrace a MQTT')], ['none', L('not shown', 'nezobrazovat')]];
 let mb = null, mbTpls = [], mbTimer = null, mbOpen = new Set(), mbFull = {}, mbPrefill = null;
 const mbTpl = id => mbTpls.find(t => t.id === id);
-const mbConn = d => d.transport === 'tcp' ? `TCP ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
+const mbConn = d => d.transport !== 'rtu' ? `${d.transport.toUpperCase()} ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
 const mbState = d => ({ ok: pill('ok', L('ok', 'v pořádku')), partial: pill('warn', L('partly', 'částečně')), offline: pill('bad', L('offline', 'nedostupné')),
   starting: pill('warn', L('starting', 'startuje')), off: pill('', L('off', 'vypnuto')) }[d.state] || esc(d.state)) + (d.error ? `<div class="muted">${esc(d.error)}</div>` : '');
 function mbFmt(e, v) {
@@ -4588,11 +4588,11 @@ async function loadModbus(full = true) {
     mbRenderDevices();
     mbRenderTemplates();
     if (mbPrefill) {
-      $('#mb-add-tr').value = 'tcp';
+      $('#mb-add-tr').value = $('#mb-raw-tr').value = mbPrefill.transport || 'tcp';
       $('#mb-add-host').value = $('#mb-raw-host').value = mbPrefill.host;
       $('#mb-add-port').value = mbPrefill.port;
       $('#mb-add-slave').value = $('#mb-raw-slave').value = mbPrefill.unit;
-      $('#mb-raw-tr').value = 'tcp';
+      if (mbPrefill.template) $('#mb-add-tpl').value = mbPrefill.template;
       $('#mb-add-tcp').classList.remove('hidden');
       $('#mb-raw-hostf').classList.remove('hidden');
       mbAddNote();
@@ -4618,7 +4618,7 @@ function mbList() {
   return mb.devices.map(d => {
     const row = document.querySelector(`tr[data-mbdev="${d.id}"]`);
     const o = { id: d.id, name: d.name, template: d.template, transport: d.transport, slave: d.slave, poll_s: d.poll_s, expose: d.expose, enabled: d.enabled };
-    if (d.transport === 'tcp') Object.assign(o, { host: d.host, port: d.port });
+    if (d.transport !== 'rtu') Object.assign(o, { host: d.host, port: d.port });
     if (row) Object.assign(o, { name: row.querySelector('[data-mb-name]').value.trim(), expose: row.querySelector('[data-mb-expose]').value, enabled: row.querySelector('[data-mb-en]').checked });
     return o;
   });
@@ -4647,12 +4647,13 @@ function mbRawOut(r, fc) {
 }
 document.addEventListener('change', e => {
   if (e.target.id === 'mb-add-tpl' || e.target.id === 'mb-add-tr') {
-    $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value !== 'tcp');
+    $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value === 'rtu');
+    if (e.target.id === 'mb-add-tr' && $('#mb-add-tr').value !== 'rtu') $('#mb-add-port').value = $('#mb-add-tr').value === 'udp' ? 8899 : 502;
     if (e.target.id === 'mb-add-tpl') $('#mb-add-name').dataset.auto = '1', $('#mb-add-name').value = '';
     mbAddNote();
   }
   if (e.target.id === 'mb-pr-tr') { const tcp = e.target.value === 'tcp'; $('#mb-pr-tcp').classList.toggle('hidden', !tcp); $('#mb-pr-bauds').classList.toggle('hidden', tcp); }
-  if (e.target.id === 'mb-raw-tr') $('#mb-raw-hostf').classList.toggle('hidden', e.target.value !== 'tcp');
+  if (e.target.id === 'mb-raw-tr') $('#mb-raw-hostf').classList.toggle('hidden', e.target.value === 'rtu');
   if (e.target.id === 'mb-add-name') e.target.dataset.auto = '0';
   if (e.target.matches('[data-mb-sel]')) { const [d, k] = e.target.dataset.mbSel.split('|'); mbWrite(d, k, e.target.value).catch(err => toast(L('Error: ', 'Chyba: ') + err.message)); }
   if (e.target.id === 'mb-tpl-import' && e.target.files[0]) {
@@ -4670,10 +4671,10 @@ document.addEventListener('click', async e => {
         : { baud: tp.baud, parity: tp.serial[1], stop: +tp.serial[2] };
       await mbPut({ bus }, L('Bus settings saved', 'Nastavení sběrnice uloženo'));
     } else if (t.id === 'mb-add') {
-      const tcp = $('#mb-add-tr').value === 'tcp';
-      const d = { name: $('#mb-add-name').value.trim(), template: $('#mb-add-tpl').value, transport: tcp ? 'tcp' : 'rtu', slave: +$('#mb-add-slave').value,
+      const transport = $('#mb-add-tr').value;
+      const d = { name: $('#mb-add-name').value.trim(), template: $('#mb-add-tpl').value, transport, slave: +$('#mb-add-slave').value,
         poll_s: +$('#mb-add-poll').value, expose: $('#mb-add-expose').value };
-      if (tcp) Object.assign(d, { host: $('#mb-add-host').value.trim(), port: +$('#mb-add-port').value });
+      if (transport !== 'rtu') Object.assign(d, { host: $('#mb-add-host').value.trim(), port: +$('#mb-add-port').value });
       await mbPut({ devices: [...mbList(), d] }, L(`Added ${d.name}`, `Přidáno ${d.name}`));
     } else if (t.id === 'mb-dev-save') {
       await mbPut({ devices: mbList() }, L('Saved', 'Uloženo'));
@@ -4710,15 +4711,15 @@ document.addEventListener('click', async e => {
       $('#mb-add-tr').value = $('#mb-pr-tr').value;
       if ($('#mb-pr-tr').value === 'tcp') { $('#mb-add-host').value = $('#mb-pr-host').value; $('#mb-add-port').value = $('#mb-pr-port').value; }
       if ($('#mb-pr-tpl').value) $('#mb-add-tpl').value = $('#mb-pr-tpl').value;
-      $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value !== 'tcp');
+      $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value === 'rtu');
       mbAddNote();
       if (baud && +baud !== mb.bus.baud) toast(L(`Found at ${baud} Bd: set the bus to it`, `Nalezeno při ${baud} Bd: nastavte na ni sběrnici`));
       $('#mb-add-tpl').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (t.id === 'mb-raw-send') {
-      const fc = +$('#mb-raw-fc').value, tcp = $('#mb-raw-tr').value === 'tcp';
+      const fc = +$('#mb-raw-fc').value, transport = $('#mb-raw-tr').value;
       const addr = parseInt($('#mb-raw-addr').value), n = $('#mb-raw-n').value.trim();
-      const body = { transport: tcp ? 'tcp' : 'rtu', slave: +$('#mb-raw-slave').value, fc, addr };
-      if (tcp) body.host = $('#mb-raw-host').value.trim();
+      const body = { transport, slave: +$('#mb-raw-slave').value, fc, addr };
+      if (transport !== 'rtu') body.host = $('#mb-raw-host').value.trim();
       if (fc <= 4) body.count = +n; else body.values = n.split(',').map(x => parseInt(x.trim()));
       $('#mb-raw-out').innerHTML = mbRawOut(await api('/api/modbus/raw', { json: body }), fc);
     } else if (t.id === 'mb-tpl-new') {
@@ -4798,8 +4799,10 @@ async function loadMbScan(first) {
       + `<button class="btn" data-ms-use="${f.host}|${f.port}|${f.device_unit !== undefined ? f.device_unit : f.unit}" title="${L('Open in RS485 › Add a device and Manual request', 'Otevřít v RS485 › Přidat zařízení a Ruční dotaz')}">${ic('chevron-right')}RS485</button>`;
     return `<tr><td data-notr>${esc(f.host)}:${f.port}</td><td class="hw-wrap">${dev}</td><td data-notr>${units.join(', ')}</td><td>${L('unit', 'jednotka')} ${f.unit}: ${msAnswer(f)}</td><td>${acts}</td></tr>`;
   }).join('');
-  const udp = d.udp.map(u => `<tr><td data-notr>${esc(u.host)}</td><td class="hw-wrap"><b>GoodWe</b> <span class="muted" data-notr>${esc(u.info)}</span></td><td>UDP</td>
-    <td colspan="2" class="hw-wrap">${L('Modbus only on UDP: the gateway reads Modbus TCP. A WiFi/LAN Kit-20 or the LAN+WiFi kit 2.0 offers TCP port 502.', 'Modbus jen přes UDP: brána čte Modbus TCP. WiFi/LAN Kit-20 nebo LAN+WiFi kit 2.0 nabízí TCP port 502.')}</td></tr>`).join('');
+  const udp = d.udp.map(u => `<tr><td data-notr>${esc(u.host)}${u.unit ? ':8899' : ''}</td><td class="hw-wrap"><b>GoodWe</b> <span class="muted" data-notr>${esc(u.info)}</span></td><td data-notr>${u.unit || '—'}</td>
+    <td class="hw-wrap">${u.unit ? L('Modbus RTU on UDP 8899', 'Modbus RTU přes UDP 8899') : L('Discovery only, no Modbus answer on UDP 8899', 'Jen vyhledání, Modbus na UDP 8899 neodpověděl')}</td>
+    <td>${u.unit === 127 ? `<button class="btn" data-ms-add="${u.host}|8899|127|goodwe_xs|udp" ${ro}>${ic('plus')}${L('Add', 'Přidat')}</button>` : ''}
+      ${u.unit ? `<button class="btn" data-ms-use="${u.host}|8899|${u.unit}|udp" title="${L('Open in RS485 › Add a device and Manual request', 'Otevřít v RS485 › Přidat zařízení a Ruční dotaz')}">${ic('chevron-right')}RS485</button>` : ''}</td></tr>`).join('');
   $('#ms-found').innerHTML = rows || udp ? `<table class="hw-stack"><tr>${[L('Address', 'Adresa'), L('Device', 'Zařízení'), L('Units', 'Jednotky'), L('Answer', 'Odpověď'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${rows}${udp}</table>`
     : `<p class="muted">${d.running ? L('Nothing yet.', 'Zatím nic.') : L('No Modbus TCP device answered. A routed network needs a route from the gateway; an inverter\'s dongle may be off at night.', 'Žádné zařízení Modbus TCP neodpovědělo. Do jiné sítě musí z brány vést trasa; modul střídače může být v noci vypnutý.')}</p>`;
 }
@@ -4814,17 +4817,17 @@ document.addEventListener('click', async e => {
     } else if (t.id === 'ms-stop') {
       await api('/api/modbus/scan', { json: { stop: true } });
     } else if (t.dataset.msAdd) {
-      const [host, port, unit, template] = t.dataset.msAdd.split('|');
+      const [host, port, unit, template, transport = 'tcp'] = t.dataset.msAdd.split('|');
       mb = await api('/api/modbus');
       mbTpls = (await api('/api/modbus/templates')).templates;
       const tp = mbTpl(template);
-      if (mb.devices.some(d => d.transport === 'tcp' && d.host === host && d.port === +port && d.slave === +unit)) { toast(L('Already added', 'Už je přidané')); return; }
+      if (mb.devices.some(d => d.transport === transport && d.host === host && d.port === +port && d.slave === +unit)) { toast(L('Already added', 'Už je přidané')); return; }
       const name = `${tp ? tp.manufacturer.split(' ')[0] + ' ' + tp.model.split(' (')[0] : template}`.slice(0, 32);
-      await api('/api/modbus', { method: 'PUT', json: { devices: [...mbList(), { name, template, transport: 'tcp', host, port: +port, slave: +unit, poll_s: 0, expose: 'integration' }] } });
+      await api('/api/modbus', { method: 'PUT', json: { devices: [...mbList(), { name, template, transport, host, port: +port, slave: +unit, poll_s: 0, expose: 'integration' }] } });
       toast(L(`Added ${name}: System › RS485`, `Přidáno ${name}: Systém › RS485`));
     } else if (t.dataset.msUse) {
-      const [host, port, unit] = t.dataset.msUse.split('|');
-      mbPrefill = { host, port: +port, unit: +unit };
+      const [host, port, unit, transport = 'tcp'] = t.dataset.msUse.split('|');
+      mbPrefill = { host, port: +port, unit: +unit, transport, template: transport === 'udp' && +unit === 127 ? 'goodwe_xs' : '' };
       go('system/rs485');
     }
   } catch (err) {

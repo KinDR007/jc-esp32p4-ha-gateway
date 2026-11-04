@@ -2484,9 +2484,9 @@ Response:
 }
 ```
 
-Errors: 400 baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; tcp without host; slave not 1-247 (TCP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.
+Errors: 400 baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; transport not rtu/tcp/udp; tcp or udp without host; slave not 1-247 (TCP, UDP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.
 
-Effects: devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.
+Effects: transport: rtu (RS485), tcp (Modbus TCP, port 502) or udp (GoodWe Wi-Fi module: Modbus RTU over UDP, answers with AA 55, port 8899). devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.
 
 #### GET `/api/modbus/templates`
 
@@ -2682,9 +2682,9 @@ Response:
 }
 ```
 
-Errors: 400 fc not 1-6, 15, 16; addr, count or values invalid; tcp without host.; 503 Modbus busy for 8 s.
+Errors: 400 fc not 1-6, 15, 16; addr, count or values invalid; tcp or udp without host.; 503 Modbus busy for 8 s.
 
-Effects: Writes take values (16-bit numbers; coils 0/1). A refused request answers 200 with ok false and the exception in result and error.
+Effects: transport rtu, tcp (port default 502) or udp (GoodWe, port default 8899). Writes take values (16-bit numbers; coils 0/1). A refused request answers 200 with ok false and the exception in result and error.
 
 #### GET `/api/modbus/probe`
 
@@ -2765,14 +2765,15 @@ Response:
   ],
   "udp": [
     {
-      "host": "192.168.1.60",
-      "info": "Modbus RTU on UDP 8899"
+      "host": "192.168.1.170",
+      "info": "192.168.1.170,34EAE7000000,Solar-WiFi211W0000",
+      "unit": 127
     }
   ]
 }
 ```
 
-Effects: default_net is the network of the interface carrying the traffic. answer: 0 data, else the Modbus exception code of the first unit that answered. manufacturer, model, template: a device recognised by its serial number; vebus_unit: the VE.Bus unit of a Victron GX. udp: GoodWe dongles answering on UDP 8899 or the discovery port 48899 (the gateway reads Modbus TCP only).
+Effects: default_net is the network of the interface carrying the traffic. answer: 0 data, else the Modbus exception code of the first unit that answered. manufacturer, model, template: a device recognised by its serial number; vebus_unit: the VE.Bus unit of a Victron GX. udp: GoodWe dongles answering the discovery port 48899 (info: ip,mac,name) or Modbus RTU on UDP 8899 (unit: the one that answered; 127 is the DT/XS family, template goodwe_xs, transport udp).
 
 #### POST `/api/modbus/scan`
 

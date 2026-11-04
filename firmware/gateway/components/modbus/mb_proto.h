@@ -73,6 +73,10 @@ size_t mb_rtu_expected(const uint8_t *frame, size_t len);
 /* Silent interval of 3.5 characters at baud (11 bits per character), at least 1750 µs above 19200 Bd. */
 uint32_t mb_rtu_gap_us(uint32_t baud);
 
+/* GoodWe Wi-Fi modules (UDP 8899): the request is an RTU frame, the answer 0xAA 0x55 + an RTU frame. */
+#define MB_AA55_HEAD 2
+int mb_aa55_unframe(uint8_t slave, const uint8_t *frame, size_t len, const uint8_t **pdu, size_t *pdu_len);
+
 /* TCP: MBAP header (transaction, protocol 0, length, unit) + PDU. */
 size_t mb_tcp_frame(uint16_t transaction, uint8_t unit, const uint8_t *pdu, size_t pdu_len, uint8_t *out, size_t out_len);
 /* Length of the whole ADU announced by a 7-byte MBAP header, 0 when the header is invalid. */

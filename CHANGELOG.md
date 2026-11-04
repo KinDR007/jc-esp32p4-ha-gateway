@@ -8,7 +8,12 @@
   one click; GoodWe Wi-Fi dongles answering only on UDP 8899 are listed too. Runs beside the polling.
 - Modbus templates of a Victron GX: `victron_gx_system` (unit 100) and `victron_vebus` (MultiPlus /
   Quattro), from Victron's register list 3.81, checked on a MultiPlus-II GX.
+- Modbus over UDP for GoodWe Wi-Fi modules (connection "GoodWe UDP", `transport: "udp"`, port 8899):
+  Modbus RTU frames out, `AA 55` answers back, also split into several datagrams. The network search
+  lists such a module with the unit that answered and adds a DT family inverter (unit 127) in one click.
+  Template `goodwe_xs` (XS, MS, D-NS) from the goodwe library's DT map, checked on a GW3000-XS.
 - Tests: TC49, UI33; the Modbus simulator plays text registers as serial numbers (no spaces).
+- Tests: TC50, UI34 and a unit test of the AA 55 framing; the simulator plays a GoodWe module (`--udp`).
 - Tests: Modbus TCP simulator of a Huawei SUN2000 hybrid PV inverter with battery and meter (simulated
   day, power limit, start/stop) and its template to import (`tests/modbus_tcp/`).
 - 3D printable case for the board (OpenSCAD, two shells, flexible BOOT/RST/PWR buttons, bay for the

@@ -7,12 +7,15 @@ Addresses no entity covers answer exception 2 (like a strict device), unless --l
 (functions 5, 6, 15, 16) change the registers and are logged; function 0x42 answers (PZEM reset).
 
   sim_tcp.py [--port 1502] [--lenient] eastron_sdm630:1 peacefair_pzem016:2 ...
+  sim_tcp.py --udp [--port 8899] [--split] goodwe_xs:127   a GoodWe Wi-Fi module: Modbus RTU frames over UDP,
+                                          answers with AA 55 (--split: long ones in two datagrams); discovery on 48899
   sim_tcp.py --expect eastron_sdm630      print the values the gateway must show, as JSON
 
 The value of an entity: a number derived from its key (stable), within the range its type can hold;
 bool entities alternate; map entities take their first option."""
 import argparse
 import json
+import socket
 import socketserver
 import struct
 import sys
@@ -195,10 +198,51 @@ class Handler(socketserver.BaseRequestHandler):
         return exc(1)
 
 
+def crc16(data):
+    c = 0xFFFF
+    for b in data:
+        c ^= b
+        for _ in range(8):
+            c = (c >> 1) ^ 0xA001 if c & 1 else c >> 1
+    return struct.pack('<H', c)
+
+
+class UdpHandler(socketserver.BaseRequestHandler):
+    """GoodWe: an RTU request (unit, PDU, CRC) in, 0xAA 0x55 + an RTU answer out."""
+    split = False
+
+    def handle(self):
+        data, sock = self.request
+        if len(data) < 4 or crc16(data[:-2]) != data[-2:]:
+            return
+        answer = Handler.answer(UNITS.get(data[0]), data[1:-2])
+        if answer is None:
+            return
+        frame = bytes([data[0]]) + answer
+        out = b'\xaa\x55' + frame + crc16(frame)
+        if self.split and len(out) > 32:  # long answers only, as a module does
+            sock.sendto(out[:5], self.client_address)
+            sock.sendto(out[5:], self.client_address)
+        else:
+            sock.sendto(out, self.client_address)
+
+
+class DiscoveryHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, sock = self.request
+        if data == b'WIFIKIT-214028-READ':
+            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe.connect(self.client_address)  # the address the client reaches us on
+            sock.sendto(f'{probe.getsockname()[0]},000000000000,Solar-WiFi-SIM'.encode(), self.client_address)
+            probe.close()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--port', type=int, default=1502)
     p.add_argument('--lenient', action='store_true', help='unknown addresses read as 0 (no exception)')
+    p.add_argument('--udp', action='store_true', help='GoodWe Modbus RTU over UDP (AA 55 answers)')
+    p.add_argument('--split', action='store_true', help='--udp: answers over 32 bytes in two datagrams')
     p.add_argument('--expect', metavar='TEMPLATE')
     p.add_argument('units', nargs='*', metavar='TEMPLATE:UNIT')
     a = p.parse_args()
@@ -208,6 +252,15 @@ def main():
     for spec in a.units:
         tid, unit = spec.rsplit(':', 1)
         UNITS[int(unit)] = Unit(tid, not a.lenient)
+    if a.udp:
+        UdpHandler.split = a.split
+        socketserver.UDPServer.allow_reuse_address = True
+        disc = socketserver.UDPServer(('0.0.0.0', 48899), DiscoveryHandler)
+        threading.Thread(target=disc.serve_forever, daemon=True).start()
+        with socketserver.ThreadingUDPServer(('0.0.0.0', a.port), UdpHandler) as srv:
+            print(f'GoodWe UDP simulator on port {a.port}: ' + ', '.join(f'{u}={x.t["id"]}' for u, x in sorted(UNITS.items())), flush=True)
+            srv.serve_forever()
+        return 0
     socketserver.ThreadingTCPServer.allow_reuse_address = True
     with socketserver.ThreadingTCPServer(('0.0.0.0', a.port), Handler) as srv:
         print(f'Modbus TCP simulator on port {a.port}: ' + ', '.join(f'{u}={x.t["id"]}' for u, x in sorted(UNITS.items())), flush=True)

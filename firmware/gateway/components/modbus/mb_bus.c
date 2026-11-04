@@ -260,3 +260,85 @@ int mb_tcp_request(mb_tcp_t *c, const char *host, uint16_t port, uint8_t unit, c
     }
     return err;
 }
+
+int mb_udp_request(mb_tcp_t *c, const char *host, uint16_t port, uint8_t slave, const mb_req_t *req, uint16_t timeout_ms,
+                   uint8_t *data, size_t *len)
+{
+    uint8_t pdu[MB_PDU_MAX], frame[MB_AA55_HEAD + MB_RTU_MAX];
+    size_t plen = mb_pdu_encode(req, pdu, sizeof(pdu));
+    if (!plen) {
+        return MB_ERR_ARG;
+    }
+    if (c->sock < 0) {
+        if (esp_timer_get_time() < c->retry_us) {
+            return MB_ERR_IO;
+        }
+        struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_DGRAM}, *res = NULL;
+        char service[8];
+        snprintf(service, sizeof(service), "%u", port);
+        int s = getaddrinfo(host, service, &hints, &res) == 0 && res ? socket(AF_INET, SOCK_DGRAM, 0) : -1;
+        if (s >= 0 && connect(s, res->ai_addr, res->ai_addrlen) != 0) {
+            close(s);
+            s = -1;
+        }
+        if (res) {
+            freeaddrinfo(res);
+        }
+        if (s < 0) {
+            c->retry_us = esp_timer_get_time() + TCP_RETRY_US;
+            return MB_ERR_IO;
+        }
+        c->sock = s;
+    }
+    /* late answers of an earlier request */
+    while (recv(c->sock, frame, sizeof(frame), MSG_DONTWAIT) > 0) {
+    }
+    size_t flen = mb_rtu_frame(slave, pdu, plen, frame, sizeof(frame));
+    if (send(c->sock, frame, flen, 0) != (int)flen) {
+        mb_tcp_close(c);
+        return MB_ERR_IO;
+    }
+    /* the module may split an answer into several datagrams */
+    int64_t end = esp_timer_get_time() + timeout_ms * 1000LL;
+    size_t got = 0, want = 0;
+    int err = MB_ERR_TIMEOUT;
+    while (got < sizeof(frame)) {
+        int64_t left = end - esp_timer_get_time();
+        if (left <= 0) {
+            break;
+        }
+        struct timeval tv = {.tv_sec = left / 1000000, .tv_usec = left % 1000000};
+        setsockopt(c->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        int r = recv(c->sock, frame + got, sizeof(frame) - got, 0);
+        if (r <= 0) {
+            if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+                err = MB_ERR_IO; /* e.g. ICMP port unreachable */
+            }
+            break;
+        }
+        got += r;
+        if (got >= MB_AA55_HEAD && (frame[0] != 0xaa || frame[1] != 0x55)) {
+            got = 0; /* not an answer: wait for the next one */
+            continue;
+        }
+        want = got > MB_AA55_HEAD ? mb_rtu_expected(frame + MB_AA55_HEAD, got - MB_AA55_HEAD) : 0;
+        if (want && got >= MB_AA55_HEAD + want) {
+            const uint8_t *p, *d;
+            size_t pl, dl;
+            err = mb_aa55_unframe(slave, frame, MB_AA55_HEAD + want, &p, &pl);
+            if (err == MB_OK) {
+                err = mb_pdu_check(req, p, pl, &d, &dl);
+            }
+            if (err == MB_OK && data && len) {
+                size_t n = dl < *len ? dl : *len;
+                memcpy(data, d, n);
+                *len = n;
+            }
+            break;
+        }
+    }
+    if (err == MB_ERR_IO) {
+        mb_tcp_close(c);
+    }
+    return err;
+}

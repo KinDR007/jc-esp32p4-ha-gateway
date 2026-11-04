@@ -11,6 +11,9 @@
 // --html serves the page from a local file while the API stays on the board (test a UI change
 // before flashing it, or check that a test fails on the old page).
 import { readFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import dgram from 'node:dgram';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
@@ -915,6 +918,39 @@ await test('UI33', 'System › Modbus TCP search: menu item, the gateway network
   check((await page.textContent('#ms-state')).includes('1 open') || (await page.textContent('#ms-state')).includes('1 otevřených'), `state: ${(await page.textContent('#ms-state')).trim()}`);
   check(!(await page.$('#ms-found table')), 'nothing listed: the web server does not speak Modbus');
   check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+});
+
+await test('UI34', 'Modbus TCP search finds a GoodWe Wi-Fi module (simulator on UDP 8899): listed with unit 127, Add puts it on transport udp with the GoodWe template, RS485 shows it as UDP; configuration restored', async () => {
+  const myIp = await new Promise((ok, fail) => {
+    const s = dgram.createSocket('udp4');
+    s.connect(80, new URL(base).hostname, err => { if (err) fail(err); else { ok(s.address().address); s.close(); } });
+  });
+  const sim = spawn('python3', [fileURLToPath(new URL('../../tools/modbus/sim_tcp.py', import.meta.url)), '--udp', '--port', '8899', 'goodwe_xs:127'], { stdio: 'ignore' });
+  const before = await (await page.request.get(base + 'api/modbus')).json();
+  const keep = { devices: before.devices.map(({ id, name, template, transport, slave, host, port, poll_s, expose, enabled }) => ({ id, name, template, transport, slave, host, port, poll_s, expose, enabled })) };
+  try {
+    await new Promise(r => setTimeout(r, 1000));
+    await tab('system/mbscan');
+    await page.waitForFunction(() => document.querySelector('#ms-net')?.value, null, { timeout: 10000 });
+    await page.fill('#ms-net', `${myIp}/32`);
+    await page.fill('#ms-ports', '9');
+    await page.check('#ms-udp');
+    await page.click('#ms-start');
+    await page.waitForSelector('#ms-found [data-ms-add*="|udp"]', { timeout: 30000 });
+    const row = await page.textContent('#ms-found table');
+    check(row.includes(`${myIp}:8899`) && row.includes('127'), `module listed with unit 127: ${row.replace(/\s+/g, ' ').trim()}`);
+    await page.click('#ms-found [data-ms-add*="|udp"]');
+    await page.waitForFunction(() => /GoodWe/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
+    const dev = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.transport === 'udp' && d.host === myIp);
+    check(dev && dev.template === 'goodwe_xs' && dev.port === 8899 && dev.slave === 127, `device added: ${JSON.stringify(dev && { name: dev.name, template: dev.template, transport: dev.transport, port: dev.port, slave: dev.slave })}`);
+    await tab('system/rs485');
+    await page.waitForFunction(ip => document.querySelector('#mb-devices')?.textContent.includes(`UDP ${ip}:8899 #127`), myIp, { timeout: 10000 });
+    check(true, 'RS485 lists it as UDP host:8899 #127');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/modbus', { data: keep });
+    sim.kill();
+  }
 });
 
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it

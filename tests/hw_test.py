@@ -999,6 +999,59 @@ def tc49_modbus_scan():
     code, r = http('GET', '/api/modbus')
     check(code == 200 and len(r['devices']) == len(keep['devices']), 'configuration of before restored')
 
+def tc50_modbus_goodwe_udp():
+    """GoodWe Wi-Fi module transport (Modbus RTU over UDP 8899, answers with AA 55) against the simulator of this
+    computer playing a GW3000-XS (template goodwe_xs, unit 127) that splits every answer into two datagrams:
+    the network search lists it with unit 127, a manual request reads its serial number, a unit that does not
+    exist times out, invalid devices are refused, and a device on transport udp reads every value as the simulator
+    encodes it. The configuration of before comes back."""
+    import subprocess
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    sim = subprocess.Popen([sys.executable, sim_py, '--udp', '--port', '8899', '--split', 'goodwe_xs:127'],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+    try:
+        time.sleep(1)
+        check(sim.poll() is None, 'simulator listens on UDP 8899 and 48899')
+        check(http('POST', '/api/modbus/scan', {'net': f'{my_ip}/32', 'ports': [9], 'udp': True})[0] == 200, 'search with UDP started')
+        r = wait_until('search done', lambda: (lambda r: r if not r['running'] else None)(http('GET', '/api/modbus/scan')[1]), 60, 2)
+        u = r['udp'][0] if len(r['udp']) == 1 else {}
+        check(u.get('host') == my_ip and u.get('unit') == 127 and 'Solar-WiFi-SIM' in u.get('info', ''), f'the module found with unit 127: {r["udp"]}')
+
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'udp', 'host': my_ip, 'slave': 127, 'fc': 3, 'addr': 30004, 'count': 8})
+        text = ''.join(chr(v >> 8) + chr(v & 0xff) for v in r.get('registers', []))
+        check(code == 200 and r.get('ok') and text == 'SERIAL-012345678', f'manual request over UDP: serial number {text!r}')
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'udp', 'host': my_ip, 'slave': 200, 'fc': 3, 'addr': 30004, 'count': 1})
+        check(code == 200 and not r.get('ok') and r.get('result') == -1, f'a unit that does not exist: no answer ({r.get("error")})')
+        check(http('POST', '/api/modbus/raw', {'transport': 'udp', 'slave': 127, 'fc': 3, 'addr': 0})[0] == 400, 'refused: udp without host')
+
+        dev = {'name': 'TC50 GoodWe', 'template': 'goodwe_xs', 'transport': 'udp', 'host': my_ip, 'slave': 127, 'poll_s': 3, 'expose': 'none'}
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + [dict(dev, transport='xyz')]})[0] == 400, 'refused: unknown transport')
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + [{k: v for k, v in dev.items() if k != 'host'}]})[0] == 400, 'refused: udp without host')
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + [dev]})[0] == 200, 'GoodWe device on udp added')
+        d = next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == dev['name'])
+        check(d['transport'] == 'udp' and d['port'] == 8899, f'stored as transport {d["transport"]}, default port {d.get("port")}')
+        exp = json.loads(subprocess.run([sys.executable, sim_py, '--expect', 'goodwe_xs'], capture_output=True, text=True).stdout)
+        get = lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == dev['name'])
+        d = wait_until('values of goodwe_xs', lambda: (lambda d: d if len(d['values']) >= len(exp) else None)(get()), 40, 2)
+        bad = {k: (v, d['values'].get(k)) for k, v in exp.items()
+               if not (d['values'].get(k) == v or isinstance(v, (int, float)) and abs(d['values'].get(k, 1e18) - v) <= 1e-6 + abs(v) * 1e-6)}
+        check(not bad and d['state'] == 'ok', f'goodwe_xs: all {len(exp)} values as encoded' + (f', different {bad}' if bad else ''))
+    finally:
+        http('POST', '/api/modbus/scan', {'stop': True})
+        http('PUT', '/api/modbus', keep)
+        sim.terminate()
+        sim.communicate(timeout=5)
+    code, r = http('GET', '/api/modbus')
+    check(code == 200 and len(r['devices']) == len(keep['devices']), 'configuration of before restored')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -2246,7 +2299,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2273,7 +2326,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

@@ -31,6 +31,11 @@ void mb_tcp_close(mb_tcp_t *c);
 int mb_tcp_request(mb_tcp_t *c, const char *host, uint16_t port, uint8_t unit, const mb_req_t *req, uint16_t timeout_ms,
                    uint8_t *data, size_t *len);
 
+/* One request to a GoodWe Wi-Fi module over UDP (port 8899): an RTU frame out, 0xAA 0x55 + an RTU frame back.
+ * Uses the socket of c (connected to host, so only its datagrams arrive). */
+int mb_udp_request(mb_tcp_t *c, const char *host, uint16_t port, uint8_t slave, const mb_req_t *req, uint16_t timeout_ms,
+                   uint8_t *data, size_t *len);
+
 /* counters for the UI */
 typedef struct {
     uint32_t requests, timeouts, crc_errors, exceptions;

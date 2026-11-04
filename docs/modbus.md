@@ -1,7 +1,7 @@
-# Modbus (RS485 and Modbus TCP)
+# Modbus (RS485, Modbus TCP, GoodWe UDP)
 
 The gateway reads and writes Modbus devices, on the board's RS485 port and over the network
-(Modbus TCP), and shows each one in Home Assistant as its own device. What to read from a device
+(Modbus TCP, or Modbus RTU over UDP for GoodWe Wi-Fi modules), and shows each one in Home Assistant as its own device. What to read from a device
 and how to show it is a **template** (JSON): built-in ones come with the firmware, own ones are
 added in the web UI. Web UI: System › RS485 and System › Modbus TCP search. API: [api.md](api.md#modbus-rs485-and-tcp). Code:
 `firmware/gateway/components/modbus`.
@@ -17,12 +17,12 @@ added in the web UI. Web UI: System › RS485 and System › Modbus TCP search. 
 
 The bus settings (baud rate, parity, stop bits, timeout) apply to all RS485 devices; a template
 shows its device's defaults and the page offers to take them. Modbus TCP devices need only host,
-port (502) and unit id.
+port (502) and unit id; GoodWe UDP devices the same with port 8899.
 
 ## Devices
 
 Per device: template, name (default the model, up to 32 characters), connection (RS485 address
-1-247, or TCP host, port and unit 0-255), read interval (0 = the template's), how it is shown in
+1-247, TCP host, port and unit 0-255, or GoodWe UDP host, port 8899 and unit), read interval (0 = the template's), how it is shown in
 Home Assistant (integration, MQTT, both, none), enabled. Up to 16 devices.
 
 - The task reads the entities due in a poll in as few requests as the template allows (adjacent
@@ -58,13 +58,27 @@ the traffic):
    (units 228, 227, 242, 246, register 3), GoodWe ET/EH/BT (unit 247, 35003) and DT/XS/D-NS (unit 127 or
    247, 30004). A recognised device with a template is added with one click.
 4. With "GoodWe dongles on UDP 8899" (default on) also sends the GoodWe discovery broadcast (port 48899)
-   and a Modbus RTU read on UDP 8899 to every address. Older GoodWe Wi-Fi dongles speak Modbus only there;
-   the gateway reads Modbus TCP, so such an inverter is listed but cannot be added (a WiFi/LAN Kit-20 or
-   the LAN+WiFi kit 2.0 offers TCP 502).
+   and a Modbus RTU read on UDP 8899 to every address (unit 127 register 30001, unit 247 register 35000).
+   Older GoodWe Wi-Fi dongles speak Modbus only there; a module that answers is listed with its unit, and
+   unit 127 (DT family: XS, MS, D-NS) is added with one click on the GoodWe UDP connection and the
+   `goodwe_xs` template. A WiFi/LAN Kit-20 or the LAN+WiFi kit 2.0 offers Modbus TCP 502 instead.
 
 The search runs in its own task beside the polling, only reads, and is started by hand. Another network
 is reached only through a route of the gateway's router (broadcasts do not cross it); a PV inverter's
 dongle is often powered from the panels and off at night.
+
+## GoodWe UDP (connection `udp`)
+
+GoodWe Wi-Fi modules (e.g. `Solar-WiFi…` of a GW3000-XS) answer Modbus only on UDP 8899: the request is a
+plain Modbus RTU frame (unit, PDU, CRC), the answer is `AA 55` + an RTU frame, a long one possibly split into
+several datagrams (`mb_udp_request` in `mb_bus.c` joins them up to the length the RTU header announces).
+The socket is connected to the module, so only its datagrams arrive; late answers of an earlier request are
+dropped before the next one. Same timeouts, offline handling and writes as Modbus TCP.
+
+GW3000-XS checked on 2026-11-04 from a computer (the gateway has no route to that network yet): unit 127
+answers 30001 (model `GW3000-XS`, serial at 30004) and 30100+ (PV 230.5 V 1.0 A, grid 233.3 V 1.7 A
+50.01 Hz, about 280 W); unit 247 and all TCP ports stay silent. The module is powered from the panels and
+does not answer at night.
 
 ## Home Assistant
 
@@ -162,9 +176,10 @@ checked by a second, independent research (sources below). "Not confirmed" items
 | `peacefair_pzem017` | Peacefair PZEM-017 / 003 (DC) | 9600 **8N2** | shunt range select, alarm thresholds, energy reset |
 | `victron_gx_system` | Victron GX (Cerbo, MultiPlus-II GX, Venus OS), system values | TCP, unit 100 | consumption, grid, generator, AC-coupled PV, battery V/A/W/SOC/state, DC PV, serial; L1 only |
 | `victron_vebus` | Victron MultiPlus / Quattro via a GX | TCP, unit 228 (MultiPlus-II GX; 227 Cerbo, 242 Venus GX, 246 CCGX) | AC in/out V, A, Hz, W, battery, state, switch position, alarms; read only; L1 only |
+| `goodwe_xs` | GoodWe XS / MS / D-NS (single phase DT family) | UDP 8899 (Wi-Fi module) or TCP 502, unit 127 | power, PV1/PV2 V and A, grid V, A, Hz, energy today/total, temperature, work mode, error and warning codes, hours, serial, model; read only |
 
 The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/modbus/gen_other.py` and
-`tools/modbus/gen_victron.py`.
+`tools/modbus/gen_victron.py`, `tools/modbus/gen_goodwe.py`.
 
 ### Findings worth knowing
 
@@ -189,7 +204,8 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   (`01 03 00 00 00 0A C5 CD`, Eastron's `43 66 33 34` = 230.2 V and `42 70 00 00` = 60.0), every
   word order, exceptions, the template checks, read planning; every built-in template parses and
   its reads fit `max_regs`.
-- `tools/modbus/sim_tcp.py`: a Modbus TCP device simulator playing templates; it encodes a known
+- `tools/modbus/sim_tcp.py`: a Modbus TCP device simulator playing templates (`--udp`: a GoodWe
+  Wi-Fi module on UDP 8899 with the discovery port 48899, `--split`: long answers in two datagrams); it encodes a known
   value per entity independently of the gateway code and answers exception 2 on undocumented
   addresses. TC48 runs it: all values of four templates match, writes of each kind are read back,
   the search finds the units, a user template works, an unreachable device goes offline, MQTT
@@ -200,6 +216,10 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
 - TC49: the search finds the simulator playing a Victron GX and recognises it by its serial number with
   both units, leaves out an open port without Modbus, refuses a second search and stops; both Victron
   templates read every value as encoded. UI33: the page of the search.
+- TC50: the simulator as a GoodWe module on UDP (answers split): the search lists it with unit 127, a
+  manual request reads the serial number, an absent unit times out, invalid devices are refused, a device
+  on `udp` with `goodwe_xs` reads every value. UI34: the search page adds it in one click. The unit test
+  checks the AA 55 framing against the request bytes of the goodwe library (`7F 03 75 31 00 28 04 09`).
 - Integration tests (`tests/ha_integration`), UI32.
 - **Not yet tested on a real RS485 device**: the RS485 path ran only without a device (timeouts);
   real meters will confirm the serial timing and the maps marked "community" above.
@@ -207,10 +227,6 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
 ## Sources
 
 Eastron: SDM120-MODBUS protocol V2.4, SDM230-MODBUS protocol V1.1, SDM630 Modbus protocol V1.8
-Victron: CCGX Modbus TCP register list 3.81 (victronenergy.com, technical information). GoodWe:
-marcelblijleven/goodwe (`dt.py`, `et.py`, discovery `WIFIKIT-214028-READ` on port 48899), its 0.4.3
-notes (Modbus TCP 502 on the LAN+WiFi kit 2.0), Home Assistant issue 176918 and the Homey forum (unit
-247 or 1, Kit-20 on 502).
 (eastroneurope.com), SDM72DM-V2 user manual V1.1, SDM630-Modbus V2 manuals V1.5/V1.6B, SDM230
 manuals v1.6/v1.8, SDM120-M manual; nmakel/sdm_modbus, reaper7/SDM_Energy_Meter, ESPHome
 `sdm_meter`, volkszaehler/mbmd, evcc templates, Tasmota energy drivers. Chint DTSU666/DDSU666 user
@@ -221,3 +237,9 @@ HARDWARIO and Grenton integration pages, apichlinski/orno-reader-domoticz, ioBro
 Template formats compared: evcc, ESPHome `modbus_controller`, Home Assistant `modbus`, Tasmota
 `modbus.json`, jollyjinx/modbus-2-mqtt-bridge. Board: schematic sheets 2, 4, 5 and 8
 ([unofficial_guition_esp32p4_repo](https://github.com/p1ngb4ck/unofficial_guition_esp32p4_repo/tree/main/JC-ESP32P4-M3-Dev)).
+
+Victron: CCGX Modbus TCP register list 3.81 (victronenergy.com, technical information). GoodWe:
+marcelblijleven/goodwe (`dt.py` register map of the DT family, `protocol.py` and `modbus.py`: RTU
+request over UDP 8899, answer with the AA 55 head and possibly in several datagrams; discovery
+`WIFIKIT-214028-READ` on port 48899), its 0.4.3 notes (Modbus TCP 502 on the LAN+WiFi kit 2.0), Home
+Assistant issue 176918 and the Homey forum (unit 247 or 1, Kit-20 on 502).
