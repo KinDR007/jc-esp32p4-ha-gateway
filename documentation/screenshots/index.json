@@ -705,5 +705,18 @@
     "file": "system_rs485__6"
    }
   ]
+ },
+ "system/mbscan": {
+  "page": "system_mbscan",
+  "cards": [
+   {
+    "title": "SEARCH THE NETWORK",
+    "file": "system_mbscan__1"
+   },
+   {
+    "title": "FOUND",
+    "file": "system_mbscan__2"
+   }
+  ]
  }
 }

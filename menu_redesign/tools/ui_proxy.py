@@ -2,7 +2,7 @@
 
 Lets the reworked UI run against live data without flashing the gateway; POST/PUT/DELETE are refused,
 so taking screenshots cannot change the gateway. Wi-Fi names and BSSIDs (the ESPHome radio's network, the
-Wi-Fi networks of a scan) are masked.
+Wi-Fi networks of a scan) and the serial numbers of the Modbus search are masked.
   P4GW_TOKEN=<admin token> python3 ui_proxy.py <index.html> [gateway=192.168.88.243] [port=8088]
 """
 import http.server
@@ -43,6 +43,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         b = ap['bssid']
                         fake = vendors.setdefault(b[2:6] + b[7], f'{0xa0 + len(vendors):02x}00{len(vendors) % 16:x}')
                         ap['bssid'] = b[:2] + fake[:4] + fake[4] + b[7] + b[8:]
+                    body = json.dumps(d).encode()
+                elif self.path.startswith('/api/modbus/scan'):
+                    d = json.loads(body)
+                    for f in d.get('found') or []:
+                        if f.get('serial'):
+                            f['serial'] = f['serial'][:6] + '0' * (len(f['serial']) - 6)
+                    for u in d.get('udp') or []:
+                        u['info'] = ','.join(x[:6] + '000000' if len(x) == 12 else x for x in u.get('info', '').split(','))
                     body = json.dumps(d).encode()
                 self.reply(r.status, r.headers.get('Content-Type', 'application/octet-stream'), body)
         except urllib.error.HTTPError as e:

@@ -2759,7 +2759,7 @@ Response:
       "model": "GX device",
       "device_unit": 100,
       "template": "victron_gx_system",
-      "serial": "c0619ab3d745",
+      "serial": "c0619a000000",
       "vebus_unit": 228
     }
   ],

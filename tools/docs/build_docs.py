@@ -384,7 +384,7 @@ PAGES = [
      T("Modbus devices on RS485 (connector J4) and Modbus TCP, from templates: values, writes, search, own templates.",
        "Zařízení Modbus na RS485 (konektor J4) a Modbus TCP podle šablon: hodnoty, zápisy, hledání, vlastní šablony."),
      {"RS485 BUS": T("Wiring and the bus settings (baud rate, parity, stop bits, timeout) shared by all RS485 devices; request statistics.", "Zapojení a nastavení sběrnice (rychlost, parita, stop bity, časový limit) společné všem zařízením na RS485; statistika dotazů."),
-      "ADD A DEVICE": T("Template, name, RS485 address or Modbus TCP host, read interval and how Home Assistant shows it (integration, MQTT, both, none).", "Šablona, jméno, adresa na RS485 nebo host Modbus TCP, interval čtení a jak ho ukáže Home Assistant (integrace, MQTT, obojí, nic)."),
+      "ADD A DEVICE": T("Template, name, connection (RS485, Modbus TCP or GoodWe UDP) with its address, read interval and how Home Assistant shows it (integration, MQTT, both, none).", "Šablona, jméno, připojení (RS485, Modbus TCP nebo GoodWe UDP) s adresou, interval čtení a jak ho ukáže Home Assistant (integrace, MQTT, obojí, nic)."),
       "DEVICES": T("State, main values, Home Assistant and enable per device; the arrow shows every value with controls for the writable ones.", "Stav, hlavní hodnoty, Home Assistant a zapnutí po zařízeních; šipka ukáže všechny hodnoty s ovládáním zapisovatelných."),
       "FIND DEVICES": T("Tries every address (and baud rates) with a read of a template.", "Zkusí každou adresu (a rychlosti) čtením podle šablony."),
       "MANUAL REQUEST": T("Reads or writes registers; shows them as u16, s16, u32 and float32 in both word orders.", "Čte nebo zapisuje registry; ukáže je jako u16, s16, u32 a float32 v obou pořadích slov."),
@@ -399,6 +399,22 @@ PAGES = [
        <li>Integrace ukáže zařízení jako samostatné zařízení v Home Assistant; pro MQTT ho zvolte po zařízení a povolte skupinu <i>Zařízení Modbus</i>.</li>
        <li>Šablona pro vaše zařízení chybí: zkopírujte podobnou, upravte registry (pomůže ruční dotaz) a uložte.</li></ol>"""),
      ["system_rs485"]),
+    ("system/mbscan", "lan-pending", T("System › Modbus TCP search", "Systém › Hledání Modbus TCP"),
+     T("Finds Modbus TCP devices and GoodWe Wi-Fi modules in a network and adds a recognised one in one click.",
+       "Najde v síti zařízení Modbus TCP a moduly Wi-Fi GoodWe a rozpoznané přidá jedním klikem."),
+     {"SEARCH THE NETWORK": T("Network (up to /22, default the gateway's), ports, unit ids to ask and GoodWe modules on UDP 8899. Only reads; the Modbus devices keep being read. A /24 takes about 20-60 s.",
+                              "Síť (nejvýš /22, výchozí je síť brány), porty, jednotky k dotazu a moduly GoodWe na UDP 8899. Jen čte; zařízení Modbus se dál čtou. Rozsah /24 trvá asi 20-60 s."),
+      "FOUND": T("Every address that answered: Victron GX (with its VE.Bus unit) and GoodWe recognised by the serial number, other devices with the unit and the answer. <b>Add</b> adds the device with its template, <b>RS485</b> opens it in the add form and the manual request (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-search-in-a-network\">modbus.md</a>).",
+                 "Každá adresa, která odpověděla: Victron GX (i s jednotkou VE.Bus) a GoodWe pozná podle sériového čísla, ostatní zařízení s jednotkou a odpovědí. <b>Přidat</b> přidá zařízení se šablonou, <b>RS485</b> ho otevře ve formuláři přidání a v ručním dotazu (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-search-in-a-network\">modbus.md</a>).")},
+     T("""<ol><li>Enable Modbus TCP on the device (Victron GX: Settings › Integrations › Modbus TCP server).</li>
+       <li>Check the network and press <b>Search</b>.</li>
+       <li>Press <b>Add</b> at the recognised device; it appears under System › RS485 › Devices. An unknown device: <b>RS485</b> and pick or write a template.</li>
+       <li>A GoodWe Wi-Fi module (XS, MS, D-NS) answers only on UDP 8899: keep <i>GoodWe dongles on UDP 8899</i> checked, it is added on connection GoodWe UDP with unit 127.</li></ol>""",
+       """<ol><li>Zapněte na zařízení Modbus TCP (Victron GX: Nastavení › Integrace › Modbus TCP server).</li>
+       <li>Zkontrolujte síť a stiskněte <b>Hledat</b>.</li>
+       <li>U rozpoznaného zařízení stiskněte <b>Přidat</b>; objeví se v Systém › RS485 › Zařízení. Neznámé zařízení: <b>RS485</b> a zvolte nebo napište šablonu.</li>
+       <li>Modul Wi-Fi GoodWe (XS, MS, D-NS) odpovídá jen na UDP 8899: nechte zaškrtnuté <i>Moduly GoodWe na UDP 8899</i>, přidá se s připojením GoodWe UDP a jednotkou 127.</li></ol>"""),
+     ["system_mbscan"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",
