@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
@@ -678,6 +679,7 @@ static cJSON *values_json(void)
             cJSON *c = cJSON_AddObjectToObject(j, key);
             cJSON_AddNumberToObject(c, "count", p->count);
             cJSON_AddNumberToObject(c, "rate", roundf(p->rate * 10) / 10);
+            cJSON_AddNumberToObject(c, "frequency", roundf((p->edge == EDGE_BOTH ? p->rate / 2 : p->rate) * 10) / 10);
         } else {
             cJSON_AddNumberToObject(j, key, p->level);
         }
@@ -693,7 +695,7 @@ static void push(void)
     char *text = cJSON_PrintUnformatted(v);
     cJSON_Delete(v);
     if (text) {
-        gw_mqtt_publish("gpio", text, false); /* also the push WebSocket of the integration */
+        gw_mqtt_publish("gpio", text, true); /* also the push WebSocket of the integration; retained for MQTT */
         cJSON_free(text);
     }
 }
@@ -818,6 +820,7 @@ static esp_err_t gpio_put(httpd_req_t *req)
     xSemaphoreGive(s_lock);
     free(list);
     ESP_LOGI(TAG, "%d pins configured by %s", n, gw_auth_who());
+    gw_mqtt_rediscover();
     return gw_http_send_json(req, j);
 }
 
@@ -899,6 +902,162 @@ static esp_err_t set_post(httpd_req_t *req)
     return gw_http_send_json(req, j);
 }
 
+/* ---------------------------------------------------------------- MQTT */
+
+/* gpio/<n>/set: ON, OFF or PULSE <ms> (output), ON/OFF (PWM: 100 % or 0 %); gpio/<n>/duty/set: 0-100 */
+static void mqtt_command(const char *suffix, const char *payload)
+{
+    int gpio = -1;
+    char what[8] = "";
+    if (sscanf(suffix, "gpio/%d/%7[^/]", &gpio, what) != 2) {
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    pin_t *p = find(gpio);
+    cJSON *v = NULL;
+    const char *err = "unknown command";
+    bool on = !strcasecmp(payload, "ON"), off = !strcasecmp(payload, "OFF");
+    if (p && !strcmp(what, "duty")) {
+        v = cJSON_CreateNumber(atof(payload));
+        err = set_value(p, NULL, v, NULL, false);
+    } else if (p && p->mode == M_PWM && (on || off)) {
+        v = cJSON_CreateNumber(on ? 100 : 0);
+        err = set_value(p, NULL, v, NULL, false);
+    } else if (p && !strncasecmp(payload, "PULSE", 5)) {
+        v = cJSON_CreateNumber(atoi(payload + 5) > 0 ? atoi(payload + 5) : 1000);
+        err = set_value(p, NULL, NULL, v, false);
+    } else if (p && (on || off)) {
+        v = cJSON_CreateNumber(on);
+        err = set_value(p, v, NULL, NULL, false);
+    }
+    if (!err) {
+        s_changed = true;
+    }
+    xSemaphoreGive(s_lock);
+    cJSON_Delete(v);
+    if (err) {
+        ESP_LOGW(TAG, "MQTT %s %s: %s", suffix, payload, err);
+    }
+}
+
+/* discovery entries sent, to remove them when a pin changes */
+static struct {
+    char oid[32];
+    char component[16];
+} s_pub[MAX_PINS * 2];
+static int s_npub;
+
+static void mqtt_entity(const pin_t *p, const char *component, const char *key, const char *base, const char *host)
+{
+    char oid[32], buf[160], tpl[128], name[NAME_CHARS * 3 + 16];
+    snprintf(oid, sizeof(oid), "gpio_%d_%s_%s", p->gpio, s_modes[p->mode], key);
+    snprintf(name, sizeof(name), "%s%s", p->name[0] ? p->name : "", !strcmp(key, "frequency") ? " frequency" : "");
+    if (!p->name[0]) {
+        snprintf(name, sizeof(name), "GPIO%d%s", p->gpio, !strcmp(key, "frequency") ? " frequency" : "");
+    }
+    cJSON *cfg = cJSON_CreateObject();
+    cJSON_AddStringToObject(cfg, "name", name);
+    snprintf(buf, sizeof(buf), "%s/gpio", base);
+    cJSON_AddStringToObject(cfg, "state_topic", buf);
+    if (!strcmp(component, "light")) {
+        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] > 0 else 'OFF' }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "state_value_template", tpl);
+        cJSON_AddStringToObject(cfg, "brightness_state_topic", buf);
+        snprintf(tpl, sizeof(tpl), "{{ value_json['%d'] }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "brightness_value_template", tpl);
+        cJSON_AddNumberToObject(cfg, "brightness_scale", 100);
+        cJSON_AddStringToObject(cfg, "on_command_type", "brightness");
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/duty/set", base, p->gpio);
+        cJSON_AddStringToObject(cfg, "brightness_command_topic", buf);
+    } else if (!strcmp(key, "count") || !strcmp(key, "frequency")) {
+        snprintf(tpl, sizeof(tpl), "{{ value_json['%d'].%s }}", p->gpio, key);
+        cJSON_AddStringToObject(cfg, "value_template", tpl);
+        if (!strcmp(key, "count")) {
+            cJSON_AddStringToObject(cfg, "state_class", "total_increasing");
+        } else {
+            cJSON_AddStringToObject(cfg, "state_class", "measurement");
+            cJSON_AddStringToObject(cfg, "device_class", "frequency");
+            cJSON_AddStringToObject(cfg, "unit_of_measurement", "Hz");
+        }
+    } else {
+        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] else 'OFF' }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "value_template", tpl);
+    }
+    if (!strcmp(component, "switch") || !strcmp(component, "light")) {
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/set", base, p->gpio);
+        cJSON_AddStringToObject(cfg, "command_topic", buf);
+    }
+    cJSON *dev = cJSON_AddObjectToObject(cfg, "device");
+    cJSON *ids = cJSON_AddArrayToObject(dev, "identifiers");
+    snprintf(buf, sizeof(buf), "%s_gpio", host);
+    cJSON_AddItemToArray(ids, cJSON_CreateString(buf));
+    snprintf(buf, sizeof(buf), "%s GPIO", host);
+    cJSON_AddStringToObject(dev, "name", buf);
+    cJSON_AddStringToObject(dev, "manufacturer", "Guition");
+    cJSON_AddStringToObject(dev, "model", "GPIO of header JP1");
+    gw_mqtt_discovery(GW_MQTT_GPIO, component, oid, cfg);
+    if (s_npub < MAX_PINS * 2) {
+        strlcpy(s_pub[s_npub].oid, oid, sizeof(s_pub[0].oid));
+        strlcpy(s_pub[s_npub].component, component, sizeof(s_pub[0].component));
+        s_npub++;
+    }
+}
+
+/* Runs in the MQTT publish task (connect, gw_mqtt_rediscover). */
+static void mqtt_discovery(void)
+{
+    pin_t *snap = calloc(MAX_PINS, sizeof(pin_t));
+    if (!snap) {
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int n = s_npin;
+    memcpy(snap, s_pin, n * sizeof(pin_t));
+    xSemaphoreGive(s_lock);
+    /* what was published before: removed, then published again if still there */
+    char oid[32];
+    for (int k = 0; k < s_npub; k++) {
+        bool keep = false;
+        for (int i = 0; i < n && !keep; i++) {
+            const pin_t *p = &snap[i];
+            if (p->active && (p->expose & EXPOSE_MQTT)) {
+                for (const char *const *key = (const char *const[]){"level", "duty", "count", "frequency", NULL}; *key && !keep; key++) {
+                    snprintf(oid, sizeof(oid), "gpio_%d_%s_%s", p->gpio, s_modes[p->mode], *key);
+                    keep = !strcmp(oid, s_pub[k].oid);
+                }
+            }
+        }
+        if (!keep) {
+            gw_mqtt_discovery(GW_MQTT_GPIO, s_pub[k].component, s_pub[k].oid, NULL);
+        }
+    }
+    s_npub = 0;
+    const char *base = gw_mqtt_base_topic(), *host = gw_state()->hostname;
+    for (int i = 0; i < n; i++) {
+        const pin_t *p = &snap[i];
+        if (!p->active || !(p->expose & EXPOSE_MQTT)) {
+            continue;
+        }
+        switch (p->mode) {
+        case M_INPUT:
+            mqtt_entity(p, "binary_sensor", "level", base, host);
+            break;
+        case M_OUTPUT:
+            mqtt_entity(p, "switch", "level", base, host);
+            break;
+        case M_PWM:
+            mqtt_entity(p, "light", "duty", base, host);
+            break;
+        case M_COUNTER:
+            mqtt_entity(p, "sensor", "count", base, host);
+            mqtt_entity(p, "sensor", "frequency", base, host);
+            break;
+        }
+    }
+    free(snap);
+    push(); /* the retained state for the entities */
+}
+
 /* ---------------------------------------------------------------- Telegram */
 
 static void bot_gpio(const char *args, bool cz, char *out, size_t len)
@@ -952,6 +1111,9 @@ esp_err_t gpio_ctl_init(void)
     gw_http_register("/api/gpio", HTTP_PUT, gpio_put);
     gw_http_register("/api/gpio/set", HTTP_POST, set_post);
     gw_bot_command("gpio", "GPIO of JP1", "GPIO na JP1", "system/hw", 1, false, bot_gpio);
+    gw_mqtt_set_extension(mqtt_discovery, NULL);
+    gw_mqtt_add_command("gpio/+/set", mqtt_command);
+    gw_mqtt_add_command("gpio/+/duty/set", mqtt_command);
     ESP_LOGI(TAG, "%d pins configured", n);
     return xTaskCreate(task, "gpio_ctl", 4096, NULL, 5, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

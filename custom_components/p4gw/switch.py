@@ -13,6 +13,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .api import P4Error
 from .coordinator import P4ConfigEntry, P4Coordinator
 from .entity import P4Entity
+from .gpio import P4GpioEntity, add_gpio_entities
 from .modbus import P4ModbusEntity, add_modbus_entities
 
 
@@ -21,6 +22,22 @@ async def async_setup_entry(
 ) -> None:
     async_add_entities([P4SoundSwitch(entry.runtime_data)])
     add_modbus_entities(entry.runtime_data, async_add_entities, "switch", P4ModbusSwitch)
+    add_gpio_entities(entry.runtime_data, async_add_entities, "switch", P4GpioOutput)
+
+
+class P4GpioOutput(P4GpioEntity, SwitchEntity):
+    """A GPIO output of JP1."""
+
+    @property
+    def is_on(self) -> bool | None:
+        pin = self.pin
+        return None if pin is None or "level" not in pin else bool(pin["level"])
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.set({"level": 1})
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.set({"level": 0})
 
 
 class P4ModbusSwitch(P4ModbusEntity, SwitchEntity):

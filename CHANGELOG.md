@@ -13,8 +13,12 @@
   locked with the reason; free pins (GPIO1, 2, 3, 45; radio B's while radio B has no role and none is found)
   as input (pull, inverted, debounce), output (open drain, pulse, read back on the pad), PWM (1 Hz-1 MHz)
   or pulse counter (rate, frequency, glitch filter), state after a restart per pin (off, on, last).
-  Telegram `/gpio`. Home Assistant follows (docs/gpio.md, G3).
-- Tests: TC52, UI36.
+  Telegram `/gpio`.
+- Home Assistant: integration 1.7.0 shows GPIO set to *integration* as the device "<host> GPIO" (input
+  binary sensor, output switch, PWM light with the duty as brightness, counter count and frequency);
+  MQTT discovery group `gpio` with the same entities and commands `gpio/<n>/set` (ON, OFF, PULSE <ms>) and
+  `gpio/<n>/duty/set`. A stored selection of all eight MQTT groups gets the new one.
+- Tests: TC52, TC53, UI36, integration tests of the GPIO device.
 
 ## v1.12 (2026-11-04)
 

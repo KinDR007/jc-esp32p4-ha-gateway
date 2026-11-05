@@ -2158,7 +2158,8 @@ Response:
     "sound_events",
     "sound_triggers",
     "sensors",
-    "modbus"
+    "modbus",
+    "gpio"
   ],
   "interval": 60,
   "base_topic": "p4gw/p4gw-a1b2c3",
@@ -2208,7 +2209,7 @@ Response:
 }
 ```
 
-Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors, modbus.
+Errors: 400 A field is invalid (the message says which): uri must start with mqtt://, mqtts://, ws:// or wss:// (max 120); user, password, client_id max 63; prefix 1..31 characters without wildcards, spaces and outer slashes; base topic without #, +, spaces and outer slashes (max 63); tls bundle or ca; ca a PEM certificate up to 3999 characters, required when tls is ca; keepalive 10..240; interval 10..3600; discovery_groups from roles, system, update, sound, sound_events, sound_triggers, sensors, modbus, gpio.
 
 Effects: Body up to 8 kB. Stores to NVS, then stops and restarts the MQTT client. Turning discovery or a group off first removes those entities from Home Assistant. interval is the state publish period in seconds. Returns the new state like GET.
 

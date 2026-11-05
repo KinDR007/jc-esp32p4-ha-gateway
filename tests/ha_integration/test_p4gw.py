@@ -451,3 +451,66 @@ async def test_firmware_without_modbus(hass: HomeAssistant, gateway) -> None:
     entry = await setup_entry(hass, gateway)
     assert entry.state is ConfigEntryState.LOADED
     assert er.async_get(hass).async_get_entity_id("sensor", DOMAIN, f"{MAC}_mb_d1_voltage") is None
+
+
+async def test_gpio_device(hass: HomeAssistant, gateway) -> None:
+    """GPIO of JP1 shown through the integration: the device "<host> GPIO" via the gateway with a binary sensor
+    per input, a switch per output, a light per PWM pin (brightness = duty) and two sensors per counter;
+    commands go to /api/gpio/set; the push of topic gpio updates them; a pin only for MQTT has no entity."""
+    from homeassistant.helpers import device_registry as dr
+
+    await setup_entry(hass, gateway)
+    eid = lambda platform, key: er.async_get(hass).async_get_entity_id(platform, DOMAIN, f"{MAC}_gpio_{key}")
+    assert hass.states.get(eid("binary_sensor", "3_input_level")).state == STATE_OFF
+    relay = hass.states.get(eid("switch", "2_output_level"))
+    assert relay.state == STATE_ON and relay.attributes["friendly_name"].endswith("Relay") and relay.attributes["jp1_pin"] == 9
+    led = hass.states.get(eid("light", "1_pwm_duty"))
+    assert led.state == STATE_ON and led.attributes["brightness"] == 102
+    assert hass.states.get(eid("sensor", "45_counter_count")).state == "120"
+    freq = hass.states.get(eid("sensor", "45_counter_frequency"))
+    assert float(freq.state) == 1.0 and freq.attributes["unit_of_measurement"] == "Hz"
+    assert eid("switch", "32_output_level") is None  # MQTT only
+
+    entry_id = hass.config_entries.async_entries(DOMAIN)[0].entry_id
+    devices = dr.async_get(hass)
+    dev = devices.async_get_device_by_identifier((DOMAIN, f"{MAC}_gpio"), entry_id)
+    gw = devices.async_get_device_by_identifier((DOMAIN, MAC), entry_id)
+    assert dev.name == "p4gw-e30a08 GPIO" and dev.via_device_id == gw.id
+
+    await hass.services.async_call("switch", "turn_off", {"entity_id": eid("switch", "2_output_level")}, blocking=True)
+    await hass.services.async_call("light", "turn_on", {"entity_id": eid("light", "1_pwm_duty"), "brightness": 255}, blocking=True)
+    await hass.services.async_call("light", "turn_off", {"entity_id": eid("light", "1_pwm_duty")}, blocking=True)
+    assert ("/api/gpio/set", {"gpio": 2, "level": 0}) in gateway.posts
+    assert ("/api/gpio/set", {"gpio": 1, "duty": 100.0}) in gateway.posts
+    assert ("/api/gpio/set", {"gpio": 1, "duty": 0}) in gateway.posts
+    assert hass.states.get(eid("switch", "2_output_level")).state == STATE_OFF
+    await hass.services.async_call("light", "turn_on", {"entity_id": eid("light", "1_pwm_duty")}, blocking=True)
+    assert gateway.posts[-1] == ("/api/gpio/set", {"gpio": 1, "duty": 100.0})  # back to the last duty
+
+    await push(hass, gateway, "gpio", {"3": 1, "2": 1, "1": 25.0, "45": {"count": 130, "rate": 4.0}})
+    assert hass.states.get(eid("binary_sensor", "3_input_level")).state == STATE_ON
+    assert hass.states.get(eid("switch", "2_output_level")).state == STATE_ON
+    assert hass.states.get(eid("light", "1_pwm_duty")).attributes["brightness"] == 64
+    assert hass.states.get(eid("sensor", "45_counter_count")).state == "130"
+    assert float(hass.states.get(eid("sensor", "45_counter_frequency")).state) == 2.0  # both edges: two counts a period
+
+
+async def test_gpio_pin_off_or_changed(hass: HomeAssistant, gateway) -> None:
+    """A pin that went off (radio B took its pins) or changed its mode is unavailable; the new mode's entity appears."""
+    await setup_entry(hass, gateway)
+    eid = lambda platform, key: er.async_get(hass).async_get_entity_id(platform, DOMAIN, f"{MAC}_gpio_{key}")
+    gateway.gpio["pins"][1].update(active=False, error="radio B: UART TX (radio B has the role zigbee_router)")
+    gateway.gpio["pins"][0].update(mode="output", level=1)
+    coordinator = hass.config_entries.async_entries(DOMAIN)[0].runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(eid("switch", "2_output_level")).state == STATE_UNAVAILABLE
+    assert hass.states.get(eid("binary_sensor", "3_input_level")).state == STATE_UNAVAILABLE
+    assert hass.states.get(eid("switch", "3_output_level")).state == STATE_ON
+
+
+async def test_firmware_without_gpio(hass: HomeAssistant, gateway) -> None:
+    gateway.gpio = None
+    entry = await setup_entry(hass, gateway)
+    assert entry.state is ConfigEntryState.LOADED
+    assert er.async_get(hass).async_get_entity_id("switch", DOMAIN, f"{MAC}_gpio_2_output_level") is None

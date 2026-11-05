@@ -85,6 +85,10 @@ class P4Client:
     async def modbus_template(self, template_id: str) -> dict[str, Any]:
         return await self._request("GET", f"/api/modbus/template?id={template_id}")
 
+    async def gpio(self) -> dict[str, Any]:
+        """GPIO of JP1 with their values (firmware 1.13 on; older answers 404)."""
+        return await self._request("GET", "/api/gpio")
+
     async def notifications(self, since: int) -> dict[str, Any]:
         """Notifications the gateway keeps, newer than seq since: {"notifications": [...], "seq"}."""
         return await self._request("GET", f"/api/notify?since={since}")

@@ -206,6 +206,7 @@ Rozhodnutí: piny rádia B volné, když rádio B nemá roli; funkce vstup, výs
 - [x] G1 Tabulka pinů a obsazení, kresba JP1; GPIO1 a GPIO45 bez zátěže na desce (sledují vnitřní pull)
 - [x] G2 Vstup, výstup, PWM, čítač; API `/api/gpio`, UI Systém › GPIO (JP1), NVS, stav po restartu, Telegram `/gpio`; TC52, UI36
 - [ ] Ověřit piny rádia B jako GPIO (rádio B bez role a bez C5)
-- [ ] G3 Zařízení „P4 GPIO“ v integraci (1.7.0) a MQTT (skupina `gpio`)
+- [x] G3 Zařízení „<host> GPIO“ v integraci (1.7.0) a MQTT (skupina `gpio`, příkazy set/duty/PULSE); TC53, testy integrace
+- [ ] Nasadit integraci 1.7.0 do HA (po vydání firmwaru s GPIO)
 - [ ] G4 UART-TCP most (UART4), I2C sběrnice 2, 1-Wire DS18B20, WS2812
 - [ ] G5 HW testy s propojkou JP1 9–11, dokumentace

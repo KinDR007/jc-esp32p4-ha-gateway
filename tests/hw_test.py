@@ -705,7 +705,7 @@ def tc46_mqtt_discovery_groups():
     try:
         for bad in (['bogus'], 'roles', [1]):
             check(http('POST', '/api/mqtt', {'discovery_groups': bad})[0] == 400, f'refused: discovery_groups {bad!r}')
-        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors', 'modbus']
+        all_groups = ['roles', 'system', 'update', 'sound', 'sound_events', 'sound_triggers', 'sensors', 'modbus', 'gpio']
         # an I2C sensor to expose (need not be connected: its entity exists, unavailable)
         sensors = http('GET', '/api/sensors')[1]['sensors']
         if not any(x['addr'] == 0x76 for x in sensors):
@@ -2395,6 +2395,84 @@ def tc52_gpio():
     check(len(http('GET', '/api/gpio')[1]['pins']) == len(keep['pins']), 'configuration of before restored')
 
 
+def tc53_gpio_mqtt():
+    """GPIO of JP1 over MQTT against a plain test broker (--mqtt-broker host:port): the device "<host> GPIO" via the
+    gateway with a switch, binary sensor, light (brightness = duty) and two counter sensors, retained state, commands
+    ON/OFF/PULSE and duty, a mode change replaces the entity, the gpio group off removes them; then the original settings."""
+    if not ARGS.mqtt_broker:
+        raise Skip('needs --mqtt-broker <host>:<port> (anonymous mosquitto, e.g. mosquitto -p 18883)')
+    import subprocess
+    host, port = ARGS.mqtt_broker.rsplit(':', 1)
+    code, backup = http('GET', '/api/settings/export?secrets=1')
+    check(code == 200, 'original settings exported (restored by import at the end)')
+    groups_before = http('GET', '/api/mqtt')[1]['discovery_groups']
+    gpio_before = http('GET', '/api/gpio')[1]['pins']
+    name = status()['hostname']
+    base = f'p4gw/{name}'
+
+    def sub(topic):
+        out = subprocess.run(['mosquitto_sub', '-h', host, '-p', port, '-t', topic, '-v', '-W', '3', '-C', '1'],
+                             capture_output=True, text=True).stdout.strip()
+        return out.split(' ', 1)[1] if ' ' in out else ''
+
+    def pub(topic, payload):
+        subprocess.run(['mosquitto_pub', '-h', host, '-p', port, '-t', topic, '-m', payload], check=True)
+        time.sleep(0.6)
+
+    retained = lambda component, oid: sub(f'homeassistant/{component}/{name}/{oid}/config')
+    pin = lambda g: next((p for p in http('GET', '/api/gpio')[1]['pins'] if p['gpio'] == g), None)
+    try:
+        check(http('PUT', '/api/gpio', {'pins': [
+            {'gpio': 2, 'mode': 'output', 'name': 'Relé', 'expose': 'mqtt'},
+            {'gpio': 3, 'mode': 'input', 'pull': 'up', 'name': 'Tlačítko', 'expose': 'both'},
+            {'gpio': 1, 'mode': 'pwm', 'freq': 1000, 'expose': 'mqtt'},
+            {'gpio': 45, 'mode': 'counter', 'pull': 'down', 'name': 'Vodoměr', 'expose': 'mqtt'}]})[0] == 200, 'pins set to MQTT')
+        code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle', 'base': '',
+                                             'prefix': 'homeassistant', 'discovery': True, 'discovery_groups': ['gpio'], 'enabled': True})
+        check(code == 200 and wait_until('connected', lambda: http('GET', '/api/mqtt')[1]['connected'], 25, 1), 'test broker, group gpio only')
+        time.sleep(2)
+        sw = json.loads(retained('switch', 'gpio_2_output_level') or '{}')
+        check(sw.get('name') == 'Relé' and sw.get('command_topic') == f'{base}/gpio/2/set' and sw['device']['identifiers'] == [f'{name}_gpio']
+              and sw['device']['via_device'] == name, 'output: switch of the device "<host> GPIO" via the gateway')
+        check(json.loads(retained('binary_sensor', 'gpio_3_input_level') or '{}').get('value_template', '').startswith("{{ 'ON' if value_json['3']"), 'input: binary sensor')
+        light = json.loads(retained('light', 'gpio_1_pwm_duty') or '{}')
+        check(light.get('name') == 'GPIO1' and light.get('brightness_scale') == 100 and light.get('brightness_command_topic') == f'{base}/gpio/1/duty/set',
+              'PWM: light with brightness 0-100 (the duty)')
+        freq = json.loads(retained('sensor', 'gpio_45_counter_frequency') or '{}')
+        check(retained('sensor', 'gpio_45_counter_count') and freq.get('unit_of_measurement') == 'Hz', 'counter: count and frequency sensors')
+        state = json.loads(sub(f'{base}/gpio') or '{}')
+        check(state.get('3') == 1 and state.get('2') == 0 and state.get('45', {}).get('count') == 0, f'retained state {state}')
+        pub(f'{base}/gpio/2/set', 'ON')
+        p2 = wait_until('output on after ON', lambda: (lambda x: x if x['level'] == 1 else None)(pin(2)), 3, 0.3)
+        state = json.loads(sub(f'{base}/gpio') or '{}')
+        check(p2['pin_level'] == 1 and state.get('2') == 1, f'command ON: output on, state published {state}')
+        pub(f'{base}/gpio/2/set', 'OFF')
+        pub(f'{base}/gpio/2/set', 'PULSE 1500')
+        check(pin(2)['pin_level'] == 1, 'command PULSE 1500: on')
+        time.sleep(1.5)
+        check(pin(2)['pin_level'] == 0, 'and off again')
+        pub(f'{base}/gpio/1/duty/set', '30')
+        check(pin(1)['duty'] == 30, 'duty 30 from the light')
+        pub(f'{base}/gpio/1/set', 'OFF')
+        check(pin(1)['duty'] == 0, 'light OFF: duty 0')
+        http('PUT', '/api/gpio', {'pins': [{'gpio': 2, 'mode': 'input', 'expose': 'mqtt'}]})
+        time.sleep(2)
+        check(not retained('switch', 'gpio_2_output_level') and retained('binary_sensor', 'gpio_2_input_level')
+              and not retained('light', 'gpio_1_pwm_duty'), 'mode changed and pins freed: old entities removed, new one published')
+        check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_triggers']})[0] == 200, 'group gpio off')
+        time.sleep(3)
+        check(not retained('binary_sensor', 'gpio_2_input_level'), 'GPIO entities removed (empty retained config)')
+    finally:
+        http('PUT', '/api/gpio', {'pins': [{k: p[k] for k in ('gpio', 'mode', 'name', 'expose', 'invert', 'pull', 'debounce_ms', 'open_drain', 'restore', 'freq', 'edge', 'filter_ns') if k in p}
+                                           for p in gpio_before]})
+        http('POST', '/api/mqtt', {'discovery_groups': groups_before})
+        code, r = http('POST', '/api/settings/import', backup)
+        check(code == 200, 'original settings imported, the gateway restarts')
+        wait_restart(status()['role']['desired'])
+    m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] or not m['enabled'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
+    check(m['discovery_groups'] == groups_before, f'original broker {m["uri"]}, groups {groups_before}')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -2408,7 +2486,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2435,7 +2513,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

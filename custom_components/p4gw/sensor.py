@@ -13,7 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfInformation, UnitOfSoundPressure, UnitOfTemperature
+from homeassistant.const import EntityCategory, UnitOfFrequency, UnitOfInformation, UnitOfSoundPressure, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from .const import ROLES
 from .coordinator import P4ConfigEntry, P4Data
 from .entity import P4Entity
+from .gpio import P4GpioEntity, add_gpio_entities
 from .modbus import P4ModbusEntity, add_modbus_entities, sensor_attrs
 
 
@@ -170,6 +171,26 @@ async def async_setup_entry(
     add_new()
     entry.async_on_unload(coordinator.async_add_listener(add_new))
     add_modbus_entities(coordinator, async_add_entities, "sensor", P4ModbusSensor)
+    add_gpio_entities(coordinator, async_add_entities, "sensor", P4GpioCounter)
+
+
+class P4GpioCounter(P4GpioEntity, SensorEntity):
+    """A pulse counter of JP1: the count since the last reset or start, or its frequency."""
+
+    def __init__(self, coordinator, gpio: int, mode: str, key: str) -> None:
+        super().__init__(coordinator, gpio, mode, key)
+        if key == "frequency":
+            self._attr_device_class = SensorDeviceClass.FREQUENCY
+            self._attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._attr_suggested_display_precision = 1
+        else:
+            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self) -> float | None:
+        pin = self.pin
+        return pin.get(self.key) if pin else None
 
 
 class P4ModbusSensor(P4ModbusEntity, SensorEntity):

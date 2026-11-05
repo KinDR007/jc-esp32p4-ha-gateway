@@ -2,7 +2,8 @@
 
 Free pins of header JP1 configured and controlled from System › GPIO (JP1), the API and Home Assistant
 (device "P4 GPIO" through the integration or MQTT). Status: G1 and G2 done (pins, reservations, input,
-output, PWM, counter, API, web UI, Telegram `/gpio`); G3-G5 planned.
+output, PWM, counter, API, web UI, Telegram `/gpio`) and G3 (Home Assistant through the integration
+1.7.0 and MQTT); G4 and G5 planned.
 
 ## Use
 
@@ -23,6 +24,22 @@ At most 4 PWM pins (LEDC timers) and 4 counters (PCNT units). An output's level 
 turns on; the last level or duty is saved 5 s after the last change. While radio B's pins are GPIO, radio B
 is not started, tested, flashed or backed up (409); a role given to radio B turns them off at the next
 start with a notification.
+
+## Home Assistant
+
+Per pin *integration*, *MQTT*, both or none (`expose`). Both show the device "<host> GPIO" connected via
+the gateway:
+
+| Mode | Entity | MQTT commands below the base topic |
+|---|---|---|
+| input | binary sensor | |
+| output | switch | `gpio/<n>/set`: `ON`, `OFF`, `PULSE <ms>` |
+| pwm | light, brightness = duty | `gpio/<n>/duty/set`: 0-100; `gpio/<n>/set`: `ON` (100 %), `OFF` |
+| counter | sensors count (total increasing) and frequency (Hz) | |
+
+State: topic `gpio` (retained) `{"<n>": level or duty, "<n>": {"count", "rate", "frequency"}}`, published on
+every change, a running counter at most every 5 s; the integration gets it over `/api/ws`. MQTT discovery
+group `gpio` (a stored selection of all eight groups of v1.11-v1.12 gets it too).
 
 ## Pins
 

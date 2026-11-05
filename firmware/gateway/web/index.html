@@ -2646,7 +2646,7 @@ document.addEventListener('change', e => {
 
 /* discovery groups of /api/mqtt (gw_mqtt_group_t) */
 const MQTT_GROUPS = [['roles', 'Roles and networks'], ['system', 'System'], ['update', 'Firmware update entity'],
-  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)'], ['sound_triggers', 'Sound event device triggers'], ['sensors', 'I2C sensors'], ['modbus', 'Modbus devices']];
+  ['sound', 'Sound level and noise'], ['sound_events', 'Sound events (per event)'], ['sound_triggers', 'Sound event device triggers'], ['sensors', 'I2C sensors'], ['modbus', 'Modbus devices'], ['gpio', 'GPIO (JP1)']];
 async function loadMqtt() {
   const box = $('#mqtt-box');
   if (!box) return;

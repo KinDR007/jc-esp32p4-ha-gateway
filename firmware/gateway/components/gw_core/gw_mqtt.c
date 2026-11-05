@@ -48,24 +48,25 @@ static char s_last_error[96];
 static uint32_t s_publishes;
 static char *s_ca;          /* esp-mqtt keeps the pointer, not a copy */
 static bool s_discovery = true;
-static uint8_t s_groups = GW_MQTT_ALL;
+static uint16_t s_groups = GW_MQTT_ALL;
 static const struct {
     gw_mqtt_group_t group;
     const char *name;
 } s_group_names[] = {
     {GW_MQTT_ROLES, "roles"}, {GW_MQTT_SYSTEM, "system"}, {GW_MQTT_UPDATE, "update"},
     {GW_MQTT_SOUND, "sound"}, {GW_MQTT_SOUND_EVENTS, "sound_events"}, {GW_MQTT_SOUND_TRIGGERS, "sound_triggers"},
-    {GW_MQTT_SENSORS, "sensors"}, {GW_MQTT_MODBUS, "modbus"},
+    {GW_MQTT_SENSORS, "sensors"}, {GW_MQTT_MODBUS, "modbus"}, {GW_MQTT_GPIO, "gpio"},
 };
 static uint32_t s_interval_s = DEFAULT_INTERVAL_S;
 
-/* Stored mask of the discovery groups. A mask of v1.10 or older that held all its groups gets the new
- * ones too (sensors, modbus). */
-static uint8_t groups_stored(void)
+/* Stored mask of the discovery groups. A mask that held all the groups of its version gets the new ones
+ * too: v1.10 or older (sensors, modbus, gpio), v1.11-v1.12 (gpio). */
+static uint16_t groups_stored(void)
 {
     char text[8];
     if (gw_config_get_str(KEY_GROUPS, text, sizeof(text)) && text[0]) {
-        return (uint8_t)(atoi(text) & GW_MQTT_ALL);
+        int mask = atoi(text);
+        return mask == 0xff ? GW_MQTT_ALL : (uint16_t)(mask & GW_MQTT_ALL);
     }
     uint8_t old = gw_config_get_u8(KEY_GROUPS_OLD, 0x3f);
     /* bit 7 marked masks of development builds between v1.10 and v1.11 */
@@ -417,7 +418,7 @@ static void publish_state(void)
     s_publishes++;
 }
 
-#define COMMANDS 2
+#define COMMANDS 4
 static struct {
     const char *filter; /* below the base topic, MQTT wildcards allowed: "modbus/+/+/set" */
     void (*fn)(const char *suffix, const char *payload);
@@ -692,7 +693,7 @@ static esp_err_t mqtt_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "base", buf);
     cJSON_AddBoolToObject(json, "discovery", gw_config_get_u8(KEY_DISCOVERY, 1));
     cJSON *groups = cJSON_AddArrayToObject(json, "discovery_groups");
-    uint8_t mask = groups_stored();
+    uint16_t mask = groups_stored();
     for (size_t i = 0; i < sizeof(s_group_names) / sizeof(s_group_names[0]); i++) {
         if (mask & s_group_names[i].group) {
             cJSON_AddItemToArray(groups, cJSON_CreateString(s_group_names[i].name));
@@ -787,7 +788,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     } else if (interval && (!cJSON_IsNumber(interval) || interval->valueint < 10 || interval->valueint > 3600)) {
         error = "interval: 10-3600 s";
     } else if (groups && mask < 0) {
-        error = "discovery_groups: list of roles, system, update, sound, sound_events, sound_triggers, sensors, modbus";
+        error = "discovery_groups: list of roles, system, update, sound, sound_events, sound_triggers, sensors, modbus, gpio";
     }
     if (error) {
         cJSON_Delete(body);
@@ -844,7 +845,7 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     /* Discovery or groups switched off: remove the entities while still connected with the old settings. */
     bool on = gw_config_get_u8(KEY_DISCOVERY, 1);
-    uint8_t now = groups_stored();
+    uint16_t now = groups_stored();
     if (s_discovery && gw_mqtt_connected() && (!on || (s_groups & ~now))) {
         s_discovery = on;
         s_groups = now;

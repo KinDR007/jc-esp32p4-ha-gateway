@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import P4ConfigEntry, P4Coordinator
 from .entity import P4Entity, P4SoundEntity, add_sound_entities
+from .gpio import P4GpioEntity, add_gpio_entities
 from .modbus import P4ModbusEntity, add_modbus_entities
 
 
@@ -19,6 +20,16 @@ async def async_setup_entry(
     async_add_entities([P4Ethernet(coordinator), P4ZigbeeHost(coordinator), P4Push(coordinator)])
     add_sound_entities(coordinator, async_add_entities, P4SoundActive)
     add_modbus_entities(coordinator, async_add_entities, "binary_sensor", P4ModbusBinarySensor)
+    add_gpio_entities(coordinator, async_add_entities, "binary_sensor", P4GpioInput)
+
+
+class P4GpioInput(P4GpioEntity, BinarySensorEntity):
+    """A GPIO input of JP1 (debounced, inverted on the gateway when set there)."""
+
+    @property
+    def is_on(self) -> bool | None:
+        pin = self.pin
+        return None if pin is None or "level" not in pin else bool(pin["level"])
 
 
 class P4ModbusBinarySensor(P4ModbusEntity, BinarySensorEntity):

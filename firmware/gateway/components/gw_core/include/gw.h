@@ -318,7 +318,8 @@ typedef enum {
     GW_MQTT_SOUND_TRIGGERS = 1 << 5, /* device trigger per sound event (the integration has none) */
     GW_MQTT_SENSORS = 1 << 6,      /* I2C sensors set to be exposed */
     GW_MQTT_MODBUS = 1 << 7,       /* Modbus devices set to MQTT (each its own device) */
-    GW_MQTT_ALL = 0xff,
+    GW_MQTT_GPIO = 1 << 8,         /* GPIO of JP1 set to MQTT (device "<host> GPIO") */
+    GW_MQTT_ALL = 0x1ff,
 } gw_mqtt_group_t;
 /* Extra discovery entities (called on every connect) and extra keys in the state JSON; one pair per
  * component (up to 4). */

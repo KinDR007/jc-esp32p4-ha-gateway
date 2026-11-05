@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from typing import Any
 
@@ -40,6 +40,22 @@ class P4Data:
     quantities: dict[str, dict[str, Any]]  # what the sensors measure, by key
     modbus: dict[str, dict[str, Any]]  # Modbus devices by id ("d1"), with their values
     modbus_templates: dict[str, dict[str, Any]]  # templates of the exposed Modbus devices, by id
+    gpio: dict[int, dict[str, Any]] = field(default_factory=dict)  # configured GPIO of JP1 by number, with values
+
+
+def apply_gpio_push(pins: dict[int, dict[str, Any]], values: dict[str, Any]) -> None:
+    """Values of the push message into the pins of the last poll."""
+    for key, value in values.items():
+        pin = pins.get(int(key))
+        if pin is None:
+            continue
+        if pin["mode"] == "pwm":
+            pin["duty"] = value
+        elif pin["mode"] == "counter" and isinstance(value, dict):
+            pin["count"], pin["rate"] = value.get("count", 0), value.get("rate", 0)
+            pin["frequency"] = value.get("frequency", pin["rate"] / 2 if pin.get("edge") == "both" else pin["rate"])
+        else:
+            pin["level"] = value
 
 
 class P4Coordinator(DataUpdateCoordinator[P4Data]):
@@ -92,6 +108,10 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
             except P4RequestError:
                 modbus = []  # firmware without Modbus, or no right to System › RS485
             templates = await self._modbus_templates(modbus)
+            try:
+                gpio = (await self.client.gpio())["pins"]
+            except P4RequestError:
+                gpio = []  # firmware without GPIO, or no right to System › Hardware
         except P4AuthError as err:
             raise ConfigEntryAuthFailed from err
         except P4Error as err:
@@ -104,6 +124,7 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
             quantities={q["key"]: q for q in sensors.get("quantities", [])},
             modbus={d["id"]: d for d in modbus},
             modbus_templates=templates,
+            gpio={p["gpio"]: p for p in gpio},
         )
 
     async def _modbus_templates(self, devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -152,6 +173,9 @@ class P4Coordinator(DataUpdateCoordinator[P4Data]):
                 device["values"] = json.loads(payload)
                 if device.get("state") not in ("ok", "partial"):
                     device["state"] = "ok"
+            self.async_set_updated_data(self.data)
+        elif topic == "gpio":
+            apply_gpio_push(self.data.gpio, json.loads(payload))
             self.async_set_updated_data(self.data)
         elif topic == "notify":
             note = json.loads(payload)

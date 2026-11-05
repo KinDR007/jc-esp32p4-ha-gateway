@@ -71,6 +71,7 @@ python3 tests/hw_test.py --host <ip> --only TC04 TC05
 | TC50 | Modbus přes UDP (moduly Wi-Fi GoodWe) | `tools/modbus/sim_tcp.py --udp --split` (goodwe_xs jednotka 127, porty 8899 a 48899) spuštěný testem | hledání s UDP najde modul s jednotkou 127 a odpovědí na 48899; ruční dotaz `udp` přečte sériové číslo; neexistující jednotka bez odpovědi (-1); `udp` bez host a neznámý transport → 400; zařízení na `udp` uloženo s výchozím portem 8899 a šablona goodwe_xs čte všechny hodnoty (odpovědi rozdělené do dvou datagramů); konfigurace obnovena |
 | TC51 | Čas brány (Systém › LAN › Čas) | `GET`/`POST /api/time`, restart | SNTP synchronizováno; 4 servery, mezera ve jménu, servers ne seznam, tz_name bez tz, prázdné tz a tz 64 znaků → 400; nové servery (tik.cesnet.cz, 192.0.2.1) a UTC: znovu synchronizováno bez restartu (do 5 s od počítače); pásmo v `/api/status` a nastavení Telegramu; staré pole `tz` Telegramu nastaví pásmo bez názvu; prázdný seznam = bez synchronizace; server a pásmo vydrží restart; nastavení obnoveno |
 | TC52 | GPIO na JP1 bez propojky | `GET`/`PUT /api/gpio`, `POST /api/gpio/set`, restart | 26 pinů, piny rádia A (a rádia B s rolí) zamčené, GPIO1/2/3/45 volné; odmítnuto: pin rádia A, rádia B, GPIO mimo JP1, dvakrát, neznámý režim, PWM 2 MHz, debounce 2 s, jméno 33 znaků, neznámé expose, filtr 20 µs; vstupy čtou podle pull-up/pull-down; výstup čten zpět na pinu, inverze, pulz 0,8 s; open drain s pull-down pin pustí (0), push-pull ho drží (1); PWM 1 kHz 33 % 16 bitů; chyby set 400/404; čítač 0 a reset; po restartu výstup poslední 1, PWM posledních 33 %, invertovaný výstup zapnutý; konfigurace obnovena |
+| TC53 | GPIO přes MQTT | `--mqtt-broker` (anonymní mosquitto), skupina `gpio` | zařízení „<host> GPIO“ přes bránu: switch, binary_sensor, light (jas 0–100 = střída), senzory počet a frekvence; stav retained; příkazy ON, PULSE 1500 (zapne a vypne), střída 30, light OFF → 0; změna režimu a uvolnění pinu odebere staré entity a publikuje nové; skupina gpio vypnutá entity odebere; nastavení obnoveno importem |
 | TC45 | Prohození Wi-Fi mezi rádii | `POST /api/role {"swap":true}` dvakrát | Wi-Fi uplink na rádiu A (C6) s adresou a webem; rádio B běží původní roli A (Thread BR); po prohození zpět je rádio A ve své původní Thread síti |
 | TC40 | Thread síť per rádio | rádio A `zigbee_router`, rádio B `thread_br`, pak rádio B vypnuto a A zpět `thread_br` | rádio B (RCP na C5) má vlastní síť (jiné ext PAN ID), rádio A se vrátí do své původní sítě |
 | TC30 | Rozhraní integrace Home Assistant | mDNS dotaz `_p4gw._tcp`, WebSocket `/api/ws`, dočasná událost na třídu Silence, účet a token | mDNS odpoví s MAC brány; stav všech povolených událostí dorazí v jedné dávce celý a detekce ihned; bez hesla handshake 401, s heslem 101; události i účet a token obnoveny |
@@ -93,7 +94,10 @@ Ověřuje: config flow ručně, s heslem (špatné heslo), nedostupná brána, z
 adresy u známé brány, záznam bez MAC odmítnut); entity a jejich stavy, entity jen pro povolené
 události; push detekce a stavu události, push průběhu aktualizace; nová událost přidá entity bez
 reloadu, vypnutá je nedostupná; příkazy (přepínač zvuku, role, restart, instalace); obnovení push
-spojení; heslo nastavené později spustí reauth.
+spojení; heslo nastavené později spustí reauth. GPIO: zařízení „<host> GPIO“ přes bránu se vstupem,
+výstupem, PWM jako světlem (jas = střída, zapnutí bez jasu vrátí poslední střídu) a dvěma senzory čítače;
+příkazy na `/api/gpio/set`, push tématu `gpio`; pin jen pro MQTT bez entity; vypnutý pin a změna režimu;
+firmware bez `/api/gpio`.
 
 ## UI testy (prohlížeč)
 

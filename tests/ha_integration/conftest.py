@@ -64,6 +64,19 @@ MODBUS = {
 }
 
 
+# GPIO of JP1 as /api/gpio serves them: one pin per mode, and a pin only for MQTT
+GPIO = {
+    "pins": [
+        {"gpio": 3, "mode": "input", "name": "Button", "expose": "integration", "jp1": 11, "active": True, "level": 0},
+        {"gpio": 2, "mode": "output", "name": "Relay", "expose": "both", "jp1": 9, "active": True, "level": 1, "pin_level": 1},
+        {"gpio": 1, "mode": "pwm", "name": "LED", "expose": "integration", "jp1": 7, "active": True, "duty": 40, "freq": 1000},
+        {"gpio": 45, "mode": "counter", "name": "Water meter", "expose": "integration", "edge": "both", "jp1": 14, "active": True,
+         "count": 120, "rate": 2.0, "frequency": 1.0},
+        {"gpio": 32, "mode": "output", "name": "MQTT only", "expose": "mqtt", "jp1": 19, "active": True, "level": 0},
+    ]
+}
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     yield
@@ -76,6 +89,7 @@ class FakeGateway:
         self.events = copy.deepcopy(EVENTS)
         self.sensors = copy.deepcopy(SENSORS)  # None: firmware without /api/sensors
         self.modbus = copy.deepcopy(MODBUS)  # None: firmware without /api/modbus
+        self.gpio = copy.deepcopy(GPIO)  # None: firmware without /api/gpio
         self.template_gets = 0
         self.password = ""  # admin password of firmware before user accounts (Basic)
         self.token = ""  # API token of firmware with user accounts (Bearer)
@@ -92,6 +106,7 @@ class FakeGateway:
         app.router.add_get("/api/sensors", self._sensors)
         app.router.add_get("/api/modbus", self._modbus)
         app.router.add_get("/api/modbus/template", self._modbus_template)
+        app.router.add_get("/api/gpio", self._gpio)
         app.router.add_get("/api/notify", self._get(lambda: {"notifications": self.notes, "seq": len(self.notes), "boot": self.boot}))
         app.router.add_post("/api/{path:.*}", self._post)
         app.router.add_get("/api/ws", self._ws)
@@ -128,6 +143,11 @@ class FakeGateway:
         if self.modbus is None:
             return web.Response(status=404, text="Nothing matches the given URI")
         return await self._get(lambda: self.modbus)(request)
+
+    async def _gpio(self, request: web.Request) -> web.Response:
+        if self.gpio is None:
+            return web.Response(status=404, text="Nothing matches the given URI")
+        return await self._get(lambda: self.gpio)(request)
 
     async def _modbus_template(self, request: web.Request) -> web.Response:
         self.template_gets += 1
