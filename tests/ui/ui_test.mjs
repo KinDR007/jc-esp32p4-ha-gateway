@@ -192,7 +192,7 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
     }
   }
   // every menu item and sub page has a Czech label (names of standards stay as they are)
-  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter', 'LAN', 'Wi-Fi'];
+  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter', 'LAN', 'Wi-Fi', 'Hardware', 'RS485', 'API'];
   const english = [];
   for (const sec of ['overview', 'radios', 'thread', 'zigbee', 'esphome', 'sound', 'ha', 'system']) {
     await page.click(`#side a[data-route="${sec}"]`);
@@ -646,9 +646,12 @@ await test('UI25', 'Log: every line has its local time, source, level, tag and s
   check(lines.every(l => /^(\d+\.\d+\. )?\d\d:\d\d:\d\d\.\d{3} [IWEDV] /.test(l)), `${lines.length} lines, each starting with the time: ${lines[0].slice(0, 60)}`);
   const known = lines.filter(l => !l.includes('??:')).length;
   check(known > lines.length * 0.8, `${known} with a wall clock time`);
-  const now = new Date(), last = lines[lines.length - 1].match(/(\d\d):(\d\d):(\d\d)/);
-  const diff = Math.abs((now.getHours() * 3600 + now.getMinutes() * 60 + +now.getSeconds()) - (last[1] * 3600 + last[2] * 60 + +last[3]));
-  check(diff < 120, `last line at ${last[0]}, local time of the browser (${diff} s ago)`);
+  // the page shows the gateway's own stamps (unix ms) in the gateway time zone
+  const zone = (await (await page.request.get(base + 'api/status')).json()).tz_name || undefined;
+  const raw = await (await page.request.get(base + 'api/logs')).text();
+  const stamps = new Set([...raw.matchAll(/^(\d{13}) /gm)].map(m => new Date(+m[1]).toLocaleTimeString('en-GB', { timeZone: zone, hourCycle: 'h23' }) + '.' + m[1].slice(-3)));
+  const last = lines.filter(l => !l.includes('??:')).at(-1).match(/\d\d:\d\d:\d\d\.\d{3}/)[0];
+  check(stamps.has(last), `last line at ${last}, the gateway's stamp in its time zone (${zone || 'browser'})`);
   await page.selectOption('#log-lvl', 'WE');
   check(await page.$$eval('#log .lv-I', x => x.length) === 0, 'warnings and errors: no info lines');
   await page.selectOption('#log-lvl', 'IWED');
@@ -941,7 +944,7 @@ await test('UI34', 'Modbus TCP search finds a GoodWe Wi-Fi module (simulator on 
     check(row.includes(`${myIp}:8899`) && row.includes('127'), `module listed with unit 127: ${row.replace(/\s+/g, ' ').trim()}`);
     await page.click('#ms-found [data-ms-add*="|udp"]');
     await page.waitForFunction(() => /GoodWe/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
-    const dev = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.transport === 'udp' && d.host === myIp);
+    const dev = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.transport === 'udp' && d.host === myIp && d.port === 8899);
     check(dev && dev.template === 'goodwe_xs' && dev.port === 8899 && dev.slave === 127, `device added: ${JSON.stringify(dev && { name: dev.name, template: dev.template, transport: dev.transport, port: dev.port, slave: dev.slave })}`);
     await tab('system/rs485');
     await page.waitForFunction(ip => document.querySelector('#mb-devices')?.textContent.includes(`UDP ${ip}:8899 #127`), myIp, { timeout: 10000 });
@@ -950,6 +953,39 @@ await test('UI34', 'Modbus TCP search finds a GoodWe Wi-Fi module (simulator on 
   } finally {
     await page.request.put(base + 'api/modbus', { data: keep });
     sim.kill();
+  }
+});
+
+await test('UI35', 'System › LAN › Time: shows the sync state, a zone chosen in the list is saved with its POSIX rule and moves the header clock and the log to that zone, Other shows the POSIX field; Telegram points to it; settings restored', async () => {
+  const before = await (await page.request.get(base + 'api/time')).json();
+  const keep = { servers: before.servers.map(s => s.name), tz: before.tz, tz_name: before.tz_name };
+  const hm = zone => page.evaluate(zone => new Date().toLocaleTimeString(document.documentElement.lang === 'cs' ? 'cs-CZ' : 'en-GB', { hour: '2-digit', minute: '2-digit', timeZone: zone }), zone);
+  try {
+    await tab('system/lan');
+    await page.waitForSelector('#time-save', { timeout: 10000 });
+    const box = await page.textContent('#time-box');
+    check(before.servers.every(s => box.includes(s.name)) && /odpovídá|answers/.test(box), `servers listed with their state: ${box.replace(/\s+/g, ' ').slice(0, 160)}`);
+    await page.selectOption('#time-zone', '');
+    check(await page.isVisible('#time-posix-f'), 'Other shows the POSIX rule');
+    await page.selectOption('#time-zone', 'America/New_York');
+    check(!await page.isVisible('#time-posix-f'), 'a listed zone hides it');
+    await page.click('#time-save');
+    await page.waitForFunction(() => /Saved|Uloženo/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
+    const r = await (await page.request.get(base + 'api/time')).json();
+    check(r.tz === 'EST5EDT,M3.2.0,M11.1.0' && r.tz_name === 'America/New_York', `stored: ${r.tz_name} ${r.tz}`);
+    const ny = await hm('America/New_York');
+    await page.waitForFunction(t => document.querySelector('#hdr-clock').textContent.includes(t), ny, { timeout: 8000 });
+    check(ny !== await hm(Intl.DateTimeFormat().resolvedOptions().timeZone), `header clock in the gateway zone: ${ny}`);
+    await tab('system/diag');
+    await page.waitForFunction(() => /\d{2}:\d{2}:\d{2}\.\d{3}/.test(document.querySelector('#main').innerText), null, { timeout: 10000 });
+    const stamps = (await page.innerText('#main')).match(/\b\d{2}:\d{2}:\d{2}\.\d{3}\b/g);
+    check(stamps.at(-1).slice(0, 2) === ny.slice(0, 2), `log in the gateway zone: last line ${stamps.at(-1)}`);
+    await tab('system/notify');
+    await page.waitForSelector('#tg-save', { timeout: 10000 });
+    check(!await page.$('#tg-tz') && /LAN/.test(await page.textContent('#tg-box')), 'Telegram has no zone of its own, points to System › LAN › Time');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.post(base + 'api/time', { data: keep });
   }
 });
 

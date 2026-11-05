@@ -282,6 +282,7 @@ static esp_err_t status_get(httpd_req_t *req)
     cJSON_AddStringToObject(json, "built_time", app->time);
     time_t now = time(NULL);
     cJSON_AddNumberToObject(json, "time", now > 1700000000 ? (double)now : 0);
+    cJSON_AddStringToObject(json, "tz_name", gw_time_tz_name());
     char matter_url[128];
     gw_config_get_str(GW_KEY_MATTER_URL, matter_url, sizeof(matter_url));
     cJSON_AddStringToObject(json, "matter_url", matter_url);

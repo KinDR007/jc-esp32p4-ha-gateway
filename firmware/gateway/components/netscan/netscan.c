@@ -8,7 +8,6 @@
 #include "driver/uart.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -340,8 +339,6 @@ void netscan_init(void)
             s_result = NULL;
         }
     }
-    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&sntp);
     gw_http_register("/api/net/scan", HTTP_GET, scan_get);
     gw_http_register("/api/net/scan", HTTP_POST, scan_post);
 }

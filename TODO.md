@@ -189,3 +189,14 @@ Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr)
 - [x] M11 Hledání Modbus TCP v síti (Systém › Hledání Modbus TCP, `/api/modbus/scan`), rozpoznání Victron GX/VE.Bus a GoodWe, TC49, UI33; šablony Victron GX a VE.Bus ověřené na MultiPlus-II GX (192.168.88.240)
 - [x] M12 GoodWe GW3000-XS: nalezen 2026-11-04 9:00 z Macu přes VPN na 192.168.1.170 (modul Solar-WiFi…, MAC 34:EA:E7:xx:xx:xx), Modbus jen UDP 8899 (AA 55), unit 0x7F; TCP zavřené. Přidán přenos `udp` (GoodWe AA55) do komponenty modbus, šablona goodwe_xs, hledání v síti ho přidá jedním klikem; TC50, UI34 se simulátorem
 - [ ] M13 GW3000-XS ze skutečné brány: 2026-11-04 přes `tools/modbus/udp_relay.py` na Macu (VPN) čte brána všech 17 hodnot jako zařízení d4 (expose none, host = Mac:18899, dočasné). Trvale: trasa z 192.168.88.x do 192.168.1.0/24 na routeru, pak d4 přepnout na 192.168.1.170:8899 a expose integration; porovnat s aplikací SEMS
+
+## Čas a NTP (zadání 2026-11-05)
+- [x] Systém › LAN › Čas (`/api/time`): až 3 servery SNTP, časové pásmo brány (seznam IANA nebo pravidlo POSIX), platí hned; pásmo pro celou bránu (časy v UI a logu, tiché hodiny Telegramu, noční záloha Zigbee 03:00–04:00 místního času); pásmo přesunuto z Telegramu (stejný klíč `tz`); TC51, UI35
+- [ ] Volitelně servery NTP z DHCP (volba 42): lwIP při obnově zápůjčky přepíše i ručně zadané servery, proto zatím vynecháno
+
+## XIAO nRF54LM20A jako rádio B (odloženo 2026-11-05, deska je k dispozici)
+Rešerše v [docs/dual-radio.md](docs/dual-radio.md#xiao-nrf54lm20a-deferred).
+- [ ] N1 Thread RCP: NCS `samples/openthread/coprocessor` na uart21 (D6/D7 = P1.08/P1.09), 1 Mbd s RTS/CTS na volných pinech nebo nižší rychlost bez řízení toku; ověřit verzi Spinel API proti hostiteli v ESP-IDF
+- [ ] N2 Detekce typu rádia B: ROM ESP / Spinel (HDLC 0x7E, PROP_NCP_VERSION) / ZBOSS NCP (0xDE 0xAD) / MCUboot SMP, na více rychlostech
+- [ ] N3 Aktualizace z brány: MCUboot serial recovery + vlastní klient SMP v P4 (CBOR, base64 rámce), vstup přes RESET (`BOOT_SERIAL_PIN_RESET`) nebo pin; první flash přes USB-C (SAMD11 CMSIS-DAP)
+- [ ] N4 Zigbee NCP: ověřit, zda R23 add-on 1.4 umí NCP sestavit (předkompilované knihovny) a zda je kompatibilní se Z2M `zboss`; ESPHome BLE proxy na nRF nejde

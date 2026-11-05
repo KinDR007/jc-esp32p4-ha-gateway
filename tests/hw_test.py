@@ -2286,6 +2286,43 @@ def tc45_wifi_swap():
         check(t.get('network_name') == net0, f'radio A back on its Thread network ({net0})')
 
 
+def tc51_time_settings():
+    """Clock of the gateway (System › LAN › Time): SNTP synced, invalid settings refused, new servers sync
+    again without a restart, the zone reaches /api/status and the Telegram settings, the old Telegram field
+    still sets it, an empty list stops the sync, the settings survive a restart. The settings of before come back."""
+    code, before = http('GET', '/api/time')
+    check(code == 200 and before['synced'] > 1700000000 and before['time'] >= before['synced'],
+          f'synced at {before["synced"]} from {[s["name"] for s in before["servers"]]}, zone {before["tz_name"] or before["tz"]}')
+    check(status()['tz_name'] == before['tz_name'], 'zone name in /api/status')
+    keep = {'servers': [s['name'] for s in before['servers']], 'tz': before['tz'], 'tz_name': before['tz_name']}
+    try:
+        for body, why in (({'servers': ['a', 'b', 'c', 'd']}, 'four servers'), ({'servers': ['bad host']}, 'space in a name'),
+                          ({'servers': 'pool.ntp.org'}, 'servers not a list'), ({'tz_name': 'UTC'}, 'name without a rule'),
+                          ({'tz': ''}, 'empty rule'), ({'tz': 'X' * 64}, 'rule of 64 characters')):
+            check(http('POST', '/api/time', body)[0] == 400, f'refused: {why}')
+        code, r = http('POST', '/api/time', {'servers': ['tik.cesnet.cz', '192.0.2.1'], 'tz': 'UTC0', 'tz_name': 'UTC'})
+        check(code == 200 and [s['name'] for s in r['servers']] == ['tik.cesnet.cz', '192.0.2.1'] and r['tz'] == 'UTC0', 'stored: two servers, UTC')
+        s = wait_until('sync from the new server', lambda: (lambda x: x if x['synced'] > r['synced'] and x['servers'][0]['reach'] & 1
+                                                                 and x['servers'][0]['address'] else None)(http('GET', '/api/time')[1]), 60, 3)
+        check(abs(s['time'] - time.time()) < 5, f'synced again from {s["servers"][0]["address"]} without a restart, {s["time"] - time.time():+.1f} s from this computer')
+        check(status()['tz_name'] == 'UTC' and http('GET', '/api/telegram')[1]['tz'] == 'UTC0', 'zone in /api/status and the Telegram settings')
+        code, _ = http('POST', '/api/telegram', {'tz': 'EET-2EEST,M3.5.0/3,M10.5.0/4'})
+        r = http('GET', '/api/time')[1]
+        check(code == 200 and r['tz'] == 'EET-2EEST,M3.5.0/3,M10.5.0/4' and r['tz_name'] == '', 'the Telegram field sets the zone, without a name')
+        code, r = http('POST', '/api/time', {'servers': []})
+        check(code == 200 and r['servers'] == [], 'empty list: no time sync')
+        http('POST', '/api/time', {'servers': ['tik.cesnet.cz'], 'tz': 'UTC0', 'tz_name': 'UTC'})
+        http('POST', '/api/reboot', {})
+        wait_restart(status()['role']['desired'])
+        r = wait_until('sync after the restart', lambda: (lambda x: x if x['synced'] else None)(http('GET', '/api/time')[1]), 60, 3)
+        check([s['name'] for s in r['servers']] == ['tik.cesnet.cz'] and r['tz'] == 'UTC0' and r['tz_name'] == 'UTC',
+              'server and zone kept over a restart, synced again')
+    finally:
+        http('POST', '/api/time', keep)
+    r = http('GET', '/api/time')[1]
+    check([s['name'] for s in r['servers']] == keep['servers'] and r['tz'] == keep['tz'] and r['tz_name'] == keep['tz_name'], 'settings of before restored')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -2299,7 +2336,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2326,7 +2363,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

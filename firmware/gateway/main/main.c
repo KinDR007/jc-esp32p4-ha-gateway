@@ -276,10 +276,10 @@ static bool zigbee_radio(c6_radio_t *radio, gw_role_t *role)
 /* ---- Zigbee network backup ----
  * The C6 data can only be read through its ROM bootloader, so a backup restarts the gateway and
  * saves the data before the role starts again (the C6 restarts anyway). The automatic one runs
- * between 02:00 and 03:00 UTC; as coordinator only while no host is connected, because the host
+ * between 03:00 and 04:00 of the gateway time zone; as coordinator only while no host is connected, because the host
  * loses its adapter for the restart.
  */
-#define SNAP_HOUR_UTC 2
+#define SNAP_HOUR 3 /* local time */
 #define SNAP_CHECK_MS (10 * 60 * 1000)
 
 static void request_zigbee_backup(void)
@@ -508,7 +508,7 @@ static bool zigbee_backup_due(void)
     bool zigbee = zigbee_radio(&radio, &role);
     uint8_t days = gw_config_get_u8(GW_KEY_ZB_SNAP_DAYS, GW_ZB_SNAP_DAYS_DEFAULT);
     time_t now = time(NULL);
-    struct tm utc;
+    struct tm local;
     uint32_t size, gen, saved = 0;
 
     /* up for an hour at least: a failed attempt (it restarts) is not repeated in the same night */
@@ -516,8 +516,8 @@ static bool zigbee_backup_due(void)
         esp_timer_get_time() < 3600LL * 1000000) {
         return false;
     }
-    gmtime_r(&now, &utc);
-    if (utc.tm_hour != SNAP_HOUR_UTC || (role == GW_ROLE_ZIGBEE_COORD && role_zigbee_host_connected())) {
+    localtime_r(&now, &local);
+    if (local.tm_hour != SNAP_HOUR || (role == GW_ROLE_ZIGBEE_COORD && role_zigbee_host_connected())) {
         return false;
     }
     c6_snapshot_info(radio, gw_role_c6_bundle(role), &size, &gen, &saved);
@@ -623,6 +623,7 @@ void app_main(void)
     ESP_ERROR_CHECK(gw_api_register());
     gw_auth_register();
     gw_notify_register();
+    gw_time_init();
     gw_telegram_start();
     gw_http_register("/api/ha/discover", HTTP_GET, ha_discover_get);
     gw_http_register("/api/c6/zigbee-snapshot", HTTP_POST, zigbee_snapshot_post);

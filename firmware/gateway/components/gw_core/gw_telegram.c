@@ -29,8 +29,6 @@ static const char *TAG = "gw_telegram";
 
 #define KEY_TOKEN "tg_token"
 #define KEY_ON "tg_on"
-#define KEY_TZ "tz"
-#define DEFAULT_TZ "CET-1CEST,M3.5.0,M10.5.0/3"
 #define POLL_S 5
 #define RESP_MAX (24 * 1024)
 #define MAX_COMMANDS 24
@@ -72,7 +70,6 @@ static bool s_enabled;
 static char s_bot[48];
 static char s_state[16] = "off";
 static char s_error[120];
-static char s_tz[64];
 static int64_t s_offset;
 static command_t s_cmds[MAX_COMMANDS];
 static int s_ncmds;
@@ -523,11 +520,6 @@ static void load(void)
         s_token[0] = '\0';
     }
     s_enabled = gw_config_get_u8(KEY_ON, 0) && s_token[0];
-    if (!gw_config_get_str(KEY_TZ, s_tz, sizeof(s_tz)) || !s_tz[0]) {
-        strlcpy(s_tz, DEFAULT_TZ, sizeof(s_tz));
-    }
-    setenv("TZ", s_tz, 1);
-    tzset();
 }
 
 static void tg_task(void *arg)
@@ -823,7 +815,7 @@ static cJSON *admin_json(void)
     cJSON_AddStringToObject(j, "bot", s_bot);
     cJSON_AddStringToObject(j, "state", s_state);
     cJSON_AddStringToObject(j, "error", s_error);
-    cJSON_AddStringToObject(j, "tz", s_tz);
+    cJSON_AddStringToObject(j, "tz", getenv("TZ") ? getenv("TZ") : "");
     int paired = 0;
     gw_auth_lock();
     for (int i = 0; i < gw_auth_users_max(); i++) {
@@ -859,7 +851,7 @@ static esp_err_t telegram_post(httpd_req_t *req)
         cJSON_Delete(body);
         return gw_http_send_error(req, 400, "token: the one BotFather gave, 123456:ABC...");
     }
-    if (tz && (strlen(tz) >= sizeof(s_tz) || !tz[0])) {
+    if (tz && (strlen(tz) >= 64 || !tz[0])) {
         cJSON_Delete(body);
         return gw_http_send_error(req, 400, "tz: POSIX time zone, e.g. CET-1CEST,M3.5.0,M10.5.0/3");
     }
@@ -867,7 +859,7 @@ static esp_err_t telegram_post(httpd_req_t *req)
         gw_config_set_str(KEY_TOKEN, token);
     }
     if (tz) {
-        gw_config_set_str(KEY_TZ, tz);
+        gw_time_set_tz(tz, ""); /* the zone of the gateway (/api/time), kept here for older clients */
     }
     if (cJSON_IsBool(en)) {
         gw_config_set_u8(KEY_ON, cJSON_IsTrue(en));

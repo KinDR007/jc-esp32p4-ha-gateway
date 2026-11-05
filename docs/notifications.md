@@ -27,7 +27,8 @@ integration options, into a persistent notification. Details:
 Admin, System › Notifications:
 
 1. In Telegram open @BotFather, send `/newbot`, pick a name and a user name ending with `bot`.
-2. Paste the token into the gateway, turn the bot on, choose the time zone (for quiet hours).
+2. Paste the token into the gateway and turn the bot on. Quiet hours use the gateway time zone (System › LAN ›
+   Time, [installation.md](installation.md#time)).
 
 Each user, My account › Telegram and notifications:
 

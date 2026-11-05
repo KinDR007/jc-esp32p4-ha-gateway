@@ -342,10 +342,12 @@ PAGES = [
       "MEMORY": T("Internal RAM and PSRAM, minimum since start, NVS.", "Interní RAM a PSRAM, minimum od startu, NVS."),
       "FIRMWARE": T("Version, build, ESP-IDF, reset reason.", "Verze, sestavení, ESP-IDF, důvod resetu.")}, None, ["system_info"]),
     ("system/lan", "ethernet", T("System › LAN", "Systém › LAN"),
-     T("Ethernet settings and traffic.", "Nastavení a provoz Ethernetu."),
+     T("Ethernet settings and traffic, device name and time.", "Nastavení a provoz Ethernetu, název zařízení a čas."),
      {"LAN SETTINGS": T("DHCP or a static address with netmask, gateway and DNS; link speed and duplex.", "DHCP nebo statická adresa s maskou, bránou a DNS; rychlost a duplex linky."),
       "CURRENT STATE": T("What is in effect now.", "Co právě platí."),
       "DEVICE NAME": T("Hostname (applies after a restart); the gateway answers as &lt;name&gt;.local.", "Název zařízení (platí po restartu); brána odpovídá jako &lt;název&gt;.local."),
+      "TIME": T("Gateway time, last sync and the state of each NTP server; up to three servers and the time zone of the gateway (a listed zone or a POSIX rule). The zone holds for the whole gateway: times in the web UI and the log, Telegram quiet hours, the nightly Zigbee backup.",
+                "Čas brány, poslední synchronizace a stav každého serveru NTP; až tři servery a časové pásmo brány (ze seznamu nebo pravidlo POSIX). Pásmo platí pro celou bránu: časy ve webovém rozhraní a logu, tiché hodiny Telegramu, noční záloha Zigbee."),
       "TRAFFIC": T("RX/TX rate, totals since start and the split per service (web UI, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, Thread routed).",
                    "Rychlost RX/TX, součty od startu a rozpad podle služeb (web UI, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, směrovaný Thread).")},
      T("""<ol><li>Choose <b>Static</b>, fill in the address, netmask, gateway and DNS, press <b>Apply</b>.</li>
@@ -457,7 +459,7 @@ PAGES = [
      None, ["system_api"]),
     ("system/notify", "bell-cog-outline", T("System › Notifications", "Systém › Notifikace"),
      T("The Telegram bot (admins) and where Home Assistant notifications are set.", "Telegram bot (správci) a kde se nastavují notifikace pro Home Assistant."),
-     {"TELEGRAM BOT": T("Token from @BotFather, on/off, time zone for quiet hours; state and paired users.", "Token od @BotFather, zapnutí, časové pásmo pro tiché hodiny; stav a spárovaní uživatelé."),
+     {"TELEGRAM BOT": T("Token from @BotFather, on/off; state and paired users. Quiet hours use the gateway time zone (System › LAN › Time).", "Token od @BotFather, zapnutí; stav a spárovaní uživatelé. Tiché hodiny používají časové pásmo brány (Systém › LAN › Čas)."),
       "HOME ASSISTANT": T("The integration gets every notification; levels per topic are set in its options.", "Integrace dostává každou notifikaci; úrovně pro témata se nastavují v jejích volbách.")},
      T("""<ol><li>Telegram: open <b>@BotFather</b>, send <code>/newbot</code>, choose a name and a user name ending with <code>bot</code>.</li>
        <li>Paste the token here, tick <b>Bot on</b>, save. The state turns to <i>running, @yourbot</i>.</li>

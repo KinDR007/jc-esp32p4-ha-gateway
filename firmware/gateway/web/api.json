@@ -86,6 +86,7 @@
             "built": "Nov  2 2026",
             "built_time": "10:15:00",
             "time": 1793610000,
+            "tz_name": "Europe/Prague",
             "matter_url": "ws://192.168.1.10:5580/ws",
             "chip_revision": 301,
             "uptime_s": 120,
@@ -4310,6 +4311,87 @@
         },
         {
           "method": "GET",
+          "path": "/api/time",
+          "perm": "system/settings",
+          "level": 1,
+          "summary": {
+            "en": "Clock of the gateway: time, last SNTP sync, servers and time zone.",
+            "cs": "Hodiny brány: čas, poslední synchronizace SNTP, servery a časové pásmo."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "time": 1762336800,
+            "synced": 1762336512,
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+            "tz_name": "Europe/Prague",
+            "servers": [
+              {
+                "name": "pool.ntp.org",
+                "address": "195.113.144.201",
+                "reach": 255
+              }
+            ]
+          },
+          "effects": {
+            "en": "time and synced are unix seconds, 0 while unknown. address is the server's resolved address (empty before the first poll), reach the RFC 5905 reachability register of its last eight polls (bit 0 the last). tz_name is empty for a zone set as a POSIX rule only.",
+            "cs": "time a synced jsou unixové sekundy, 0 dokud nejsou známé. address je přeložená adresa serveru (prázdná před prvním dotazem), reach registr dosažitelnosti podle RFC 5905 z posledních osmi dotazů (bit 0 poslední). tz_name je prázdné u pásma zadaného jen pravidlem POSIX."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/time",
+          "perm": "system/settings",
+          "level": 2,
+          "summary": {
+            "en": "Sets the SNTP servers and the time zone of the gateway; send only the fields to change.",
+            "cs": "Nastaví servery SNTP a časové pásmo brány; posílejte jen měněná pole."
+          },
+          "body": {
+            "servers": [
+              "pool.ntp.org",
+              "192.168.1.1"
+            ],
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+            "tz_name": "Europe/Prague"
+          },
+          "body_type": "json",
+          "response": {
+            "time": 1762336800,
+            "synced": 1762336512,
+            "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+            "tz_name": "Europe/Prague",
+            "servers": [
+              {
+                "name": "pool.ntp.org",
+                "address": "195.113.144.201",
+                "reach": 255
+              }
+            ]
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "servers not a list of up to 3 host names or addresses; tz empty or longer than 63; tz_name longer than 47 or without tz.",
+                "cs": "servers není seznam nejvýš 3 jmen nebo adres; tz je prázdné nebo delší než 63; tz_name je delší než 47 nebo bez tz."
+              }
+            },
+            {
+              "code": 500,
+              "when": {
+                "en": "Storing to NVS failed.",
+                "cs": "Uložení do NVS selhalo."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Applies at once, no restart. An empty server list stops time sync. tz is the POSIX rule the gateway uses (Telegram quiet hours, the nightly Zigbee backup between 03:00 and 04:00); tz_name the IANA name the web UI shows times in. Sends a system notification.",
+            "cs": "Platí hned, bez restartu. Prázdný seznam serverů zastaví synchronizaci času. tz je pravidlo POSIX, podle kterého brána počítá (tiché hodiny Telegramu, noční záloha Zigbee mezi 03:00 a 04:00); tz_name název IANA, ve kterém webové rozhraní ukazuje časy. Pošle systémovou notifikaci."
+          }
+        },
+        {
+          "method": "GET",
           "path": "/api/settings/export",
           "perm": "system/settings",
           "level": 2,
@@ -4830,8 +4912,8 @@
             }
           ],
           "effects": {
-            "en": "Stored in NVS and the bot restarts its connection. tz is a POSIX time zone used for quiet hours. An empty token removes it. Sends a notification.",
-            "cs": "Uloží se do NVS a bot znovu naváže spojení. tz je časové pásmo POSIX pro tiché hodiny. Prázdný token ho odstraní. Pošle oznámení."
+            "en": "Stored in NVS and the bot restarts its connection. tz (optional, for older clients) sets the gateway time zone as POST /api/time does, without its IANA name. An empty token removes it. Sends a notification.",
+            "cs": "Uloží se do NVS a bot znovu naváže spojení. tz (nepovinné, pro starší klienty) nastaví časové pásmo brány jako POST /api/time, bez názvu IANA. Prázdný token ho odstraní. Pošle oznámení."
           }
         }
       ]

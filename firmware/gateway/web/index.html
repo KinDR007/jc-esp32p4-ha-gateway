@@ -1138,7 +1138,7 @@ const TIPS = {
   'slot:gw_b': ['Gateway firmware slot B. Updates go to the slot that is not running.', 'Slot B firmwaru brány. Aktualizace jde vždy do slotu, který neběží.'],
   'slot:esphome': ['ESPHome BLE proxy image, started by the ESPHome role.', 'Image ESPHome BLE proxy, spouští ho role ESPHome.'],
   'State': ['valid: confirmed image; new: not started yet; pending: on trial until it runs stable.', 'valid: potvrzený image; new: ještě nespuštěný; pending: na zkoušku, dokud neběží stabilně.'],
-  'Automatic Zigbee backup': ['Saves the network data of the running Zigbee role between 02:00 and 03:00 UTC. The gateway restarts for it (about 20 s). As coordinator only while no Zigbee2MQTT or ZHA is connected, because the host would lose its adapter; use Back up now then.', 'Uloží data sítě běžící Zigbee role mezi 02:00 a 03:00 UTC. Brána se kvůli tomu restartuje (asi 20 s). Jako koordinátor jen tehdy, když není připojen Zigbee2MQTT ani ZHA, protože by ztratil adaptér; pak použijte Zálohovat teď.'],
+  'Automatic Zigbee backup': ['Saves the network data of the running Zigbee role between 03:00 and 04:00 of the gateway time. The gateway restarts for it (about 20 s). As coordinator only while no Zigbee2MQTT or ZHA is connected, because the host would lose its adapter; use Back up now then.', 'Uloží data sítě běžící Zigbee role mezi 03:00 a 04:00 času brány. Brána se kvůli tomu restartuje (asi 20 s). Jako koordinátor jen tehdy, když není připojen Zigbee2MQTT ani ZHA, protože by ztratil adaptér; pak použijte Zálohovat teď.'],
   'Snapshot firmware': ['C6 firmware whose network data the backup holds: zigbee_ncp is the coordinator, zigbee_router the router.', 'Firmware C6, jehož data sítě záloha obsahuje: zigbee_ncp je koordinátor, zigbee_router router.'],
   'Snapshot generation': ['Counter over all backups; the higher one is newer.', 'Počítadlo přes všechny zálohy; vyšší je novější.'],
   'Back up now': ['Restarts the gateway and saves the network data of the running Zigbee role from the C6 (it can be read only while the C6 is stopped).', 'Restartuje bránu a uloží data sítě běžící Zigbee role z C6 (dají se číst jen při zastaveném C6).'],
@@ -1646,9 +1646,10 @@ function renderHeader() {
   const clock = $('#hdr-clock'), synced = status.time > 1700000000, locale = lang === 'cs' ? 'cs-CZ' : 'en-GB';
   clock.classList.toggle('hidden', !synced);
   if (synced) {
-    clock.innerHTML = ic('clock-outline') + new Date(status.time * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-    hdrTips['hdr-clock'] = { title: L('Gateway time', 'Čas brány'), rows: [[L('Date and time', 'Datum a čas'), new Date(status.time * 1000).toLocaleString(locale)],
-      [L('Source', 'Zdroj'), 'SNTP pool.ntp.org'], [L('Time zone (browser)', 'Časové pásmo (prohlížeč)'), esc(Intl.DateTimeFormat().resolvedOptions().timeZone || '')]] };
+    clock.innerHTML = ic('clock-outline') + new Date(status.time * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: gwZone() });
+    hdrTips['hdr-clock'] = { title: L('Gateway time', 'Čas brány'), rows: [[L('Date and time', 'Datum a čas'), fmtDate(status.time)],
+      [L('Time zone', 'Časové pásmo'), esc(gwZone() || L(`${Intl.DateTimeFormat().resolvedOptions().timeZone || ''} (browser)`, `${Intl.DateTimeFormat().resolvedOptions().timeZone || ''} (prohlížeč)`))],
+      [L('Settings', 'Nastavení'), L('System › LAN › Time', 'Systém › LAN › Čas')]] };
   }
   /* C6 flashing, visible on every page */
   const fl = status.c6.flash;
@@ -2449,7 +2450,7 @@ function snapshotCard() {
   return `<div class="card">${h3('backup-restore', 'Zigbee network backups')}
     <p class="muted">Saved from the C6 whenever the gateway leaves a Zigbee role, restored on return.</p>
     ${snaps.length ? `<table><tr>${[L('Radio', 'Rádio'), ['Firmware', 'Snapshot firmware'], 'Size', ['Generation', 'Snapshot generation'], 'Saved'].map(th).join('')}<th></th></tr>${snaps.map(s =>
-      `<tr><td>${(s.radio || 'a').toUpperCase()}</td><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td>${s.saved ? new Date(s.saved * 1000).toLocaleString() : '—'}</td>
+      `<tr><td>${(s.radio || 'a').toUpperCase()}</td><td>${esc(s.bundle)}</td><td>${fmtBytes(s.size)}</td><td>${s.generation}</td><td>${s.saved ? fmtDate(s.saved) : '—'}</td>
       <td><button class="btn" data-snap="${esc(s.bundle)}" data-snap-radio="${s.radio || 'a'}">${ic('download')}Download</button></td></tr>`).join('')}</table>`
       : '<p class="muted">No snapshot yet.</p>'}
     <div class="row" style="margin-top:12px"><label class="field" style="margin:0"><span>Automatic backup${tip('Automatic Zigbee backup')}</span>
@@ -2727,7 +2728,7 @@ async function loadLearn() {
     : r.result ? `${pill(r.ok ? 'ok' : 'err', r.ok ? 'done' : 'error')} ${esc(r.result)} · ${learn.slots_free} / ${learn.slots_total} ${L('free slots', 'volných slotů')}`
     : `${learn.ready ? '' : pill('err', L('recognition off', 'rozpoznávání vypnuto')) + ' '}${learn.slots_free} / ${learn.slots_total} ${L('free slots', 'volných slotů')}`;
   $('#ln-sample').disabled = $('#ln-bg').disabled = r.active || !learn.ready;
-  const when = t => t ? new Date(t * 1000).toLocaleString() : '';
+  const when = t => t ? fmtDate(t) : '';
   const slotRow = x => `<span class="pill" data-notr>#${x.slot} ${x.level_db} dB${x.tone_hz ? ' · ' + x.tone_hz + ' Hz' : ''}
     <a href="#" data-ln-play="${x.slot}" title="${esc(when(x.saved))}">${ic('play')}</a><a href="#" data-ln-del="${x.slot}">×</a></span>`;
   $('#ln-bgs').innerHTML = learn.background.length ? `<div class="row">${learn.background.map(slotRow).join('')}</div>
@@ -3072,7 +3073,7 @@ function updateCard() {
   const state = !u.url ? `<p class="muted">${L('Off: no manifest URL', 'Vypnuto: není nastavená adresa manifestu')} (${L('set it in Update settings below', 'nastavte ji v Nastavení aktualizací níže')}).</p>`
     : u.error ? `<p>${pill('bad', L('error', 'chyba'))} ${esc(u.error)}</p>`
     : !u.checked ? `<p class="muted">${L('Not checked yet.', 'Zatím nezkontrolováno.')}</p>`
-    : `<p class="muted">${L('Checked', 'Zkontrolováno')} ${new Date(u.checked * 1000).toLocaleString()}</p>`;
+    : `<p class="muted">${L('Checked', 'Zkontrolováno')} ${fmtDate(u.checked)}</p>`;
   const upToDate = pill('ok', L('up to date', 'aktuální'));
   const rows = u.url && u.checked ? `<div class="table-wrap"><table class="upd-table" data-notr><thead><tr><th style="width:30%"></th><th style="width:18%">${L('Installed', 'Nainstalováno')}</th>
       <th style="width:18%">${L('Offered', 'Nabízeno')}</th><th>${L('State', 'Stav')}</th><th></th></tr></thead><tbody>
@@ -3644,7 +3645,7 @@ async function loadZigbeeNet(full) {
   zInfo = new Map(devs.map(x => [x.ieee, x]));
   renderZDevices(devs, d.now);
   $('#zmap-state').textContent = d.map_running ? L(' Zigbee2MQTT is collecting the map, this can take several minutes…', ' Zigbee2MQTT sestavuje mapu, může to trvat i několik minut…')
-    : d.map_error ? ' ' + d.map_error : d.map ? ` ${L('map from', 'mapa z')} ${d.map.at ? new Date(d.map.at * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '?'}` : '';
+    : d.map_error ? ' ' + d.map_error : d.map ? ` ${L('map from', 'mapa z')} ${d.map.at ? fmtDate(d.map.at) : '?'}` : '';
   $('#zmap-refresh').disabled = d.map_running || !inst;
   if (d.map && (full || $('#zmap').dataset.at !== String(d.map.at))) renderZMap(d.map, devs);
   else if (!d.map) $('#zmap').innerHTML = L('No map yet: request one (Zigbee2MQTT asks every router for its neighbours).', 'Zatím bez mapy: vyžádejte ji (Zigbee2MQTT se zeptá každého routeru na sousedy).');
@@ -4049,7 +4050,7 @@ async function loadNetscan() {
   $('#ns-quick').disabled = busy || !d.quick_available;
   $('#ns-full').disabled = busy;
   const last = d.last;
-  const when = last && last.at ? new Date(last.at * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '';
+  const when = last && last.at ? fmtDate(last.at) : '';
   $('#ns-state').innerHTML = busy ? pill('warn', L('scanning…', 'skenuji…'))
     : last ? `${L('Last scan', 'Poslední sken')}: ${esc(when)} · ${last.mode === 'full' ? L('full', 'úplný') : L('quick', 'rychlý')}${last.radio ? ` · ${L('radio', 'rádio')} ${esc(last.radio.toUpperCase())}` : ''} · ${(last.duration_ms / 1000).toFixed(0)} s${(last.errors || []).map(e => `<div class="warn-text">${esc(e)}</div>`).join('')}`
     : L('No scan yet.', 'Zatím bez skenu.');
@@ -4119,12 +4120,36 @@ views['system/lan'] = () => `<div class="grid"><div class="card">${h3('ethernet'
     <label class="field"><span>Hostname (restart to apply)</span><input type="text" id="set-host" value="${esc(status.hostname)}"></label>
     <div class="row"><button class="btn primary" id="set-save">${ic('check')}Save</button></div>
     <p class="muted">${L('The gateway is reachable as', 'Brána je dostupná jako')} <code>${esc(status.hostname)}.local</code>.</p></div>
+  <div class="card" data-perm="system/settings">${h3('clock-outline', L('Time', 'Čas'))}<div id="time-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>
   <div class="card wide">${h3('swap-horizontal', L('Traffic', 'Provoz'))}<div id="traffic-box" class="muted">${L('Loading…', 'Načítám…')}</div></div></div>`;
 
 views['system/wifi'] = () => `<div class="grid"><div class="card">${h3('wifi-cog', L('Wi-Fi settings', 'Nastavení Wi-Fi'))}
     <div id="wifi-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>
   <div class="card">${h3('information-outline', L('Current state', 'Aktuální stav'))}<div id="wifi-state"></div></div>
   <div class="card wide">${h3('swap-horizontal', L('Traffic over Wi-Fi', 'Provoz přes Wi-Fi'))}<div id="traffic-box" class="muted">${L('Loading…', 'Načítám…')}</div></div></div>`;
+
+async function loadTime() {
+  const box = $('#time-box');
+  if (!box || perm('system/settings') < 1) return;
+  let c;
+  try { c = await api('/api/time'); } catch (e) { box.textContent = e.message; return; }
+  const known = TZ_ZONES.some(z => z[0] === c.tz_name && z[1] === c.tz), ro = perm('system/settings') < 2 ? 'disabled' : '';
+  const reach = s => !s.address ? pill('', L('not asked yet', 'zatím nedotázán')) : s.reach & 1 ? pill('ok', L('answers', 'odpovídá')) : pill(s.reach ? 'warn' : 'bad', L('no answer', 'neodpovídá'));
+  box.classList.remove('muted');
+  box.innerHTML = `${dl([[L('Gateway time', 'Čas brány'), c.time ? fmtDate(c.time) : pill('bad', L('not set', 'nenastaven'))],
+      [L('Last sync', 'Poslední synchronizace'), c.synced ? fmtDate(c.synced) : '—'],
+      ...c.servers.map((s, i) => [`${L('Server', 'Server')} ${i + 1}`, `<span data-notr>${esc(s.name)}${s.address && s.address !== s.name ? ` <span class="muted">${esc(s.address)}</span>` : ''}</span> ${reach(s)}`])])}
+    ${[0, 1, 2].map(i => `<label class="field" ${i ? '' : 'style="margin-top:14px"'}><span>${L(`NTP server ${i + 1}`, `NTP server ${i + 1}`)}</span><input type="text" id="time-srv${i}" data-notr ${ro}
+      value="${esc(c.servers[i]?.name || '')}" placeholder="${i ? L('optional', 'nepovinné') : 'pool.ntp.org'}"></label>`).join('')}
+    <label class="field"><span>${L('Time zone', 'Časové pásmo')}</span><select id="time-zone" ${ro}>
+      ${TZ_ZONES.map(z => `<option value="${z[0]}" ${known && z[0] === c.tz_name ? 'selected' : ''}>${z[0].replace(/_/g, ' ')}</option>`).join('')}
+      <option value="" ${known ? '' : 'selected'}>${L('Other (POSIX rule)', 'Jiné (pravidlo POSIX)')}</option></select></label>
+    <label class="field ${known ? 'hidden' : ''}" id="time-posix-f"><span>${L('POSIX rule', 'Pravidlo POSIX')}</span><input type="text" id="time-posix" data-notr ${ro}
+      value="${esc(c.tz)}" placeholder="CET-1CEST,M3.5.0,M10.5.0/3"></label>
+    <p class="muted">${L('Used by the whole gateway: times in the web UI, the log, Telegram quiet hours, the nightly Zigbee backup. Empty servers: no time sync.',
+      'Platí pro celou bránu: časy ve webovém rozhraní, log, tiché hodiny Telegramu, noční záloha Zigbee. Bez serverů se čas nesynchronizuje.')}</p>
+    <div class="row"><button class="btn primary" id="time-save" ${ro}>${ic('check')}${L('Save', 'Uložit')}</button></div>`;
+}
 
 const LAN_FIELDS = [['ip', 'IPv4'], ['mask', ['Netmask', 'Maska']], ['gw', ['Gateway', 'Výchozí brána']], ['dns1', ['DNS server', 'DNS server']], ['dns2', ['Backup DNS server', 'Záložní DNS server']]];
 async function loadLan() {
@@ -4174,6 +4199,7 @@ function wifiFields() {
   for (const [k] of LAN_FIELDS) $('#wifi-' + k).disabled = !fixed;
 }
 document.addEventListener('change', e => { if (e.target.id === 'wifi-mode') wifiFields(); });
+document.addEventListener('change', e => { if (e.target.id === 'time-zone') $('#time-posix-f').classList.toggle('hidden', !!e.target.value); });
 function renderWifiState() {
   const box = $('#wifi-state');
   if (!box) return;
@@ -4838,7 +4864,7 @@ document.addEventListener('click', async e => {
 /* ---------------- users and permissions ---------------- */
 const ROLE_NAMES = () => ({ admin: L('Admin', 'Správce'), user: L('User', 'Uživatel'), viewer: L('Viewer', 'Divák') });
 const LEVELS = () => [L('Hidden', 'Skryto'), L('Read', 'Číst'), L('Edit', 'Upravovat')];
-const fmtTime = t => t ? new Date(t * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB') : '–';
+const fmtTime = t => t ? fmtDate(t) : '–';
 /* label of a permission page: "Thread › Settings" */
 function pageLabel(page) {
   const tr = v => (lang === 'cs' && CS[v]) || v, out = [];
@@ -4999,8 +5025,6 @@ function renderPolicy(p) {
 }
 
 /* ---- notifications: Telegram bot (admins) ---- */
-const TZ_PRESETS = [['CET-1CEST,M3.5.0,M10.5.0/3', 'Europe/Prague, Berlin, Vienna'], ['GMT0BST,M3.5.0/1,M10.5.0', 'Europe/London'],
-  ['EET-2EEST,M3.5.0/3,M10.5.0/4', 'Europe/Helsinki, Kyiv'], ['UTC0', 'UTC']];
 views['system/notify'] = () => `<div class="grid"><div class="card">${h3('send', L('Telegram bot', 'Telegram bot'))}<div id="tg-box" class="muted">${L('Loading…', 'Načítám…')}</div></div>
   <div class="card">${h3('home-assistant', 'Home Assistant')}<p data-notr>${L('The P4 Gateway integration gets every notification: the Notification event entity (for automations) and persistent notifications from the level chosen per topic in the integration options (Settings › Devices & services › P4 Gateway › Configure).',
     'Integrace P4 Gateway dostává každou notifikaci: entitu události Notifikace (pro automatizace) a trvalá oznámení od úrovně zvolené pro každé téma v nastavení integrace (Nastavení › Zařízení a služby › P4 Gateway › Konfigurovat).')}</p>
@@ -5014,17 +5038,44 @@ async function loadNotifyAdmin() {
   try { t = await api('/api/telegram'); } catch (e) { box.textContent = e.message; return; }
   const state = { running: pill('ok', L(`running, @${t.bot}`, `běží, @${t.bot}`)), connecting: pill('warn', L('connecting', 'připojuje se')),
     error: pill('bad', L('error', 'chyba')), off: pill('', L('off', 'vypnuto')) }[t.state] || esc(t.state);
-  const preset = TZ_PRESETS.some(p => p[0] === t.tz);
   box.classList.remove('muted');
   box.innerHTML = `<div data-notr>${dl([[L('State', 'Stav'), state], [L('Error', 'Chyba'), esc(t.error)], [L('Paired users', 'Spárovaní uživatelé'), t.paired]])}
     <ol class="muted" style="padding-left:18px">${L('<li>In Telegram open @BotFather, send /newbot and choose a name.</li><li>Paste the token it gives here and turn the bot on.</li><li>Each user pairs a chat in My account › Telegram.</li>',
       '<li>V Telegramu otevřete @BotFather, pošlete /newbot a zvolte jméno.</li><li>Token, který vám dá, vložte sem a bota zapněte.</li><li>Každý uživatel si spáruje chat v Můj účet › Telegram.</li>')}</ol>
     <label class="field"><span>${L('Bot token', 'Token bota')}</span><input type="password" id="tg-token" autocomplete="off" placeholder="${t.token_set ? L('set, leave empty to keep', 'nastaven, prázdné = ponechat') : '123456789:AA…'}"></label>
-    <label class="field"><span>${L('Time zone (quiet hours)', 'Časové pásmo (tiché hodiny)')}</span><select id="tg-tz">
-      ${TZ_PRESETS.map(p => `<option value="${p[0]}" ${p[0] === t.tz ? 'selected' : ''}>${p[1]}</option>`).join('')}
-      ${preset ? '' : `<option value="${esc(t.tz)}" selected>${esc(t.tz)}</option>`}</select></label>
+    <p class="muted">${L('Quiet hours use the gateway time zone: System › LAN › Time.', 'Tiché hodiny používají časové pásmo brány: Systém › LAN › Čas.')}</p>
     <div class="row"><label><input type="checkbox" id="tg-on" ${t.enabled ? 'checked' : ''}> ${L('Bot on', 'Bot zapnutý')}</label>
       <button class="btn primary" id="tg-save">${ic('check')}${L('Save', 'Uložit')}</button></div></div>`;
+}
+
+/* ---- time: the gateway's time zone (System › LAN › Time), the browser's while unknown ---- */
+/* IANA name -> POSIX rule for the gateway (newlib TZ) */
+const TZ_ZONES = [['Europe/Prague', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Bratislava', 'CET-1CEST,M3.5.0,M10.5.0/3'],
+  ['Europe/Berlin', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Vienna', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Warsaw', 'CET-1CEST,M3.5.0,M10.5.0/3'],
+  ['Europe/Budapest', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Paris', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Amsterdam', 'CET-1CEST,M3.5.0,M10.5.0/3'],
+  ['Europe/Brussels', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Zurich', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Rome', 'CET-1CEST,M3.5.0,M10.5.0/3'],
+  ['Europe/Madrid', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Stockholm', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/Oslo', 'CET-1CEST,M3.5.0,M10.5.0/3'],
+  ['Europe/Copenhagen', 'CET-1CEST,M3.5.0,M10.5.0/3'], ['Europe/London', 'GMT0BST,M3.5.0/1,M10.5.0'], ['Europe/Dublin', 'IST-1GMT0,M10.5.0,M3.5.0/1'],
+  ['Europe/Lisbon', 'WET0WEST,M3.5.0/1,M10.5.0'], ['Europe/Helsinki', 'EET-2EEST,M3.5.0/3,M10.5.0/4'], ['Europe/Kyiv', 'EET-2EEST,M3.5.0/3,M10.5.0/4'],
+  ['Europe/Athens', 'EET-2EEST,M3.5.0/3,M10.5.0/4'], ['Europe/Bucharest', 'EET-2EEST,M3.5.0/3,M10.5.0/4'], ['Europe/Sofia', 'EET-2EEST,M3.5.0/3,M10.5.0/4'],
+  ['Europe/Istanbul', '<+03>-3'], ['Europe/Moscow', 'MSK-3'], ['America/New_York', 'EST5EDT,M3.2.0,M11.1.0'], ['America/Chicago', 'CST6CDT,M3.2.0,M11.1.0'],
+  ['America/Denver', 'MST7MDT,M3.2.0,M11.1.0'], ['America/Phoenix', 'MST7'], ['America/Los_Angeles', 'PST8PDT,M3.2.0,M11.1.0'],
+  ['Asia/Dubai', '<+04>-4'], ['Asia/Kolkata', 'IST-5:30'], ['Asia/Singapore', '<+08>-8'], ['Asia/Shanghai', 'CST-8'], ['Asia/Tokyo', 'JST-9'],
+  ['Australia/Sydney', 'AEST-10AEDT,M10.1.0,M4.1.0/3'], ['Pacific/Auckland', 'NZST-12NZDT,M9.5.0,M4.1.0/3'], ['UTC', 'UTC0']];
+const gwZone = () => { try { return status.tz_name ? (Intl.DateTimeFormat('en', { timeZone: status.tz_name }), status.tz_name) : undefined; } catch (e) { return undefined; } };
+/* unix seconds as date and time in the gateway's zone */
+const fmtDate = (t, opts = {}) => new Date(t * 1000).toLocaleString(lang === 'cs' ? 'cs-CZ' : 'en-GB', { timeZone: gwZone(), ...opts });
+let tzFmt = null, tzFmtZone = null;
+/* fields of a time (ms) in the gateway's zone, for the log */
+function tzParts(ms) {
+  const zone = gwZone();
+  if (!tzFmt || tzFmtZone !== zone) {
+    tzFmt = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    tzFmtZone = zone;
+  }
+  const o = {};
+  for (const p of tzFmt.formatToParts(new Date(ms))) o[p.type] = +p.value;
+  return { y: o.year, m: o.month, d: o.day, h: o.hour, mi: o.minute, s: o.second };
 }
 
 /* ---- own account ---- */
@@ -5170,7 +5221,7 @@ document.addEventListener('click', async e => {
       await totpSetup(false);
       loadProfile();
     } else if (b.id === 'tg-save') {
-      const body = { enabled: $('#tg-on').checked, tz: $('#tg-tz').value };
+      const body = { enabled: $('#tg-on').checked };
       if ($('#tg-token').value.trim()) body.token = $('#tg-token').value.trim();
       await api('/api/telegram', { json: body });
       toast(L('Saved', 'Uloženo'));
@@ -5533,6 +5584,13 @@ document.addEventListener('click', async e => {
       a.click();
     } else if (t.dataset.upload) {
       await upload(t.dataset.upload);
+    } else if (t.id === 'time-save') {
+      const zone = $('#time-zone').value, z = TZ_ZONES.find(x => x[0] === zone);
+      const body = { servers: [0, 1, 2].map(i => $(`#time-srv${i}`).value.trim()).filter(Boolean), tz: z ? z[1] : $('#time-posix').value.trim(), tz_name: z ? z[0] : '' };
+      await api('/api/time', { json: body });
+      status.tz_name = body.tz_name;
+      toast(L('Saved', 'Uloženo'));
+      loadTime();
     } else if (t.id === 'set-save') {
       const body = {};
       if ($('#set-host').value.trim() !== status.hostname) body.hostname = $('#set-host').value.trim();
@@ -5684,7 +5742,7 @@ let restarting = false;
 async function importSettings(file) {
   const c = JSON.parse(await file.text());
   if (c.format !== 'p4gw-settings') throw new Error(L('not a settings file of this gateway', 'není to soubor nastavení této brány'));
-  const when = c.exported ? new Date(c.exported * 1000).toLocaleString() : '?';
+  const when = c.exported ? fmtDate(c.exported) : '?';
   if (!await confirmDialog('Import settings?', L(`Settings of ${c.hostname} from ${when} (${Object.keys(c.keys || {}).length} items${c.secrets ? ', with passwords' : ''}) overwrite the current ones and the gateway restarts.`,
     `Nastavení ${c.hostname} z ${when} (${Object.keys(c.keys || {}).length} položek${c.secrets ? ', s hesly' : ''}) přepíše současné a brána se restartuje.`))) return;
   await api('/api/settings/import', { json: c });
@@ -5795,10 +5853,10 @@ function logParse(text) {
 const pad = (n, w = 2) => String(n).padStart(w, '0');
 function logTime(at, full) {
   if (at == null) return full ? '????-??-?? ??:??:??.???' : '??:??:??.???';
-  const d = new Date(at);
-  const t = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
-  return full ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${t}`
-    : (new Date().toDateString() === d.toDateString() ? t : `${d.getDate()}.${d.getMonth() + 1}. ${t}`);
+  const d = tzParts(at), today = tzParts(Date.now());
+  const t = `${pad(d.h)}:${pad(d.mi)}:${pad(d.s)}.${pad(at % 1000, 3)}`;
+  return full ? `${d.y}-${pad(d.m)}-${pad(d.d)} ${t}`
+    : (today.y === d.y && today.m === d.m && today.d === d.d ? t : `${d.d}.${d.m}. ${t}`);
 }
 
 function logMatcher() {
@@ -5899,7 +5957,7 @@ function render(full) {
     if (route() === 'system/diag') renderLog();
     if (route() === 'radios/scan') loadNetscan();
     if (route() === 'system/lan' || route() === 'system/wifi') {
-      if (route() === 'system/lan') { loadLan(); renderLanState(); } else { loadWifi(); renderWifiState(); }
+      if (route() === 'system/lan') { loadLan(); loadTime(); renderLanState(); } else { loadWifi(); renderWifiState(); }
       loadTraffic();
       if (!trafficTimer) trafficTimer = setInterval(loadTraffic, 2000);
     }

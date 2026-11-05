@@ -83,6 +83,7 @@ Response:
   "built": "Nov  2 2026",
   "built_time": "10:15:00",
   "time": 1793610000,
+  "tz_name": "Europe/Prague",
   "matter_url": "ws://192.168.1.10:5580/ws",
   "chip_revision": 301,
   "uptime_s": 120,
@@ -2944,6 +2945,8 @@ Effects: The body is optional. target: gateway (default), c6 (radio package of r
 |---|---|---|---|
 | POST | `/api/reboot` | Restarts the gateway. | page `system/maint`, edit |
 | POST | `/api/settings` | Changes basic gateway settings; send only the fields to change. | page `system/settings`, edit |
+| GET | `/api/time` | Clock of the gateway: time, last SNTP sync, servers and time zone. | page `system/settings`, read |
+| POST | `/api/time` | Sets the SNTP servers and the time zone of the gateway; send only the fields to change. | page `system/settings`, edit |
 | GET | `/api/settings/export` | Exports the gateway settings as a JSON file. | page `system/settings`, edit |
 | POST | `/api/settings/import` | Imports a settings file made by the export. | page `system/settings`, edit |
 
@@ -2991,6 +2994,65 @@ Response:
 Errors: 400 hostname not lowercase letters, digits and inner dashes (max 31); matter_url not ws:// (max 120); zigbee_backup_days not 0, 1 or 7; update_url not http(s):// (max 200); or password given (use /api/users).; 500 Storing to NVS failed.
 
 Effects: Writes to NVS. Empty matter_url or update_url clears it; changing update_url starts an update check. zigbee_backup_days is the automatic Zigbee backup period (0 off). A new hostname takes effect after a restart (restart_required: true); the gateway does not restart by itself. Fields before an invalid one may already be stored.
+
+#### GET `/api/time`
+
+Response:
+
+```json
+{
+  "time": 1762336800,
+  "synced": 1762336512,
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "tz_name": "Europe/Prague",
+  "servers": [
+    {
+      "name": "pool.ntp.org",
+      "address": "195.113.144.201",
+      "reach": 255
+    }
+  ]
+}
+```
+
+Effects: time and synced are unix seconds, 0 while unknown. address is the server's resolved address (empty before the first poll), reach the RFC 5905 reachability register of its last eight polls (bit 0 the last). tz_name is empty for a zone set as a POSIX rule only.
+
+#### POST `/api/time`
+
+Body:
+
+```json
+{
+  "servers": [
+    "pool.ntp.org",
+    "192.168.1.1"
+  ],
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "tz_name": "Europe/Prague"
+}
+```
+
+Response:
+
+```json
+{
+  "time": 1762336800,
+  "synced": 1762336512,
+  "tz": "CET-1CEST,M3.5.0,M10.5.0/3",
+  "tz_name": "Europe/Prague",
+  "servers": [
+    {
+      "name": "pool.ntp.org",
+      "address": "195.113.144.201",
+      "reach": 255
+    }
+  ]
+}
+```
+
+Errors: 400 servers not a list of up to 3 host names or addresses; tz empty or longer than 63; tz_name longer than 47 or without tz.; 500 Storing to NVS failed.
+
+Effects: Applies at once, no restart. An empty server list stops time sync. tz is the POSIX rule the gateway uses (Telegram quiet hours, the nightly Zigbee backup between 03:00 and 04:00); tz_name the IANA name the web UI shows times in. Sends a system notification.
 
 #### GET `/api/settings/export`
 
@@ -3309,4 +3371,4 @@ Response:
 
 Errors: 400 token without a colon (the BotFather format 123456:ABC...) or too long; tz empty or too long.
 
-Effects: Stored in NVS and the bot restarts its connection. tz is a POSIX time zone used for quiet hours. An empty token removes it. Sends a notification.
+Effects: Stored in NVS and the bot restarts its connection. tz (optional, for older clients) sets the gateway time zone as POST /api/time does, without its IANA name. An empty token removes it. Sends a notification.

@@ -66,6 +66,9 @@ const gw_radio_keys_t *gw_radio_keys(int radio);
 #define GW_KEY_LAN "lan"            /* str JSON, LAN settings (gw_lan_set), none = DHCP */
 #define GW_KEY_ZB_SNAP_DAYS "zb_snap_days" /* u8, automatic Zigbee network backup every n days, 0 = off */
 #define GW_ZB_SNAP_DAYS_DEFAULT 7
+#define GW_KEY_NTP "ntp"            /* str, SNTP servers separated by commas; absent = pool.ntp.org, empty = no sync */
+#define GW_KEY_TZ "tz"              /* str, POSIX time zone of the gateway */
+#define GW_KEY_TZ_NAME "tz_name"    /* str, its IANA name for the web UI, empty = unknown */
 #define GW_KEY_ZB_SNAP_REQ "zb_snap_req" /* u8, back up the Zigbee network data on the next start */
 
 esp_err_t gw_config_init(void);
@@ -183,6 +186,12 @@ void gw_notify_boot(bool after_failure);
 void gw_notify_register(void);
 /* one more consumer of every notification (the Telegram bot); called in the notifying task */
 void gw_notify_set_listener(void (*listener)(const char *topic, gw_notify_level_t level, const char *text));
+
+/* ---- clock (gw_time.c): SNTP servers and the time zone (TZ) ---- */
+void gw_time_init(void);
+/* POSIX zone and its IANA name ("" when unknown) */
+esp_err_t gw_time_set_tz(const char *tz, const char *name);
+const char *gw_time_tz_name(void);
 
 /* ---- Telegram bot (gw_telegram.c) ---- */
 void gw_telegram_start(void);

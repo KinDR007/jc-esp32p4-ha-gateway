@@ -837,6 +837,8 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/coredump", HTTP_DELETE, "system/diag", 2},
     {"/api/tools/ping", -1, "system/diag", 2},
     {"/api/settings", -1, "system/settings", 2},
+    {"/api/time", HTTP_GET, "system/settings", 1},
+    {"/api/time", HTTP_POST, "system/settings", 2},
     {"/api/settings/export", -1, "system/settings", 2}, /* keys of the networks */
     {"/api/settings/import", -1, "system/settings", 2},
     {"/api/reboot", -1, "system/maint", 2},

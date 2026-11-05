@@ -237,8 +237,12 @@
     "file": "system_lan__3"
    },
    {
-    "title": "TRAFFIC",
+    "title": "TIME",
     "file": "system_lan__4"
+   },
+   {
+    "title": "TRAFFIC",
+    "file": "system_lan__5"
    }
   ]
  },

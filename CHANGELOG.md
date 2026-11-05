@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Time settings, System › LAN › Time (`GET`/`POST /api/time`): up to three SNTP servers (default
+  pool.ntp.org) and the gateway time zone (a listed IANA zone or a POSIX rule), applied at once. The zone
+  holds for the whole gateway: the web UI shows times (header clock, log, backups, events) in it instead of
+  the browser's zone, Telegram quiet hours follow it, the nightly Zigbee backup runs 03:00-04:00 local
+  time (was 02:00-03:00 UTC). The time zone moved there from the Telegram settings (same key, no migration;
+  `tz` of `POST /api/telegram` still sets it). `/api/status` carries `tz_name`.
+- Tests: TC51, UI35.
+
 ## v1.12 (2026-11-04)
 
 Summary: Modbus TCP search in a network, Victron GX and GoodWe XS templates, Modbus over UDP for GoodWe Wi-Fi modules.

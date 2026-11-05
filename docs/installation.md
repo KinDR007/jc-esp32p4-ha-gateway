@@ -183,6 +183,18 @@ API, OTBR REST, Zigbee2MQTT, MQTT, mDNS, DNS/NTP, HTTPS, Thread traffic routed b
 Frames are counted by port in the input and output path of the interface, without copying or delaying
 them.
 
+## Time
+
+**System › LAN › Time** (or `GET`/`POST /api/time`): up to three SNTP servers (host names or addresses,
+default `pool.ntp.org`; none = no time sync) and the time zone of the gateway, chosen from a list of IANA
+zones or given as a POSIX rule (`CET-1CEST,M3.5.0,M10.5.0/3`). Changes apply at once, without a restart.
+The card shows the gateway time, the last sync and per server its address and whether it answered.
+The zone holds for the whole gateway: times in the web UI (header clock, log, backups, events) are shown
+in it rather than in the browser's zone, Telegram quiet hours and the nightly Zigbee backup (03:00 to
+04:00) follow it. A zone given only as a POSIX rule has no IANA name; the web UI then shows its times in the
+browser's zone. The former time zone field of the Telegram settings (`tz` of `POST /api/telegram`) sets the
+same zone.
+
 ## Recovery
 
 | Situation | Action |

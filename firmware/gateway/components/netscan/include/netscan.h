@@ -22,7 +22,7 @@ extern "C" {
 /* Quick scan of the active role: fills result with "channels", "beacons" and "thread" arrays. */
 typedef esp_err_t (*netscan_quick_fn)(cJSON *result, char *err, size_t err_len);
 
-/* Loads the last result, registers /api/net/scan, starts SNTP (scan time). */
+/* Loads the last result, registers /api/net/scan. */
 void netscan_init(void);
 /* The Thread roles provide the quick scan. */
 void netscan_set_quick(netscan_quick_fn fn);
