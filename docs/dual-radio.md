@@ -68,6 +68,30 @@ chip detection; the slots layout (`firmware/c6/slots.csv`, 4 MB) fits as it is.
 
 Estimate: 3–4 weeks including F6.
 
+## XIAO nRF54LM20A (deferred)
+
+Researched 2026-11-05 as an alternative to the C5 for radio B; implementation postponed (the board is
+available). Facts and sources:
+
+- nRF54LM20A: Cortex-M33 128 MHz, about 2 MB RRAM, 512 KB RAM, BLE 6.0 and 802.15.4 (Thread, Zigbee,
+  Matter) ([Nordic](https://www.nordicsemi.com/Products/nRF54LM20A)). XIAO pads D6 TX = P1.08, D7 RX =
+  P1.09 (UARTE21); the console UARTE20 goes to the onboard SAMD11 (CMSIS-DAP, USB-C), not to the pads
+  ([Zephyr board](https://docs.zephyrproject.org/latest/boards/seeed/xiao_nrf54lm20a/doc/index.html)).
+- No ROM bootloader over UART: the first flash is over SWD (the SAMD11 over USB-C). Updates from the
+  gateway would need MCUboot serial recovery and an SMP client in the P4
+  ([MCUboot](https://docs.mcuboot.com/serial_recovery.html)).
+- Thread RCP: NCS `samples/openthread/coprocessor`, Spinel at 1 Mbd with flow control; Seeed runs it with
+  the Home Assistant OTBR ([Seeed](https://wiki.seeedstudio.com/xiao_nrf54lm20a_with_matter/)).
+- Zigbee NCP: the NCS Zigbee R23 add-on lists nRF54LM20, but its NCP page says the NCP libraries are not
+  shipped; R23 NCP compatibility with the Zigbee2MQTT `zboss` adapter is unverified
+  ([add-on](https://nrfconnectdocs.nordicsemi.com/addons/ncs-zigbee/latest/samples/ncp/README.html)).
+- ESPHome Bluetooth proxy: not possible (needs an ESP32 with Wi-Fi).
+- Detection over UART: Spinel `PROP_NCP_VERSION`, ZBOSS NCP version request, or MCUboot SMP echo; each
+  has its own framing and baud rate.
+
+Open: the RESET pad and RTS/CTS wiring to JP1, the RCP API version against the ESP-IDF host. Plan in
+[TODO.md](../TODO.md) (N1–N4).
+
 ## Risks
 
 | Risk | Impact | Handling |
