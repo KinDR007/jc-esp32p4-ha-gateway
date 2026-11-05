@@ -4322,6 +4322,7 @@ views['system/hw'] = () => `<div class="grid">
   <div class="card">${h3('plus', L('Add manually', 'Přidat ručně'))}
     <p class="muted">${L('For a sensor the scan cannot tell apart, or one with another address than the usual one.', 'Pro senzor, který sken nerozliší, nebo s jinou než obvyklou adresou.')}</p>
     <label class="field"><span>${L('Address', 'Adresa')}</span><input type="text" id="hw-add-addr" placeholder="0x76" style="width:90px"></label>
+    <label class="field hidden" id="hw-add-bus-f"><span>${L('Bus', 'Sběrnice')}</span><select id="hw-add-bus"><option value="1">1 (CN3, JP1 23/25)</option><option value="2">${L('2 (System › GPIO)', '2 (Systém › GPIO)')}</option></select></label>
     <label class="field"><span>${L('Type', 'Typ')}</span><select id="hw-add-type"></select></label>
     <div class="row"><button class="btn" id="hw-add">${ic('plus')}${L('Add', 'Přidat')}</button></div></div>
   <div class="card wide">${h3('format-list-bulleted', L('Supported sensors', 'Podporované senzory'))}<div class="table-wrap" id="hw-types"></div></div>
@@ -4329,6 +4330,8 @@ views['system/hw'] = () => `<div class="grid">
 
 let hw = null, hwTimer = null;
 const hex2 = a => '0x' + a.toString(16).padStart(2, '0');
+/* the address with the bus when a second bus exists */
+const hwAddr = (bus, addr) => `<code>${hex2(addr)}</code>${bus === 2 || hw.bus2 ? ` <span class="muted">${L('bus', 'sběrnice')} ${bus || 1}</span>` : ''}`;
 const hwQ = k => hw.quantities.find(q => q.key === k) || { name: k, precision: 1 };
 /* quantity name in the UI language (the firmware names them in English) */
 const hwQName = k => { const n = hwQ(k).name; return (lang === 'cs' && CS[n]) || n; };
@@ -4350,12 +4353,12 @@ function hwRender() {
   if (!$('#hw-table') || !hw) return;
   const ro = perm('system/hw') < 2 ? 'disabled' : '';
   const lb = [L('Name', 'Jméno'), L('Chip', 'Čip'), L('Address', 'Adresa'), L('Values', 'Hodnoty'), L('State', 'Stav'), L('Expose', 'Exponovat'), L('Enabled', 'Zapnuto')];
-  $('#hw-table').innerHTML = hw.sensors.length ? `<table class="hw-stack"><tr>${[...lb, ''].map(x => `<th>${x}</th>`).join('')}</tr>${hw.sensors.map(s => `<tr data-hw="${s.addr}">
+  $('#hw-table').innerHTML = hw.sensors.length ? `<table class="hw-stack"><tr>${[...lb, ''].map(x => `<th>${x}</th>`).join('')}</tr>${hw.sensors.map(s => `<tr data-hw="${s.id}">
       <td><input type="text" data-hw-name maxlength="32" value="${esc(s.name)}" ${ro} data-notr></td>
       <td data-l="${lb[1]}">${esc(s.chip)}${s.chip !== hw.types.find(t => t.type === s.type)?.label ? ` <span class="muted">(${esc(s.type)})</span>` : ''}</td>
-      <td data-l="${lb[2]}"><code>${hex2(s.addr)}</code></td><td data-l="${lb[3]}" id="hw-v-${s.addr}">${hwValues(s)}</td><td class="hw-wrap" id="hw-s-${s.addr}">${hwState(s)}</td>
+      <td data-l="${lb[2]}">${hwAddr(s.bus, s.addr)}</td><td data-l="${lb[3]}" id="hw-v-${s.id}">${hwValues(s)}</td><td class="hw-wrap" id="hw-s-${s.id}">${hwState(s)}</td>
       <td data-l="${lb[5]}"><input type="checkbox" data-hw-expose ${s.expose ? 'checked' : ''} ${ro}></td><td data-l="${lb[6]}"><input type="checkbox" data-hw-enabled ${s.enabled ? 'checked' : ''} ${ro}></td>
-      <td><button class="btn icon" data-hw-del="${s.addr}" title="${L('Remove', 'Odebrat')}" ${ro}>${ic('delete-outline')}</button></td></tr>`).join('')}</table>`
+      <td><button class="btn icon" data-hw-del="${s.id}" title="${L('Remove', 'Odebrat')}" ${ro}>${ic('delete-outline')}</button></td></tr>`).join('')}</table>`
     : `<p class="muted">${L('No sensor yet. Connect one to CN3 and scan.', 'Zatím žádný senzor. Připojte ho na CN3 a spusťte sken.')}</p>`;
   if (document.activeElement?.id !== 'hw-interval') $('#hw-interval').value = hw.interval_s;
   const sc = hw.scan;
@@ -4364,22 +4367,23 @@ function hwRender() {
   $('#hw-found').classList.toggle('muted', !sc.devices.length);
   $('#hw-found').innerHTML = !sc.done ? L('No scan yet.', 'Zatím bez skenu.') : !sc.devices.length ? L('Nothing answers on the bus (not even the codec: check the bus).', 'Na sběrnici nic neodpovídá (ani kodek: zkontrolujte sběrnici).')
     : `<table><tr><th>${L('Address', 'Adresa')}</th><th>${L('Device', 'Zařízení')}</th><th></th></tr>${sc.devices.map(d => {
-      const conf = hw.sensors.find(s => s.addr === d.addr);
+      const conf = hw.sensors.find(s => s.addr === d.addr && (s.bus || 1) === (d.bus || 1)), key = `${d.bus || 1}:${d.addr}`;
       let what, act = '';
       if (d.onboard) what = esc(d.hint);
       else if (conf) what = `${esc(conf.name)} <span class="muted">(${esc(conf.chip)})</span>`;
       else if (d.candidates.length) {
-        what = `<select data-hw-cand="${d.addr}">${d.candidates.map(c => `<option value="${c.type}|${esc(c.chip)}">${esc(c.chip)}${c.sure ? ' ✓' : ` (${L('likely', 'pravděpodobně')})`}</option>`).join('')}</select>`
+        what = `<select data-hw-cand="${key}">${d.candidates.map(c => `<option value="${c.type}|${esc(c.chip)}">${esc(c.chip)}${c.sure ? ' ✓' : ` (${L('likely', 'pravděpodobně')})`}</option>`).join('')}</select>`
           + (d.candidates.length > 1 ? `<div class="muted">${L('Several chips answer like this: pick the one on your board.', 'Takto odpovídá víc čipů: vyberte ten na vašem modulu.')}</div>` : '')
           + (d.hint ? `<div class="muted">${L('Could also be', 'Může to být i')}: ${esc(d.hint)}</div>` : '');
-        act = `<button class="btn" data-hw-addc="${d.addr}" ${ro}>${ic('plus')}${L('Add', 'Přidat')}</button>`;
+        act = `<button class="btn" data-hw-addc="${key}" ${ro}>${ic('plus')}${L('Add', 'Přidat')}</button>`;
       } else {
         what = `<span class="muted">${d.hint ? esc(d.hint) : L('unknown device', 'neznámé zařízení')}</span>`;
-        act = `<button class="btn" data-hw-manual="${d.addr}" ${ro}>${L('Add as…', 'Přidat jako…')}</button>`;
+        act = `<button class="btn" data-hw-manual="${key}" ${ro}>${L('Add as…', 'Přidat jako…')}</button>`;
       }
-      return `<tr><td><code>${hex2(d.addr)}</code></td><td class="hw-wrap">${what}</td><td>${act}</td></tr>`;
+      return `<tr><td>${hwAddr(d.bus, d.addr)}</td><td class="hw-wrap">${what}</td><td>${act}</td></tr>`;
     }).join('')}</table>`;
   if (!$('#hw-add-type').options.length) $('#hw-add-type').innerHTML = hwTypeOpts(hwParseAddr($('#hw-add-addr').value), '');
+  $('#hw-add-bus-f').classList.toggle('hidden', !hw.bus2);
   $('#hw-types').innerHTML = `<table><tr><th>${L('Chip', 'Čip')}</th><th>${L('Measures', 'Měří')}</th><th>${L('Addresses', 'Adresy')}</th></tr>${hw.types.map(t =>
     `<tr><td class="hw-wrap"><b>${esc(t.label)}</b> <span class="muted">${esc(t.vendor)}</span>${t.note ? `<div class="muted">${esc(t.note)}</div>` : ''}</td>
      <td class="hw-wrap">${t.quantities.map(k => esc(hwQName(k))).join(', ')}</td><td class="hw-wrap">${t.addrs.map(hex2).join(', ')}</td></tr>`).join('')}</table>`;
@@ -4387,7 +4391,7 @@ function hwRender() {
 /* values and states only: the name fields keep what is being typed */
 function hwRefresh() {
   for (const s of hw.sensors) {
-    const v = $(`#hw-v-${s.addr}`), st = $(`#hw-s-${s.addr}`);
+    const v = $(`#hw-v-${s.id}`), st = $(`#hw-s-${s.id}`);
     if (v) v.innerHTML = hwValues(s);
     if (st) st.innerHTML = hwState(s);
   }
@@ -4401,8 +4405,8 @@ async function loadHw(full = true) {
 /* the list as shown, with the edits of the table */
 function hwList() {
   return hw.sensors.map(s => {
-    const row = document.querySelector(`tr[data-hw="${s.addr}"]`);
-    return { addr: s.addr, type: s.type, chip: s.chip, name: row ? row.querySelector('[data-hw-name]').value.trim() : s.name,
+    const row = document.querySelector(`tr[data-hw="${s.id}"]`);
+    return { bus: s.bus || 1, addr: s.addr, type: s.type, chip: s.chip, name: row ? row.querySelector('[data-hw-name]').value.trim() : s.name,
       expose: row ? row.querySelector('[data-hw-expose]').checked : s.expose, enabled: row ? row.querySelector('[data-hw-enabled]').checked : s.enabled };
   });
 }
@@ -4427,24 +4431,26 @@ document.addEventListener('click', async e => {
     } else if (t.id === 'hw-save') {
       await hwPut({ interval_s: +$('#hw-interval').value, sensors: hwList() }, L('Saved', 'Uloženo'));
     } else if (t.dataset.hwDel) {
-      const a = +t.dataset.hwDel, s = hw.sensors.find(x => x.addr === a);
+      const s = hw.sensors.find(x => x.id === t.dataset.hwDel);
       if (!await confirmDialog(L(`Remove ${s.name}?`, `Odebrat ${s.name}?`), L('Its entities in Home Assistant become unavailable. A sensor still connected is added again by the next scan: to keep it out, switch it off instead.',
         'Jeho entity v Home Assistant přestanou být dostupné. Senzor, který zůstane připojený, přidá další sken znovu: chcete-li ho vynechat, raději ho vypněte.'))) return;
-      await hwPut({ sensors: hwList().filter(x => x.addr !== a) }, L('Removed', 'Odebráno'));
+      await hwPut({ sensors: hwList().filter(x => !(x.addr === s.addr && x.bus === (s.bus || 1))) }, L('Removed', 'Odebráno'));
     } else if (t.dataset.hwAddc) {
-      const a = +t.dataset.hwAddc, [type, chip] = $(`[data-hw-cand="${a}"]`).value.split('|');
-      await hwPut({ sensors: [...hwList(), { addr: a, type, chip, name: chip }] }, L(`Added ${chip}`, `Přidán ${chip}`));
+      const [bus, a] = t.dataset.hwAddc.split(':').map(Number), [type, chip] = $(`[data-hw-cand="${t.dataset.hwAddc}"]`).value.split('|');
+      await hwPut({ sensors: [...hwList(), { bus, addr: a, type, chip, name: chip }] }, L(`Added ${chip}`, `Přidán ${chip}`));
     } else if (t.dataset.hwManual) {
-      $('#hw-add-addr').value = hex2(+t.dataset.hwManual);
-      $('#hw-add-type').innerHTML = hwTypeOpts(+t.dataset.hwManual, '');
+      const [bus, a] = t.dataset.hwManual.split(':').map(Number);
+      $('#hw-add-addr').value = hex2(a);
+      $('#hw-add-bus').value = String(bus);
+      $('#hw-add-type').innerHTML = hwTypeOpts(a, '');
       $('#hw-add-addr').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (t.id === 'hw-add') {
-      const a = hwParseAddr($('#hw-add-addr').value), type = $('#hw-add-type').value;
+      const a = hwParseAddr($('#hw-add-addr').value), type = $('#hw-add-type').value, bus = hw.bus2 ? +$('#hw-add-bus').value : 1;
       if (a === null) return toast(L('Address: 0x08 to 0x77', 'Adresa: 0x08 až 0x77'));
       const tt = hw.types.find(x => x.type === type);
       if (!tt || !tt.addrs.includes(a)) return toast(L('This type cannot have this address', 'Tento typ nemůže mít tuto adresu'));
-      if (hw.sensors.some(s => s.addr === a)) return toast(L('A sensor with this address is configured already', 'Senzor s touto adresou už je nastaven'));
-      await hwPut({ sensors: [...hwList(), { addr: a, type, name: tt.label }] }, L(`Added ${tt.label}`, `Přidán ${tt.label}`));
+      if (hw.sensors.some(s => s.addr === a && (s.bus || 1) === bus)) return toast(L('A sensor with this address is configured already', 'Senzor s touto adresou už je nastaven'));
+      await hwPut({ sensors: [...hwList(), { bus, addr: a, type, name: tt.label }] }, L(`Added ${tt.label}`, `Přidán ${tt.label}`));
     }
   } catch (err) {
     toast(L('Error: ', 'Chyba: ') + err.message);
@@ -4882,11 +4888,15 @@ views['system/gpio'] = () => `<div class="grid">
       'Logika 3,3 V, 5 V pin nesnese; pin zatěžujte nejvýš asi 20 mA (relé nebo LED pásek přes tranzistor či modul). Po zapnutí a po pádu jsou piny 1–2 s vypnuté (vysoká impedance): relé potřebuje vnější pull-down. Piny rádií jsou zamčené, dokud je rádio používá. Volný pin nastavíte kliknutím.')}</p>
     <div class="table-wrap"><div class="gp-row-label">${L('Pins 1, 3 … 25', 'Piny 1, 3 … 25')}</div><div class="gp-hdr" id="gp-odd"></div>
       <div class="gp-hdr" id="gp-even" style="margin-top:6px"></div><div class="gp-row-label">${L('Pins 2, 4 … 26', 'Piny 2, 4 … 26')}</div></div></div>
-  <div class="card">${h3('cog-outline', L('Pin settings', 'Nastavení pinu'))}<div id="gp-edit" class="muted">${L('Choose a free pin on the header.', 'Zvolte volný pin na konektoru.')}</div></div>
-  <div class="card">${h3('tune-variant', L('Configured pins', 'Nastavené piny'))}<div id="gp-pins" class="muted">${L('Loading…', 'Načítám…')}</div></div>
+  <div class="card wide">${h3('tune-variant', L('Configured pins', 'Nastavené piny'))}<div id="gp-pins" class="muted">${L('Loading…', 'Načítám…')}</div></div>
+  <div class="card" id="gp-edit-card">${h3('cog-outline', L('Pin settings', 'Nastavení pinu'))}<div id="gp-edit" class="muted">${L('Choose a free pin on the header.', 'Zvolte volný pin na konektoru.')}</div></div>
 </div>`;
 
-const GP_MODES = () => ({ off: L('Off', 'Vypnuto'), input: L('Input', 'Vstup'), output: L('Output', 'Výstup'), pwm: 'PWM', counter: L('Pulse counter', 'Čítač pulzů') });
+const GP_MODES = () => ({ off: L('Off', 'Vypnuto'), input: L('Input', 'Vstup'), output: L('Output', 'Výstup'), pwm: 'PWM', counter: L('Pulse counter', 'Čítač pulzů'),
+  uart: L('UART-TCP bridge', 'Most UART–TCP'), i2c: L('I2C bus 2', 'Sběrnice I2C 2'), onewire: L('1-Wire DS18B20', '1-Wire DS18B20'), ws2812: L('LED strip WS2812', 'LED pásek WS2812') });
+/* the configured pin using g as its second pin (UART RX, I2C SCL) */
+const gpOwner = g => gp?.pins.find(p => p.mode !== 'off' && (p.rx === g && p.mode === 'uart' || p.scl === g && p.mode === 'i2c'));
+const gpHex = c => '#' + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, '0')).join('');
 let gp = null, gpSel = null, gpTimer = null, gpShape = '';
 const gpPin = g => gp?.pins.find(p => p.gpio === g);
 /* what a pin carries on the board besides JP1 (the API's note, in the page's language) */
@@ -4896,13 +4906,22 @@ function gpValue(p) {
   if (!p.active) return pill('bad', L('off', 'vypnuto'));
   if (p.mode === 'pwm') return `${p.duty} %`;
   if (p.mode === 'counter') return `${p.count} · ${p.frequency} Hz`;
+  if (p.mode === 'uart') return `${p.client ? pill('ok', esc(p.client)) : pill('', L('no client', 'bez klienta'))} <span class="muted" data-notr>:${p.port} · RX ${fmtBytes(p.rx_bytes)} · TX ${fmtBytes(p.tx_bytes)}</span>`;
+  if (p.mode === 'i2c') return `<a href="#system/hw">${L('Sensors: System › Hardware', 'Senzory: Systém › Hardware')}</a>`;
+  if (p.mode === 'onewire') {
+    const t = Object.entries(p.temperatures || {});
+    return !p.present && !t.length ? pill('warn', L('no device', 'žádné zařízení')) : t.map(([rom, v]) => `<span data-notr title="${rom}">${rom.slice(-4)}: ${v === null ? '–' : v.toFixed(1) + ' °C'}</span>`).join('<br>');
+  }
+  if (p.mode === 'ws2812') return `<span style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;background:${gpHex(p.light.color)};opacity:${p.light.state === 'ON' ? 1 : .25}"></span> ${p.light.state === 'ON' ? Math.round(p.light.brightness / 2.55) + ' %' : L('off', 'vypnuto')}${p.light.effect !== 'none' ? ' · ' + esc(p.light.effect) : ''}`;
   return p.level ? pill('ok', '1') : pill('', '0');
 }
 function gpCell(h) {
+  const own = h.kind === 'gpio' ? gpOwner(h.gpio) : null;
+  if (own) return `<div class="gp-pin gp-cfg" data-gp="${own.gpio}" title="GPIO${own.gpio}"><b>${h.pin}</b><span data-notr>${esc(h.label)}</span><span>${own.mode === 'uart' ? 'UART RX' : 'I2C SCL'}</span></div>`;
   const p = h.gpio !== undefined ? gpPin(h.gpio) : null;
   const cls = h.kind !== 'gpio' ? `gp-${h.kind}` : p && p.mode !== 'off' ? `gp-cfg${p.error ? ' gp-err' : ''}` : h.free ? 'gp-free' : 'gp-res';
   const title = h.reserved || gpNote(h) || (p?.error) || '';
-  const val = p && p.mode !== 'off' ? `<span class="gp-v" data-gpv="${h.gpio}">${p.active ? (p.mode === 'pwm' ? p.duty + ' %' : p.mode === 'counter' ? p.count : p.level) : '×'}</span>` : '';
+  const val = p && p.mode !== 'off' ? `<span class="gp-v" data-gpv="${h.gpio}">${gpShort(p)}</span>` : '';
   const what = h.kind === 'gpio' && !h.free && !p ? ic('lock-outline') : p && p.mode !== 'off' ? esc(GP_MODES()[p.mode]) : '';
   return `<div class="gp-pin ${cls} ${gpSel === h.gpio && h.kind === 'gpio' ? 'gp-sel' : ''}" ${h.kind === 'gpio' && (h.free || p) ? `data-gp="${h.gpio}"` : ''} title="${esc(title)}">
     <b>${h.pin}</b><span data-notr>${esc(h.label)}</span>${what ? `<span>${what}</span>` : ''}${val}</div>`;
@@ -4920,13 +4939,21 @@ function gpRender() {
       <td>${!p.active ? '' : p.mode === 'output' ? `<label><input type="checkbox" data-gp-level="${p.gpio}" ${p.level ? 'checked' : ''} ${ro}> ${L('On', 'Zapnuto')}</label>
           <button class="btn" data-gp-pulse="${p.gpio}" ${ro}>${L('Pulse 1 s', 'Pulz 1 s')}</button>`
         : p.mode === 'pwm' ? `<input type="range" min="0" max="100" step="0.5" value="${p.duty}" data-gp-duty="${p.gpio}" ${ro} style="width:140px">`
-        : p.mode === 'counter' ? `<button class="btn" data-gp-reset="${p.gpio}" ${ro}>${L('Reset', 'Vynulovat')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+        : p.mode === 'counter' ? `<button class="btn" data-gp-reset="${p.gpio}" ${ro}>${L('Reset', 'Vynulovat')}</button>`
+        : p.mode === 'onewire' ? `<button class="btn" data-gp-rescan="${p.gpio}" ${ro}>${ic('magnify-scan')}${L('Search', 'Hledat')}</button>`
+        : p.mode === 'ws2812' ? `<label><input type="checkbox" data-gp-on="${p.gpio}" ${p.light.state === 'ON' ? 'checked' : ''} ${ro}> ${L('On', 'Zapnuto')}</label>
+          <input type="color" data-gp-color="${p.gpio}" value="${gpHex(p.light.color)}" ${ro}>
+          <input type="range" min="1" max="255" value="${p.light.brightness}" data-gp-bri="${p.gpio}" ${ro} style="width:110px">
+          <select data-gp-fx="${p.gpio}" ${ro}>${['none', 'rainbow'].map(f => `<option value="${f}" ${f === p.light.effect ? 'selected' : ''}>${f === 'none' ? L('Colour', 'Barva') : L('Rainbow', 'Duha')}</option>`).join('')}</select>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
 }
+/* the value on the header drawing */
+const gpShort = p => !p.active ? '×' : p.mode === 'pwm' ? p.duty + ' %' : p.mode === 'counter' ? p.count : p.mode === 'uart' ? 'TX' : p.mode === 'i2c' ? 'SDA'
+  : p.mode === 'ws2812' ? (p.light.state === 'ON' ? '●' : '○') : p.mode === 'onewire' ? Object.keys(p.temperatures || {}).length + '×' : p.level;
 /* live values without touching the controls being used */
 function gpUpdate() {
   for (const p of gp.pins) {
     const v = $(`[data-gpv="${p.gpio}"]`);
-    if (v && p.active) v.textContent = p.mode === 'pwm' ? p.duty + ' %' : p.mode === 'counter' ? p.count : p.level;
+    if (v && p.active) v.textContent = gpShort(p);
     const cell = $(`[data-gpval="${p.gpio}"]`);
     if (cell && p.active) cell.innerHTML = gpValue(p);
     const box = $(`[data-gp-level="${p.gpio}"]`);
@@ -4936,14 +4963,17 @@ function gpUpdate() {
 async function loadGpio(first) {
   if (route() !== 'system/gpio') { clearInterval(gpTimer); gpTimer = null; return; }
   try { gp = await api('/api/gpio'); } catch (e) { if ($('#gp-pins')) $('#gp-pins').textContent = e.message; return; }
-  const shape = JSON.stringify([gp.header.map(h => [h.free, h.reserved]), gp.pins.map(p => [p.gpio, p.mode, p.name, p.active, p.error])]);
+  const shape = JSON.stringify([gp.header.map(h => [h.free, h.reserved]), gp.pins.map(p => [p.gpio, p.mode, p.name, p.active, p.error, Object.keys(p.temperatures || {})])]);
   if (first || shape !== gpShape) { gpShape = shape; gpRender(); } else gpUpdate();
   if (first && gpSel !== null) gpEdit(gpSel);
   if (!gpTimer) gpTimer = setInterval(loadGpio, 1000);
 }
-function gpEdit(g) {
+function gpEdit(g, scroll) {
   gpSel = g;
   const h = gp.header.find(x => x.gpio === g && x.kind === 'gpio'), p = gpPin(g) || { gpio: g, mode: 'output', name: '', expose: 'integration', pull: 'none', restore: 'off', freq: 1000, edge: 'rising', debounce_ms: 20, filter_ns: 0 };
+  /* free pins for the second pin of a UART or I2C bus */
+  const second = gp.header.filter(x => x.kind === 'gpio' && x.gpio !== g && (x.free && !gpPin(x.gpio) && !(gpOwner(x.gpio) && gpOwner(x.gpio).gpio !== g) || x.gpio === p.rx || x.gpio === p.scl))
+    .map(x => [String(x.gpio), `GPIO${x.gpio} (JP1 ${x.pin})`]);
   const ro = perm('system/hw') < 2 ? 'disabled' : '';
   const sel = (id, opts, v) => `<select id="${id}" ${ro}>${opts.map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
   const f = (label, html, modes) => `<label class="field" data-gp-for="${modes}"><span>${label}</span>${html}</label>`;
@@ -4957,31 +4987,51 @@ function gpEdit(g) {
     ${f(L('Frequency (Hz)', 'Frekvence (Hz)'), `<input type="number" id="gp-freq" min="1" max="1000000" value="${p.freq ?? 1000}" ${ro}>`, 'pwm')}
     ${f(L('Count edges', 'Počítat hrany'), sel('gp-edge', [['rising', L('Rising', 'Náběžné')], ['falling', L('Falling', 'Sestupné')], ['both', L('Both', 'Obě')]], p.edge), 'counter')}
     ${f(L('Glitch filter (ns)', 'Filtr zákmitů (ns)'), `<input type="number" id="gp-filter" min="0" max="10000" value="${p.filter_ns ?? 0}" ${ro}>`, 'counter')}
-    ${f(L('After a restart', 'Po restartu'), sel('gp-restore', [['off', L('Off', 'Vypnuto')], ['on', L('On', 'Zapnuto')], ['last', L('Last state', 'Poslední stav')]], p.restore), 'output pwm')}
-    ${f(L('Home Assistant', 'Home Assistant'), sel('gp-expose', [['integration', L('Integration', 'Integrace')], ['mqtt', 'MQTT'], ['both', L('Integration and MQTT', 'Integrace a MQTT')], ['none', L('Not shown', 'Nezobrazovat')]], p.expose), 'input output pwm counter')}
+    ${f(L('After a restart', 'Po restartu'), sel('gp-restore', [['off', L('Off', 'Vypnuto')], ['on', L('On', 'Zapnuto')], ['last', L('Last state', 'Poslední stav')]], p.restore), 'output pwm ws2812')}
+    ${f(L('RX pin (this pin is TX)', 'Pin RX (tento pin je TX)'), sel('gp-rx', second, String(p.rx ?? second[0]?.[0])), 'uart')}
+    ${f(L('SCL pin (this pin is SDA)', 'Pin SCL (tento pin je SDA)'), sel('gp-scl', second, String(p.scl ?? second[0]?.[0])), 'i2c')}
+    ${f(L('Baud rate', 'Rychlost (Bd)'), `<input type="number" id="gp-baud" min="300" max="3000000" value="${p.baud ?? 115200}" ${ro}>`, 'uart')}
+    ${f(L('Frame', 'Rámec'), sel('gp-frame', ['8N1', '8E1', '8O1', '8N2', '7E1', '7O1', '7N2'].map(x => [x, x]), `${p.data_bits ?? 8}${(p.parity ?? 'none')[0].toUpperCase()}${p.stop_bits ?? 1}`), 'uart')}
+    ${f(L('TCP port', 'TCP port'), `<input type="number" id="gp-port" min="1024" max="65535" value="${p.port ?? 6639}" ${ro}>`, 'uart')}
+    ${f(L('Bus speed', 'Rychlost sběrnice'), sel('gp-hz', [['100000', '100 kHz'], ['400000', '400 kHz']], String(p.hz ?? 100000)), 'i2c')}
+    ${f(L('Read every (s)', 'Číst každých (s)'), `<input type="number" id="gp-interval" min="5" max="3600" value="${p.interval_s ?? 30}" ${ro}>`, 'onewire')}
+    ${f(L('LEDs', 'Počet LED'), `<input type="number" id="gp-leds" min="1" max="512" value="${p.leds ?? 30}" ${ro}>`, 'ws2812')}
+    ${f(L('Colour order', 'Pořadí barev'), sel('gp-order', ['grb', 'rgb', 'brg', 'rbg'].map(x => [x, x.toUpperCase()]), p.order ?? 'grb'), 'ws2812')}
+    <p class="muted" data-gp-for="uart">${L('One TCP client at a time (a new one replaces it); bytes pass unchanged. 3.3 V levels: an RS232 device needs a converter.', 'Jeden TCP klient najednou (nový ho nahradí); bajty procházejí beze změny. Úrovně 3,3 V: zařízení RS232 potřebuje převodník.')}</p>
+    <p class="muted" data-gp-for="i2c">${L('Sensors on this bus are found and set up under System › Hardware (bus 2). Pull-ups 2.2-4.7 kΩ to 3.3 V for wires longer than a few cm.', 'Senzory na této sběrnici se najdou a nastaví v Systém › Hardware (sběrnice 2). Pull-upy 2,2–4,7 kΩ na 3,3 V pro vodiče delší než pár cm.')}</p>
+    <p class="muted" data-gp-for="onewire">${L('DS18B20, DS1822, DS18S20; a 4.7 kΩ pull-up to 3.3 V is needed. Each sensor becomes its own temperature in Home Assistant.', 'DS18B20, DS1822, DS18S20; je potřeba pull-up 4,7 kΩ na 3,3 V. Každé čidlo bude v Home Assistant vlastní teplota.')}</p>
+    <p class="muted" data-gp-for="ws2812">${L('Data through a level shifter (74AHCT125) or a first LED at a lower supply; the strip needs its own 5 V supply.', 'Data přes převodník úrovně (74AHCT125) nebo první LED na nižším napájení; pásek potřebuje vlastní napájení 5 V.')}</p>
+    ${f(L('Home Assistant', 'Home Assistant'), sel('gp-expose', [['integration', L('Integration', 'Integrace')], ['mqtt', 'MQTT'], ['both', L('Integration and MQTT', 'Integrace a MQTT')], ['none', L('Not shown', 'Nezobrazovat')]], p.expose), 'input output pwm counter onewire ws2812')}
     <div class="row" data-gp-for="input output pwm counter"><label><input type="checkbox" id="gp-invert" ${p.invert ? 'checked' : ''} ${ro}> ${L('Inverted (active low)', 'Invertovaný (aktivní v nule)')}</label></div>
     <div class="row" data-gp-for="output"><label><input type="checkbox" id="gp-od" ${p.open_drain ? 'checked' : ''} ${ro}> ${L('Open drain', 'Otevřený kolektor (open drain)')}</label></div>
     <div class="row"><button class="btn primary" id="gp-save" ${ro}>${ic('check')}${L('Save', 'Uložit')}</button>
       ${gpPin(g) ? `<button class="btn" id="gp-remove" ${ro}>${ic('close')}${L('Free the pin', 'Uvolnit pin')}</button>` : ''}</div>`;
   gpFields();
   gpRender();
+  if (scroll) $('#gp-edit-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 function gpFields() {
   const m = $('#gp-mode')?.value;
   document.querySelectorAll('#gp-edit [data-gp-for]').forEach(e => e.classList.toggle('hidden', e.dataset.gpFor !== 'all' && !e.dataset.gpFor.split(' ').includes(m)));
 }
 document.addEventListener('change', e => { if (e.target.id === 'gp-mode') gpFields(); });
-const gpList = () => gp.pins.filter(p => p.mode !== 'off').map(({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns }) =>
-  ({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns }));
+const gpList = () => gp.pins.filter(p => p.mode !== 'off').map(({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns, rx, baud, data_bits, parity, stop_bits, port, scl, hz, interval_s, leds, order }) =>
+  ({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns, rx, baud, data_bits, parity, stop_bits, port, scl, hz, interval_s, leds, order }));
 document.addEventListener('click', async e => {
-  const t = e.target.closest('[data-gp], #gp-save, #gp-remove, [data-gp-pulse], [data-gp-reset]');
+  const t = e.target.closest('[data-gp], #gp-save, #gp-remove, [data-gp-pulse], [data-gp-reset], [data-gp-rescan]');
   if (!t) return;
   try {
-    if (t.dataset.gp) gpEdit(+t.dataset.gp);
+    if (t.dataset.gp) gpEdit(+t.dataset.gp, true);
     else if (t.id === 'gp-save' || t.id === 'gp-remove') {
       const pin = { gpio: gpSel, mode: $('#gp-mode').value, name: $('#gp-name').value.trim(), expose: $('#gp-expose').value, invert: $('#gp-invert').checked,
         pull: $('#gp-pull').value, debounce_ms: +$('#gp-debounce').value, open_drain: $('#gp-od').checked, restore: $('#gp-restore').value,
         freq: +$('#gp-freq').value, edge: $('#gp-edge').value, filter_ns: +$('#gp-filter').value };
+      const fr = $('#gp-frame').value;
+      if (pin.mode === 'uart') Object.assign(pin, { rx: +$('#gp-rx').value, baud: +$('#gp-baud').value, port: +$('#gp-port').value,
+        data_bits: +fr[0], parity: { N: 'none', E: 'even', O: 'odd' }[fr[1]], stop_bits: +fr[2] });
+      if (pin.mode === 'i2c') Object.assign(pin, { scl: +$('#gp-scl').value, hz: +$('#gp-hz').value });
+      if (pin.mode === 'onewire') pin.interval_s = +$('#gp-interval').value;
+      if (pin.mode === 'ws2812') Object.assign(pin, { leds: +$('#gp-leds').value, order: $('#gp-order').value });
       const pins = gpList().filter(p => p.gpio !== gpSel);
       if (t.id === 'gp-save' && pin.mode !== 'off') pins.push(pin);
       gp = await api('/api/gpio', { method: 'PUT', json: { pins } });
@@ -4992,6 +5042,7 @@ document.addEventListener('click', async e => {
       if (now?.error) toast(L('Pin off: ', 'Pin vypnutý: ') + now.error);
     } else if (t.dataset.gpPulse) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpPulse, pulse_ms: 1000 } });
     else if (t.dataset.gpReset) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpReset, reset: true } });
+    else if (t.dataset.gpRescan) { await api('/api/gpio/set', { json: { gpio: +t.dataset.gpRescan, rescan: true } }); toast(L('Searching the bus…', 'Hledám na sběrnici…')); }
   } catch (err) {
     toast(L('Error: ', 'Chyba: ') + err.message);
   }
@@ -5001,6 +5052,10 @@ document.addEventListener('change', async e => {
   try {
     if (t.dataset.gpLevel) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpLevel, level: t.checked ? 1 : 0 } });
     else if (t.dataset.gpDuty) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpDuty, duty: +t.value } });
+    else if (t.dataset.gpOn) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpOn, on: t.checked } });
+    else if (t.dataset.gpColor) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpColor, color: [1, 3, 5].map(i => parseInt(t.value.slice(i, i + 2), 16)) } });
+    else if (t.dataset.gpBri) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpBri, brightness: +t.value } });
+    else if (t.dataset.gpFx) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpFx, effect: t.value } });
   } catch (err) {
     toast(L('Error: ', 'Chyba: ') + err.message);
   }

@@ -337,7 +337,7 @@ void gw_mqtt_entity(gw_mqtt_group_t group, const char *component, const char *ob
  * "device" stays that device, connected via the gateway. */
 void gw_mqtt_discovery(gw_mqtt_group_t group, const char *component, const char *object_id, cJSON *cfg);
 /* Commands below the base topic (filter with + levels, e.g. "modbus/+/+/set"); fn gets the topic below the
- * base and the payload (up to 63 bytes) in the MQTT task: it must not block. */
+ * base and the payload (up to 191 bytes) in the MQTT task: it must not block. */
 void gw_mqtt_add_command(const char *filter, void (*fn)(const char *suffix, const char *payload));
 bool gw_mqtt_connected(void);
 /* "off" (not configured or disabled), "connected" or "disconnected" */

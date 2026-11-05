@@ -208,5 +208,6 @@ Rozhodnutí: piny rádia B volné, když rádio B nemá roli; funkce vstup, výs
 - [ ] Ověřit piny rádia B jako GPIO (rádio B bez role a bez C5)
 - [x] G3 Zařízení „<host> GPIO“ v integraci (1.7.0) a MQTT (skupina `gpio`, příkazy set/duty/PULSE); TC53, testy integrace
 - [ ] Nasadit integraci 1.7.0 do HA (po vydání firmwaru s GPIO)
-- [ ] G4 UART-TCP most (UART4), I2C sběrnice 2, 1-Wire DS18B20, WS2812
+- [x] G4 UART-TCP most (UART4), I2C sběrnice 2 (senzory `bus: 2`), 1-Wire DS18B20, WS2812 (barva, jas, duha); TC54, rozšířený TC53, testy integrace
+- [ ] G4 na skutečném hardwaru: DS18B20, pásek WS2812, zařízení na UART, senzor na sběrnici 2
 - [ ] G5 HW testy s propojkou JP1 9–11, dokumentace

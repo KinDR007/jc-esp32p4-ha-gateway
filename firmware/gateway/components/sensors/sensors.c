@@ -38,6 +38,7 @@ static const char *TAG = "sensors";
 #define RETRY_S 60
 
 typedef struct {
+    uint8_t bus; /* 0 the board's bus, 1 the second bus on JP1 (gpio_ctl) */
     uint8_t addr;
     const sdrv_t *drv;
     char chip[16]; /* the exact chip found (BME688 for the bme680 driver) */
@@ -55,6 +56,7 @@ typedef struct {
 } sensor_t;
 
 typedef struct {
+    uint8_t bus;
     uint8_t addr;
     uint8_t ncand;
     sdrv_cand_t cand[MAX_CANDS];
@@ -67,7 +69,15 @@ static found_t *s_found; /* last scan, PSRAM, MAX_FOUND */
 static int s_nfound = -1; /* -1: no scan yet */
 static int64_t s_scan_time, s_scan_uptime_us;
 static SemaphoreHandle_t s_lock;
-static uint32_t s_published[128]; /* per address: quantities with an MQTT discovery config out */
+static uint32_t s_published[2][128]; /* per bus and address: quantities with an MQTT discovery config out */
+static i2c_master_bus_handle_t s_bus2; /* second bus on free pins of JP1, NULL while not set up */
+static int s_bus2_sda = -1, s_bus2_scl = -1;
+static uint32_t s_bus2_hz = BUS_HZ;
+
+static i2c_master_bus_handle_t bus_handle(int bus)
+{
+    return bus ? s_bus2 : gw_i2c_bus();
+}
 
 /* ---------------------------------------------------------------- bus */
 
@@ -90,15 +100,15 @@ static void bus_delay(void *ctx, int ms)
     vTaskDelay(pdMS_TO_TICKS(ms) ? pdMS_TO_TICKS(ms) : 1);
 }
 
-static i2c_master_dev_handle_t dev_add(uint8_t addr)
+static i2c_master_dev_handle_t dev_add(int bus, uint8_t addr)
 {
     i2c_device_config_t cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = addr,
-        .scl_speed_hz = BUS_HZ,
+        .scl_speed_hz = bus ? s_bus2_hz : BUS_HZ,
     };
     i2c_master_dev_handle_t dev = NULL;
-    if (!gw_i2c_bus() || i2c_master_bus_add_device(gw_i2c_bus(), &cfg, &dev) != ESP_OK) {
+    if (!bus_handle(bus) || i2c_master_bus_add_device(bus_handle(bus), &cfg, &dev) != ESP_OK) {
         return NULL;
     }
     return dev;
@@ -122,10 +132,10 @@ static void release(sensor_t *s)
     s->ready = false;
 }
 
-static sensor_t *find(uint8_t addr)
+static sensor_t *find(int bus, uint8_t addr)
 {
     for (int i = 0; i < s_count; i++) {
-        if (s_sens[i].addr == addr) {
+        if (s_sens[i].bus == bus && s_sens[i].addr == addr) {
             return &s_sens[i];
         }
     }
@@ -140,6 +150,9 @@ static void save(void)
     for (int i = 0; i < s_count; i++) {
         sensor_t *s = &s_sens[i];
         cJSON *j = cJSON_CreateObject();
+        if (s->bus) {
+            cJSON_AddNumberToObject(j, "bus", 2);
+        }
         cJSON_AddNumberToObject(j, "addr", s->addr);
         cJSON_AddStringToObject(j, "type", s->drv->id);
         cJSON_AddStringToObject(j, "chip", s->chip);
@@ -169,6 +182,7 @@ static size_t utf8_chars(const char *s)
 static const char *parse_sensor(const cJSON *j, sensor_t *out)
 {
     const cJSON *addr = cJSON_GetObjectItem(j, "addr");
+    const cJSON *bus = cJSON_GetObjectItem(j, "bus");
     const char *type = GW_JSON_STR(j, "type");
     const char *name = GW_JSON_STR(j, "name");
     const char *chip = GW_JSON_STR(j, "chip");
@@ -177,7 +191,10 @@ static const char *parse_sensor(const cJSON *j, sensor_t *out)
     if (!cJSON_IsNumber(addr) || addr->valueint < 0x08 || addr->valueint > 0x77) {
         return "addr: 7-bit address 0x08-0x77";
     }
-    if (addr->valueint == GW_I2C_CODEC_ADDR) {
+    if (bus && (!cJSON_IsNumber(bus) || (bus->valueint != 1 && bus->valueint != 2))) {
+        return "bus: 1 (the board's) or 2 (on JP1, System › GPIO)";
+    }
+    if (addr->valueint == GW_I2C_CODEC_ADDR && !(bus && bus->valueint == 2)) {
         return "addr 0x18 is the audio codec of the board";
     }
     const sdrv_t *drv = type ? sdrv_find(type) : NULL;
@@ -194,6 +211,7 @@ static const char *parse_sensor(const cJSON *j, sensor_t *out)
         return "expose, enabled: true or false";
     }
     memset(out, 0, sizeof(*out));
+    out->bus = bus && bus->valueint == 2;
     out->addr = (uint8_t)addr->valueint;
     out->drv = drv;
     snprintf(out->chip, sizeof(out->chip), "%s", chip && chip[0] && strlen(chip) < sizeof(out->chip) ? chip : drv->label);
@@ -211,7 +229,7 @@ static void apply(sensor_t *list, int n)
         bool kept = false;
         for (int k = 0; k < n; k++) {
             sensor_t *nw = &list[k];
-            if (nw->addr == old->addr && nw->drv == old->drv && old->enabled && nw->enabled) {
+            if (nw->bus == old->bus && nw->addr == old->addr && nw->drv == old->drv && old->enabled && nw->enabled) {
                 nw->dev = old->dev, nw->state = old->state, nw->ready = old->ready;
                 nw->retry_us = old->retry_us, nw->next_us = old->next_us, nw->last_us = old->last_us;
                 nw->val = old->val, nw->reads = old->reads, nw->errors = old->errors, nw->fails = old->fails;
@@ -242,7 +260,7 @@ static void load(void)
     const cJSON *j;
     cJSON_ArrayForEach(j, cJSON_GetObjectItem(root, "sensors"))
     {
-        if (s_count < MAX_SENSORS && !parse_sensor(j, &s_sens[s_count]) && !find(s_sens[s_count].addr)) {
+        if (s_count < MAX_SENSORS && !parse_sensor(j, &s_sens[s_count]) && !find(s_sens[s_count].bus, s_sens[s_count].addr)) {
             s_count++;
         }
     }
@@ -262,7 +280,7 @@ static void fail(sensor_t *s, int64_t now, const char *what, int err)
     s->errors++;
     snprintf(s->error, sizeof(s->error), "%s: %s", what, err == SDRV_EDATA ? "invalid data (CRC or range)" : "no answer");
     if (++s->fails >= FAILS_TO_RESTART || !s->ready) {
-        ESP_LOGW(TAG, "0x%02x %s: %s, again in %d s", s->addr, s->chip, s->error, RETRY_S);
+        ESP_LOGW(TAG, "%s0x%02x %s: %s, again in %d s", s->bus ? "bus 2 " : "", s->addr, s->chip, s->error, RETRY_S);
         s->ready = false;
         s->val.have = 0;
         s->retry_us = now + (int64_t)RETRY_S * 1000000;
@@ -278,7 +296,7 @@ static void service(sensor_t *s, int64_t now)
         if (now < s->retry_us) {
             return;
         }
-        if (!s->dev && !(s->dev = dev_add(s->addr))) {
+        if (!s->dev && !(s->dev = dev_add(s->bus, s->addr))) {
             fail(s, now, "bus", SDRV_EBUS);
             return;
         }
@@ -293,7 +311,7 @@ static void service(sensor_t *s, int64_t now)
         s->ready = true;
         s->fails = 0;
         s->next_us = now;
-        ESP_LOGI(TAG, "0x%02x %s started", s->addr, s->chip);
+        ESP_LOGI(TAG, "%s0x%02x %s started", s->bus ? "bus 2 " : "", s->addr, s->chip);
     }
     if (now < s->next_us) {
         return;
@@ -342,7 +360,7 @@ static void task(void *arg)
 
 /* ---------------------------------------------------------------- scan */
 
-/* Probes the bus, identifies the chips not configured yet and adds those recognised without doubt.
+/* Probes the buses, identifies the chips not configured yet and adds those recognised without doubt.
  * Under s_lock. Returns how many were added (their addresses in added). */
 static int scan(uint8_t *added, int max_added)
 {
@@ -351,41 +369,42 @@ static int scan(uint8_t *added, int max_added)
     s_scan_uptime_us = esp_timer_get_time();
     time_t t = time(NULL);
     s_scan_time = t > 1700000000 ? (int64_t)t : 0;
-    if (!gw_i2c_bus()) {
-        return 0;
-    }
     /* identification reads registers of chips that may not have them: NACKs are expected */
     esp_log_level_t level = esp_log_level_get("i2c.master");
     esp_log_level_set("i2c.master", ESP_LOG_NONE);
-    for (uint8_t addr = 0x08; addr <= 0x77 && s_nfound < MAX_FOUND; addr++) {
-        if (i2c_master_probe(gw_i2c_bus(), addr, 20) != ESP_OK) {
-            continue;
-        }
-        found_t *f = &s_found[s_nfound++];
-        memset(f, 0, sizeof(*f));
-        f->addr = addr;
-        if (addr == GW_I2C_CODEC_ADDR || find(addr)) {
-            continue; /* the codec, or a sensor already running: not disturbed */
-        }
-        i2c_master_dev_handle_t dev = dev_add(addr);
-        if (!dev) {
-            continue;
-        }
-        sbus_t b = sbus(dev, addr);
-        f->ncand = (uint8_t)sdrv_identify_all(&b, f->cand, MAX_CANDS);
-        i2c_master_bus_rm_device(dev);
-        const sdrv_cand_t *pick = sdrv_pick(f->cand, f->ncand);
-        if (pick && s_count < MAX_SENSORS) {
-            sensor_t *s = &s_sens[s_count++];
-            memset(s, 0, sizeof(*s));
-            s->addr = addr;
-            s->drv = pick->drv;
-            snprintf(s->chip, sizeof(s->chip), "%s", pick->label);
-            snprintf(s->name, sizeof(s->name), "%s", pick->label);
-            s->expose = true;
-            s->enabled = true;
-            if (n_added < max_added) {
-                added[n_added++] = addr;
+    for (int bus = 0; bus < 2; bus++) {
+        for (uint8_t addr = 0x08; bus_handle(bus) && addr <= 0x77 && s_nfound < MAX_FOUND; addr++) {
+            if (i2c_master_probe(bus_handle(bus), addr, 20) != ESP_OK) {
+                continue;
+            }
+            found_t *f = &s_found[s_nfound++];
+            memset(f, 0, sizeof(*f));
+            f->bus = bus;
+            f->addr = addr;
+            if ((!bus && addr == GW_I2C_CODEC_ADDR) || find(bus, addr)) {
+                continue; /* the codec, or a sensor already running: not disturbed */
+            }
+            i2c_master_dev_handle_t dev = dev_add(bus, addr);
+            if (!dev) {
+                continue;
+            }
+            sbus_t b = sbus(dev, addr);
+            f->ncand = (uint8_t)sdrv_identify_all(&b, f->cand, MAX_CANDS);
+            i2c_master_bus_rm_device(dev);
+            const sdrv_cand_t *pick = sdrv_pick(f->cand, f->ncand);
+            if (pick && s_count < MAX_SENSORS) {
+                sensor_t *s = &s_sens[s_count++];
+                memset(s, 0, sizeof(*s));
+                s->bus = bus;
+                s->addr = addr;
+                s->drv = pick->drv;
+                snprintf(s->chip, sizeof(s->chip), "%s", pick->label);
+                snprintf(s->name, sizeof(s->name), "%s", pick->label);
+                s->expose = true;
+                s->enabled = true;
+                if (n_added < max_added) {
+                    added[n_added++] = addr;
+                }
             }
         }
     }
@@ -441,6 +460,12 @@ static cJSON *status_json(void)
     cJSON_AddNumberToObject(bus, "sda", GW_I2C_SDA);
     cJSON_AddNumberToObject(bus, "scl", GW_I2C_SCL);
     cJSON_AddNumberToObject(bus, "khz", BUS_HZ / 1000);
+    if (s_bus2) {
+        cJSON *b2 = cJSON_AddObjectToObject(root, "bus2");
+        cJSON_AddNumberToObject(b2, "sda", s_bus2_sda);
+        cJSON_AddNumberToObject(b2, "scl", s_bus2_scl);
+        cJSON_AddNumberToObject(b2, "khz", s_bus2_hz / 1000);
+    }
     cJSON_AddNumberToObject(root, "interval_s", s_interval);
     cJSON_AddNumberToObject(root, "max_sensors", MAX_SENSORS);
 
@@ -448,9 +473,10 @@ static cJSON *status_json(void)
     for (int i = 0; i < s_count; i++) {
         const sensor_t *s = &s_sens[i];
         cJSON *j = cJSON_CreateObject();
-        char id[8];
-        snprintf(id, sizeof(id), "i2c_%02x", s->addr);
+        char id[12];
+        snprintf(id, sizeof(id), s->bus ? "i2c2_%02x" : "i2c_%02x", s->addr);
         cJSON_AddStringToObject(j, "id", id);
+        cJSON_AddNumberToObject(j, "bus", s->bus + 1);
         cJSON_AddNumberToObject(j, "addr", s->addr);
         cJSON_AddStringToObject(j, "type", s->drv->id);
         cJSON_AddStringToObject(j, "chip", s->chip);
@@ -478,9 +504,10 @@ static cJSON *status_json(void)
     for (int i = 0; i < s_nfound; i++) {
         const found_t *f = &s_found[i];
         cJSON *d = cJSON_CreateObject();
+        cJSON_AddNumberToObject(d, "bus", f->bus + 1);
         cJSON_AddNumberToObject(d, "addr", f->addr);
-        cJSON_AddBoolToObject(d, "onboard", f->addr == GW_I2C_CODEC_ADDR);
-        cJSON_AddBoolToObject(d, "configured", find(f->addr) != NULL);
+        cJSON_AddBoolToObject(d, "onboard", !f->bus && f->addr == GW_I2C_CODEC_ADDR);
+        cJSON_AddBoolToObject(d, "configured", find(f->bus, f->addr) != NULL);
         const char *hint = sdrv_hint(f->addr);
         cJSON_AddStringToObject(d, "hint", hint ? hint : "");
         cJSON *cands = cJSON_AddArrayToObject(d, "candidates");
@@ -562,8 +589,8 @@ static esp_err_t sensors_put(httpd_req_t *req)
         {
             const char *why = parsed ? parse_sensor(j, &parsed[n]) : "out of memory";
             for (int k = 0; !why && k < n; k++) {
-                if (parsed[k].addr == parsed[n].addr) {
-                    why = "addr: used twice";
+                if (parsed[k].bus == parsed[n].bus && parsed[k].addr == parsed[n].addr) {
+                    why = "addr: used twice on the bus";
                 }
             }
             if (why) {
@@ -611,9 +638,9 @@ static esp_err_t scan_post(httpd_req_t *req)
 
 /* ---------------------------------------------------------------- MQTT */
 
-static void object_id(char *out, size_t len, uint8_t addr, int q)
+static void object_id(char *out, size_t len, int bus, uint8_t addr, int q)
 {
-    snprintf(out, len, "i2c_%02x_%s", addr, sdrv_quantity[q].key);
+    snprintf(out, len, bus ? "i2c2_%02x_%s" : "i2c_%02x_%s", addr, sdrv_quantity[q].key);
 }
 
 /* Runs in the MQTT task (connect) and in the publish task (gw_mqtt_rediscover), possibly both at once:
@@ -621,12 +648,12 @@ static void object_id(char *out, size_t len, uint8_t addr, int q)
 static void mqtt_discovery(void)
 {
     typedef struct {
-        uint8_t addr;
+        uint8_t bus, addr;
         uint32_t quantities;
         char name[SENSOR_NAME_MAX * 3 + 1];
     } entry_t;
     entry_t *list = heap_caps_calloc(MAX_SENSORS, sizeof(entry_t), MALLOC_CAP_SPIRAM);
-    uint32_t *gone = heap_caps_calloc(128, sizeof(uint32_t), MALLOC_CAP_SPIRAM);
+    uint32_t (*gone)[128] = heap_caps_calloc(2, sizeof(*gone), MALLOC_CAP_SPIRAM);
     char oid[40], buf[160], tpl[96];
     int n = 0;
     if (!list || !gone) {
@@ -638,25 +665,30 @@ static void mqtt_discovery(void)
     for (int i = 0; i < s_count; i++) {
         const sensor_t *s = &s_sens[i];
         if (s->expose && s->enabled) {
+            list[n].bus = s->bus;
             list[n].addr = s->addr;
             list[n].quantities = s->drv->quantities;
             memcpy(list[n].name, s->name, sizeof(list[n].name));
-            gone[s->addr] = s->drv->quantities; /* wanted, for the moment */
+            gone[s->bus][s->addr] = s->drv->quantities; /* wanted, for the moment */
             n++;
         }
     }
-    for (int addr = 0; addr < 128; addr++) {
-        uint32_t want = gone[addr];
-        gone[addr] = s_published[addr] & ~want;
-        s_published[addr] = want;
+    for (int bus = 0; bus < 2; bus++) {
+        for (int addr = 0; addr < 128; addr++) {
+            uint32_t want = gone[bus][addr];
+            gone[bus][addr] = s_published[bus][addr] & ~want;
+            s_published[bus][addr] = want;
+        }
     }
     xSemaphoreGive(s_lock);
 
-    for (int addr = 0; addr < 128; addr++) {
-        for (int q = 0; q < SQ_COUNT; q++) {
-            if (gone[addr] & (1u << q)) {
-                object_id(oid, sizeof(oid), addr, q);
-                gw_mqtt_discovery(GW_MQTT_SENSORS, "sensor", oid, NULL); /* removed */
+    for (int bus = 0; bus < 2; bus++) {
+        for (int addr = 0; addr < 128; addr++) {
+            for (int q = 0; q < SQ_COUNT; q++) {
+                if (gone[bus][addr] & (1u << q)) {
+                    object_id(oid, sizeof(oid), bus, addr, q);
+                    gw_mqtt_discovery(GW_MQTT_SENSORS, "sensor", oid, NULL); /* removed */
+                }
             }
         }
     }
@@ -666,7 +698,7 @@ static void mqtt_discovery(void)
                 continue;
             }
             const sdrv_quantity_t *qd = &sdrv_quantity[q];
-            object_id(oid, sizeof(oid), list[i].addr, q);
+            object_id(oid, sizeof(oid), list[i].bus, list[i].addr, q);
             cJSON *cfg = cJSON_CreateObject();
             snprintf(buf, sizeof(buf), "%s %s", list[i].name, qd->name);
             cJSON_AddStringToObject(cfg, "name", buf);
@@ -714,7 +746,7 @@ static void mqtt_state(cJSON *state)
         }
         for (int q = 0; q < SQ_COUNT; q++) {
             if (s->val.have & (1u << q)) {
-                object_id(oid, sizeof(oid), s->addr, q);
+                object_id(oid, sizeof(oid), s->bus, s->addr, q);
                 cJSON_AddNumberToObject(state, oid, rounded(s->val.v[q], sdrv_quantity[q].precision));
             }
         }
@@ -748,6 +780,34 @@ static void bot_sensors(const char *args, bool cz, char *out, size_t len)
         }
     }
     xSemaphoreGive(s_lock);
+}
+
+/* ---------------------------------------------------------------- second bus */
+
+void sensors_set_bus2(i2c_master_bus_handle_t bus, int sda, int scl, uint32_t hz)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    /* the devices of the old bus go first: the bus is deleted after this */
+    for (int i = 0; i < s_count; i++) {
+        if (s_sens[i].bus) {
+            release(&s_sens[i]);
+            s_sens[i].retry_us = 0;
+        }
+    }
+    s_bus2 = bus;
+    s_bus2_sda = sda;
+    s_bus2_scl = scl;
+    s_bus2_hz = hz ? hz : BUS_HZ;
+    uint8_t added[MAX_SENSORS];
+    if (bus) {
+        scan(added, MAX_SENSORS);
+    }
+    xSemaphoreGive(s_lock);
+    if (bus) {
+        ESP_LOGI(TAG, "second bus on SDA GPIO%d, SCL GPIO%d", sda, scl);
+    } else {
+        ESP_LOGI(TAG, "second bus gone");
+    }
 }
 
 /* ---------------------------------------------------------------- start */

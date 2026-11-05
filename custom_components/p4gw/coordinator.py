@@ -51,6 +51,10 @@ def apply_gpio_push(pins: dict[int, dict[str, Any]], values: dict[str, Any]) -> 
             continue
         if pin["mode"] == "pwm":
             pin["duty"] = value
+        elif pin["mode"] == "ws2812" and isinstance(value, dict):
+            pin["light"] = value
+        elif pin["mode"] == "onewire" and isinstance(value, dict):
+            pin["temperatures"] = value
         elif pin["mode"] == "counter" and isinstance(value, dict):
             pin["count"], pin["rate"] = value.get("count", 0), value.get("rate", 0)
             pin["frequency"] = value.get("frequency", pin["rate"] / 2 if pin.get("edge") == "both" else pin["rate"])

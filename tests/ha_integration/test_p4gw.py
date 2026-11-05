@@ -514,3 +514,30 @@ async def test_firmware_without_gpio(hass: HomeAssistant, gateway) -> None:
     entry = await setup_entry(hass, gateway)
     assert entry.state is ConfigEntryState.LOADED
     assert er.async_get(hass).async_get_entity_id("switch", DOMAIN, f"{MAC}_gpio_2_output_level") is None
+
+
+async def test_gpio_strip_and_onewire(hass: HomeAssistant, gateway) -> None:
+    """A WS2812 strip is an RGB light with the rainbow effect; each DS18B20 of a 1-Wire bus a temperature sensor,
+    one found later is added from the push."""
+    await setup_entry(hass, gateway)
+    eid = lambda platform, key: er.async_get(hass).async_get_entity_id(platform, DOMAIN, f"{MAC}_gpio_{key}")
+    strip = hass.states.get(eid("light", "33_ws2812_light"))
+    assert strip.state == STATE_ON and strip.attributes["rgb_color"] == (255, 80, 0) and strip.attributes["brightness"] == 200
+    assert "rainbow" in strip.attributes["effect_list"]
+    temp = hass.states.get(eid("sensor", "46_onewire_28ff641e0f16034c"))
+    assert float(temp.state) == 21.5 and temp.attributes["unit_of_measurement"] == "°C" and temp.attributes["friendly_name"].endswith("Floor 034c")
+
+    await hass.services.async_call("light", "turn_on", {"entity_id": eid("light", "33_ws2812_light"), "rgb_color": [0, 0, 255],
+                                                        "brightness": 50, "effect": "rainbow"}, blocking=True)
+    assert ("/api/gpio/set", {"gpio": 33, "on": True, "color": [0, 0, 255], "brightness": 50, "effect": "rainbow"}) in gateway.posts
+    await hass.services.async_call("light", "turn_off", {"entity_id": eid("light", "33_ws2812_light")}, blocking=True)
+    assert gateway.posts[-1] == ("/api/gpio/set", {"gpio": 33, "on": False})
+
+    await push(hass, gateway, "gpio", {"33": {"state": "OFF", "color": {"r": 0, "g": 0, "b": 255}, "brightness": 50, "effect": "rainbow"},
+                                       "46": {"28ff641e0f16034c": 22.0, "28aa000000000099": 19.25}})
+    assert hass.states.get(eid("light", "33_ws2812_light")).state == STATE_OFF
+    assert float(hass.states.get(eid("sensor", "46_onewire_28ff641e0f16034c")).state) == 22.0
+    assert float(hass.states.get(eid("sensor", "46_onewire_28aa000000000099")).state) == 19.25  # found later
+    await push(hass, gateway, "gpio", {"46": {"28ff641e0f16034c": None}})
+    assert hass.states.get(eid("sensor", "46_onewire_28ff641e0f16034c")).state == "unknown"
+    assert hass.states.get(eid("sensor", "46_onewire_28aa000000000099")).state == STATE_UNAVAILABLE  # gone from the bus

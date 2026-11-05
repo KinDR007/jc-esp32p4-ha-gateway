@@ -196,10 +196,10 @@
        <li>The start scans the bus and adds what it recognises; <b>Scan the bus</b> does it again. For a chip the scan cannot tell apart pick it under <i>Found on the bus</i> and press <b>Add</b>.</li>
        <li>Give it a name and <b>Save</b>. The P4 Gateway integration shows its values as sensors; MQTT does too with the group <i>I2C sensors</i>.</li></ol></div>
 <details><summary>Whole page (1)</summary><div class="fulls"><figure><a href="../screenshots/system_hw.jpg" class="zoom"><img class="shot full" src="../screenshots/system_hw.jpg" alt="System › Hardware" width="1440" height="2418" loading="lazy"></a><figcaption>Whole page</figcaption></figure></div></details>
-</section><section class="card wide" id="system-gpio"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg><span>System › GPIO (JP1)</span></h3><p>Free pins of header JP1 as inputs, outputs, PWM or pulse counters, set up and switched from the page.</p>
-<div class="item"><div class="item-text"><h4>Header JP1</h4><p>All 26 pins: power, radio pins locked with the reason (hover), free pins in green, configured ones in blue with their value. 3.3 V logic, not 5 V tolerant, about 20 mA per pin.</p></div><div class="item-pic"><a href="../screenshots/system_gpio__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__1.jpg" alt="HEADER JP1" width="1156" height="352" loading="lazy"></a></div></div>
-<div class="item"><div class="item-text"><h4>Pin settings</h4><p>Name for Home Assistant, mode and its options: pull resistor, inverted, debounce (input), open drain and the state after a restart (output, PWM), frequency (PWM), edges and glitch filter (counter).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__2.jpg" alt="PIN SETTINGS" width="570" height="260" loading="lazy"></a></div></div>
-<div class="item"><div class="item-text"><h4>Configured pins</h4><p>Live values; switch an output or pulse it for 1 s, move a PWM duty, clear a counter (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md">gpio.md</a>).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__3.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__3.jpg" alt="CONFIGURED PINS" width="570" height="260" loading="lazy"></a></div></div>
+</section><section class="card wide" id="system-gpio"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg><span>System › GPIO (JP1)</span></h3><p>Free pins of header JP1 as inputs, outputs, PWM, pulse counters, a UART-TCP bridge, a second I2C bus, 1-Wire temperatures or a WS2812 LED strip, set up and controlled from the page.</p>
+<div class="item"><div class="item-text"><h4>Header JP1</h4><p>All 26 pins: power, radio pins locked with the reason (hover), free pins in green, configured ones in blue with their value. 3.3 V logic, not 5 V tolerant, about 20 mA per pin.</p></div><div class="item-pic"><a href="../screenshots/system_gpio__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__1.jpg" alt="HEADER JP1" width="1156" height="368" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>Pin settings</h4><p>Name for Home Assistant, mode and its options: pull resistor, inverted, debounce (input), open drain and the state after a restart (output, PWM), frequency (PWM), edges and glitch filter (counter).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__3.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__3.jpg" alt="PIN SETTINGS" width="570" height="82" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>Configured pins</h4><p>Live values; switch an output or pulse it for 1 s, move a PWM duty, clear a counter, set a strip's colour, brightness and effect, search a 1-Wire bus; the UART bridge shows its client and bytes (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md">gpio.md</a>).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__2.jpg" alt="CONFIGURED PINS" width="1156" height="222" loading="lazy"></a></div></div>
 <div class="howto"><h4><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z"/></svg>How to</h4><ol><li>Wire the circuit with the gateway off; a relay or a LED strip goes through a transistor or a driver module, a relay with a pull-down (pins are off for 1-2 s after power on).</li>
        <li>Click a free (green) pin, name it, choose the mode and its options, <b>Save</b>.</li>
        <li>Switch or watch it in <i>Configured pins</i>; <b>Free the pin</b> turns it off again.</li></ol></div>
@@ -720,42 +720,42 @@ advanced:
   &quot;pins&quot;: [
     {
       &quot;gpio&quot;: 2,
-      &quot;mode&quot;: &quot;output&quot;,
-      &quot;name&quot;: &quot;Relay&quot;,
-      &quot;expose&quot;: &quot;integration&quot;,
-      &quot;invert&quot;: false,
-      &quot;open_drain&quot;: false,
-      &quot;pull&quot;: &quot;none&quot;,
-      &quot;restore&quot;: &quot;last&quot;
-    },
-    {
-      &quot;gpio&quot;: 3,
-      &quot;mode&quot;: &quot;input&quot;,
-      &quot;name&quot;: &quot;Button&quot;,
-      &quot;pull&quot;: &quot;up&quot;,
-      &quot;invert&quot;: true,
-      &quot;debounce_ms&quot;: 20
+      &quot;mode&quot;: &quot;uart&quot;,
+      &quot;name&quot;: &quot;Meter&quot;,
+      &quot;rx&quot;: 3,
+      &quot;baud&quot;: 9600,
+      &quot;data_bits&quot;: 8,
+      &quot;parity&quot;: &quot;none&quot;,
+      &quot;stop_bits&quot;: 1,
+      &quot;port&quot;: 6639
     },
     {
       &quot;gpio&quot;: 1,
-      &quot;mode&quot;: &quot;pwm&quot;,
-      &quot;name&quot;: &quot;LED&quot;,
-      &quot;freq&quot;: 1000,
-      &quot;restore&quot;: &quot;off&quot;
+      &quot;mode&quot;: &quot;ws2812&quot;,
+      &quot;name&quot;: &quot;Strip&quot;,
+      &quot;leds&quot;: 60,
+      &quot;order&quot;: &quot;grb&quot;,
+      &quot;restore&quot;: &quot;last&quot;,
+      &quot;expose&quot;: &quot;both&quot;
     },
     {
       &quot;gpio&quot;: 45,
-      &quot;mode&quot;: &quot;counter&quot;,
-      &quot;name&quot;: &quot;Water meter&quot;,
-      &quot;edge&quot;: &quot;rising&quot;,
-      &quot;pull&quot;: &quot;down&quot;,
-      &quot;filter_ns&quot;: 1000
+      &quot;mode&quot;: &quot;onewire&quot;,
+      &quot;name&quot;: &quot;Floor&quot;,
+      &quot;interval_s&quot;: 30
     }
   ]
 }</pre></details></td><td>system/hw · edit</td></tr>
 <tr><td><code>POST</code></td><td><code>/api/gpio/set</code></td><td>Sets an output, a pulse, the duty of a PWM pin or clears a counter.<details><summary>body</summary><pre>{
-  &quot;gpio&quot;: 2,
-  &quot;level&quot;: 1
+  &quot;gpio&quot;: 1,
+  &quot;on&quot;: true,
+  &quot;color&quot;: [
+    255,
+    80,
+    0
+  ],
+  &quot;brightness&quot;: 180,
+  &quot;effect&quot;: &quot;rainbow&quot;
 }</pre></details></td><td>system/hw · edit</td></tr>
 </tbody></table>
 <h4>Updates and firmware</h4><table><thead><tr><th></th><th>Path</th><th>What it does</th><th>Permission</th></tr></thead><tbody>

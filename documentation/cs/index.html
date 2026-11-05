@@ -196,10 +196,10 @@
        <li>Start projde sběrnici a přidá, co rozpozná; <b>Skenovat sběrnici</b> to zopakuje. U čipu, který sken nerozliší, ho vyberte v <i>Nalezeno na sběrnici</i> a stiskněte <b>Přidat</b>.</li>
        <li>Pojmenujte ho a <b>Uložte</b>. Integrace P4 Gateway ukáže jeho hodnoty jako senzory; MQTT také se skupinou <i>I2C senzory</i>.</li></ol></div>
 <details><summary>Celá stránka (1)</summary><div class="fulls"><figure><a href="../screenshots/system_hw.jpg" class="zoom"><img class="shot full" src="../screenshots/system_hw.jpg" alt="Systém › Hardware" width="1440" height="2418" loading="lazy"></a><figcaption>Celá stránka</figcaption></figure></div></details>
-</section><section class="card wide" id="system-gpio"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg><span>Systém › GPIO (JP1)</span></h3><p>Volné piny konektoru JP1 jako vstupy, výstupy, PWM nebo čítače pulzů, nastavené a ovládané ze stránky.</p>
-<div class="item"><div class="item-text"><h4>Konektor JP1</h4><p>Všech 26 pinů: napájení, piny rádií zamčené s důvodem (po najetí myší), volné zeleně, nastavené modře s hodnotou. Logika 3,3 V, 5 V pin nesnese, asi 20 mA na pin.</p></div><div class="item-pic"><a href="../screenshots/system_gpio__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__1.jpg" alt="HEADER JP1" width="1156" height="352" loading="lazy"></a></div></div>
-<div class="item"><div class="item-text"><h4>Nastavení pinu</h4><p>Jméno pro Home Assistant, režim a jeho volby: pull rezistor, inverze, debounce (vstup), open drain a stav po restartu (výstup, PWM), frekvence (PWM), hrany a filtr zákmitů (čítač).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__2.jpg" alt="PIN SETTINGS" width="570" height="260" loading="lazy"></a></div></div>
-<div class="item"><div class="item-text"><h4>Nastavené piny</h4><p>Živé hodnoty; přepnutí výstupu nebo pulz 1 s, posun střídy PWM, vynulování čítače (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md">gpio.md</a>).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__3.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__3.jpg" alt="CONFIGURED PINS" width="570" height="260" loading="lazy"></a></div></div>
+</section><section class="card wide" id="system-gpio"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z"/></svg><span>Systém › GPIO (JP1)</span></h3><p>Volné piny konektoru JP1 jako vstupy, výstupy, PWM, čítače pulzů, most UART–TCP, druhá sběrnice I2C, teploty 1-Wire nebo LED pásek WS2812, nastavené a ovládané ze stránky.</p>
+<div class="item"><div class="item-text"><h4>Konektor JP1</h4><p>Všech 26 pinů: napájení, piny rádií zamčené s důvodem (po najetí myší), volné zeleně, nastavené modře s hodnotou. Logika 3,3 V, 5 V pin nesnese, asi 20 mA na pin.</p></div><div class="item-pic"><a href="../screenshots/system_gpio__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__1.jpg" alt="HEADER JP1" width="1156" height="368" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>Nastavení pinu</h4><p>Jméno pro Home Assistant, režim a jeho volby: pull rezistor, inverze, debounce (vstup), open drain a stav po restartu (výstup, PWM), frekvence (PWM), hrany a filtr zákmitů (čítač).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__3.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__3.jpg" alt="PIN SETTINGS" width="570" height="82" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>Nastavené piny</h4><p>Živé hodnoty; přepnutí výstupu nebo pulz 1 s, posun střídy PWM, vynulování čítače, barva, jas a efekt pásku, hledání na sběrnici 1-Wire; most UART ukazuje klienta a bajty (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md">gpio.md</a>).</p></div><div class="item-pic"><a href="../screenshots/system_gpio__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_gpio__2.jpg" alt="CONFIGURED PINS" width="1156" height="222" loading="lazy"></a></div></div>
 <div class="howto"><h4><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z"/></svg>Postup</h4><ol><li>Obvod zapojte při vypnuté bráně; relé nebo LED pásek přes tranzistor či budicí modul, relé s pull-down rezistorem (po zapnutí jsou piny 1–2 s vypnuté).</li>
        <li>Klikněte na volný (zelený) pin, pojmenujte ho, zvolte režim a jeho volby a <b>Uložte</b>.</li>
        <li>Ovládejte nebo sledujte ho v <i>Nastavených pinech</i>; <b>Uvolnit pin</b> ho zase vypne.</li></ol></div>
@@ -720,42 +720,42 @@ advanced:
   &quot;pins&quot;: [
     {
       &quot;gpio&quot;: 2,
-      &quot;mode&quot;: &quot;output&quot;,
-      &quot;name&quot;: &quot;Relay&quot;,
-      &quot;expose&quot;: &quot;integration&quot;,
-      &quot;invert&quot;: false,
-      &quot;open_drain&quot;: false,
-      &quot;pull&quot;: &quot;none&quot;,
-      &quot;restore&quot;: &quot;last&quot;
-    },
-    {
-      &quot;gpio&quot;: 3,
-      &quot;mode&quot;: &quot;input&quot;,
-      &quot;name&quot;: &quot;Button&quot;,
-      &quot;pull&quot;: &quot;up&quot;,
-      &quot;invert&quot;: true,
-      &quot;debounce_ms&quot;: 20
+      &quot;mode&quot;: &quot;uart&quot;,
+      &quot;name&quot;: &quot;Meter&quot;,
+      &quot;rx&quot;: 3,
+      &quot;baud&quot;: 9600,
+      &quot;data_bits&quot;: 8,
+      &quot;parity&quot;: &quot;none&quot;,
+      &quot;stop_bits&quot;: 1,
+      &quot;port&quot;: 6639
     },
     {
       &quot;gpio&quot;: 1,
-      &quot;mode&quot;: &quot;pwm&quot;,
-      &quot;name&quot;: &quot;LED&quot;,
-      &quot;freq&quot;: 1000,
-      &quot;restore&quot;: &quot;off&quot;
+      &quot;mode&quot;: &quot;ws2812&quot;,
+      &quot;name&quot;: &quot;Strip&quot;,
+      &quot;leds&quot;: 60,
+      &quot;order&quot;: &quot;grb&quot;,
+      &quot;restore&quot;: &quot;last&quot;,
+      &quot;expose&quot;: &quot;both&quot;
     },
     {
       &quot;gpio&quot;: 45,
-      &quot;mode&quot;: &quot;counter&quot;,
-      &quot;name&quot;: &quot;Water meter&quot;,
-      &quot;edge&quot;: &quot;rising&quot;,
-      &quot;pull&quot;: &quot;down&quot;,
-      &quot;filter_ns&quot;: 1000
+      &quot;mode&quot;: &quot;onewire&quot;,
+      &quot;name&quot;: &quot;Floor&quot;,
+      &quot;interval_s&quot;: 30
     }
   ]
 }</pre></details></td><td>system/hw · úpravy</td></tr>
 <tr><td><code>POST</code></td><td><code>/api/gpio/set</code></td><td>Nastaví výstup, pulz, střídu PWM nebo vynuluje čítač.<details><summary>tělo</summary><pre>{
-  &quot;gpio&quot;: 2,
-  &quot;level&quot;: 1
+  &quot;gpio&quot;: 1,
+  &quot;on&quot;: true,
+  &quot;color&quot;: [
+    255,
+    80,
+    0
+  ],
+  &quot;brightness&quot;: 180,
+  &quot;effect&quot;: &quot;rainbow&quot;
 }</pre></details></td><td>system/hw · úpravy</td></tr>
 </tbody></table>
 <h4>Aktualizace a firmware</h4><table><thead><tr><th></th><th>Cesta</th><th>Co dělá</th><th>Oprávnění</th></tr></thead><tbody>

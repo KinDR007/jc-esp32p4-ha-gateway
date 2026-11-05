@@ -26,7 +26,15 @@ ENTITIES = {
     "output": [("switch", "level")],
     "pwm": [("light", "duty")],
     "counter": [("sensor", "count"), ("sensor", "frequency")],
+    "ws2812": [("light", "light")],
 }
+
+
+def entities_of(pin: dict[str, Any]) -> list[tuple[str, str]]:
+    """(platform, key) of a pin's entities; a 1-Wire bus has one temperature sensor per device found."""
+    if pin["mode"] == "onewire":
+        return [("sensor", rom) for rom in pin.get("temperatures") or {}]
+    return ENTITIES.get(pin["mode"], [])
 
 
 class P4GpioEntity(CoordinatorEntity[P4Coordinator]):
@@ -66,6 +74,8 @@ class P4GpioEntity(CoordinatorEntity[P4Coordinator]):
         if self.key == "frequency":
             cs = self.hass is not None and self.hass.config.language == "cs"
             return f"{base} {'frekvence' if cs else 'frequency'}"
+        if self.mode == "onewire":
+            return f"{base} {self.key[-4:]}"  # the end of the device's ROM code, as on the gateway
         return base
 
     @property
@@ -77,7 +87,7 @@ class P4GpioEntity(CoordinatorEntity[P4Coordinator]):
             and pin.get("active", False)
             and pin["mode"] == self.mode
             and pin.get("expose") in EXPOSED
-            and self.key in pin
+            and (self.key in pin or self.key in (pin.get("temperatures") or {}))
         )
 
     @property
@@ -88,12 +98,14 @@ class P4GpioEntity(CoordinatorEntity[P4Coordinator]):
     async def set(self, body: dict[str, Any]) -> None:
         """POST /api/gpio/set for this pin; the value is kept until the next push or poll."""
         try:
-            await self.coordinator.client.post("/api/gpio/set", {"gpio": self.gpio, **body})
+            result = await self.coordinator.client.post("/api/gpio/set", {"gpio": self.gpio, **body})
         except P4Error as err:
             raise HomeAssistantError(f"GPIO{self.gpio}: {err}") from err
         pin = self.pin
         if pin is not None:
             pin.update({k: v for k, v in body.items() if k in ("level", "duty")})
+            if "light" in pin and isinstance(result, dict) and "light" in result:
+                pin["light"] = result["light"]
             self.async_write_ha_state()
 
 
@@ -108,7 +120,7 @@ def add_gpio_entities(
         for gpio, pin in coordinator.data.gpio.items():
             if pin.get("expose") not in EXPOSED:
                 continue
-            for plat, key in ENTITIES.get(pin["mode"], []):
+            for plat, key in entities_of(pin):
                 if plat == platform and (gpio, pin["mode"], key) not in known:
                     known.add((gpio, pin["mode"], key))
                     new.append(factory(coordinator, gpio, pin["mode"], key))

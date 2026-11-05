@@ -2440,7 +2440,7 @@ def tc53_gpio_mqtt():
               'PWM: light with brightness 0-100 (the duty)')
         freq = json.loads(retained('sensor', 'gpio_45_counter_frequency') or '{}')
         check(retained('sensor', 'gpio_45_counter_count') and freq.get('unit_of_measurement') == 'Hz', 'counter: count and frequency sensors')
-        state = json.loads(sub(f'{base}/gpio') or '{}')
+        state = wait_until('retained GPIO state', lambda: json.loads(sub(f'{base}/gpio') or '{}'), 6, 1)
         check(state.get('3') == 1 and state.get('2') == 0 and state.get('45', {}).get('count') == 0, f'retained state {state}')
         pub(f'{base}/gpio/2/set', 'ON')
         p2 = wait_until('output on after ON', lambda: (lambda x: x if x['level'] == 1 else None)(pin(2)), 3, 0.3)
@@ -2455,10 +2455,16 @@ def tc53_gpio_mqtt():
         check(pin(1)['duty'] == 30, 'duty 30 from the light')
         pub(f'{base}/gpio/1/set', 'OFF')
         check(pin(1)['duty'] == 0, 'light OFF: duty 0')
-        http('PUT', '/api/gpio', {'pins': [{'gpio': 2, 'mode': 'input', 'expose': 'mqtt'}]})
+        http('PUT', '/api/gpio', {'pins': [{'gpio': 2, 'mode': 'input', 'expose': 'mqtt'}, {'gpio': 1, 'mode': 'ws2812', 'leds': 10, 'expose': 'mqtt'}]})
         time.sleep(2)
+        strip = json.loads(retained('light', 'gpio_1_ws2812_light') or '{}')
+        check(strip.get('schema') == 'json' and strip.get('supported_color_modes') == ['rgb'] and 'rainbow' in strip.get('effect_list', []),
+              'strip: JSON light with RGB and the rainbow effect')
+        pub(f'{base}/gpio/1/light/set', '{"state":"ON","color":{"r":10,"g":20,"b":30},"brightness":99}')
+        st = json.loads(sub(f'{base}/gpio/1/light') or '{}')
+        check(pin(1)['light']['color'] == {'r': 10, 'g': 20, 'b': 30} and st.get('brightness') == 99 and st.get('state') == 'ON', f'strip set from MQTT, state {st}')
         check(not retained('switch', 'gpio_2_output_level') and retained('binary_sensor', 'gpio_2_input_level')
-              and not retained('light', 'gpio_1_pwm_duty'), 'mode changed and pins freed: old entities removed, new one published')
+              and not retained('light', 'gpio_1_pwm_duty'), 'mode changed: old entities removed, new ones published')
         check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_triggers']})[0] == 200, 'group gpio off')
         time.sleep(3)
         check(not retained('binary_sensor', 'gpio_2_input_level'), 'GPIO entities removed (empty retained config)')
@@ -2471,6 +2477,72 @@ def tc53_gpio_mqtt():
         wait_restart(status()['role']['desired'])
     m = wait_until('MQTT back on the original broker', lambda: (lambda m: m if m['connected'] or not m['enabled'] else None)(http('GET', '/api/mqtt')[1]), 40, 2)
     check(m['discovery_groups'] == groups_before, f'original broker {m["uri"]}, groups {groups_before}')
+
+
+def tc54_gpio_functions():
+    """GPIO functions over peripherals without a jumper: UART-TCP bridge (TCP client, bytes to the UART, a new client
+    replaces the old), WS2812 strip (colour, brightness, effect, last state after a restart), 1-Wire bus without devices,
+    second I2C bus for the sensors (bus 2, own ids); limits and invalid settings refused. The configuration of before comes back."""
+    keys = ('gpio', 'mode', 'name', 'expose', 'invert', 'pull', 'debounce_ms', 'open_drain', 'restore', 'freq', 'edge', 'filter_ns',
+            'rx', 'baud', 'data_bits', 'parity', 'stop_bits', 'port', 'scl', 'hz', 'interval_s', 'leds', 'order')
+    gpio_before = {'pins': [{k: p[k] for k in keys if k in p} for p in http('GET', '/api/gpio')[1]['pins']]}
+    sensors_before = http('GET', '/api/sensors')[1]
+    pin = lambda g: next((p for p in http('GET', '/api/gpio')[1]['pins'] if p['gpio'] == g), None)
+    try:
+        for body, why in (({'pins': [{'gpio': 2, 'mode': 'uart'}]}, 'UART without rx'), ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 2}]}, 'rx = tx'),
+                          ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 4}]}, 'rx on radio A'), ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 3, 'port': 6638}]}, 'port 6638'),
+                          ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 3, 'baud': 100}]}, 'baud 100'),
+                          ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 3}, {'gpio': 1, 'mode': 'uart', 'rx': 45}]}, 'two UARTs'),
+                          ({'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 3}, {'gpio': 3, 'mode': 'input'}]}, 'rx pin used again'),
+                          ({'pins': [{'gpio': 1, 'mode': 'ws2812', 'leds': 1000}]}, '1000 LEDs'), ({'pins': [{'gpio': 45, 'mode': 'onewire', 'interval_s': 1}]}, '1-Wire every 1 s'),
+                          ({'pins': [{'gpio': 2, 'mode': 'i2c', 'scl': 3, 'hz': 250000}]}, 'I2C 250 kHz')):
+            check(http('PUT', '/api/gpio', body)[0] == 400, f'refused: {why}')
+        code, r = http('PUT', '/api/gpio', {'pins': [{'gpio': 2, 'mode': 'uart', 'rx': 3, 'baud': 9600, 'port': 6639},
+                                                     {'gpio': 1, 'mode': 'ws2812', 'leds': 60, 'restore': 'last'},
+                                                     {'gpio': 45, 'mode': 'onewire', 'interval_s': 5}]})
+        check(code == 200 and all(p['active'] for p in r['pins']), 'UART bridge, WS2812 strip and 1-Wire bus active')
+        a = socket.create_connection((ARGS.host, 6639), timeout=3)
+        a.sendall(b'P4 GPIO UART test\n')
+        time.sleep(0.5)
+        u = pin(2)
+        check(u['client'] and u['tx_bytes'] == 18 and u['sessions'] == 1, f'TCP client {u["client"]}: 18 bytes to the UART')
+        b = socket.create_connection((ARGS.host, 6639), timeout=3)
+        time.sleep(0.5)
+        a.settimeout(2)
+        check(a.recv(16) == b'' and pin(2)['sessions'] == 2, 'a second client replaces the first (closed)')
+        b.close()
+        time.sleep(0.5)
+        check(pin(2)['client'] == '', 'client gone after it closed')
+        a.close()
+        for body, why in (({'gpio': 1, 'color': [300, 0, 0]}, 'colour 300'), ({'gpio': 1, 'effect': 'strobe'}, 'effect strobe'), ({'gpio': 1, 'brightness': 256}, 'brightness 256')):
+            check(http('POST', '/api/gpio/set', body)[0] == 400, f'strip refused: {why}')
+        code, r = http('POST', '/api/gpio/set', {'gpio': 1, 'color': [255, 80, 0], 'brightness': 180})
+        check(code == 200 and r['light'] == {'state': 'ON', 'color': {'r': 255, 'g': 80, 'b': 0}, 'brightness': 180, 'effect': 'none'},
+              'colour and brightness turn the strip on')
+        check(http('POST', '/api/gpio/set', {'gpio': 1, 'effect': 'rainbow'})[1]['light']['effect'] == 'rainbow', 'rainbow effect')
+        time.sleep(6)  # the last state is saved 5 s after the last change
+        o = pin(45)
+        check(o['present'] is False and o['temperatures'] == {} and http('POST', '/api/gpio/set', {'gpio': 45, 'rescan': True})[0] == 200,
+              '1-Wire: no device answers the reset, search again')
+        http('POST', '/api/reboot', {})
+        wait_restart(status()['role']['desired'])
+        light = pin(1)['light']
+        check(light['state'] == 'ON' and light['effect'] == 'rainbow' and light['color']['g'] == 80, 'strip after the restart: on, its colour, rainbow')
+        check(pin(2)['active'] and socket.create_connection((ARGS.host, 6639), timeout=3), 'UART bridge back after the restart')
+        code, r = http('PUT', '/api/gpio', {'pins': [{'gpio': 2, 'mode': 'i2c', 'scl': 3, 'hz': 400000}]})
+        s = http('GET', '/api/sensors')[1]
+        check(code == 200 and s.get('bus2') == {'sda': 2, 'scl': 3, 'khz': 400}, f'second I2C bus on GPIO2/3 at 400 kHz')
+        hdr = {h['pin']: h for h in http('GET', '/api/gpio')[1]['header']}
+        code, s = http('PUT', '/api/sensors', {'sensors': [{'bus': 2, 'addr': 0x76, 'type': 'bme280', 'name': 'Bus 2'}]})
+        check(code == 200 and s['sensors'][0]['id'] == 'i2c2_76' and s['sensors'][0]['bus'] == 2, 'sensor on bus 2: id i2c2_76')
+        check(http('PUT', '/api/sensors', {'sensors': [{'bus': 3, 'addr': 0x76, 'type': 'bme280'}]})[0] == 400, 'bus 3 refused')
+        http('PUT', '/api/gpio', {'pins': []})
+        check('bus2' not in http('GET', '/api/sensors')[1], 'bus gone with the pins')
+    finally:
+        http('PUT', '/api/gpio', gpio_before)
+        http('PUT', '/api/sensors', {'interval_s': sensors_before['interval_s'],
+                                     'sensors': [{k: x[k] for k in ('bus', 'addr', 'type', 'chip', 'name', 'expose', 'enabled')} for x in sensors_before['sensors']]})
+    check(len(http('GET', '/api/gpio')[1]['pins']) == len(gpio_before['pins']), 'configuration of before restored')
 
 
 TESTS = [
@@ -2486,7 +2558,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2513,7 +2585,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

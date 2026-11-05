@@ -454,7 +454,7 @@ static bool topic_matches(const char *filter, const char *t)
 
 static void handle_command(const char *t, int tlen, const char *data, int dlen)
 {
-    char name[96], payload[64];
+    char name[96], payload[192];
     snprintf(name, sizeof(name), "%.*s", tlen, t);
     snprintf(payload, sizeof(payload), "%.*s", dlen, data);
     char expect[96];

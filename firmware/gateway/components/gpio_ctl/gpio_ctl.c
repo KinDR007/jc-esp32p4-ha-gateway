@@ -7,6 +7,7 @@
 #include <strings.h>
 
 #include "driver/gpio.h"
+#include "driver/i2c_master.h"
 #include "driver/ledc.h"
 #include "driver/pulse_cnt.h"
 #include "esp_log.h"
@@ -14,8 +15,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "gpio_ctl_priv.h"
 #include "gw.h"
 #include "sdkconfig.h"
+#include "sensors.h"
 #include "soc/soc_caps.h"
 
 /*
@@ -41,12 +44,21 @@ static const char *TAG = "gpio_ctl";
 #define PWM_CLK_HZ 80000000 /* LEDC_USE_PLL_DIV_CLK */
 #define FILTER_MAX_NS 10000
 #define CNT_LIMIT 30000
+#define BAUD_MIN 300
+#define BAUD_MAX 3000000
+#define UART_PORT_DEFAULT 6639 /* next to the Zigbee bridge's 6638 */
+#define LEDS_MAX 512
+#define FX_US 50000 /* a frame of an effect */
+#define OW_POLL_US 500000
 #define EXPOSE_INTEGRATION 1
 #define EXPOSE_MQTT 2
 static const char *const s_exposes[] = {"none", "integration", "mqtt", "both"}; /* by the bits */
 
-typedef enum { M_OFF, M_INPUT, M_OUTPUT, M_PWM, M_COUNTER, M_COUNT } pin_mode_t;
-static const char *const s_modes[M_COUNT] = {"off", "input", "output", "pwm", "counter"};
+typedef enum { M_OFF, M_INPUT, M_OUTPUT, M_PWM, M_COUNTER, M_UART, M_WS2812, M_ONEWIRE, M_I2C, M_COUNT } pin_mode_t;
+static const char *const s_modes[M_COUNT] = {"off", "input", "output", "pwm", "counter", "uart", "ws2812", "onewire", "i2c"};
+static const char *const s_parities[] = {"none", "even", "odd"};
+static const char *const s_orders[] = {"grb", "rgb", "brg", "rbg"};
+static const char *const s_effects[] = {"none", "rainbow"};
 static const char *const s_pulls[] = {"none", "up", "down"};
 enum { RESTORE_OFF, RESTORE_ON, RESTORE_LAST };
 static const char *const s_restores[] = {"off", "on", "last"};
@@ -124,6 +136,27 @@ typedef struct {
     int64_t win_us, report_us;
     float rate;
     esp_timer_handle_t pulse;
+    /* uart: TX on gpio, RX on partner; i2c: SDA on gpio, SCL on partner */
+    int8_t partner;
+    uint32_t hz;
+    i2c_master_bus_handle_t i2c;
+    uint32_t baud;
+    uint8_t data_bits, parity, stop_bits;
+    uint16_t port;
+    /* ws2812 */
+    uint16_t leds;
+    uint8_t order;
+    gpio_light_t light;
+    gpio_strip_t *strip;
+    uint8_t phase;
+    int64_t fx_us;
+    /* onewire */
+    uint16_t interval_s;
+    gpio_ow_t *ow;
+    int ow_n;
+    bool ow_present;
+    gpio_ow_sensor_t ow_dev[OW_MAX];
+    int64_t ow_us;
 } pin_t;
 
 #define MAX_PINS 8
@@ -228,6 +261,42 @@ static void save_last(void)
     s_last_dirty_us = 0;
 }
 
+/* light of a strip: {"on", "rgb": [r, g, b], "b", "fx"} under its GPIO */
+static void last_light(const pin_t *p, gpio_light_t *l)
+{
+    char key[8];
+    snprintf(key, sizeof(key), "%d", p->gpio);
+    const cJSON *o = s_last ? cJSON_GetObjectItem(s_last, key) : NULL;
+    const cJSON *rgb = cJSON_GetObjectItem(o, "rgb"), *b = cJSON_GetObjectItem(o, "b"), *fx = cJSON_GetObjectItem(o, "fx");
+    l->on = cJSON_IsTrue(cJSON_GetObjectItem(o, "on"));
+    for (int k = 0; k < 3 && cJSON_GetArraySize(rgb) == 3; k++) {
+        l->rgb[k] = cJSON_GetArrayItem(rgb, k)->valueint;
+    }
+    if (cJSON_IsNumber(b)) {
+        l->brightness = b->valueint;
+    }
+    if (cJSON_IsNumber(fx) && fx->valueint < 2) {
+        l->effect = fx->valueint;
+    }
+}
+
+static void remember_light(const pin_t *p)
+{
+    if (p->restore != RESTORE_LAST || !s_last) {
+        return;
+    }
+    char key[8];
+    snprintf(key, sizeof(key), "%d", p->gpio);
+    cJSON_DeleteItemFromObject(s_last, key);
+    cJSON *o = cJSON_AddObjectToObject(s_last, key);
+    cJSON_AddBoolToObject(o, "on", p->light.on);
+    int rgb[3] = {p->light.rgb[0], p->light.rgb[1], p->light.rgb[2]};
+    cJSON_AddItemToObject(o, "rgb", cJSON_CreateIntArray(rgb, 3));
+    cJSON_AddNumberToObject(o, "b", p->light.brightness);
+    cJSON_AddNumberToObject(o, "fx", p->light.effect);
+    s_last_dirty_us = esp_timer_get_time();
+}
+
 /* ---------------------------------------------------------------- pins */
 
 static void pulse_end(void *arg)
@@ -265,10 +334,33 @@ static void release(pin_t *p)
         p->unit = NULL;
         p->chan = NULL;
     }
+    if (p->active && p->mode == M_UART) {
+        gpio_uart_stop();
+    }
+    if (p->strip) {
+        gpio_light_t dark = {0};
+        gpio_ws2812_show(p->strip, &dark, 0);
+        gpio_ws2812_stop(p->strip);
+        p->strip = NULL;
+    }
+    if (p->ow) {
+        gpio_onewire_stop(p->ow);
+        p->ow = NULL;
+    }
+    if (p->i2c) {
+        sensors_set_bus2(NULL, -1, -1, 0); /* its devices first */
+        i2c_del_master_bus(p->i2c);
+        p->i2c = NULL;
+    }
     if (p->active) {
-        gpio_reset_pin(p->gpio);
-        gpio_set_direction(p->gpio, GPIO_MODE_DISABLE);
-        gpio_set_pull_mode(p->gpio, GPIO_FLOATING);
+        for (int k = 0; k < 2; k++) {
+            int g = k ? p->partner : p->gpio;
+            if (g >= 0) {
+                gpio_reset_pin(g);
+                gpio_set_direction(g, GPIO_MODE_DISABLE);
+                gpio_set_pull_mode(g, GPIO_FLOATING);
+            }
+        }
     }
     p->active = false;
     p->channel = p->timer = -1;
@@ -380,6 +472,9 @@ static void start(pin_t *p, uint8_t *timers, uint8_t *channels)
 {
     char buf[96];
     const char *r = reserved(p->gpio, buf, sizeof(buf));
+    if (!r && p->partner >= 0) {
+        r = reserved(p->partner, buf, sizeof(buf));
+    }
     p->active = false;
     p->why[0] = '\0';
     p->channel = p->timer = -1;
@@ -413,6 +508,39 @@ static void start(pin_t *p, uint8_t *timers, uint8_t *channels)
         gpio_set_direction(p->gpio, GPIO_MODE_INPUT);
         err = start_counter(p);
         break;
+    case M_UART: {
+        gpio_reset_pin(p->partner);
+        gpio_uart_cfg_t c = {.tx = p->gpio, .rx = p->partner, .baud = p->baud, .data_bits = p->data_bits,
+                             .parity = p->parity, .stop_bits = p->stop_bits, .port = p->port};
+        err = gpio_uart_start(&c, p->why, sizeof(p->why));
+        break;
+    }
+    case M_WS2812:
+        p->strip = gpio_ws2812_start(p->gpio, p->leds, p->order, p->why, sizeof(p->why));
+        p->light = (gpio_light_t){.on = p->restore == RESTORE_ON, .rgb = {255, 255, 255}, .brightness = 128};
+        if (p->restore == RESTORE_LAST) {
+            last_light(p, &p->light);
+        }
+        err = p->strip ? gpio_ws2812_show(p->strip, &p->light, 0) : ESP_FAIL;
+        break;
+    case M_ONEWIRE:
+        p->ow = gpio_onewire_start(p->gpio, p->interval_s, p->why, sizeof(p->why));
+        p->ow_n = 0;
+        err = p->ow ? ESP_OK : ESP_FAIL;
+        break;
+    case M_I2C: {
+        gpio_reset_pin(p->partner);
+        i2c_master_bus_config_t bc = {.i2c_port = -1, .sda_io_num = p->gpio, .scl_io_num = p->partner, .clk_source = I2C_CLK_SRC_DEFAULT,
+                                      .glitch_ignore_cnt = 7, .flags.enable_internal_pullup = true};
+        err = i2c_new_master_bus(&bc, &p->i2c);
+        if (err != ESP_OK) {
+            snprintf(p->why, sizeof(p->why), err == ESP_ERR_NOT_FOUND ? "no I2C port left" : "I2C: %s", esp_err_to_name(err));
+            p->i2c = NULL;
+        } else {
+            sensors_set_bus2(p->i2c, p->gpio, p->partner, p->hz); /* the sensors never call back into here */
+        }
+        break;
+    }
     }
     p->active = true; /* release() resets the pin */
     if (err != ESP_OK) {
@@ -430,7 +558,7 @@ static void start(pin_t *p, uint8_t *timers, uint8_t *channels)
 static const char *parse_pin(const cJSON *j, pin_t *p)
 {
     memset(p, 0, sizeof(*p));
-    p->channel = p->timer = -1;
+    p->channel = p->timer = p->partner = -1;
     const cJSON *g = cJSON_GetObjectItem(j, "gpio");
     if (!cJSON_IsNumber(g) || !header_pin(g->valueint)) {
         return "gpio: a free GPIO of JP1 (1, 2, 3, 45; 32, 33, 46, 47 without radio B)";
@@ -441,7 +569,7 @@ static const char *parse_pin(const cJSON *j, pin_t *p)
     p->gpio = g->valueint;
     int m = find_name(s_modes, M_COUNT, GW_JSON_STR(j, "mode"));
     if (m < 0) {
-        return "mode: off, input, output, pwm or counter";
+        return "mode: off, input, output, pwm, counter, uart, ws2812, onewire or i2c";
     }
     p->mode = m;
     const char *name = GW_JSON_STR(j, "name");
@@ -485,6 +613,59 @@ static const char *parse_pin(const cJSON *j, pin_t *p)
     if (cJSON_IsNumber(v) && (v->valuedouble < 0 || v->valuedouble > FILTER_MAX_NS)) {
         return "filter_ns: 0..10000";
     }
+    if (p->mode == M_UART) {
+        v = cJSON_GetObjectItem(j, "rx");
+        if (!cJSON_IsNumber(v) || !header_pin(v->valueint) || v->valueint == p->gpio || radio_a_use(v->valueint)) {
+            return "rx: a free GPIO of JP1 for the UART's RX, not the TX pin";
+        }
+        p->partner = v->valueint;
+        v = cJSON_GetObjectItem(j, "baud");
+        p->baud = cJSON_IsNumber(v) ? (uint32_t)v->valuedouble : 115200;
+        v = cJSON_GetObjectItem(j, "data_bits");
+        p->data_bits = cJSON_IsNumber(v) ? v->valueint : 8;
+        v = cJSON_GetObjectItem(j, "stop_bits");
+        p->stop_bits = cJSON_IsNumber(v) ? v->valueint : 1;
+        s = GW_JSON_STR(j, "parity");
+        int parity = s ? find_name(s_parities, 3, s) : 0;
+        v = cJSON_GetObjectItem(j, "port");
+        p->port = cJSON_IsNumber(v) ? v->valueint : UART_PORT_DEFAULT;
+        if (p->baud < BAUD_MIN || p->baud > BAUD_MAX || (p->data_bits != 7 && p->data_bits != 8) || (p->stop_bits != 1 && p->stop_bits != 2) || parity < 0) {
+            return "uart: baud 300..3000000, data_bits 7 or 8, parity none, even or odd, stop_bits 1 or 2";
+        }
+        p->parity = parity;
+        if (cJSON_IsNumber(v) && (v->valueint < 1024 || v->valueint > 65535 || v->valueint == 6638 || v->valueint == 8081)) {
+            return "port: 1024..65535, not 6638 (Zigbee) or 8081 (OTBR)";
+        }
+    }
+    if (p->mode == M_I2C) {
+        v = cJSON_GetObjectItem(j, "scl");
+        if (!cJSON_IsNumber(v) || !header_pin(v->valueint) || v->valueint == p->gpio || radio_a_use(v->valueint)) {
+            return "scl: a free GPIO of JP1 for the bus's SCL, not the SDA pin";
+        }
+        p->partner = v->valueint;
+        v = cJSON_GetObjectItem(j, "hz");
+        p->hz = cJSON_IsNumber(v) ? (uint32_t)v->valuedouble : 100000;
+        if (p->hz != 100000 && p->hz != 400000) {
+            return "hz: 100000 or 400000";
+        }
+    }
+    if (p->mode == M_WS2812) {
+        v = cJSON_GetObjectItem(j, "leds");
+        p->leds = cJSON_IsNumber(v) ? v->valueint : 30;
+        s = GW_JSON_STR(j, "order");
+        int order = s ? find_name(s_orders, 4, s) : WS_GRB;
+        if (p->leds < 1 || p->leds > LEDS_MAX || order < 0) {
+            return "ws2812: leds 1..512, order grb, rgb, brg or rbg";
+        }
+        p->order = order;
+    }
+    if (p->mode == M_ONEWIRE) {
+        v = cJSON_GetObjectItem(j, "interval_s");
+        p->interval_s = cJSON_IsNumber(v) ? v->valueint : 30;
+        if (p->interval_s < 5 || p->interval_s > 3600) {
+            return "interval_s: 5..3600";
+        }
+    }
     return NULL;
 }
 
@@ -503,8 +684,27 @@ static cJSON *pin_config_json(const pin_t *p)
     if (p->mode == M_OUTPUT) {
         cJSON_AddBoolToObject(j, "open_drain", p->open_drain);
     }
-    if (p->mode == M_OUTPUT || p->mode == M_PWM) {
+    if (p->mode == M_OUTPUT || p->mode == M_PWM || p->mode == M_WS2812) {
         cJSON_AddStringToObject(j, "restore", s_restores[p->restore]);
+    }
+    if (p->mode == M_UART) {
+        cJSON_AddNumberToObject(j, "rx", p->partner);
+        cJSON_AddNumberToObject(j, "baud", p->baud);
+        cJSON_AddNumberToObject(j, "data_bits", p->data_bits);
+        cJSON_AddStringToObject(j, "parity", s_parities[p->parity]);
+        cJSON_AddNumberToObject(j, "stop_bits", p->stop_bits);
+        cJSON_AddNumberToObject(j, "port", p->port);
+    }
+    if (p->mode == M_WS2812) {
+        cJSON_AddNumberToObject(j, "leds", p->leds);
+        cJSON_AddStringToObject(j, "order", s_orders[p->order]);
+    }
+    if (p->mode == M_ONEWIRE) {
+        cJSON_AddNumberToObject(j, "interval_s", p->interval_s);
+    }
+    if (p->mode == M_I2C) {
+        cJSON_AddNumberToObject(j, "scl", p->partner);
+        cJSON_AddNumberToObject(j, "hz", p->hz);
     }
     if (p->mode == M_PWM) {
         cJSON_AddNumberToObject(j, "freq", p->freq);
@@ -534,7 +734,7 @@ static void save(void)
 static bool uses_radio_b(const pin_t *list, int n)
 {
     for (int i = 0; i < n; i++) {
-        if (list[i].mode != M_OFF && radio_b_use(list[i].gpio)) {
+        if (list[i].mode != M_OFF && (radio_b_use(list[i].gpio) || (list[i].partner >= 0 && radio_b_use(list[i].partner)))) {
             return true;
         }
     }
@@ -547,7 +747,7 @@ static const char *check_list(const cJSON *pins, pin_t *out, int *n, char *buf, 
     if (!cJSON_IsArray(pins) || cJSON_GetArraySize(pins) > MAX_PINS) {
         return "pins: a list of up to 8 pins";
     }
-    int pwm = 0, cnt = 0;
+    int pwm = 0, cnt = 0, uart = 0, ws = 0, ow = 0, i2c = 0;
     *n = 0;
     const cJSON *j;
     cJSON_ArrayForEach(j, pins)
@@ -557,24 +757,37 @@ static const char *check_list(const cJSON *pins, pin_t *out, int *n, char *buf, 
             snprintf(buf, len, "pin %d: %s", *n + 1, e);
             return buf;
         }
+        const pin_t *q = &out[*n];
         for (int i = 0; i < *n; i++) {
-            if (out[i].gpio == out[*n].gpio) {
-                snprintf(buf, len, "GPIO%d twice", out[i].gpio);
-                return buf;
+            int a[2] = {out[i].gpio, out[i].partner}, b[2] = {q->gpio, q->partner};
+            for (int x = 0; x < 2; x++) {
+                for (int y = 0; y < 2; y++) {
+                    if (a[x] >= 0 && a[x] == b[y]) {
+                        snprintf(buf, len, "GPIO%d twice", a[x]);
+                        return buf;
+                    }
+                }
             }
         }
         char why[96];
-        const char *r = out[*n].mode != M_OFF ? reserved(out[*n].gpio, why, sizeof(why)) : NULL;
-        if (r) {
-            snprintf(buf, len, "GPIO%d: %s", out[*n].gpio, r);
-            return buf;
+        for (int k = 0; k < 2 && q->mode != M_OFF; k++) {
+            int g = k ? q->partner : q->gpio;
+            const char *r = g >= 0 ? reserved(g, why, sizeof(why)) : NULL;
+            if (r) {
+                snprintf(buf, len, "GPIO%d: %s", g, r);
+                return buf;
+            }
         }
-        pwm += out[*n].mode == M_PWM;
-        cnt += out[*n].mode == M_COUNTER;
+        pwm += q->mode == M_PWM;
+        cnt += q->mode == M_COUNTER;
+        uart += q->mode == M_UART;
+        ws += q->mode == M_WS2812;
+        ow += q->mode == M_ONEWIRE;
+        i2c += q->mode == M_I2C;
         (*n)++;
     }
-    if (pwm > 4 || cnt > 4) {
-        return "4 PWM pins and 4 counters at most";
+    if (pwm > 4 || cnt > 4 || uart > 1 || ws > 2 || ow > 2 || i2c > 1) {
+        return "at most 4 PWM pins, 4 counters, 1 UART, 2 WS2812 strips, 2 1-Wire buses and 1 I2C bus";
     }
     return NULL;
 }
@@ -628,6 +841,43 @@ bool gpio_ctl_claims_radio_b(void)
 
 /* ---------------------------------------------------------------- state */
 
+static void rom_hex(const uint8_t rom[8], char out[17])
+{
+    for (int i = 0; i < 8; i++) {
+        snprintf(out + i * 2, 3, "%02x", rom[i]);
+    }
+}
+
+/* {"state", "color": {r, g, b}, "brightness", "effect"}: also the MQTT JSON light's state */
+static cJSON *light_json(const pin_t *p)
+{
+    cJSON *j = cJSON_CreateObject();
+    cJSON_AddStringToObject(j, "state", p->light.on ? "ON" : "OFF");
+    cJSON *c = cJSON_AddObjectToObject(j, "color");
+    cJSON_AddNumberToObject(c, "r", p->light.rgb[0]);
+    cJSON_AddNumberToObject(c, "g", p->light.rgb[1]);
+    cJSON_AddNumberToObject(c, "b", p->light.rgb[2]);
+    cJSON_AddNumberToObject(j, "brightness", p->light.brightness);
+    cJSON_AddStringToObject(j, "effect", s_effects[p->light.effect]);
+    return j;
+}
+
+/* {"<rom>": temperature or null} */
+static cJSON *onewire_json(const pin_t *p)
+{
+    cJSON *j = cJSON_CreateObject();
+    char rom[17];
+    for (int i = 0; i < p->ow_n; i++) {
+        rom_hex(p->ow_dev[i].rom, rom);
+        if (p->ow_dev[i].ok) {
+            cJSON_AddNumberToObject(j, rom, roundf(p->ow_dev[i].temp * 100) / 100);
+        } else {
+            cJSON_AddNullToObject(j, rom);
+        }
+    }
+    return j;
+}
+
 static cJSON *pin_state_json(const pin_t *p)
 {
     cJSON *j = pin_config_json(p);
@@ -658,6 +908,16 @@ static cJSON *pin_state_json(const pin_t *p)
         cJSON_AddNumberToObject(j, "rate", roundf(p->rate * 10) / 10);
         cJSON_AddNumberToObject(j, "frequency", roundf((p->edge == EDGE_BOTH ? p->rate / 2 : p->rate) * 10) / 10);
         break;
+    case M_UART:
+        gpio_uart_state(j);
+        break;
+    case M_WS2812:
+        cJSON_AddItemToObject(j, "light", light_json(p));
+        break;
+    case M_ONEWIRE:
+        cJSON_AddBoolToObject(j, "present", p->ow_present);
+        cJSON_AddItemToObject(j, "temperatures", onewire_json(p));
+        break;
     }
     return j;
 }
@@ -680,7 +940,11 @@ static cJSON *values_json(void)
             cJSON_AddNumberToObject(c, "count", p->count);
             cJSON_AddNumberToObject(c, "rate", roundf(p->rate * 10) / 10);
             cJSON_AddNumberToObject(c, "frequency", roundf((p->edge == EDGE_BOTH ? p->rate / 2 : p->rate) * 10) / 10);
-        } else {
+        } else if (p->mode == M_WS2812) {
+            cJSON_AddItemToObject(j, key, light_json(p));
+        } else if (p->mode == M_ONEWIRE) {
+            cJSON_AddItemToObject(j, key, onewire_json(p));
+        } else if (p->mode != M_UART && p->mode != M_I2C) {
             cJSON_AddNumberToObject(j, key, p->level);
         }
     }
@@ -692,12 +956,25 @@ static void push(void)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     cJSON *v = values_json();
     xSemaphoreGive(s_lock);
-    char *text = cJSON_PrintUnformatted(v);
-    cJSON_Delete(v);
+    char *text = cJSON_PrintUnformatted(v), topic[24];
     if (text) {
         gw_mqtt_publish("gpio", text, true); /* also the push WebSocket of the integration; retained for MQTT */
         cJSON_free(text);
     }
+    /* a strip's state also on its own topic: the MQTT JSON light reads the whole payload */
+    cJSON *item;
+    cJSON_ArrayForEach(item, v)
+    {
+        if (cJSON_GetObjectItem(item, "effect")) {
+            snprintf(topic, sizeof(topic), "gpio/%s/light", item->string);
+            char *one = cJSON_PrintUnformatted(item);
+            if (one) {
+                gw_mqtt_publish(topic, one, true);
+                cJSON_free(one);
+            }
+        }
+    }
+    cJSON_Delete(v);
 }
 
 static void task(void *arg)
@@ -721,6 +998,18 @@ static void task(void *arg)
                 if (p->raw != p->level && now - p->raw_us >= (int64_t)p->debounce_ms * 1000) {
                     p->level = p->raw;
                     s_changed = true;
+                }
+            } else if (p->mode == M_WS2812 && p->light.on && p->light.effect != WS_SOLID && now - p->fx_us >= FX_US) {
+                p->fx_us = now;
+                gpio_ws2812_show(p->strip, &p->light, p->phase += 2);
+            } else if (p->mode == M_ONEWIRE && now - p->ow_us >= OW_POLL_US) {
+                bool changed = false;
+                int before = p->ow_n;
+                p->ow_us = now;
+                p->ow_n = gpio_onewire_read(p->ow, p->ow_dev, &p->ow_present, &changed);
+                s_changed |= changed;
+                if (p->ow_n != before) {
+                    gw_mqtt_rediscover(); /* sensors found or gone */
                 }
             } else if (p->mode == M_COUNTER && now - p->win_us >= RATE_WINDOW_US) {
                 int count = 0;
@@ -834,9 +1123,61 @@ static pin_t *find(int gpio)
     return NULL;
 }
 
-/* level (0/1) of an output, its pulse or the duty of a PWM pin; NULL or the error */
-static const char *set_value(pin_t *p, const cJSON *level, const cJSON *duty, const cJSON *pulse_ms, bool reset)
+/* light of a strip from {"on" | "state", "color": [r, g, b] | {r, g, b}, "brightness", "effect"} */
+static const char *set_light(pin_t *p, const cJSON *b)
 {
+    gpio_light_t l = p->light;
+    const cJSON *on = cJSON_GetObjectItem(b, "on"), *color = cJSON_GetObjectItem(b, "color"), *br = cJSON_GetObjectItem(b, "brightness");
+    const char *state = GW_JSON_STR(b, "state"), *effect = GW_JSON_STR(b, "effect");
+    if (cJSON_IsBool(on)) {
+        l.on = cJSON_IsTrue(on);
+    } else if (state) {
+        l.on = !strcasecmp(state, "ON");
+    }
+    if (color) {
+        const cJSON *c[3] = {cJSON_GetArrayItem(color, 0), cJSON_GetArrayItem(color, 1), cJSON_GetArrayItem(color, 2)};
+        if (cJSON_IsObject(color)) {
+            c[0] = cJSON_GetObjectItem(color, "r");
+            c[1] = cJSON_GetObjectItem(color, "g");
+            c[2] = cJSON_GetObjectItem(color, "b");
+        }
+        for (int k = 0; k < 3; k++) {
+            if (!cJSON_IsNumber(c[k]) || c[k]->valueint < 0 || c[k]->valueint > 255) {
+                return "color: [r, g, b] or {r, g, b}, 0..255";
+            }
+            l.rgb[k] = c[k]->valueint;
+        }
+    }
+    if (br) {
+        if (!cJSON_IsNumber(br) || br->valueint < 0 || br->valueint > 255) {
+            return "brightness: 0..255";
+        }
+        l.brightness = br->valueint;
+    }
+    if (effect) {
+        int fx = find_name(s_effects, 2, effect);
+        if (fx < 0) {
+            return "effect: none or rainbow";
+        }
+        l.effect = fx;
+    }
+    /* a colour or brightness alone turns the strip on, as Home Assistant expects */
+    if ((color || br) && !cJSON_IsBool(on) && !state) {
+        l.on = true;
+    }
+    if (gpio_ws2812_show(p->strip, &l, p->phase) != ESP_OK) {
+        return "LED strip update failed";
+    }
+    p->light = l;
+    remember_light(p);
+    return NULL;
+}
+
+/* {"level" | "pulse_ms" | "duty" | "reset" | light fields | "rescan"} for the pin's mode; NULL or the error */
+static const char *set_value(pin_t *p, const cJSON *b)
+{
+    const cJSON *level = cJSON_GetObjectItem(b, "level"), *duty = cJSON_GetObjectItem(b, "duty"),
+                *pulse_ms = cJSON_GetObjectItem(b, "pulse_ms");
     if (!p || !p->active) {
         return "no active pin with this GPIO";
     }
@@ -871,15 +1212,23 @@ static const char *set_value(pin_t *p, const cJSON *level, const cJSON *duty, co
         remember(p, p->duty);
         return NULL;
     }
-    if (p->mode == M_COUNTER && reset) {
+    if (p->mode == M_COUNTER && cJSON_IsTrue(cJSON_GetObjectItem(b, "reset"))) {
         pcnt_unit_clear_count(p->unit);
         p->count = p->win_count = 0;
         return NULL;
     }
-    return "output: level or pulse_ms; pwm: duty; counter: reset";
+    if (p->mode == M_WS2812 && (cJSON_GetObjectItem(b, "on") || cJSON_GetObjectItem(b, "state") || cJSON_GetObjectItem(b, "color") ||
+                                cJSON_GetObjectItem(b, "brightness") || cJSON_GetObjectItem(b, "effect"))) {
+        return set_light(p, b);
+    }
+    if (p->mode == M_ONEWIRE && cJSON_IsTrue(cJSON_GetObjectItem(b, "rescan"))) {
+        gpio_onewire_rescan(p->ow);
+        return NULL;
+    }
+    return "output: level or pulse_ms; pwm: duty; counter: reset; ws2812: on, color, brightness, effect; onewire: rescan";
 }
 
-/* {"gpio": 2, "level": 1 | "pulse_ms": 500 | "duty": 50 | "reset": true} */
+/* {"gpio": 2, "level": 1 | "pulse_ms": 500 | "duty": 50 | "reset": true | "on", "color", ... | "rescan": true} */
 static esp_err_t set_post(httpd_req_t *req)
 {
     cJSON *body = gw_http_read_json(req);
@@ -889,8 +1238,7 @@ static esp_err_t set_post(httpd_req_t *req)
     const cJSON *g = cJSON_GetObjectItem(body, "gpio");
     xSemaphoreTake(s_lock, portMAX_DELAY);
     pin_t *p = cJSON_IsNumber(g) ? find(g->valueint) : NULL;
-    const char *err = set_value(p, cJSON_GetObjectItem(body, "level"), cJSON_GetObjectItem(body, "duty"),
-                                cJSON_GetObjectItem(body, "pulse_ms"), cJSON_IsTrue(cJSON_GetObjectItem(body, "reset")));
+    const char *err = set_value(p, body);
     cJSON_Delete(body);
     if (err) {
         xSemaphoreGive(s_lock);
@@ -904,7 +1252,8 @@ static esp_err_t set_post(httpd_req_t *req)
 
 /* ---------------------------------------------------------------- MQTT */
 
-/* gpio/<n>/set: ON, OFF or PULSE <ms> (output), ON/OFF (PWM: 100 % or 0 %); gpio/<n>/duty/set: 0-100 */
+/* gpio/<n>/set: ON, OFF or PULSE <ms> (output), ON/OFF (PWM: 100 % or 0 %); gpio/<n>/duty/set: 0-100;
+ * gpio/<n>/light/set: the JSON of a light (strip) */
 static void mqtt_command(const char *suffix, const char *payload)
 {
     int gpio = -1;
@@ -912,81 +1261,62 @@ static void mqtt_command(const char *suffix, const char *payload)
     if (sscanf(suffix, "gpio/%d/%7[^/]", &gpio, what) != 2) {
         return;
     }
+    cJSON *b = !strcmp(what, "light") ? cJSON_Parse(payload) : cJSON_CreateObject();
     xSemaphoreTake(s_lock, portMAX_DELAY);
     pin_t *p = find(gpio);
-    cJSON *v = NULL;
     const char *err = "unknown command";
     bool on = !strcasecmp(payload, "ON"), off = !strcasecmp(payload, "OFF");
-    if (p && !strcmp(what, "duty")) {
-        v = cJSON_CreateNumber(atof(payload));
-        err = set_value(p, NULL, v, NULL, false);
-    } else if (p && p->mode == M_PWM && (on || off)) {
-        v = cJSON_CreateNumber(on ? 100 : 0);
-        err = set_value(p, NULL, v, NULL, false);
-    } else if (p && !strncasecmp(payload, "PULSE", 5)) {
-        v = cJSON_CreateNumber(atoi(payload + 5) > 0 ? atoi(payload + 5) : 1000);
-        err = set_value(p, NULL, NULL, v, false);
-    } else if (p && (on || off)) {
-        v = cJSON_CreateNumber(on);
-        err = set_value(p, v, NULL, NULL, false);
+    if (p && b) {
+        if (!strcmp(what, "light")) {
+            err = NULL;
+        } else if (!strcmp(what, "duty")) {
+            cJSON_AddNumberToObject(b, "duty", atof(payload));
+            err = NULL;
+        } else if (p->mode == M_PWM && (on || off)) {
+            cJSON_AddNumberToObject(b, "duty", on ? 100 : 0);
+            err = NULL;
+        } else if (!strncasecmp(payload, "PULSE", 5)) {
+            cJSON_AddNumberToObject(b, "pulse_ms", atoi(payload + 5) > 0 ? atoi(payload + 5) : 1000);
+            err = NULL;
+        } else if (on || off) {
+            cJSON_AddNumberToObject(b, "level", on);
+            err = NULL;
+        }
+        if (!err) {
+            err = set_value(p, b);
+        }
     }
     if (!err) {
         s_changed = true;
     }
     xSemaphoreGive(s_lock);
-    cJSON_Delete(v);
+    cJSON_Delete(b);
     if (err) {
         ESP_LOGW(TAG, "MQTT %s %s: %s", suffix, payload, err);
     }
 }
 
 /* discovery entries sent, to remove them when a pin changes */
-static struct {
-    char oid[32];
+#define PUB_MAX (MAX_PINS * 2 + 2 * OW_MAX)
+typedef struct {
+    char oid[40];
     char component[16];
-} s_pub[MAX_PINS * 2];
+} pub_t;
+static pub_t s_pub[PUB_MAX];
 static int s_npub;
 
-static void mqtt_entity(const pin_t *p, const char *component, const char *key, const char *base, const char *host)
+static cJSON *entity_cfg(const pin_t *p, const char *suffix, const char *base, const char *host)
 {
-    char oid[32], buf[160], tpl[128], name[NAME_CHARS * 3 + 16];
-    snprintf(oid, sizeof(oid), "gpio_%d_%s_%s", p->gpio, s_modes[p->mode], key);
-    snprintf(name, sizeof(name), "%s%s", p->name[0] ? p->name : "", !strcmp(key, "frequency") ? " frequency" : "");
-    if (!p->name[0]) {
-        snprintf(name, sizeof(name), "GPIO%d%s", p->gpio, !strcmp(key, "frequency") ? " frequency" : "");
+    char buf[160], name[NAME_CHARS * 3 + 32];
+    if (p->name[0]) {
+        snprintf(name, sizeof(name), "%s%s", p->name, suffix);
+    } else {
+        snprintf(name, sizeof(name), "GPIO%d%s", p->gpio, suffix);
     }
     cJSON *cfg = cJSON_CreateObject();
     cJSON_AddStringToObject(cfg, "name", name);
     snprintf(buf, sizeof(buf), "%s/gpio", base);
     cJSON_AddStringToObject(cfg, "state_topic", buf);
-    if (!strcmp(component, "light")) {
-        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] > 0 else 'OFF' }}", p->gpio);
-        cJSON_AddStringToObject(cfg, "state_value_template", tpl);
-        cJSON_AddStringToObject(cfg, "brightness_state_topic", buf);
-        snprintf(tpl, sizeof(tpl), "{{ value_json['%d'] }}", p->gpio);
-        cJSON_AddStringToObject(cfg, "brightness_value_template", tpl);
-        cJSON_AddNumberToObject(cfg, "brightness_scale", 100);
-        cJSON_AddStringToObject(cfg, "on_command_type", "brightness");
-        snprintf(buf, sizeof(buf), "%s/gpio/%d/duty/set", base, p->gpio);
-        cJSON_AddStringToObject(cfg, "brightness_command_topic", buf);
-    } else if (!strcmp(key, "count") || !strcmp(key, "frequency")) {
-        snprintf(tpl, sizeof(tpl), "{{ value_json['%d'].%s }}", p->gpio, key);
-        cJSON_AddStringToObject(cfg, "value_template", tpl);
-        if (!strcmp(key, "count")) {
-            cJSON_AddStringToObject(cfg, "state_class", "total_increasing");
-        } else {
-            cJSON_AddStringToObject(cfg, "state_class", "measurement");
-            cJSON_AddStringToObject(cfg, "device_class", "frequency");
-            cJSON_AddStringToObject(cfg, "unit_of_measurement", "Hz");
-        }
-    } else {
-        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] else 'OFF' }}", p->gpio);
-        cJSON_AddStringToObject(cfg, "value_template", tpl);
-    }
-    if (!strcmp(component, "switch") || !strcmp(component, "light")) {
-        snprintf(buf, sizeof(buf), "%s/gpio/%d/set", base, p->gpio);
-        cJSON_AddStringToObject(cfg, "command_topic", buf);
-    }
     cJSON *dev = cJSON_AddObjectToObject(cfg, "device");
     cJSON *ids = cJSON_AddArrayToObject(dev, "identifiers");
     snprintf(buf, sizeof(buf), "%s_gpio", host);
@@ -995,66 +1325,143 @@ static void mqtt_entity(const pin_t *p, const char *component, const char *key, 
     cJSON_AddStringToObject(dev, "name", buf);
     cJSON_AddStringToObject(dev, "manufacturer", "Guition");
     cJSON_AddStringToObject(dev, "model", "GPIO of header JP1");
-    gw_mqtt_discovery(GW_MQTT_GPIO, component, oid, cfg);
-    if (s_npub < MAX_PINS * 2) {
-        strlcpy(s_pub[s_npub].oid, oid, sizeof(s_pub[0].oid));
-        strlcpy(s_pub[s_npub].component, component, sizeof(s_pub[0].component));
-        s_npub++;
+    return cfg;
+}
+
+/* the entities of a pin into list (component, object id) with their configurations */
+static int pin_entities(const pin_t *p, const char *base, const char *host, pub_t *list, cJSON **cfgs, int room)
+{
+    char buf[160], tpl[160], rom[17], suffix[24];
+    int n = 0;
+#define ADD(comp, key, cfg)                                                                                            \
+    do {                                                                                                               \
+        if (n < room) {                                                                                                \
+            snprintf(list[n].oid, sizeof(list[n].oid), "gpio_%d_%s_%s", p->gpio, s_modes[p->mode], key);              \
+            strlcpy(list[n].component, comp, sizeof(list[n].component));                                               \
+            cfgs[n++] = cfg;                                                                                           \
+        } else {                                                                                                       \
+            cJSON_Delete(cfg);                                                                                         \
+        }                                                                                                              \
+    } while (0)
+    cJSON *cfg;
+    switch (p->mode) {
+    case M_INPUT:
+    case M_OUTPUT:
+        cfg = entity_cfg(p, "", base, host);
+        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] else 'OFF' }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "value_template", tpl);
+        if (p->mode == M_OUTPUT) {
+            snprintf(buf, sizeof(buf), "%s/gpio/%d/set", base, p->gpio);
+            cJSON_AddStringToObject(cfg, "command_topic", buf);
+        }
+        ADD(p->mode == M_OUTPUT ? "switch" : "binary_sensor", "level", cfg);
+        break;
+    case M_PWM:
+        cfg = entity_cfg(p, "", base, host);
+        snprintf(tpl, sizeof(tpl), "{{ 'ON' if value_json['%d'] > 0 else 'OFF' }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "state_value_template", tpl);
+        snprintf(buf, sizeof(buf), "%s/gpio", base);
+        cJSON_AddStringToObject(cfg, "brightness_state_topic", buf);
+        snprintf(tpl, sizeof(tpl), "{{ value_json['%d'] }}", p->gpio);
+        cJSON_AddStringToObject(cfg, "brightness_value_template", tpl);
+        cJSON_AddNumberToObject(cfg, "brightness_scale", 100);
+        cJSON_AddStringToObject(cfg, "on_command_type", "brightness");
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/duty/set", base, p->gpio);
+        cJSON_AddStringToObject(cfg, "brightness_command_topic", buf);
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/set", base, p->gpio);
+        cJSON_AddStringToObject(cfg, "command_topic", buf);
+        ADD("light", "duty", cfg);
+        break;
+    case M_COUNTER:
+        for (int k = 0; k < 2; k++) {
+            cfg = entity_cfg(p, k ? " frequency" : "", base, host);
+            snprintf(tpl, sizeof(tpl), "{{ value_json['%d'].%s }}", p->gpio, k ? "frequency" : "count");
+            cJSON_AddStringToObject(cfg, "value_template", tpl);
+            cJSON_AddStringToObject(cfg, "state_class", k ? "measurement" : "total_increasing");
+            if (k) {
+                cJSON_AddStringToObject(cfg, "device_class", "frequency");
+                cJSON_AddStringToObject(cfg, "unit_of_measurement", "Hz");
+            }
+            ADD("sensor", k ? "frequency" : "count", cfg);
+        }
+        break;
+    case M_WS2812:
+        cfg = entity_cfg(p, "", base, host);
+        cJSON_AddStringToObject(cfg, "schema", "json");
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/light", base, p->gpio);
+        cJSON_ReplaceItemInObject(cfg, "state_topic", cJSON_CreateString(buf));
+        snprintf(buf, sizeof(buf), "%s/gpio/%d/light/set", base, p->gpio);
+        cJSON_AddStringToObject(cfg, "command_topic", buf);
+        cJSON_AddBoolToObject(cfg, "brightness", true);
+        cJSON *modes = cJSON_AddArrayToObject(cfg, "supported_color_modes");
+        cJSON_AddItemToArray(modes, cJSON_CreateString("rgb"));
+        cJSON_AddBoolToObject(cfg, "effect", true);
+        cJSON *fx = cJSON_AddArrayToObject(cfg, "effect_list");
+        for (int k = 0; k < 2; k++) {
+            cJSON_AddItemToArray(fx, cJSON_CreateString(s_effects[k]));
+        }
+        ADD("light", "light", cfg);
+        break;
+    case M_ONEWIRE:
+        for (int i = 0; i < p->ow_n; i++) {
+            rom_hex(p->ow_dev[i].rom, rom);
+            snprintf(suffix, sizeof(suffix), " %.4s", rom + 12);
+            cfg = entity_cfg(p, suffix, base, host);
+            snprintf(tpl, sizeof(tpl), "{{ value_json['%d']['%s'] }}", p->gpio, rom);
+            cJSON_AddStringToObject(cfg, "value_template", tpl);
+            cJSON_AddStringToObject(cfg, "device_class", "temperature");
+            cJSON_AddStringToObject(cfg, "unit_of_measurement", "°C");
+            cJSON_AddStringToObject(cfg, "state_class", "measurement");
+            cJSON_AddNumberToObject(cfg, "suggested_display_precision", 1);
+            ADD("sensor", rom, cfg);
+        }
+        break;
     }
+#undef ADD
+    return n;
 }
 
 /* Runs in the MQTT publish task (connect, gw_mqtt_rediscover). */
 static void mqtt_discovery(void)
 {
     pin_t *snap = calloc(MAX_PINS, sizeof(pin_t));
-    if (!snap) {
+    pub_t *now = calloc(PUB_MAX, sizeof(pub_t));
+    cJSON **cfgs = calloc(PUB_MAX, sizeof(cJSON *));
+    if (!snap || !now || !cfgs) {
+        free(snap);
+        free(now);
+        free(cfgs);
         return;
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    int n = s_npin;
-    memcpy(snap, s_pin, n * sizeof(pin_t));
+    int npin = s_npin;
+    memcpy(snap, s_pin, npin * sizeof(pin_t));
     xSemaphoreGive(s_lock);
-    /* what was published before: removed, then published again if still there */
-    char oid[32];
+    const char *base = gw_mqtt_base_topic(), *host = gw_state()->hostname;
+    int n = 0;
+    for (int i = 0; i < npin; i++) {
+        if (snap[i].active && (snap[i].expose & EXPOSE_MQTT)) {
+            n += pin_entities(&snap[i], base, host, now + n, cfgs + n, PUB_MAX - n);
+        }
+    }
+    /* what was published before and is gone now */
     for (int k = 0; k < s_npub; k++) {
         bool keep = false;
         for (int i = 0; i < n && !keep; i++) {
-            const pin_t *p = &snap[i];
-            if (p->active && (p->expose & EXPOSE_MQTT)) {
-                for (const char *const *key = (const char *const[]){"level", "duty", "count", "frequency", NULL}; *key && !keep; key++) {
-                    snprintf(oid, sizeof(oid), "gpio_%d_%s_%s", p->gpio, s_modes[p->mode], *key);
-                    keep = !strcmp(oid, s_pub[k].oid);
-                }
-            }
+            keep = !strcmp(now[i].oid, s_pub[k].oid) && !strcmp(now[i].component, s_pub[k].component);
         }
         if (!keep) {
             gw_mqtt_discovery(GW_MQTT_GPIO, s_pub[k].component, s_pub[k].oid, NULL);
         }
     }
-    s_npub = 0;
-    const char *base = gw_mqtt_base_topic(), *host = gw_state()->hostname;
     for (int i = 0; i < n; i++) {
-        const pin_t *p = &snap[i];
-        if (!p->active || !(p->expose & EXPOSE_MQTT)) {
-            continue;
-        }
-        switch (p->mode) {
-        case M_INPUT:
-            mqtt_entity(p, "binary_sensor", "level", base, host);
-            break;
-        case M_OUTPUT:
-            mqtt_entity(p, "switch", "level", base, host);
-            break;
-        case M_PWM:
-            mqtt_entity(p, "light", "duty", base, host);
-            break;
-        case M_COUNTER:
-            mqtt_entity(p, "sensor", "count", base, host);
-            mqtt_entity(p, "sensor", "frequency", base, host);
-            break;
-        }
+        gw_mqtt_discovery(GW_MQTT_GPIO, now[i].component, now[i].oid, cfgs[i]);
     }
+    memcpy(s_pub, now, n * sizeof(pub_t));
+    s_npub = n;
     free(snap);
+    free(now);
+    free(cfgs);
     push(); /* the retained state for the entities */
 }
 
@@ -1114,6 +1521,7 @@ esp_err_t gpio_ctl_init(void)
     gw_mqtt_set_extension(mqtt_discovery, NULL);
     gw_mqtt_add_command("gpio/+/set", mqtt_command);
     gw_mqtt_add_command("gpio/+/duty/set", mqtt_command);
+    gw_mqtt_add_command("gpio/+/light/set", mqtt_command);
     ESP_LOGI(TAG, "%d pins configured", n);
     return xTaskCreate(task, "gpio_ctl", 4096, NULL, 5, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 }

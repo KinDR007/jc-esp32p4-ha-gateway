@@ -804,7 +804,7 @@ await test('UI30', 'System › API: every endpoint of /api/help listed, filter, 
 
 await test('UI31', 'System › Hardware: wiring (CN3), scan with the onboard codec, supported types, add by hand, rename and expose, remove; the configuration of before comes back', async () => {
   const before = await (await page.request.get(base + 'api/sensors')).json();
-  const keep = before.sensors.map(({ addr, type, chip, name, expose, enabled }) => ({ addr, type, chip, name, expose, enabled }));
+  const keep = before.sensors.map(({ bus, addr, type, chip, name, expose, enabled }) => ({ bus, addr, type, chip, name, expose, enabled }));
   try {
     await tab('system/hw');
     await page.waitForSelector('#hw-types tr:nth-child(2)', { timeout: 15000 });
@@ -819,7 +819,7 @@ await test('UI31', 'System › Hardware: wiring (CN3), scan with the onboard cod
     check(opts.includes('bme280') && !opts.includes('sht3x'), `types offered for 0x${free.toString(16)}: ${opts.join(', ')}`);
     await page.selectOption('#hw-add-type', 'bme280');
     await page.click('#hw-add');
-    const row = `tr[data-hw="${free}"]`;
+    const id = 'i2c_' + free.toString(16), row = `tr[data-hw="${id}"]`;
     await page.waitForSelector(row);
     await page.fill(`${row} [data-hw-name]`, 'Ložnice UI31');
     await page.uncheck(`${row} [data-hw-expose]`);
@@ -829,7 +829,7 @@ await test('UI31', 'System › Hardware: wiring (CN3), scan with the onboard cod
     check(s && s.name === 'Ložnice UI31' && !s.expose && s.chip === 'BME280', 'stored: name with diacritics, not exposed');
     await page.waitForFunction(r => /error|starting/.test(document.querySelector(r + ' td:nth-child(5)')?.textContent || ''), row, { timeout: 15000 });
     check(true, `state of the missing sensor: ${(await page.textContent(`${row} td:nth-child(5)`)).trim()}`);
-    await page.click(`[data-hw-del="${free}"]`);
+    await page.click(`[data-hw-del="${id}"]`);
     await page.waitForSelector('#confirm[open]');
     await page.click('#confirm button[value="yes"]');
     await page.waitForFunction(r => !document.querySelector(r), row, { timeout: 5000 });

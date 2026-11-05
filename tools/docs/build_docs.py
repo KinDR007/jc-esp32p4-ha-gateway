@@ -383,14 +383,14 @@ PAGES = [
        <li>Pojmenujte ho a <b>Uložte</b>. Integrace P4 Gateway ukáže jeho hodnoty jako senzory; MQTT také se skupinou <i>I2C senzory</i>.</li></ol>"""),
      ["system_hw"]),
     ("system/gpio", "chip", T("System › GPIO (JP1)", "Systém › GPIO (JP1)"),
-     T("Free pins of header JP1 as inputs, outputs, PWM or pulse counters, set up and switched from the page.",
-       "Volné piny konektoru JP1 jako vstupy, výstupy, PWM nebo čítače pulzů, nastavené a ovládané ze stránky."),
+     T("Free pins of header JP1 as inputs, outputs, PWM, pulse counters, a UART-TCP bridge, a second I2C bus, 1-Wire temperatures or a WS2812 LED strip, set up and controlled from the page.",
+       "Volné piny konektoru JP1 jako vstupy, výstupy, PWM, čítače pulzů, most UART–TCP, druhá sběrnice I2C, teploty 1-Wire nebo LED pásek WS2812, nastavené a ovládané ze stránky."),
      {"HEADER JP1": T("All 26 pins: power, radio pins locked with the reason (hover), free pins in green, configured ones in blue with their value. 3.3 V logic, not 5 V tolerant, about 20 mA per pin.",
                       "Všech 26 pinů: napájení, piny rádií zamčené s důvodem (po najetí myší), volné zeleně, nastavené modře s hodnotou. Logika 3,3 V, 5 V pin nesnese, asi 20 mA na pin."),
       "PIN SETTINGS": T("Name for Home Assistant, mode and its options: pull resistor, inverted, debounce (input), open drain and the state after a restart (output, PWM), frequency (PWM), edges and glitch filter (counter).",
                         "Jméno pro Home Assistant, režim a jeho volby: pull rezistor, inverze, debounce (vstup), open drain a stav po restartu (výstup, PWM), frekvence (PWM), hrany a filtr zákmitů (čítač)."),
-      "CONFIGURED PINS": T("Live values; switch an output or pulse it for 1 s, move a PWM duty, clear a counter (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).",
-                           "Živé hodnoty; přepnutí výstupu nebo pulz 1 s, posun střídy PWM, vynulování čítače (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).")},
+      "CONFIGURED PINS": T("Live values; switch an output or pulse it for 1 s, move a PWM duty, clear a counter, set a strip's colour, brightness and effect, search a 1-Wire bus; the UART bridge shows its client and bytes (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).",
+                           "Živé hodnoty; přepnutí výstupu nebo pulz 1 s, posun střídy PWM, vynulování čítače, barva, jas a efekt pásku, hledání na sběrnici 1-Wire; most UART ukazuje klienta a bajty (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).")},
      T("""<ol><li>Wire the circuit with the gateway off; a relay or a LED strip goes through a transistor or a driver module, a relay with a pull-down (pins are off for 1-2 s after power on).</li>
        <li>Click a free (green) pin, name it, choose the mode and its options, <b>Save</b>.</li>
        <li>Switch or watch it in <i>Configured pins</i>; <b>Free the pin</b> turns it off again.</li></ol>""",

@@ -3346,8 +3346,8 @@
             ]
           },
           "effects": {
-            "en": "values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes.",
-            "cs": "values obsahuje jen čerstvé hodnoty (u senzoru, který přestal odpovídat, žádné a chybí age_s). state: ok, starting, stale (tři periody bez nové hodnoty), error (proč říká error; senzor se znovu spouští každých 60 s) nebo off. scan.devices uvádí každou adresu, která odpověděla: onboard je kodek desky, candidates čipy, které identifikace našla (sure: shodl se ID registr nebo ID příkaz; jinak čip jen odpovídá podobně). types uvádí všechny podporované čipy s adresami; quantities jednotky a třídy zařízení Home Assistant."
+            "en": "values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes. bus2 {sda, scl, khz} while a second bus is set up; every sensor and scanned device has its bus (1 or 2).",
+            "cs": "values obsahuje jen čerstvé hodnoty (u senzoru, který přestal odpovídat, žádné a chybí age_s). state: ok, starting, stale (tři periody bez nové hodnoty), error (proč říká error; senzor se znovu spouští každých 60 s) nebo off. scan.devices uvádí každou adresu, která odpověděla: onboard je kodek desky, candidates čipy, které identifikace našla (sure: shodl se ID registr nebo ID příkaz; jinak čip jen odpovídá podobně). types uvádí všechny podporované čipy s adresami; quantities jednotky a třídy zařízení Home Assistant. bus2 {sda, scl, khz}, dokud je nastavená druhá sběrnice; každý senzor i nalezené zařízení má svou sběrnici (1 nebo 2)."
           }
         },
         {
@@ -3385,8 +3385,8 @@
             }
           ],
           "effects": {
-            "en": "sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant.",
-            "cs": "sensors nahradí celý seznam (pošlete i ty, které mají zůstat). name je výchozí podle čipu, expose a enabled true; chip (přesný čip, např. BME688) se uloží, jak přišel. Senzor se stejnou adresou a typem běží dál; odebrané se zastaví a jejich entity MQTT se odstraní. expose: integrace a MQTT (skupina discovery sensors) ho ukážou v Home Assistant."
+            "en": "sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant. bus: 1 (the board's, default) or 2 (the second bus set up under System › GPIO); a sensor on bus 2 has the id i2c2_<addr>.",
+            "cs": "sensors nahradí celý seznam (pošlete i ty, které mají zůstat). name je výchozí podle čipu, expose a enabled true; chip (přesný čip, např. BME688) se uloží, jak přišel. Senzor se stejnou adresou a typem běží dál; odebrané se zastaví a jejich entity MQTT se odstraní. expose: integrace a MQTT (skupina discovery sensors) ho ukážou v Home Assistant. bus: 1 (sběrnice desky, výchozí) nebo 2 (druhá sběrnice nastavená v Systém › GPIO); senzor na sběrnici 2 má id i2c2_<adresa>."
           }
         },
         {
@@ -4106,13 +4106,30 @@
                 "count": 1520,
                 "rate": 0.5,
                 "frequency": 0.5
+              },
+              {
+                "gpio": 2,
+                "mode": "uart",
+                "name": "Meter",
+                "rx": 3,
+                "baud": 9600,
+                "data_bits": 8,
+                "parity": "none",
+                "stop_bits": 1,
+                "port": 6639,
+                "jp1": 9,
+                "active": true,
+                "client": "192.168.1.20",
+                "sessions": 1,
+                "rx_bytes": 1024,
+                "tx_bytes": 96
               }
             ],
             "radio_b_gpio": false
           },
           "effects": {
-            "en": "header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone.",
-            "cs": "header uvádí všech 26 pinů (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); GPIO je volné nebo obsazené s důvodem (rádio A vždy; rádio B, když má roli nebo je na něm nalezené rádio). pins: level (vstup po debounce, výstup jak je nastaven, oba logicky po inverzi), pin_level (výstup přečtený zpět na pinu), duty v % u PWM, count, rate (pulzy za sekundu) a frequency u čítače. active false s error: pin je nastavený, ale vypnutý (teď obsazený, nezbyl časovač PWM nebo čítač). radio_b_gpio: piny rádia B jsou GPIO, rádio B se nepoužívá."
+            "en": "header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone. uart: client (address of the TCP client, empty without one), sessions, rx_bytes (UART to the client), tx_bytes. ws2812: light {state, color {r, g, b}, brightness 0-255, effect}. onewire: present (a device answered the reset), temperatures {ROM code: °C or null}.",
+            "cs": "header uvádí všech 26 pinů (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); GPIO je volné nebo obsazené s důvodem (rádio A vždy; rádio B, když má roli nebo je na něm nalezené rádio). pins: level (vstup po debounce, výstup jak je nastaven, oba logicky po inverzi), pin_level (výstup přečtený zpět na pinu), duty v % u PWM, count, rate (pulzy za sekundu) a frequency u čítače. active false s error: pin je nastavený, ale vypnutý (teď obsazený, nezbyl časovač PWM nebo čítač). radio_b_gpio: piny rádia B jsou GPIO, rádio B se nepoužívá. uart: client (adresa TCP klienta, prázdná bez něj), sessions, rx_bytes (z UART ke klientovi), tx_bytes. ws2812: light {state, color {r, g, b}, brightness 0-255, effect}. onewire: present (zařízení odpovědělo na reset), temperatures {kód ROM: °C nebo null}."
           }
         },
         {
@@ -4128,36 +4145,29 @@
             "pins": [
               {
                 "gpio": 2,
-                "mode": "output",
-                "name": "Relay",
-                "expose": "integration",
-                "invert": false,
-                "open_drain": false,
-                "pull": "none",
-                "restore": "last"
-              },
-              {
-                "gpio": 3,
-                "mode": "input",
-                "name": "Button",
-                "pull": "up",
-                "invert": true,
-                "debounce_ms": 20
+                "mode": "uart",
+                "name": "Meter",
+                "rx": 3,
+                "baud": 9600,
+                "data_bits": 8,
+                "parity": "none",
+                "stop_bits": 1,
+                "port": 6639
               },
               {
                 "gpio": 1,
-                "mode": "pwm",
-                "name": "LED",
-                "freq": 1000,
-                "restore": "off"
+                "mode": "ws2812",
+                "name": "Strip",
+                "leds": 60,
+                "order": "grb",
+                "restore": "last",
+                "expose": "both"
               },
               {
                 "gpio": 45,
-                "mode": "counter",
-                "name": "Water meter",
-                "edge": "rising",
-                "pull": "down",
-                "filter_ns": 1000
+                "mode": "onewire",
+                "name": "Floor",
+                "interval_s": 30
               }
             ]
           },
@@ -4256,14 +4266,14 @@
             {
               "code": 400,
               "when": {
-                "en": "gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown.",
-                "cs": "gpio není volné GPIO na JP1 (piny rádia A, rádia B dokud se používá), GPIO dvakrát, mode není off, input, output, pwm ani counter, víc než 4 PWM nebo 4 čítače, name přes 32 znaků nebo s uvozovkami, zpětnými lomítky či složenými závorkami, debounce_ms mimo 0-1000, freq mimo 1-1000000, filter_ns mimo 0-10000, neznámé pull, restore, edge nebo expose."
+                "en": "gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown. uart: rx missing, the TX pin or not free, baud out of 300-3000000, data_bits not 7 or 8, parity not none, even or odd, stop_bits not 1 or 2, port out of 1024-65535 or 6638/8081; i2c: scl missing or not free, hz not 100000 or 400000; ws2812: leds out of 1-512, order not grb, rgb, brg or rbg; onewire: interval_s out of 5-3600; more than 1 UART, 1 I2C bus, 2 strips or 2 1-Wire buses.",
+                "cs": "gpio není volné GPIO na JP1 (piny rádia A, rádia B dokud se používá), GPIO dvakrát, mode není off, input, output, pwm ani counter, víc než 4 PWM nebo 4 čítače, name přes 32 znaků nebo s uvozovkami, zpětnými lomítky či složenými závorkami, debounce_ms mimo 0-1000, freq mimo 1-1000000, filter_ns mimo 0-10000, neznámé pull, restore, edge nebo expose. uart: chybí rx, je to pin TX nebo není volný, baud mimo 300-3000000, data_bits není 7 ani 8, parity není none, even ani odd, stop_bits není 1 ani 2, port mimo 1024-65535 nebo 6638/8081; i2c: chybí scl nebo není volný, hz není 100000 ani 400000; ws2812: leds mimo 1-512, order není grb, rgb, brg ani rbg; onewire: interval_s mimo 5-3600; víc než 1 UART, 1 sběrnice I2C, 2 pásky nebo 2 sběrnice 1-Wire."
               }
             }
           ],
           "effects": {
-            "en": "Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge.",
-            "cs": "Vynechané piny jsou vypnuté (vysoká impedance). restore: výstup nebo PWM po restartu vypnutý, zapnutý (100 %) nebo s poslední hodnotou (uloží se 5 s po poslední změně). Úroveň výstupu se nastaví dřív, než se zapne jeho budič. Dokud jsou piny rádia B GPIO, rádio B se nespouští, netestuje, neflashuje ani nezálohuje (409); přidělení role rádiu B je při dalším startu vypne s notifikací. invert: úrovně vstupu a výstupu jsou logické, na pinu je opak; čítač počítá druhou hranu."
+            "en": "Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge. Modes over peripherals: uart (UART4 on gpio as TX and rx as RX, a TCP server on port, one client at a time, a new one replaces it, bytes unchanged both ways), i2c (a second I2C bus, SDA gpio, SCL scl, for the sensors: /api/sensors with bus 2), onewire (DS18B20, DS1822, DS18S20 found by a ROM search, all converted at once every interval_s; needs a 4.7 kOhm pull-up), ws2812 (RMT, one colour for every LED, brightness, effect none or rainbow, state after a restart like an output).",
+            "cs": "Vynechané piny jsou vypnuté (vysoká impedance). restore: výstup nebo PWM po restartu vypnutý, zapnutý (100 %) nebo s poslední hodnotou (uloží se 5 s po poslední změně). Úroveň výstupu se nastaví dřív, než se zapne jeho budič. Dokud jsou piny rádia B GPIO, rádio B se nespouští, netestuje, neflashuje ani nezálohuje (409); přidělení role rádiu B je při dalším startu vypne s notifikací. invert: úrovně vstupu a výstupu jsou logické, na pinu je opak; čítač počítá druhou hranu. Režimy přes periferie: uart (UART4, gpio jako TX a rx jako RX, TCP server na port, jeden klient najednou, nový ho nahradí, bajty beze změny oběma směry), i2c (druhá sběrnice I2C, SDA gpio, SCL scl, pro senzory: /api/sensors s bus 2), onewire (DS18B20, DS1822, DS18S20 nalezené prohledáním ROM, všechny měří najednou každých interval_s; potřebuje pull-up 4,7 kOhm), ws2812 (RMT, jedna barva pro všechny LED, jas, efekt none nebo rainbow, stav po restartu jako u výstupu)."
           }
         },
         {
@@ -4276,8 +4286,15 @@
             "cs": "Nastaví výstup, pulz, střídu PWM nebo vynuluje čítač."
           },
           "body": {
-            "gpio": 2,
-            "level": 1
+            "gpio": 1,
+            "on": true,
+            "color": [
+              255,
+              80,
+              0
+            ],
+            "brightness": 180,
+            "effect": "rainbow"
           },
           "body_type": "json",
           "response": {
@@ -4298,8 +4315,8 @@
             {
               "code": 400,
               "when": {
-                "en": "The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true).",
-                "cs": "Hodnota neodpovídá režimu (výstup: level 0/1 nebo pulse_ms 1-3600000; pwm: duty 0-100; čítač: reset true)."
+                "en": "The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true; ws2812: on or state, color [r, g, b] or {r, g, b} 0-255, brightness 0-255, effect none or rainbow; onewire: rescan true).",
+                "cs": "Hodnota neodpovídá režimu (výstup: level 0/1 nebo pulse_ms 1-3600000; pwm: duty 0-100; čítač: reset true; ws2812: on nebo state, color [r, g, b] nebo {r, g, b} 0-255, brightness 0-255, effect none nebo rainbow; onewire: rescan true)."
               }
             },
             {
@@ -4311,8 +4328,8 @@
             }
           ],
           "effects": {
-            "en": "pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change.",
-            "cs": "pulse_ms přepne výstup na opačnou úroveň na danou dobu a zpět (další pulz během běžícího posune jeho konec); nastavení úrovně běžící pulz ukončí. Změny jdou do push kanálu (MQTT téma gpio, /api/ws) jako každá změna hodnoty."
+            "en": "pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change. A strip: a colour or brightness alone turns it on. onewire rescan: searches the bus now.",
+            "cs": "pulse_ms přepne výstup na opačnou úroveň na danou dobu a zpět (další pulz během běžícího posune jeho konec); nastavení úrovně běžící pulz ukončí. Změny jdou do push kanálu (MQTT téma gpio, /api/ws) jako každá změna hodnoty. Pásek: samotná barva nebo jas ho zapne. onewire rescan: prohledá sběrnici hned."
           }
         }
       ]

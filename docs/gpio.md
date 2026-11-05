@@ -1,9 +1,10 @@
-# GPIO on JP1 (plan)
+# GPIO on JP1
 
 Free pins of header JP1 configured and controlled from System › GPIO (JP1), the API and Home Assistant
 (device "P4 GPIO" through the integration or MQTT). Status: G1 and G2 done (pins, reservations, input,
-output, PWM, counter, API, web UI, Telegram `/gpio`) and G3 (Home Assistant through the integration
-1.7.0 and MQTT); G4 and G5 planned.
+output, PWM, counter, API, web UI, Telegram `/gpio`), G3 (Home Assistant through the integration
+1.7.0 and MQTT) and G4 (UART-TCP bridge, second I2C bus, 1-Wire DS18B20, WS2812 strip); G5 (tests with a
+jumper on the pins) open.
 
 ## Use
 
@@ -19,8 +20,25 @@ moves a PWM duty and clears counters. API `GET`/`PUT /api/gpio`, `POST /api/gpio
 | output | pull, inverted, open drain, after a restart off/on/last | level (and `pin_level` read back on the pad); `pulse_ms` flips it for a time |
 | pwm | frequency 1 Hz-1 MHz (resolution from 20 bits at 1 Hz to 6 bits at 1 MHz), inverted, after a restart | duty 0-100 % |
 | counter | edges rising/falling/both, pull, inverted, glitch filter 0-10000 ns | count, rate per second, frequency |
+| uart (two pins) | RX pin, 300-3000000 Bd, 7/8 data bits, parity, 1/2 stop bits, TCP port (default 6639) | client, bytes each way |
+| i2c (two pins) | SCL pin, 100 or 400 kHz | the sensors on it: System › Hardware, bus 2 |
+| onewire | read every 5-3600 s | temperature per DS18B20 (DS1822, DS18S20) by its ROM code |
+| ws2812 | LEDs 1-512, colour order (GRB, RGB, BRG, RBG), after a restart | on, colour, brightness 0-255, effect (none, rainbow) |
 
-At most 4 PWM pins (LEDC timers) and 4 counters (PCNT units). An output's level is set before its driver
+At most 4 PWM pins (LEDC timers), 4 counters (PCNT units), 1 UART (UART4, the only one left), 1 I2C bus, 2
+strips (RMT) and 2 1-Wire buses.
+
+- **UART-TCP bridge**: a TCP server on the port; one client at a time, a new one replaces the previous
+  (usually the same program reconnecting); bytes pass unchanged. 3.3 V levels: RS232 needs a converter,
+  RS485 a transceiver (the board's own RS485 is System › RS485).
+- **Second I2C bus**: internal pull-ups on; longer wires need 2.2-4.7 kΩ to 3.3 V. Sensors on it are
+  scanned when the bus is set up and at every start, ids `i2c2_<address>` ([sensors.md](sensors.md)).
+- **1-Wire**: bit-banged with the standard timings (open drain, external 4.7 kΩ pull-up to 3.3 V); a ROM
+  search at start, every 10 readings and on *Search*; all devices convert at once (750 ms), each is read
+  with a CRC check; 85.0 °C (the power-on value) counts as no reading.
+- **WS2812**: 800 kHz from the RMT; one colour for the whole strip or a moving rainbow (a frame every
+  50 ms). Data at 3.3 V: most strips need a level shifter (74AHCT125) or a first LED at a lower supply;
+  the strip has its own 5 V supply with GND joined to the gateway's. An output's level is set before its driver
 turns on; the last level or duty is saved 5 s after the last change. While radio B's pins are GPIO, radio B
 is not started, tested, flashed or backed up (409); a role given to radio B turns them off at the next
 start with a notification.
@@ -36,6 +54,9 @@ the gateway:
 | output | switch | `gpio/<n>/set`: `ON`, `OFF`, `PULSE <ms>` |
 | pwm | light, brightness = duty | `gpio/<n>/duty/set`: 0-100; `gpio/<n>/set`: `ON` (100 %), `OFF` |
 | counter | sensors count (total increasing) and frequency (Hz) | |
+| onewire | a temperature sensor per device, named after the pin and the end of its ROM code | |
+| ws2812 | light with RGB colour, brightness and effects (MQTT: JSON schema, state topic `gpio/<n>/light`) | `gpio/<n>/light/set`: `{"state", "color": {r, g, b}, "brightness", "effect"}` |
+| uart, i2c | none (the I2C sensors are entities of the gateway, [sensors.md](sensors.md)) | |
 
 State: topic `gpio` (retained) `{"<n>": level or duty, "<n>": {"count", "rate", "frequency"}}`, published on
 every change, a running counter at most every 5 s; the integration gets it over `/api/ws`. MQTT discovery
@@ -96,7 +117,7 @@ B, 3 RS485), one HP I2C port, LEDC (8 PWM channels), PCNT, RMT, SPI2/3.
   a crash: a relay needs an external pull-down (documented in the UI). Current per pin within the P4
   limits; a warning in the UI.
 
-## Phases
+## Phases (G1-G4 done 2026-11-05)
 
 | Phase | Content | Done when |
 |---|---|---|

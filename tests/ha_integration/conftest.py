@@ -73,6 +73,10 @@ GPIO = {
         {"gpio": 45, "mode": "counter", "name": "Water meter", "expose": "integration", "edge": "both", "jp1": 14, "active": True,
          "count": 120, "rate": 2.0, "frequency": 1.0},
         {"gpio": 32, "mode": "output", "name": "MQTT only", "expose": "mqtt", "jp1": 19, "active": True, "level": 0},
+        {"gpio": 33, "mode": "ws2812", "name": "Strip", "expose": "integration", "jp1": 21, "active": True, "leds": 30,
+         "light": {"state": "ON", "color": {"r": 255, "g": 80, "b": 0}, "brightness": 200, "effect": "none"}},
+        {"gpio": 46, "mode": "onewire", "name": "Floor", "expose": "integration", "jp1": 12, "active": True, "present": True,
+         "temperatures": {"28ff641e0f16034c": 21.5}},
     ]
 }
 

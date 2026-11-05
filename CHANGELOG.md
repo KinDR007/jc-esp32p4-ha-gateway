@@ -18,7 +18,11 @@
   binary sensor, output switch, PWM light with the duty as brightness, counter count and frequency);
   MQTT discovery group `gpio` with the same entities and commands `gpio/<n>/set` (ON, OFF, PULSE <ms>) and
   `gpio/<n>/duty/set`. A stored selection of all eight MQTT groups gets the new one.
-- Tests: TC52, TC53, UI36, integration tests of the GPIO device.
+- GPIO functions over the chip's peripherals: UART-TCP bridge (UART4, TCP port 6639 by default, one
+  client at a time), second I2C bus for the I2C sensors (`"bus": 2`, ids `i2c2_<addr>`, System › Hardware
+  shows the bus), 1-Wire DS18B20/DS1822/DS18S20 (each a temperature in Home Assistant), WS2812 LED strip
+  (colour, brightness, rainbow effect; MQTT JSON light). MQTT commands may carry up to 191 bytes.
+- Tests: TC52, TC53, TC54, UI36, integration tests of the GPIO device.
 
 ## v1.12 (2026-11-04)
 

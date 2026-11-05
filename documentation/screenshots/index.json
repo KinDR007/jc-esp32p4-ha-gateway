@@ -731,11 +731,11 @@
     "file": "system_gpio__1"
    },
    {
-    "title": "PIN SETTINGS",
+    "title": "CONFIGURED PINS",
     "file": "system_gpio__2"
    },
    {
-    "title": "CONFIGURED PINS",
+    "title": "PIN SETTINGS",
     "file": "system_gpio__3"
    }
   ]

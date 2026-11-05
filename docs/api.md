@@ -2324,7 +2324,7 @@ Response:
 }
 ```
 
-Effects: values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes.
+Effects: values holds only fresh readings (none for a sensor that stopped answering; age_s is then missing). state: ok, starting, stale (no new value for three periods), error (error says why; the sensor is started again every 60 s) or off. scan.devices lists every address that answered: onboard is the board's codec, candidates the chips the identification found (sure: an ID register or ID command matched; otherwise the chip only answers like it). types lists all supported chips with their addresses; quantities the units and Home Assistant device classes. bus2 {sda, scl, khz} while a second bus is set up; every sensor and scanned device has its bus (1 or 2).
 
 #### PUT `/api/sensors`
 
@@ -2355,7 +2355,7 @@ Response:
 
 Errors: 400 interval_s not 5..3600; more than 16 sensors; addr outside 0x08..0x77, 0x18 (the codec) or not an address of the type; unknown type; an address twice; name over 32 characters or with quotes, braces or backslash.
 
-Effects: sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant.
+Effects: sensors replaces the whole list (send the ones to keep too). name defaults to the chip, expose and enabled to true; chip (the exact chip, e.g. BME688) is kept as sent. A sensor with the same address and type keeps running; removed ones stop, and their MQTT entities are removed. expose: the integration and MQTT (discovery group sensors) show it in Home Assistant. bus: 1 (the board's, default) or 2 (the second bus set up under System › GPIO); a sensor on bus 2 has the id i2c2_<addr>.
 
 #### POST `/api/sensors/scan`
 
@@ -2905,13 +2905,30 @@ Response:
       "count": 1520,
       "rate": 0.5,
       "frequency": 0.5
+    },
+    {
+      "gpio": 2,
+      "mode": "uart",
+      "name": "Meter",
+      "rx": 3,
+      "baud": 9600,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "port": 6639,
+      "jp1": 9,
+      "active": true,
+      "client": "192.168.1.20",
+      "sessions": 1,
+      "rx_bytes": 1024,
+      "tx_bytes": 96
     }
   ],
   "radio_b_gpio": false
 }
 ```
 
-Effects: header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone.
+Effects: header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone. uart: client (address of the TCP client, empty without one), sessions, rx_bytes (UART to the client), tx_bytes. ws2812: light {state, color {r, g, b}, brightness 0-255, effect}. onewire: present (a device answered the reset), temperatures {ROM code: °C or null}.
 
 #### PUT `/api/gpio`
 
@@ -2922,36 +2939,29 @@ Body:
   "pins": [
     {
       "gpio": 2,
-      "mode": "output",
-      "name": "Relay",
-      "expose": "integration",
-      "invert": false,
-      "open_drain": false,
-      "pull": "none",
-      "restore": "last"
-    },
-    {
-      "gpio": 3,
-      "mode": "input",
-      "name": "Button",
-      "pull": "up",
-      "invert": true,
-      "debounce_ms": 20
+      "mode": "uart",
+      "name": "Meter",
+      "rx": 3,
+      "baud": 9600,
+      "data_bits": 8,
+      "parity": "none",
+      "stop_bits": 1,
+      "port": 6639
     },
     {
       "gpio": 1,
-      "mode": "pwm",
-      "name": "LED",
-      "freq": 1000,
-      "restore": "off"
+      "mode": "ws2812",
+      "name": "Strip",
+      "leds": 60,
+      "order": "grb",
+      "restore": "last",
+      "expose": "both"
     },
     {
       "gpio": 45,
-      "mode": "counter",
-      "name": "Water meter",
-      "edge": "rising",
-      "pull": "down",
-      "filter_ns": 1000
+      "mode": "onewire",
+      "name": "Floor",
+      "interval_s": 30
     }
   ]
 }
@@ -3052,9 +3062,9 @@ Response:
 }
 ```
 
-Errors: 400 gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown.
+Errors: 400 gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown. uart: rx missing, the TX pin or not free, baud out of 300-3000000, data_bits not 7 or 8, parity not none, even or odd, stop_bits not 1 or 2, port out of 1024-65535 or 6638/8081; i2c: scl missing or not free, hz not 100000 or 400000; ws2812: leds out of 1-512, order not grb, rgb, brg or rbg; onewire: interval_s out of 5-3600; more than 1 UART, 1 I2C bus, 2 strips or 2 1-Wire buses.
 
-Effects: Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge.
+Effects: Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge. Modes over peripherals: uart (UART4 on gpio as TX and rx as RX, a TCP server on port, one client at a time, a new one replaces it, bytes unchanged both ways), i2c (a second I2C bus, SDA gpio, SCL scl, for the sensors: /api/sensors with bus 2), onewire (DS18B20, DS1822, DS18S20 found by a ROM search, all converted at once every interval_s; needs a 4.7 kOhm pull-up), ws2812 (RMT, one colour for every LED, brightness, effect none or rainbow, state after a restart like an output).
 
 #### POST `/api/gpio/set`
 
@@ -3062,8 +3072,15 @@ Body:
 
 ```json
 {
-  "gpio": 2,
-  "level": 1
+  "gpio": 1,
+  "on": true,
+  "color": [
+    255,
+    80,
+    0
+  ],
+  "brightness": 180,
+  "effect": "rainbow"
 }
 ```
 
@@ -3086,9 +3103,9 @@ Response:
 }
 ```
 
-Errors: 400 The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true).; 404 No active pin with this GPIO.
+Errors: 400 The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true; ws2812: on or state, color [r, g, b] or {r, g, b} 0-255, brightness 0-255, effect none or rainbow; onewire: rescan true).; 404 No active pin with this GPIO.
 
-Effects: pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change.
+Effects: pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change. A strip: a colour or brightness alone turns it on. onewire rescan: searches the bus now.
 
 ### Updates and firmware
 

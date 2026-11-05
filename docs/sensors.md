@@ -21,6 +21,10 @@ and camera connectors ([hardware.md](hardware.md#i2c-bus-es_i2c-gpio7-sda--gpio8
 - Connect with the gateway off. A scan runs at every start and from the page.
 - Check CN3 pin 2 with a multimeter (3.3 V against pin 1) before wiring: the pin numbers come
   from the schematic.
+- A **second bus** on two free pins of JP1 (System › GPIO, mode *I2C bus 2*, 100 or 400 kHz) takes
+  sensors with addresses the first bus already has, or a longer wire away from the codec. Its sensors
+  carry `"bus": 2` and the ids `i2c2_<address>` (API, MQTT object ids, integration); everything else
+  works as on the first bus ([gpio.md](gpio.md)).
 
 ## Supported sensors
 

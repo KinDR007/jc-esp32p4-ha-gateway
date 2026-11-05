@@ -171,7 +171,9 @@ async def async_setup_entry(
     add_new()
     entry.async_on_unload(coordinator.async_add_listener(add_new))
     add_modbus_entities(coordinator, async_add_entities, "sensor", P4ModbusSensor)
-    add_gpio_entities(coordinator, async_add_entities, "sensor", P4GpioCounter)
+    add_gpio_entities(
+        coordinator, async_add_entities, "sensor", lambda c, g, mode, key: (P4GpioTemperature if mode == "onewire" else P4GpioCounter)(c, g, mode, key)
+    )
 
 
 class P4GpioCounter(P4GpioEntity, SensorEntity):
@@ -264,3 +266,21 @@ class P4Sensor(P4Entity, SensorEntity):
     @property
     def native_value(self) -> Any:
         return self.entity_description.value(self.coordinator.data)
+
+
+class P4GpioTemperature(P4GpioEntity, SensorEntity):
+    """A DS18B20 on a 1-Wire bus of JP1; the key is its ROM code."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    @property
+    def native_value(self) -> float | None:
+        pin = self.pin
+        return ((pin or {}).get("temperatures") or {}).get(self.key)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {**super().extra_state_attributes, "rom": self.key}
