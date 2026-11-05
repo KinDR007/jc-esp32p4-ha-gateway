@@ -200,3 +200,11 @@ Rešerše v [docs/dual-radio.md](docs/dual-radio.md#xiao-nrf54lm20a-deferred).
 - [ ] N2 Detekce typu rádia B: ROM ESP / Spinel (HDLC 0x7E, PROP_NCP_VERSION) / ZBOSS NCP (0xDE 0xAD) / MCUboot SMP, na více rychlostech
 - [ ] N3 Aktualizace z brány: MCUboot serial recovery + vlastní klient SMP v P4 (CBOR, base64 rámce), vstup přes RESET (`BOOT_SERIAL_PIN_RESET`) nebo pin; první flash přes USB-C (SAMD11 CMSIS-DAP)
 - [ ] N4 Zigbee NCP: ověřit, zda R23 add-on 1.4 umí NCP sestavit (předkompilované knihovny) a zda je kompatibilní se Z2M `zboss`; ESPHome BLE proxy na nRF nejde
+
+## GPIO na JP1 (zadání 2026-11-05, plán [docs/gpio.md](docs/gpio.md))
+Rozhodnutí: piny rádia B volné, když rádio B nemá roli; funkce vstup, výstup, PWM, čítač pulzů, UART-TCP most, druhá sběrnice I2C, 1-Wire DS18B20, WS2812; stav po restartu volbou u pinu; test s propojkou JP1 9–11 příště.
+- [ ] G1 Tabulka pinů a obsazení, kresba JP1 (jen čtení); ověřit GPIO1 (32k krystal) a zátěž GPIO45 (napájení SD)
+- [ ] G2 Vstup, výstup, PWM, čítač; API `/api/gpio`, UI, NVS, stav po restartu
+- [ ] G3 Zařízení „P4 GPIO“ v integraci (1.7.0) a MQTT (skupina `gpio`)
+- [ ] G4 UART-TCP most (UART4), I2C sběrnice 2, 1-Wire DS18B20, WS2812
+- [ ] G5 HW testy s propojkou JP1 9–11, dokumentace
