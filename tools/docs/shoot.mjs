@@ -12,7 +12,7 @@ const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
   thread: [['overview', 'flows', 'radios/roles', 'radios/status', 'radios/scan', 'thread/info', 'thread/topology', 'thread/diag', 'thread/settings',
     'zigbee/network', 'zigbee/backups', 'esphome', 'sound/live', 'sound/events', 'sound/log', 'sound/classes', 'sound/learn', 'ha/guide', 'ha/mqtt',
-    'ha/matter', 'system/info', 'system/lan', 'system/wifi', 'system/hw', 'system/rs485', 'system/mbscan', 'system/firmware/online', 'system/firmware/manual', 'system/maint', 'system/diag', 'system/api', 'system/notify',
+    'ha/matter', 'system/info', 'system/lan', 'system/wifi', 'system/hw', 'system/gpio', 'system/rs485', 'system/mbscan', 'system/firmware/online', 'system/firmware/manual', 'system/maint', 'system/diag', 'system/api', 'system/notify',
     'system/users/list', 'system/users/roles', 'system/users/tokens', 'system/users/requests', 'system/users/policy', 'profile'], '', true],
   zigbee: [['overview', 'radios/roles', 'zigbee/info', 'zigbee/diag', 'zigbee/backups', 'zigbee/network', 'ha/guide'], '__zigbee', false],
   router: [['overview', 'zigbee/info', 'zigbee/diag'], '__router', false],

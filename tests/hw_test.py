@@ -2323,6 +2323,78 @@ def tc51_time_settings():
     check([s['name'] for s in r['servers']] == keep['servers'] and r['tz'] == keep['tz'] and r['tz_name'] == keep['tz_name'], 'settings of before restored')
 
 
+def tc52_gpio():
+    """GPIO of JP1 without a jumper: header with radio A locked (radio B while it has a role), invalid settings
+    refused, inputs follow their pull, outputs read back on the pad (inverted, open drain against push-pull), a pulse,
+    PWM duty and resolution, counter, values restored after a restart per pin. The configuration of before comes back."""
+    code, before = http('GET', '/api/gpio')
+    check(code == 200 and len(before['header']) == 26, '26 pins of JP1')
+    hdr = {h['gpio']: h for h in before['header'] if h['kind'] == 'gpio'}
+    check(all(not hdr[g]['free'] and 'radio A' in hdr[g]['reserved'] for g in (4, 5, 20)), 'radio A pins GPIO4, 5, 20 locked')
+    free = [g for g in (1, 2, 3, 45) if hdr[g]['free']]
+    check(free == [1, 2, 3, 45], f'GPIO1, 2, 3, 45 free')
+    b_role = status()['role'].get('b', {}).get('desired', 'none')
+    if b_role != 'none':
+        check(all(not hdr[g]['free'] for g in (32, 33, 46, 47)), f'radio B pins locked while radio B runs {b_role}')
+        check(http('PUT', '/api/gpio', {'pins': [{'gpio': 32, 'mode': 'output'}]})[0] == 400, 'radio B pin refused')
+    keep = {'pins': [{k: p[k] for k in ('gpio', 'mode', 'name', 'expose', 'invert', 'pull', 'debounce_ms', 'open_drain', 'restore', 'freq', 'edge', 'filter_ns') if k in p}
+                     for p in before['pins']]}
+    pin = lambda g: next((p for p in http('GET', '/api/gpio')[1]['pins'] if p['gpio'] == g), None)
+    try:
+        for body, why in (({'pins': [{'gpio': 4, 'mode': 'output'}]}, 'radio A pin'), ({'pins': [{'gpio': 9, 'mode': 'output'}]}, 'GPIO not on JP1'),
+                          ({'pins': [{'gpio': 2, 'mode': 'output'}, {'gpio': 2, 'mode': 'input'}]}, 'GPIO twice'),
+                          ({'pins': [{'gpio': 2, 'mode': 'blink'}]}, 'unknown mode'), ({'pins': [{'gpio': 1, 'mode': 'pwm', 'freq': 2000000}]}, 'PWM 2 MHz'),
+                          ({'pins': [{'gpio': 2, 'mode': 'input', 'debounce_ms': 2000}]}, 'debounce 2 s'),
+                          ({'pins': [{'gpio': 2, 'mode': 'output', 'name': 'x' * 33}]}, 'name of 33 characters'),
+                          ({'pins': [{'gpio': 2, 'mode': 'output', 'expose': 'all'}]}, 'unknown expose'),
+                          ({'pins': [{'gpio': 45, 'mode': 'counter', 'filter_ns': 20000}]}, 'filter 20 us')):
+            check(http('PUT', '/api/gpio', body)[0] == 400, f'refused: {why}')
+        for pull, want in (('up', 1), ('down', 0)):
+            r = http('PUT', '/api/gpio', {'pins': [{'gpio': g, 'mode': 'input', 'pull': pull, 'debounce_ms': 0} for g in free]})[1]
+            time.sleep(0.3)
+            levels = {p['gpio']: p['level'] for p in http('GET', '/api/gpio')[1]['pins']}
+            check(all(levels[g] == want for g in free), f'inputs with pull-{pull} read {want}: {levels}')
+        code, r = http('PUT', '/api/gpio', {'pins': [
+            {'gpio': 2, 'mode': 'output', 'name': 'Relé', 'restore': 'last'},
+            {'gpio': 3, 'mode': 'output', 'invert': True, 'restore': 'on'},
+            {'gpio': 1, 'mode': 'pwm', 'freq': 1000, 'restore': 'last'},
+            {'gpio': 45, 'mode': 'counter', 'pull': 'down', 'edge': 'both', 'filter_ns': 1000}]})
+        check(code == 200 and all(p['active'] for p in r['pins']), 'output, inverted output, PWM and counter active')
+        p3 = pin(3)
+        check(p3['level'] == 1 and p3['pin_level'] == 0, 'inverted output restored on: level 1, pin 0')
+        check(http('POST', '/api/gpio/set', {'gpio': 2, 'level': 1})[0] == 200 and pin(2)['pin_level'] == 1, 'output on: pin reads 1')
+        http('POST', '/api/gpio/set', {'gpio': 2, 'level': 0})
+        http('POST', '/api/gpio/set', {'gpio': 2, 'pulse_ms': 800})
+        during = pin(2)['pin_level']
+        time.sleep(1.2)
+        check(during == 1 and pin(2)['pin_level'] == 0, 'pulse of 0.8 s: on, then off')
+        code, r = http('POST', '/api/gpio/set', {'gpio': 1, 'duty': 33})
+        check(code == 200 and r['duty'] == 33 and r['resolution_bits'] >= 10, f'PWM 1 kHz at 33 % with {r.get("resolution_bits")} bits')
+        for body, want, why in (({'gpio': 1, 'duty': 101}, 400, 'duty 101'), ({'gpio': 2, 'duty': 50}, 400, 'duty on an output'),
+                                ({'gpio': 9, 'level': 1}, 404, 'pin not configured'), ({'gpio': 2, 'pulse_ms': 0}, 400, 'pulse 0 ms')):
+            check(http('POST', '/api/gpio/set', body)[0] == want, f'set refused ({want}): {why}')
+        c = pin(45)
+        check(c['count'] == 0 and c['frequency'] == 0 and http('POST', '/api/gpio/set', {'gpio': 45, 'reset': True})[0] == 200, 'counter at 0 with nothing connected, reset')
+        http('POST', '/api/gpio/set', {'gpio': 2, 'level': 1})
+        time.sleep(6.5)  # the last values are saved 5 s after the last change
+        http('PUT', '/api/gpio', {'pins': [{'gpio': 45, 'mode': 'output', 'open_drain': True, 'pull': 'down', 'restore': 'on'},
+                                           {'gpio': 3, 'mode': 'output', 'pull': 'down', 'restore': 'on'}]})
+        check(pin(45)['level'] == 1 and pin(45)['pin_level'] == 0 and pin(3)['pin_level'] == 1,
+              'open drain with pull-down: level 1 releases the pin (reads 0), push-pull drives it (reads 1)')
+        http('PUT', '/api/gpio', {'pins': [
+            {'gpio': 2, 'mode': 'output', 'name': 'Relé', 'restore': 'last'},
+            {'gpio': 3, 'mode': 'output', 'invert': True, 'restore': 'on'},
+            {'gpio': 1, 'mode': 'pwm', 'freq': 1000, 'restore': 'last'}]})
+        http('POST', '/api/reboot', {})
+        wait_restart(status()['role']['desired'])
+        p2, p1, p3 = pin(2), pin(1), pin(3)
+        check(p2['level'] == 1 and p2['pin_level'] == 1 and p1['duty'] == 33 and p3['level'] == 1 and p3['pin_level'] == 0,
+              f'after the restart: output last 1, PWM last {p1["duty"]} %, inverted output on (pin 0)')
+    finally:
+        http('PUT', '/api/gpio', keep)
+    check(len(http('GET', '/api/gpio')[1]['pins']) == len(keep['pins']), 'configuration of before restored')
+
+
 TESTS = [
     ('TC01', tc01_first_start), ('TC02', tc02_backup_guard), ('TC03', tc03_c6_backup),
     ('TC04', tc04_thread_br), ('TC05', tc05_zigbee_coordinator), ('TC06', tc06_zigbee_data_kept),
@@ -2336,7 +2408,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2363,7 +2435,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

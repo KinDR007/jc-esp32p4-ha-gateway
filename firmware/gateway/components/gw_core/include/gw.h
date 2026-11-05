@@ -99,11 +99,14 @@ typedef struct {
     bool b_probed;              /* the wiring test of radio B ran at this start */
     bool b_wired;               /* ... and found it */
     char b_chip[16];            /* "ESP32-C5" */
+    bool b_gpio;                /* radio B's pins are used as GPIO (gpio_ctl): radio B left alone */
     char hostname[32];
     bool stable;                /* survived the stability window */
 } gw_state_t;
 
 gw_state_t *gw_state(void);
+/* refusal of the radio B actions while its pins are GPIO */
+#define RADIO_B_GPIO "radio B's pins are used as GPIO: free them under System › GPIO first"
 void gw_set_maintenance(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 /* ---- boot control ---- */

@@ -382,6 +382,22 @@ PAGES = [
        <li>Start projde sběrnici a přidá, co rozpozná; <b>Skenovat sběrnici</b> to zopakuje. U čipu, který sken nerozliší, ho vyberte v <i>Nalezeno na sběrnici</i> a stiskněte <b>Přidat</b>.</li>
        <li>Pojmenujte ho a <b>Uložte</b>. Integrace P4 Gateway ukáže jeho hodnoty jako senzory; MQTT také se skupinou <i>I2C senzory</i>.</li></ol>"""),
      ["system_hw"]),
+    ("system/gpio", "chip", T("System › GPIO (JP1)", "Systém › GPIO (JP1)"),
+     T("Free pins of header JP1 as inputs, outputs, PWM or pulse counters, set up and switched from the page.",
+       "Volné piny konektoru JP1 jako vstupy, výstupy, PWM nebo čítače pulzů, nastavené a ovládané ze stránky."),
+     {"HEADER JP1": T("All 26 pins: power, radio pins locked with the reason (hover), free pins in green, configured ones in blue with their value. 3.3 V logic, not 5 V tolerant, about 20 mA per pin.",
+                      "Všech 26 pinů: napájení, piny rádií zamčené s důvodem (po najetí myší), volné zeleně, nastavené modře s hodnotou. Logika 3,3 V, 5 V pin nesnese, asi 20 mA na pin."),
+      "PIN SETTINGS": T("Name for Home Assistant, mode and its options: pull resistor, inverted, debounce (input), open drain and the state after a restart (output, PWM), frequency (PWM), edges and glitch filter (counter).",
+                        "Jméno pro Home Assistant, režim a jeho volby: pull rezistor, inverze, debounce (vstup), open drain a stav po restartu (výstup, PWM), frekvence (PWM), hrany a filtr zákmitů (čítač)."),
+      "CONFIGURED PINS": T("Live values; switch an output or pulse it for 1 s, move a PWM duty, clear a counter (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).",
+                           "Živé hodnoty; přepnutí výstupu nebo pulz 1 s, posun střídy PWM, vynulování čítače (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/gpio.md\">gpio.md</a>).")},
+     T("""<ol><li>Wire the circuit with the gateway off; a relay or a LED strip goes through a transistor or a driver module, a relay with a pull-down (pins are off for 1-2 s after power on).</li>
+       <li>Click a free (green) pin, name it, choose the mode and its options, <b>Save</b>.</li>
+       <li>Switch or watch it in <i>Configured pins</i>; <b>Free the pin</b> turns it off again.</li></ol>""",
+       """<ol><li>Obvod zapojte při vypnuté bráně; relé nebo LED pásek přes tranzistor či budicí modul, relé s pull-down rezistorem (po zapnutí jsou piny 1–2 s vypnuté).</li>
+       <li>Klikněte na volný (zelený) pin, pojmenujte ho, zvolte režim a jeho volby a <b>Uložte</b>.</li>
+       <li>Ovládejte nebo sledujte ho v <i>Nastavených pinech</i>; <b>Uvolnit pin</b> ho zase vypne.</li></ol>"""),
+     ["system_gpio"]),
     ("system/rs485", "serial-port", T("System › RS485", "Systém › RS485"),
      T("Modbus devices on RS485 (connector J4) and Modbus TCP, from templates: values, writes, search, own templates.",
        "Zařízení Modbus na RS485 (konektor J4) a Modbus TCP podle šablon: hodnoty, zápisy, hledání, vlastní šablony."),

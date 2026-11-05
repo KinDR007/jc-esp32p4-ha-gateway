@@ -903,6 +903,9 @@ static esp_err_t radio_b_probe_post(httpd_req_t *req)
     if (st->active_b != GW_ROLE_NONE || c6_progress(C6_RADIO_B)->busy) {
         return gw_http_send_error(req, 409, "radio B is in use: switch its role off first");
     }
+    if (st->b_gpio) {
+        return gw_http_send_error(req, 409, RADIO_B_GPIO);
+    }
     c6_probe_t r;
     c6_radio_probe(C6_RADIO_B, &r);
     st->b_probed = true;
@@ -981,6 +984,9 @@ static esp_err_t c6_backup_get(httpd_req_t *req)
     c6_radio_t radio = query_radio(req);
     if ((radio == C6_RADIO_B ? gw_state()->active_b : gw_state()->active) != GW_ROLE_NONE) {
         return gw_http_send_error(req, 409, "only in maintenance mode (no active role)");
+    }
+    if (radio == C6_RADIO_B && gw_state()->b_gpio) {
+        return gw_http_send_error(req, 409, RADIO_B_GPIO);
     }
     if (xSemaphoreTake(s_upload_lock, 0) != pdTRUE) {
         return gw_http_send_error(req, 409, "C6 busy");

@@ -1,7 +1,28 @@
 # GPIO on JP1 (plan)
 
-Free pins of header JP1 configured and controlled from System › Hardware, the API and Home Assistant
-(device "P4 GPIO" through the integration or MQTT). Status: planned 2026-11-05, not implemented.
+Free pins of header JP1 configured and controlled from System › GPIO (JP1), the API and Home Assistant
+(device "P4 GPIO" through the integration or MQTT). Status: G1 and G2 done (pins, reservations, input,
+output, PWM, counter, API, web UI, Telegram `/gpio`); G3-G5 planned.
+
+## Use
+
+System › GPIO (JP1) draws the header: power pins, radio pins locked with their reason, free pins (green)
+and configured ones (blue, with their value). A free pin opens its settings: name, mode and what the mode
+offers; *Free the pin* turns it off. The list of configured pins switches outputs (and a 1 s pulse),
+moves a PWM duty and clears counters. API `GET`/`PUT /api/gpio`, `POST /api/gpio/set`
+([api.md](api.md#gpio-of-header-jp1)); changes also go out as MQTT topic `gpio` and over `/api/ws`.
+
+| Mode | Settings | Value |
+|---|---|---|
+| input | pull, inverted, debounce 0-1000 ms (sampled every 10 ms) | level |
+| output | pull, inverted, open drain, after a restart off/on/last | level (and `pin_level` read back on the pad); `pulse_ms` flips it for a time |
+| pwm | frequency 1 Hz-1 MHz (resolution from 20 bits at 1 Hz to 6 bits at 1 MHz), inverted, after a restart | duty 0-100 % |
+| counter | edges rising/falling/both, pull, inverted, glitch filter 0-10000 ns | count, rate per second, frequency |
+
+At most 4 PWM pins (LEDC timers) and 4 counters (PCNT units). An output's level is set before its driver
+turns on; the last level or duty is saved 5 s after the last change. While radio B's pins are GPIO, radio B
+is not started, tested, flashed or backed up (409); a role given to radio B turns them off at the next
+start with a notification.
 
 ## Pins
 
@@ -70,6 +91,7 @@ B, 3 RS485), one HP I2C port, LEDC (8 PWM channels), PCNT, RMT, SPI2/3.
 
 ## Open
 
-- GPIO1: confirm on the board that nothing (32 kHz crystal) is on it.
-- GPIO45: measure what the SD power switch loads the pin with.
+- GPIO1 and GPIO45 (2026-11-05): as inputs both follow the internal pull-up and pull-down, so nothing on
+  the board holds them (no 32 kHz crystal on GPIO1, the SD power switch does not load GPIO45).
+- Radio B's pins as GPIO is untested on hardware: it needs radio B without a role and without the C5.
 - A UART loop test needs TX and RX on the jumpered pins.

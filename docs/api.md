@@ -2805,6 +2805,290 @@ Errors: 400 net not a.b.c.d/n or prefix out of 22-32, ports not a list of 1-4, u
 
 Effects: Connects to the ports of every address (4 at a time, 300 ms each), reads holding register 0 of the units on each open port (an exception is an answer too), then recognises Victron GX and GoodWe by their serial numbers. With udp (default) also asks GoodWe dongles on UDP 8899 and sends their discovery broadcast. Runs beside the device polling; a /24 takes about 20-60 s. Ports default [502], units [1, 247, 255]. {"stop": true} ends it.
 
+### GPIO of header JP1
+
+| Method | Path | What it does | Permission |
+|---|---|---|---|
+| GET | `/api/gpio` | Header JP1 with the state of each pin, and the configured GPIO with their values. | page `system/hw`, read |
+| PUT | `/api/gpio` | Replaces the GPIO configuration; applied at once. | page `system/hw`, edit |
+| POST | `/api/gpio/set` | Sets an output, a pulse, the duty of a PWM pin or clears a counter. | page `system/hw`, edit |
+
+#### GET `/api/gpio`
+
+Response:
+
+```json
+{
+  "header": [
+    {
+      "pin": 1,
+      "kind": "3v3",
+      "label": "3.3 V"
+    },
+    {
+      "pin": 9,
+      "kind": "gpio",
+      "label": "GPIO2",
+      "gpio": 2,
+      "free": true
+    },
+    {
+      "pin": 13,
+      "kind": "gpio",
+      "label": "GPIO4",
+      "gpio": 4,
+      "free": false,
+      "reserved": "radio A (C6): UART TX"
+    },
+    {
+      "pin": 14,
+      "kind": "gpio",
+      "label": "GPIO45",
+      "gpio": 45,
+      "free": true,
+      "note": "also switches the SD card power on the board (the gateway does not use the SD card)"
+    }
+  ],
+  "pins": [
+    {
+      "gpio": 2,
+      "mode": "output",
+      "name": "Relay",
+      "expose": "integration",
+      "invert": false,
+      "pull": "none",
+      "open_drain": false,
+      "restore": "last",
+      "jp1": 9,
+      "active": true,
+      "level": 1,
+      "pin_level": 1
+    },
+    {
+      "gpio": 3,
+      "mode": "input",
+      "name": "Button",
+      "expose": "both",
+      "invert": true,
+      "pull": "up",
+      "debounce_ms": 20,
+      "jp1": 11,
+      "active": true,
+      "level": 0
+    },
+    {
+      "gpio": 1,
+      "mode": "pwm",
+      "name": "LED",
+      "expose": "integration",
+      "invert": false,
+      "pull": "none",
+      "restore": "off",
+      "freq": 1000,
+      "jp1": 7,
+      "active": true,
+      "duty": 37.5,
+      "resolution_bits": 16
+    },
+    {
+      "gpio": 45,
+      "mode": "counter",
+      "name": "Water meter",
+      "expose": "integration",
+      "invert": false,
+      "pull": "down",
+      "edge": "rising",
+      "filter_ns": 1000,
+      "jp1": 14,
+      "active": true,
+      "count": 1520,
+      "rate": 0.5,
+      "frequency": 0.5
+    }
+  ],
+  "radio_b_gpio": false
+}
+```
+
+Effects: header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone.
+
+#### PUT `/api/gpio`
+
+Body:
+
+```json
+{
+  "pins": [
+    {
+      "gpio": 2,
+      "mode": "output",
+      "name": "Relay",
+      "expose": "integration",
+      "invert": false,
+      "open_drain": false,
+      "pull": "none",
+      "restore": "last"
+    },
+    {
+      "gpio": 3,
+      "mode": "input",
+      "name": "Button",
+      "pull": "up",
+      "invert": true,
+      "debounce_ms": 20
+    },
+    {
+      "gpio": 1,
+      "mode": "pwm",
+      "name": "LED",
+      "freq": 1000,
+      "restore": "off"
+    },
+    {
+      "gpio": 45,
+      "mode": "counter",
+      "name": "Water meter",
+      "edge": "rising",
+      "pull": "down",
+      "filter_ns": 1000
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "header": [
+    {
+      "pin": 1,
+      "kind": "3v3",
+      "label": "3.3 V"
+    },
+    {
+      "pin": 9,
+      "kind": "gpio",
+      "label": "GPIO2",
+      "gpio": 2,
+      "free": true
+    },
+    {
+      "pin": 13,
+      "kind": "gpio",
+      "label": "GPIO4",
+      "gpio": 4,
+      "free": false,
+      "reserved": "radio A (C6): UART TX"
+    },
+    {
+      "pin": 14,
+      "kind": "gpio",
+      "label": "GPIO45",
+      "gpio": 45,
+      "free": true,
+      "note": "also switches the SD card power on the board (the gateway does not use the SD card)"
+    }
+  ],
+  "pins": [
+    {
+      "gpio": 2,
+      "mode": "output",
+      "name": "Relay",
+      "expose": "integration",
+      "invert": false,
+      "pull": "none",
+      "open_drain": false,
+      "restore": "last",
+      "jp1": 9,
+      "active": true,
+      "level": 1,
+      "pin_level": 1
+    },
+    {
+      "gpio": 3,
+      "mode": "input",
+      "name": "Button",
+      "expose": "both",
+      "invert": true,
+      "pull": "up",
+      "debounce_ms": 20,
+      "jp1": 11,
+      "active": true,
+      "level": 0
+    },
+    {
+      "gpio": 1,
+      "mode": "pwm",
+      "name": "LED",
+      "expose": "integration",
+      "invert": false,
+      "pull": "none",
+      "restore": "off",
+      "freq": 1000,
+      "jp1": 7,
+      "active": true,
+      "duty": 37.5,
+      "resolution_bits": 16
+    },
+    {
+      "gpio": 45,
+      "mode": "counter",
+      "name": "Water meter",
+      "expose": "integration",
+      "invert": false,
+      "pull": "down",
+      "edge": "rising",
+      "filter_ns": 1000,
+      "jp1": 14,
+      "active": true,
+      "count": 1520,
+      "rate": 0.5,
+      "frequency": 0.5
+    }
+  ],
+  "radio_b_gpio": false
+}
+```
+
+Errors: 400 gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown.
+
+Effects: Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge.
+
+#### POST `/api/gpio/set`
+
+Body:
+
+```json
+{
+  "gpio": 2,
+  "level": 1
+}
+```
+
+Response:
+
+```json
+{
+  "gpio": 2,
+  "mode": "output",
+  "name": "Relay",
+  "expose": "integration",
+  "invert": false,
+  "pull": "none",
+  "open_drain": false,
+  "restore": "last",
+  "jp1": 9,
+  "active": true,
+  "level": 1,
+  "pin_level": 1
+}
+```
+
+Errors: 400 The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true).; 404 No active pin with this GPIO.
+
+Effects: pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change.
+
 ### Updates and firmware
 
 | Method | Path | What it does | Permission |

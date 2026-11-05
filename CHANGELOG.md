@@ -9,6 +9,12 @@
   time (was 02:00-03:00 UTC). The time zone moved there from the Telegram settings (same key, no migration;
   `tz` of `POST /api/telegram` still sets it). `/api/status` carries `tz_name`.
 - Tests: TC51, UI35.
+- GPIO of header JP1, System › GPIO (JP1) (`/api/gpio`): the header drawn with every pin's use, radio pins
+  locked with the reason; free pins (GPIO1, 2, 3, 45; radio B's while radio B has no role and none is found)
+  as input (pull, inverted, debounce), output (open drain, pulse, read back on the pad), PWM (1 Hz-1 MHz)
+  or pulse counter (rate, frequency, glitch filter), state after a restart per pin (off, on, last).
+  Telegram `/gpio`. Home Assistant follows (docs/gpio.md, G3).
+- Tests: TC52, UI36.
 
 ## v1.12 (2026-11-04)
 

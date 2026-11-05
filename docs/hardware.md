@@ -104,6 +104,7 @@ roles; the sound component configures the codec at its start only.
 | Display backlight | LCD_PWM = GPIO23 | |
 | SD card | SDIO GPIO39-44, power switch GPIO45 | |
 | Battery | charger IP5306 (CN4), voltage divider 68k/100k on GPIO53 | |
+| Free GPIO on JP1 | GPIO1, 2, 3, 45 (and 32, 33, 46, 47 without radio B) | inputs, outputs, PWM, counters: [gpio.md](gpio.md) |
 
 ## C6 telemetry
 

@@ -4002,6 +4002,321 @@
       ]
     },
     {
+      "id": "gpio",
+      "title": {
+        "en": "GPIO of header JP1",
+        "cs": "GPIO na konektoru JP1"
+      },
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/gpio",
+          "perm": "system/hw",
+          "level": 1,
+          "summary": {
+            "en": "Header JP1 with the state of each pin, and the configured GPIO with their values.",
+            "cs": "Konektor JP1 se stavem každého pinu a nastavené GPIO s hodnotami."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "header": [
+              {
+                "pin": 1,
+                "kind": "3v3",
+                "label": "3.3 V"
+              },
+              {
+                "pin": 9,
+                "kind": "gpio",
+                "label": "GPIO2",
+                "gpio": 2,
+                "free": true
+              },
+              {
+                "pin": 13,
+                "kind": "gpio",
+                "label": "GPIO4",
+                "gpio": 4,
+                "free": false,
+                "reserved": "radio A (C6): UART TX"
+              },
+              {
+                "pin": 14,
+                "kind": "gpio",
+                "label": "GPIO45",
+                "gpio": 45,
+                "free": true,
+                "note": "also switches the SD card power on the board (the gateway does not use the SD card)"
+              }
+            ],
+            "pins": [
+              {
+                "gpio": 2,
+                "mode": "output",
+                "name": "Relay",
+                "expose": "integration",
+                "invert": false,
+                "pull": "none",
+                "open_drain": false,
+                "restore": "last",
+                "jp1": 9,
+                "active": true,
+                "level": 1,
+                "pin_level": 1
+              },
+              {
+                "gpio": 3,
+                "mode": "input",
+                "name": "Button",
+                "expose": "both",
+                "invert": true,
+                "pull": "up",
+                "debounce_ms": 20,
+                "jp1": 11,
+                "active": true,
+                "level": 0
+              },
+              {
+                "gpio": 1,
+                "mode": "pwm",
+                "name": "LED",
+                "expose": "integration",
+                "invert": false,
+                "pull": "none",
+                "restore": "off",
+                "freq": 1000,
+                "jp1": 7,
+                "active": true,
+                "duty": 37.5,
+                "resolution_bits": 16
+              },
+              {
+                "gpio": 45,
+                "mode": "counter",
+                "name": "Water meter",
+                "expose": "integration",
+                "invert": false,
+                "pull": "down",
+                "edge": "rising",
+                "filter_ns": 1000,
+                "jp1": 14,
+                "active": true,
+                "count": 1520,
+                "rate": 0.5,
+                "frequency": 0.5
+              }
+            ],
+            "radio_b_gpio": false
+          },
+          "effects": {
+            "en": "header lists all 26 pins (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); a GPIO is free or reserved with the reason (radio A always; radio B while it has a role or a radio is found on it). pins: level (input debounced, output as set, both logical after invert), pin_level (an output read back on the pad), duty in % of a PWM pin, count, rate (counts per second) and frequency of a counter. active false with error: the pin is configured but off (reserved now, no PWM timer or counter left). radio_b_gpio: radio B's pins are GPIO, radio B is left alone.",
+            "cs": "header uvádí všech 26 pinů (kind 3v3, 5v, gnd, nc, gpio, i2c, c6); GPIO je volné nebo obsazené s důvodem (rádio A vždy; rádio B, když má roli nebo je na něm nalezené rádio). pins: level (vstup po debounce, výstup jak je nastaven, oba logicky po inverzi), pin_level (výstup přečtený zpět na pinu), duty v % u PWM, count, rate (pulzy za sekundu) a frequency u čítače. active false s error: pin je nastavený, ale vypnutý (teď obsazený, nezbyl časovač PWM nebo čítač). radio_b_gpio: piny rádia B jsou GPIO, rádio B se nepoužívá."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/gpio",
+          "perm": "system/hw",
+          "level": 2,
+          "summary": {
+            "en": "Replaces the GPIO configuration; applied at once.",
+            "cs": "Nahradí nastavení GPIO; platí hned."
+          },
+          "body": {
+            "pins": [
+              {
+                "gpio": 2,
+                "mode": "output",
+                "name": "Relay",
+                "expose": "integration",
+                "invert": false,
+                "open_drain": false,
+                "pull": "none",
+                "restore": "last"
+              },
+              {
+                "gpio": 3,
+                "mode": "input",
+                "name": "Button",
+                "pull": "up",
+                "invert": true,
+                "debounce_ms": 20
+              },
+              {
+                "gpio": 1,
+                "mode": "pwm",
+                "name": "LED",
+                "freq": 1000,
+                "restore": "off"
+              },
+              {
+                "gpio": 45,
+                "mode": "counter",
+                "name": "Water meter",
+                "edge": "rising",
+                "pull": "down",
+                "filter_ns": 1000
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "header": [
+              {
+                "pin": 1,
+                "kind": "3v3",
+                "label": "3.3 V"
+              },
+              {
+                "pin": 9,
+                "kind": "gpio",
+                "label": "GPIO2",
+                "gpio": 2,
+                "free": true
+              },
+              {
+                "pin": 13,
+                "kind": "gpio",
+                "label": "GPIO4",
+                "gpio": 4,
+                "free": false,
+                "reserved": "radio A (C6): UART TX"
+              },
+              {
+                "pin": 14,
+                "kind": "gpio",
+                "label": "GPIO45",
+                "gpio": 45,
+                "free": true,
+                "note": "also switches the SD card power on the board (the gateway does not use the SD card)"
+              }
+            ],
+            "pins": [
+              {
+                "gpio": 2,
+                "mode": "output",
+                "name": "Relay",
+                "expose": "integration",
+                "invert": false,
+                "pull": "none",
+                "open_drain": false,
+                "restore": "last",
+                "jp1": 9,
+                "active": true,
+                "level": 1,
+                "pin_level": 1
+              },
+              {
+                "gpio": 3,
+                "mode": "input",
+                "name": "Button",
+                "expose": "both",
+                "invert": true,
+                "pull": "up",
+                "debounce_ms": 20,
+                "jp1": 11,
+                "active": true,
+                "level": 0
+              },
+              {
+                "gpio": 1,
+                "mode": "pwm",
+                "name": "LED",
+                "expose": "integration",
+                "invert": false,
+                "pull": "none",
+                "restore": "off",
+                "freq": 1000,
+                "jp1": 7,
+                "active": true,
+                "duty": 37.5,
+                "resolution_bits": 16
+              },
+              {
+                "gpio": 45,
+                "mode": "counter",
+                "name": "Water meter",
+                "expose": "integration",
+                "invert": false,
+                "pull": "down",
+                "edge": "rising",
+                "filter_ns": 1000,
+                "jp1": 14,
+                "active": true,
+                "count": 1520,
+                "rate": 0.5,
+                "frequency": 0.5
+              }
+            ],
+            "radio_b_gpio": false
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "gpio not a free GPIO of JP1 (radio A's pins, radio B's while it is in use), a GPIO twice, mode not off, input, output, pwm or counter, more than 4 PWM pins or 4 counters, name over 32 characters or with quotes, backslashes or braces, debounce_ms out of 0-1000, freq out of 1-1000000, filter_ns out of 0-10000, pull, restore, edge or expose unknown.",
+                "cs": "gpio není volné GPIO na JP1 (piny rádia A, rádia B dokud se používá), GPIO dvakrát, mode není off, input, output, pwm ani counter, víc než 4 PWM nebo 4 čítače, name přes 32 znaků nebo s uvozovkami, zpětnými lomítky či složenými závorkami, debounce_ms mimo 0-1000, freq mimo 1-1000000, filter_ns mimo 0-10000, neznámé pull, restore, edge nebo expose."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Pins left out are off (high impedance). restore: an output or PWM pin after a restart is off, on (100 %) or its last value (saved 5 s after the last change). An output's level is set before its driver turns on. While radio B's pins are GPIO, radio B is not started, tested, flashed or backed up (409); giving radio B a role turns them off at the next start with a notification. invert: input and output levels are logical, the pin carries the opposite; a counter counts the other edge.",
+            "cs": "Vynechané piny jsou vypnuté (vysoká impedance). restore: výstup nebo PWM po restartu vypnutý, zapnutý (100 %) nebo s poslední hodnotou (uloží se 5 s po poslední změně). Úroveň výstupu se nastaví dřív, než se zapne jeho budič. Dokud jsou piny rádia B GPIO, rádio B se nespouští, netestuje, neflashuje ani nezálohuje (409); přidělení role rádiu B je při dalším startu vypne s notifikací. invert: úrovně vstupu a výstupu jsou logické, na pinu je opak; čítač počítá druhou hranu."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/gpio/set",
+          "perm": "system/hw",
+          "level": 2,
+          "summary": {
+            "en": "Sets an output, a pulse, the duty of a PWM pin or clears a counter.",
+            "cs": "Nastaví výstup, pulz, střídu PWM nebo vynuluje čítač."
+          },
+          "body": {
+            "gpio": 2,
+            "level": 1
+          },
+          "body_type": "json",
+          "response": {
+            "gpio": 2,
+            "mode": "output",
+            "name": "Relay",
+            "expose": "integration",
+            "invert": false,
+            "pull": "none",
+            "open_drain": false,
+            "restore": "last",
+            "jp1": 9,
+            "active": true,
+            "level": 1,
+            "pin_level": 1
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "The value does not fit the mode (output: level 0/1 or pulse_ms 1-3600000; pwm: duty 0-100; counter: reset true).",
+                "cs": "Hodnota neodpovídá režimu (výstup: level 0/1 nebo pulse_ms 1-3600000; pwm: duty 0-100; čítač: reset true)."
+              }
+            },
+            {
+              "code": 404,
+              "when": {
+                "en": "No active pin with this GPIO.",
+                "cs": "Žádný aktivní pin s tímto GPIO."
+              }
+            }
+          ],
+          "effects": {
+            "en": "pulse_ms turns an output to the opposite level for that time and back (a second pulse while one runs moves its end); a level ends a running pulse. Changes go to the push channel (MQTT topic gpio, /api/ws) like every value change.",
+            "cs": "pulse_ms přepne výstup na opačnou úroveň na danou dobu a zpět (další pulz během běžícího posune jeho konec); nastavení úrovně běžící pulz ukončí. Změny jdou do push kanálu (MQTT téma gpio, /api/ws) jako každá změna hodnoty."
+          }
+        }
+      ]
+    },
+    {
       "id": "updates",
       "title": {
         "en": "Updates and firmware",

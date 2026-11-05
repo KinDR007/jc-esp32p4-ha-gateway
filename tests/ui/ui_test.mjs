@@ -192,7 +192,7 @@ await test('UI06', 'Language: Czech translates every tab, keeps sound names, Eng
     }
   }
   // every menu item and sub page has a Czech label (names of standards stay as they are)
-  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter', 'LAN', 'Wi-Fi', 'Hardware', 'RS485', 'API'];
+  const same = ['Role', 'Thread', 'Zigbee', 'Home Assistant', 'MQTT', 'ESPHome', 'Firmware', 'Matter', 'LAN', 'Wi-Fi', 'Hardware', 'RS485', 'API', 'GPIO (JP1)'];
   const english = [];
   for (const sec of ['overview', 'radios', 'thread', 'zigbee', 'esphome', 'sound', 'ha', 'system']) {
     await page.click(`#side a[data-route="${sec}"]`);
@@ -986,6 +986,51 @@ await test('UI35', 'System › LAN › Time: shows the sync state, a zone chosen
     check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
   } finally {
     await page.request.post(base + 'api/time', { data: keep });
+  }
+});
+
+await test('UI36', 'System › GPIO (JP1): header of 26 pins with radio A locked, a free pin set up as output switches and pulses, a PWM pin follows the slider, freeing a pin; configuration restored', async () => {
+  const before = await (await page.request.get(base + 'api/gpio')).json();
+  const keep = { pins: before.pins.map(({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns }) => ({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns })) };
+  const pin = async g => (await (await page.request.get(base + 'api/gpio')).json()).pins.find(p => p.gpio === g);
+  try {
+    await page.request.put(base + 'api/gpio', { data: { pins: [] } });
+    await tab('system/gpio');
+    await page.waitForFunction(() => document.querySelectorAll('.gp-pin').length === 26, null, { timeout: 10000 });
+    check(true, 'header of 26 pins');
+    check(!await page.$('[data-gp="4"]') && (await page.getAttribute('#gp-odd .gp-pin:nth-child(7)', 'title')).includes('radio A'), 'GPIO4 (JP1 13) locked with its reason');
+    await page.click('[data-gp="2"]');
+    await page.selectOption('#gp-mode', 'output');
+    await page.fill('#gp-name', 'Test relé');
+    await page.click('#gp-save');
+    await page.waitForSelector('[data-gp-level="2"]', { timeout: 8000 });
+    await page.check('[data-gp-level="2"]');
+    await page.waitForTimeout(500);
+    let p = await pin(2);
+    check(p.level === 1 && p.pin_level === 1 && p.name === 'Test relé', `output on, pin reads ${p.pin_level}`);
+    await page.uncheck('[data-gp-level="2"]');
+    await page.waitForTimeout(300);
+    await page.click('[data-gp-pulse="2"]');
+    await page.waitForTimeout(300);
+    const during = (await pin(2)).pin_level;
+    await page.waitForTimeout(1200);
+    check(during === 1 && (await pin(2)).pin_level === 0, 'pulse of 1 s: on, then off again');
+    await page.click('[data-gp="1"]');
+    await page.selectOption('#gp-mode', 'pwm');
+    await page.fill('#gp-freq', '2000');
+    await page.click('#gp-save');
+    await page.waitForSelector('[data-gp-duty="1"]', { timeout: 8000 });
+    await page.$eval('[data-gp-duty="1"]', e => { e.value = 25; e.dispatchEvent(new Event('change', { bubbles: true })); });
+    await page.waitForTimeout(500);
+    p = await pin(1);
+    check(p.duty === 25 && p.freq === 2000, `PWM 2 kHz at ${p.duty} % (${p.resolution_bits} bits)`);
+    await page.click('[data-gp="2"]');
+    await page.click('#gp-remove');
+    await page.waitForFunction(() => !document.querySelector('[data-gp-level="2"]'), null, { timeout: 8000 });
+    check(!await pin(2), 'GPIO2 freed');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/gpio', { data: keep });
   }
 });
 

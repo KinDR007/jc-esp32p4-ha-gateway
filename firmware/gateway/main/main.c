@@ -24,6 +24,7 @@
 #include "zigbee_net.h"
 #include "role_thread.h"
 #include "role_zigbee.h"
+#include "gpio_ctl.h"
 #include "modbus.h"
 #include "sensors.h"
 #include "sound.h"
@@ -215,6 +216,13 @@ static void apply_role_b(gw_role_t role)
 {
     gw_state_t *st = gw_state();
     s_probed_b = true;
+    if (st->b_gpio && role == GW_ROLE_NONE) {
+        st->b_probed = true;
+        st->b_wired = false;
+        st->b_chip[0] = '\0';
+        strlcpy(s_probe_b.verdict, "radio B's pins are used as GPIO (System › GPIO)", sizeof(s_probe_b.verdict));
+        return;
+    }
     bool found = c6_radio_probe(C6_RADIO_B, &s_probe_b) == ESP_OK;
     st->b_probed = true;
     st->b_wired = found;
@@ -332,6 +340,10 @@ static esp_err_t radio_b_flash_post(httpd_req_t *req)
         cJSON_Delete(body);
         return gw_http_send_error(req, 409, "radio B runs a role: switch it off first");
     }
+    if (gw_state()->b_gpio) {
+        cJSON_Delete(body);
+        return gw_http_send_error(req, 409, RADIO_B_GPIO);
+    }
     if (s_flash_b.task || c6_progress(C6_RADIO_B)->busy) {
         cJSON_Delete(body);
         return gw_http_send_error(req, 409, "radio B is being flashed");
@@ -373,6 +385,9 @@ static esp_err_t radio_b_console_get(httpd_req_t *req)
     }
     if (gw_state()->active_b != GW_ROLE_NONE || s_flash_b.task || c6_progress(C6_RADIO_B)->busy) {
         return gw_http_send_error(req, 409, "radio B is in use");
+    }
+    if (gw_state()->b_gpio) {
+        return gw_http_send_error(req, 409, RADIO_B_GPIO);
     }
     const c6_radio_pins_t *p = c6_radio_pins(C6_RADIO_B);
     uart_config_t cfg = {.baud_rate = baud, .data_bits = UART_DATA_8_BITS, .parity = UART_PARITY_DISABLE,
@@ -592,7 +607,6 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     c6_radio_init_pins(c6_radio_pins(C6_RADIO_A));
-    c6_radio_init_pins(c6_radio_pins(C6_RADIO_B)); /* external radio running, if connected */
     c6fw_stage_load(); /* a C6 package downloaded or uploaded before a software restart */
 
     gw_role_t def_role = GW_ROLE_THREAD_BR;
@@ -605,6 +619,11 @@ void app_main(void)
     st->desired_b = gw_config_get_u8(GW_KEY_ROLE_B, GW_ROLE_NONE);
     if (st->desired_b >= GW_ROLE_MAX) {
         st->desired_b = GW_ROLE_NONE;
+    }
+    /* radio B's pins used as GPIO (System › GPIO): radio B is left alone */
+    st->b_gpio = gpio_ctl_claims_radio_b();
+    if (!st->b_gpio) {
+        c6_radio_init_pins(c6_radio_pins(C6_RADIO_B)); /* external radio running, if connected */
     }
     if (!gw_config_get_str(GW_KEY_HOSTNAME, st->hostname, sizeof(st->hostname)) || !st->hostname[0]) {
         uint8_t mac[6];
@@ -639,6 +658,7 @@ void app_main(void)
     sound_init();
     sensors_init();
     modbus_init();
+    gpio_ctl_init();
     gw_mqtt_start();
     gw_update_start();
     gw_inet_start();

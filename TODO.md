@@ -203,8 +203,9 @@ Rešerše v [docs/dual-radio.md](docs/dual-radio.md#xiao-nrf54lm20a-deferred).
 
 ## GPIO na JP1 (zadání 2026-11-05, plán [docs/gpio.md](docs/gpio.md))
 Rozhodnutí: piny rádia B volné, když rádio B nemá roli; funkce vstup, výstup, PWM, čítač pulzů, UART-TCP most, druhá sběrnice I2C, 1-Wire DS18B20, WS2812; stav po restartu volbou u pinu; test s propojkou JP1 9–11 příště.
-- [ ] G1 Tabulka pinů a obsazení, kresba JP1 (jen čtení); ověřit GPIO1 (32k krystal) a zátěž GPIO45 (napájení SD)
-- [ ] G2 Vstup, výstup, PWM, čítač; API `/api/gpio`, UI, NVS, stav po restartu
+- [x] G1 Tabulka pinů a obsazení, kresba JP1; GPIO1 a GPIO45 bez zátěže na desce (sledují vnitřní pull)
+- [x] G2 Vstup, výstup, PWM, čítač; API `/api/gpio`, UI Systém › GPIO (JP1), NVS, stav po restartu, Telegram `/gpio`; TC52, UI36
+- [ ] Ověřit piny rádia B jako GPIO (rádio B bez role a bez C5)
 - [ ] G3 Zařízení „P4 GPIO“ v integraci (1.7.0) a MQTT (skupina `gpio`)
 - [ ] G4 UART-TCP most (UART4), I2C sběrnice 2, 1-Wire DS18B20, WS2812
 - [ ] G5 HW testy s propojkou JP1 9–11, dokumentace

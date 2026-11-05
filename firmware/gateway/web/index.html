@@ -386,6 +386,20 @@ ol.steps { padding-left: 20px; margin: 6px 0; } ol.steps li { margin: 6px 0; }
 #toast.show { opacity: .95; }
 dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--text); max-width: 420px; width: calc(100% - 32px); }
 dialog::backdrop { background: rgba(0,0,0,.45); }
+.gp-hdr { display: grid; grid-template-columns: repeat(13, minmax(58px, 1fr)); gap: 6px; min-width: 820px; }
+.gp-pin { border: 1px solid var(--border); border-radius: 8px; padding: 6px 4px; text-align: center; font-size: 12px; line-height: 1.3;
+  background: var(--panel-2); min-height: 62px; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.gp-pin b { font-size: 11px; color: var(--muted); font-weight: 600; }
+.gp-pin .gp-v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.gp-pin.gp-3v3 { border-color: var(--bad); color: var(--bad); } .gp-pin.gp-5v { border-color: var(--warn); color: var(--warn); }
+.gp-pin.gp-gnd, .gp-pin.gp-nc, .gp-pin.gp-c6 { color: var(--muted); }
+.gp-pin.gp-i2c { border-style: dashed; }
+.gp-pin.gp-res { opacity: .55; cursor: not-allowed; }
+.gp-pin.gp-free { border-color: var(--ok); cursor: pointer; }
+.gp-pin.gp-cfg { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); cursor: pointer; }
+.gp-pin.gp-sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gp-pin.gp-err { border-color: var(--bad); }
+.gp-row-label { font-size: 12px; color: var(--muted); margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -1407,7 +1421,7 @@ const NAV = [
     { id: 'matter', label: 'Matter', icon: 'matter' }] },
   { id: 'system', label: 'System', icon: 'developer-board', subs: [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
-    { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' }, { id: 'hw', label: 'Hardware', icon: 'expansion-card-variant' },
+    { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' }, { id: 'hw', label: 'Hardware', icon: 'expansion-card-variant' }, { id: 'gpio', label: 'GPIO (JP1)', icon: 'chip' },
     { id: 'rs485', label: 'RS485', icon: 'serial-port' }, { id: 'mbscan', label: 'Modbus TCP search', icon: 'lan-pending' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
@@ -1426,7 +1440,7 @@ const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbe
   role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
   'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
 /* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
-const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'system/mbscan': 'system/rs485', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
+const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'system/mbscan': 'system/rs485', 'system/gpio': 'system/hw', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -4861,6 +4875,137 @@ document.addEventListener('click', async e => {
   }
 });
 
+/* ---------------- GPIO of header JP1 (docs/gpio.md) ---------------- */
+views['system/gpio'] = () => `<div class="grid">
+  <div class="card wide">${h3('chip', L('Header JP1', 'Konektor JP1'))}
+    <p class="muted">${L('3.3 V logic, not 5 V tolerant; keep a pin under about 20 mA (a relay or a LED strip through a transistor or a module). Pins are off (high impedance) for 1-2 s after power on and after a crash: give a relay an external pull-down. Radio pins are locked while a radio uses them. Choose a free pin to set it up.',
+      'Logika 3,3 V, 5 V pin nesnese; pin zatěžujte nejvýš asi 20 mA (relé nebo LED pásek přes tranzistor či modul). Po zapnutí a po pádu jsou piny 1–2 s vypnuté (vysoká impedance): relé potřebuje vnější pull-down. Piny rádií jsou zamčené, dokud je rádio používá. Volný pin nastavíte kliknutím.')}</p>
+    <div class="table-wrap"><div class="gp-row-label">${L('Pins 1, 3 … 25', 'Piny 1, 3 … 25')}</div><div class="gp-hdr" id="gp-odd"></div>
+      <div class="gp-hdr" id="gp-even" style="margin-top:6px"></div><div class="gp-row-label">${L('Pins 2, 4 … 26', 'Piny 2, 4 … 26')}</div></div></div>
+  <div class="card">${h3('cog-outline', L('Pin settings', 'Nastavení pinu'))}<div id="gp-edit" class="muted">${L('Choose a free pin on the header.', 'Zvolte volný pin na konektoru.')}</div></div>
+  <div class="card">${h3('tune-variant', L('Configured pins', 'Nastavené piny'))}<div id="gp-pins" class="muted">${L('Loading…', 'Načítám…')}</div></div>
+</div>`;
+
+const GP_MODES = () => ({ off: L('Off', 'Vypnuto'), input: L('Input', 'Vstup'), output: L('Output', 'Výstup'), pwm: 'PWM', counter: L('Pulse counter', 'Čítač pulzů') });
+let gp = null, gpSel = null, gpTimer = null, gpShape = '';
+const gpPin = g => gp?.pins.find(p => p.gpio === g);
+/* what a pin carries on the board besides JP1 (the API's note, in the page's language) */
+const gpNote = h => ({ 1: L('XTAL_32K_N of the chip, no 32 kHz crystal on the board', 'XTAL_32K_N čipu, krystal 32 kHz na desce není'),
+  45: L('also switches the SD card power on the board (the gateway does not use the SD card)', 'na desce zároveň spíná napájení SD karty (brána SD kartu nepoužívá)') })[h.gpio] || h.note || '';
+function gpValue(p) {
+  if (!p.active) return pill('bad', L('off', 'vypnuto'));
+  if (p.mode === 'pwm') return `${p.duty} %`;
+  if (p.mode === 'counter') return `${p.count} · ${p.frequency} Hz`;
+  return p.level ? pill('ok', '1') : pill('', '0');
+}
+function gpCell(h) {
+  const p = h.gpio !== undefined ? gpPin(h.gpio) : null;
+  const cls = h.kind !== 'gpio' ? `gp-${h.kind}` : p && p.mode !== 'off' ? `gp-cfg${p.error ? ' gp-err' : ''}` : h.free ? 'gp-free' : 'gp-res';
+  const title = h.reserved || gpNote(h) || (p?.error) || '';
+  const val = p && p.mode !== 'off' ? `<span class="gp-v" data-gpv="${h.gpio}">${p.active ? (p.mode === 'pwm' ? p.duty + ' %' : p.mode === 'counter' ? p.count : p.level) : '×'}</span>` : '';
+  const what = h.kind === 'gpio' && !h.free && !p ? ic('lock-outline') : p && p.mode !== 'off' ? esc(GP_MODES()[p.mode]) : '';
+  return `<div class="gp-pin ${cls} ${gpSel === h.gpio && h.kind === 'gpio' ? 'gp-sel' : ''}" ${h.kind === 'gpio' && (h.free || p) ? `data-gp="${h.gpio}"` : ''} title="${esc(title)}">
+    <b>${h.pin}</b><span data-notr>${esc(h.label)}</span>${what ? `<span>${what}</span>` : ''}${val}</div>`;
+}
+function gpRender() {
+  if (!$('#gp-odd') || !gp) return;
+  $('#gp-odd').innerHTML = gp.header.filter(h => h.pin % 2).map(gpCell).join('');
+  $('#gp-even').innerHTML = gp.header.filter(h => !(h.pin % 2)).map(gpCell).join('');
+  const ro = perm('system/hw') < 2 ? 'disabled' : '';
+  const list = gp.pins.filter(p => p.mode !== 'off');
+  $('#gp-pins').classList.toggle('muted', !list.length);
+  $('#gp-pins').innerHTML = !list.length ? L('No pin is set up yet.', 'Zatím není nastavený žádný pin.') : `<div class="table-wrap"><table><thead><tr><th>GPIO</th><th>${L('Name', 'Jméno')}</th><th>${L('Mode', 'Režim')}</th><th>${L('Value', 'Hodnota')}</th><th></th></tr></thead><tbody>
+    ${list.map(p => `<tr><td data-notr>GPIO${p.gpio} <span class="muted">JP1 ${p.jp1}</span></td><td>${esc(p.name)}</td><td>${esc(GP_MODES()[p.mode])}</td>
+      <td data-gpval="${p.gpio}">${p.active ? gpValue(p) : `${pill('bad', L('off', 'vypnuto'))} <span class="muted">${esc(p.error || '')}</span>`}</td>
+      <td>${!p.active ? '' : p.mode === 'output' ? `<label><input type="checkbox" data-gp-level="${p.gpio}" ${p.level ? 'checked' : ''} ${ro}> ${L('On', 'Zapnuto')}</label>
+          <button class="btn" data-gp-pulse="${p.gpio}" ${ro}>${L('Pulse 1 s', 'Pulz 1 s')}</button>`
+        : p.mode === 'pwm' ? `<input type="range" min="0" max="100" step="0.5" value="${p.duty}" data-gp-duty="${p.gpio}" ${ro} style="width:140px">`
+        : p.mode === 'counter' ? `<button class="btn" data-gp-reset="${p.gpio}" ${ro}>${L('Reset', 'Vynulovat')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+}
+/* live values without touching the controls being used */
+function gpUpdate() {
+  for (const p of gp.pins) {
+    const v = $(`[data-gpv="${p.gpio}"]`);
+    if (v && p.active) v.textContent = p.mode === 'pwm' ? p.duty + ' %' : p.mode === 'counter' ? p.count : p.level;
+    const cell = $(`[data-gpval="${p.gpio}"]`);
+    if (cell && p.active) cell.innerHTML = gpValue(p);
+    const box = $(`[data-gp-level="${p.gpio}"]`);
+    if (box && document.activeElement !== box) box.checked = !!p.level;
+  }
+}
+async function loadGpio(first) {
+  if (route() !== 'system/gpio') { clearInterval(gpTimer); gpTimer = null; return; }
+  try { gp = await api('/api/gpio'); } catch (e) { if ($('#gp-pins')) $('#gp-pins').textContent = e.message; return; }
+  const shape = JSON.stringify([gp.header.map(h => [h.free, h.reserved]), gp.pins.map(p => [p.gpio, p.mode, p.name, p.active, p.error])]);
+  if (first || shape !== gpShape) { gpShape = shape; gpRender(); } else gpUpdate();
+  if (first && gpSel !== null) gpEdit(gpSel);
+  if (!gpTimer) gpTimer = setInterval(loadGpio, 1000);
+}
+function gpEdit(g) {
+  gpSel = g;
+  const h = gp.header.find(x => x.gpio === g && x.kind === 'gpio'), p = gpPin(g) || { gpio: g, mode: 'output', name: '', expose: 'integration', pull: 'none', restore: 'off', freq: 1000, edge: 'rising', debounce_ms: 20, filter_ns: 0 };
+  const ro = perm('system/hw') < 2 ? 'disabled' : '';
+  const sel = (id, opts, v) => `<select id="${id}" ${ro}>${opts.map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  const f = (label, html, modes) => `<label class="field" data-gp-for="${modes}"><span>${label}</span>${html}</label>`;
+  $('#gp-edit').classList.remove('muted');
+  $('#gp-edit').innerHTML = `<p><b data-notr>GPIO${g}</b> <span class="muted">JP1 ${h.pin}</span></p>
+    ${gpNote(h) ? `<p class="muted">${esc(gpNote(h))}</p>` : ''}
+    ${f(L('Name (Home Assistant)', 'Jméno (Home Assistant)'), `<input type="text" id="gp-name" maxlength="32" value="${esc(p.name)}" ${ro}>`, 'all')}
+    ${f(L('Mode', 'Režim'), sel('gp-mode', Object.entries(GP_MODES()), p.mode), 'all')}
+    ${f(L('Pull resistor', 'Pull rezistor'), sel('gp-pull', [['none', L('None', 'Žádný')], ['up', 'Pull-up'], ['down', 'Pull-down']], p.pull), 'input output counter')}
+    ${f(L('Debounce (ms)', 'Debounce (ms)'), `<input type="number" id="gp-debounce" min="0" max="1000" value="${p.debounce_ms ?? 20}" ${ro}>`, 'input')}
+    ${f(L('Frequency (Hz)', 'Frekvence (Hz)'), `<input type="number" id="gp-freq" min="1" max="1000000" value="${p.freq ?? 1000}" ${ro}>`, 'pwm')}
+    ${f(L('Count edges', 'Počítat hrany'), sel('gp-edge', [['rising', L('Rising', 'Náběžné')], ['falling', L('Falling', 'Sestupné')], ['both', L('Both', 'Obě')]], p.edge), 'counter')}
+    ${f(L('Glitch filter (ns)', 'Filtr zákmitů (ns)'), `<input type="number" id="gp-filter" min="0" max="10000" value="${p.filter_ns ?? 0}" ${ro}>`, 'counter')}
+    ${f(L('After a restart', 'Po restartu'), sel('gp-restore', [['off', L('Off', 'Vypnuto')], ['on', L('On', 'Zapnuto')], ['last', L('Last state', 'Poslední stav')]], p.restore), 'output pwm')}
+    ${f(L('Home Assistant', 'Home Assistant'), sel('gp-expose', [['integration', L('Integration', 'Integrace')], ['mqtt', 'MQTT'], ['both', L('Integration and MQTT', 'Integrace a MQTT')], ['none', L('Not shown', 'Nezobrazovat')]], p.expose), 'input output pwm counter')}
+    <div class="row" data-gp-for="input output pwm counter"><label><input type="checkbox" id="gp-invert" ${p.invert ? 'checked' : ''} ${ro}> ${L('Inverted (active low)', 'Invertovaný (aktivní v nule)')}</label></div>
+    <div class="row" data-gp-for="output"><label><input type="checkbox" id="gp-od" ${p.open_drain ? 'checked' : ''} ${ro}> ${L('Open drain', 'Otevřený kolektor (open drain)')}</label></div>
+    <div class="row"><button class="btn primary" id="gp-save" ${ro}>${ic('check')}${L('Save', 'Uložit')}</button>
+      ${gpPin(g) ? `<button class="btn" id="gp-remove" ${ro}>${ic('close')}${L('Free the pin', 'Uvolnit pin')}</button>` : ''}</div>`;
+  gpFields();
+  gpRender();
+}
+function gpFields() {
+  const m = $('#gp-mode')?.value;
+  document.querySelectorAll('#gp-edit [data-gp-for]').forEach(e => e.classList.toggle('hidden', e.dataset.gpFor !== 'all' && !e.dataset.gpFor.split(' ').includes(m)));
+}
+document.addEventListener('change', e => { if (e.target.id === 'gp-mode') gpFields(); });
+const gpList = () => gp.pins.filter(p => p.mode !== 'off').map(({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns }) =>
+  ({ gpio, mode, name, expose, invert, pull, debounce_ms, open_drain, restore, freq, edge, filter_ns }));
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-gp], #gp-save, #gp-remove, [data-gp-pulse], [data-gp-reset]');
+  if (!t) return;
+  try {
+    if (t.dataset.gp) gpEdit(+t.dataset.gp);
+    else if (t.id === 'gp-save' || t.id === 'gp-remove') {
+      const pin = { gpio: gpSel, mode: $('#gp-mode').value, name: $('#gp-name').value.trim(), expose: $('#gp-expose').value, invert: $('#gp-invert').checked,
+        pull: $('#gp-pull').value, debounce_ms: +$('#gp-debounce').value, open_drain: $('#gp-od').checked, restore: $('#gp-restore').value,
+        freq: +$('#gp-freq').value, edge: $('#gp-edge').value, filter_ns: +$('#gp-filter').value };
+      const pins = gpList().filter(p => p.gpio !== gpSel);
+      if (t.id === 'gp-save' && pin.mode !== 'off') pins.push(pin);
+      gp = await api('/api/gpio', { method: 'PUT', json: { pins } });
+      gpShape = '';
+      toast(L('Saved', 'Uloženo'));
+      gpEdit(gpSel);
+      const now = gpPin(gpSel);
+      if (now?.error) toast(L('Pin off: ', 'Pin vypnutý: ') + now.error);
+    } else if (t.dataset.gpPulse) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpPulse, pulse_ms: 1000 } });
+    else if (t.dataset.gpReset) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpReset, reset: true } });
+  } catch (err) {
+    toast(L('Error: ', 'Chyba: ') + err.message);
+  }
+});
+document.addEventListener('change', async e => {
+  const t = e.target;
+  try {
+    if (t.dataset.gpLevel) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpLevel, level: t.checked ? 1 : 0 } });
+    else if (t.dataset.gpDuty) await api('/api/gpio/set', { json: { gpio: +t.dataset.gpDuty, duty: +t.value } });
+  } catch (err) {
+    toast(L('Error: ', 'Chyba: ') + err.message);
+  }
+});
+
 /* ---------------- users and permissions ---------------- */
 const ROLE_NAMES = () => ({ admin: L('Admin', 'Správce'), user: L('User', 'Uživatel'), viewer: L('Viewer', 'Divák') });
 const LEVELS = () => [L('Hidden', 'Skryto'), L('Read', 'Číst'), L('Edit', 'Upravovat')];
@@ -5966,6 +6111,7 @@ function render(full) {
     if (route() === 'system/hw') loadHw();
     if (route() === 'system/rs485') loadModbus();
     if (route() === 'system/mbscan') loadMbScan(true);
+    if (route() === 'system/gpio') loadGpio(true);
     if (route() === 'esphome') loadEsphomeWifi();
     if (route().startsWith('system/users/')) loadUsersPage();
     if (route() === 'profile') loadProfile();
