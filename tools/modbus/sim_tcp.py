@@ -11,6 +11,7 @@ Addresses no entity covers answer exception 2 (like a strict device), unless --l
                                           answers with AA 55 (--split: long ones in two datagrams); discovery on 48899
   sim_tcp.py --expect eastron_sdm630      print the values the gateway must show, as JSON
   --log-reads                             also log every read (tests of the gateway's register cache)
+  --delay MS                              answer every request after MS (a slow device, e.g. on RS485)
 
 The value of an entity: a number derived from its key (stable), within the range its type can hold;
 bool entities alternate; map entities take their first option."""
@@ -21,6 +22,7 @@ import socketserver
 import struct
 import sys
 import threading
+import time
 import zlib
 from pathlib import Path
 
@@ -136,6 +138,7 @@ class Unit:
 
 UNITS = {}
 LOG_READS = False
+DELAY_S = 0
 SPACES = {1: 'coil', 2: 'discrete', 3: 'holding', 4: 'input'}
 
 
@@ -151,6 +154,8 @@ class Handler(socketserver.BaseRequestHandler):
             if pdu is None:
                 return
             answer = self.answer(UNITS.get(unit), pdu)
+            if DELAY_S:
+                time.sleep(DELAY_S)
             if answer is None:
                 continue  # no such unit: no answer, like a gateway with a dead target
             sock.sendall(struct.pack('>HHHB', tid, 0, len(answer) + 1, unit) + answer)
@@ -249,13 +254,15 @@ def main():
     p.add_argument('--split', action='store_true', help='--udp: answers over 32 bytes in two datagrams')
     p.add_argument('--expect', metavar='TEMPLATE')
     p.add_argument('--log-reads', action='store_true', help='log every read')
+    p.add_argument('--delay', type=int, default=0, metavar='MS', help='answer every request after MS')
     p.add_argument('units', nargs='*', metavar='TEMPLATE:UNIT')
     a = p.parse_args()
     if a.expect:
         print(json.dumps(Unit(a.expect, True).expect, ensure_ascii=False))
         return 0
-    global LOG_READS
+    global LOG_READS, DELAY_S
     LOG_READS = a.log_reads
+    DELAY_S = a.delay / 1000
     for spec in a.units:
         tid, unit = spec.rsplit(':', 1)
         UNITS[int(unit)] = Unit(tid, not a.lenient)

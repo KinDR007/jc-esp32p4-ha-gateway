@@ -4,7 +4,8 @@
 Starts the Modbus TCP simulator of this computer with three Eastron SDM630 (units 1-3), adds them to the
 gateway (poll 3 s), offers them on the shared port 502 (unit 10) and on own ports 1505-1507 (rate 50/s),
 then runs 8 clients at once (the limit: 2 on each port), each alternating a read the cache answers (input
-0-5) with one that goes to the device (holding 0xfc00, polled once only). Meanwhile it samples /api/status
+0-5) with one that goes to the device (holding registers from 0x6000 on, another address every time, so the
+cache of answers to clients does not catch it; the simulator answers unknown addresses with 0). Meanwhile it samples /api/status
 (internal heap, uptime, role) and its answer time, and the Modbus polls. The configuration of before comes
 back.
 
@@ -61,8 +62,10 @@ def client(a, port, unit, stop, out):
         return
     tid = 0
     while not stop.is_set():
-        for kind, pdu in (('cache', bytes([4, 0, 0, 0, 6])), ('device', bytes([3, 0xfc, 0, 0, 2]))):
+        for kind in ('cache', 'device'):
             tid = (tid + 1) & 0xffff
+            addr = 0x6000 + (tid * 2 + port) % 0x4000
+            pdu = bytes([4, 0, 0, 0, 6]) if kind == 'cache' else bytes([3, addr >> 8, addr & 0xff, 0, 2])
             t0 = time.perf_counter()
             try:
                 ans = request(s, tid, unit, pdu)
@@ -99,7 +102,7 @@ def main():
     here.connect((a.host, 80))
     my_ip = here.getsockname()[0]
     here.close()
-    sim = subprocess.Popen([sys.executable, str(SIM), '--port', str(a.sim_port)] + [f'eastron_sdm630:{u}' for u in (1, 2, 3)],
+    sim = subprocess.Popen([sys.executable, str(SIM), '--port', str(a.sim_port), '--lenient'] + [f'eastron_sdm630:{u}' for u in (1, 2, 3)],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     before = http(a, 'GET', '/api/modbus')
     keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}

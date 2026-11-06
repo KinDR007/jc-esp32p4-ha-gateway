@@ -4022,6 +4022,7 @@
                 "write": false,
                 "allow": [],
                 "rate": 5,
+                "cache_ms": 2000,
                 "missing": false,
                 "name": "Eastron SDM630",
                 "requests": 120,
@@ -4059,12 +4060,14 @@
               "ports": 8,
               "clients_per_port": 2,
               "clients": 8,
-              "rate": 50
+              "rate": 50,
+              "cache_ms_min": 1500,
+              "cache_ms_max": 5000
             }
           },
           "effects": {
-            "en": "devices: unit is the unit id on the shared port (0: not there), port an own port (0: none) where any unit id reaches the device. cached: reads answered from the registers the gateway polled within the device's poll interval; passed: requests sent to the device; refused: over the rate (exception 6), a write not allowed (1) or an invalid request (1, 3); failed: the device off, offline or silent (10, 11). missing: the Modbus device was removed (its requests get exception 10). ports: ok false with error when the port could not be opened. turned_away: connections closed at once because the port or the gateway had its clients.",
-            "cs": "devices: unit je unit id na sdíleném portu (0: tam ne), port vlastní port (0: žádný), kde zařízení dosáhne jakékoli unit id. cached: čtení zodpovězená z registrů, které brána přečetla během intervalu dotazování zařízení; passed: dotazy poslané zařízení; refused: nad limit (výjimka 6), nepovolený zápis (1) nebo neplatný dotaz (1, 3); failed: zařízení vypnuté, offline nebo bez odpovědi (10, 11). missing: zařízení Modbus bylo odebráno (jeho dotazy dostanou výjimku 10). ports: ok false s error, když port nešel otevřít. turned_away: spojení hned zavřená, protože port nebo brána měly plno klientů."
+            "en": "devices: unit is the unit id on the shared port (0: not there), port an own port (0: none) where any unit id reaches the device. cache_ms: how long answers to clients serve the next ones (0: no cache at all). cached: reads answered from the registers the gateway polled within the device's poll interval, from answers to clients within cache_ms, or by joining the same read of another client on its way; passed: requests sent to the device; refused: over the rate (exception 6), a write not allowed (1) or an invalid request (1, 3); failed: the device off, offline or silent (10, 11). missing: the Modbus device was removed (its requests get exception 10). ports: ok false with error when the port could not be opened. turned_away: connections closed at once because the port or the gateway had its clients.",
+            "cs": "devices: unit je unit id na sdíleném portu (0: tam ne), port vlastní port (0: žádný), kde zařízení dosáhne jakékoli unit id. cache_ms: jak dlouho odpovědi klientům slouží dalším (0: žádná cache). cached: čtení zodpovězená z registrů, které brána přečetla během intervalu dotazování zařízení, z odpovědí klientům v rámci cache_ms nebo připojením ke stejnému rozpracovanému čtení jiného klienta; passed: dotazy poslané zařízení; refused: nad limit (výjimka 6), nepovolený zápis (1) nebo neplatný dotaz (1, 3); failed: zařízení vypnuté, offline nebo bez odpovědi (10, 11). missing: zařízení Modbus bylo odebráno (jeho dotazy dostanou výjimku 10). ports: ok false s error, když port nešel otevřít. turned_away: spojení hned zavřená, protože port nebo brána měly plno klientů."
           }
         },
         {
@@ -4086,7 +4089,8 @@
                 "port": 1502,
                 "write": false,
                 "allow": [],
-                "rate": 5
+                "rate": 5,
+                "cache_ms": 2000
               },
               {
                 "device": "d2",
@@ -4096,7 +4100,8 @@
                 "allow": [
                   "192.168.88.20"
                 ],
-                "rate": 2
+                "rate": 2,
+                "cache_ms": 2000
               }
             ]
           },
@@ -4106,14 +4111,14 @@
             {
               "code": 400,
               "when": {
-                "en": "port not 1-65535 or 80, 8081, the Zigbee port; more than 16 devices; device not a configured Modbus device; unit not 0-247 or port not 0-65535; neither unit nor port; an own port equal to the shared one; a device, unit or port twice; write not a bool; allow not up to 4 IPv4 addresses; rate not 1-50; more than 8 ports (the shared one counts).",
-                "cs": "port není 1-65535 nebo je 80, 8081, port Zigbee; víc než 16 zařízení; device není nastavené zařízení Modbus; unit není 0-247 nebo port není 0-65535; chybí unit i port; vlastní port rovný sdílenému; zařízení, unit nebo port dvakrát; write není bool; allow není nejvýš 4 adresy IPv4; rate není 1-50; víc než 8 portů (sdílený se počítá)."
+                "en": "port not 1-65535 or 80, 8081, the Zigbee port; more than 16 devices; device not a configured Modbus device; unit not 0-247 or port not 0-65535; neither unit nor port; an own port equal to the shared one; a device, unit or port twice; write not a bool; allow not up to 4 IPv4 addresses; rate not 1-50; cache_ms not 0 or 1500-5000; more than 8 ports (the shared one counts).",
+                "cs": "port není 1-65535 nebo je 80, 8081, port Zigbee; víc než 16 zařízení; device není nastavené zařízení Modbus; unit není 0-247 nebo port není 0-65535; chybí unit i port; vlastní port rovný sdílenému; zařízení, unit nebo port dvakrát; write není bool; allow není nejvýš 4 adresy IPv4; rate není 1-50; cache_ms není 0 nebo 1500-5000; víc než 8 portů (sdílený se počítá)."
               }
             }
           ],
           "effects": {
-            "en": "What is not sent stays. The shared port (default 502, enabled) listens while a device has a unit id there and routes by it; unknown unit ids get exception 10. Reads of registers the gateway polls are answered from its cache, everything else goes to the device through the Modbus task (the RS485 bus is shared with the polling), at most rate requests per second per device, else exception 6. Writes (functions 5, 6, 15, 16) only with write and, when allow lists addresses, only from them; else exception 1. Up to 2 clients per port and 8 in all, one request at a time per client; idle clients are closed after 120 s. Answers the GET.",
-            "cs": "Co se nepošle, zůstane. Sdílený port (výchozí 502, zapnutý) naslouchá, když na něm má nějaké zařízení unit id, a směruje podle něj; neznámé unit id dostane výjimku 10. Čtení registrů, které brána dotazuje, odpoví z cache, vše ostatní jde na zařízení přes úlohu Modbus (sběrnici RS485 sdílí s dotazováním), nejvýš rate dotazů za sekundu na zařízení, jinak výjimka 6. Zápis (funkce 5, 6, 15, 16) jen s write, a když allow obsahuje adresy, jen z nich; jinak výjimka 1. Nejvýš 2 klienti na port a 8 celkem, jeden dotaz klienta naráz; nečinné klienty zavře po 120 s. Vrací totéž co GET."
+            "en": "What is not sent stays. The shared port (default 502, enabled) listens while a device has a unit id there and routes by it; unknown unit ids get exception 10. Reads of registers the gateway polls, and for cache_ms (default 2000) answers to clients, come from its cache; a write drops the blocks it touches; the same read of two clients goes to the device once. Everything else goes to the device through the Modbus task (the RS485 bus is shared with the polling; requests wait for one transaction of a poll at most), at most rate requests per second per device, else exception 6. Writes (functions 5, 6, 15, 16) only with write and, when allow lists addresses, only from them; else exception 1. Up to 2 clients per port and 8 in all, one request at a time per client; idle clients are closed after 120 s. Answers the GET.",
+            "cs": "Co se nepošle, zůstane. Sdílený port (výchozí 502, zapnutý) naslouchá, když na něm má nějaké zařízení unit id, a směruje podle něj; neznámé unit id dostane výjimku 10. Čtení registrů, které brána dotazuje, a po dobu cache_ms (výchozí 2000) odpovědi klientům jdou z cache; zápis zahodí bloky, kterých se týká; stejné čtení dvou klientů jde na zařízení jednou. Vše ostatní jde na zařízení přes úlohu Modbus (sběrnici RS485 sdílí s dotazováním; dotaz čeká nejvýš na jednu transakci pollu), nejvýš rate dotazů za sekundu na zařízení, jinak výjimka 6. Zápis (funkce 5, 6, 15, 16) jen s write, a když allow obsahuje adresy, jen z nich; jinak výjimka 1. Nejvýš 2 klienti na port a 8 celkem, jeden dotaz klienta naráz; nečinné klienty zavře po 120 s. Vrací totéž co GET."
           }
         }
       ]

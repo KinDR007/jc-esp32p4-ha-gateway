@@ -17,10 +17,11 @@ static const char *TAG = "mb_server";
 
 /*
  * Modbus TCP server for the gateway's Modbus devices (docs/modbus.md): the shared port (502) routes by unit
- * id, a device may also have its own port where any unit id reaches it. Reads the gateway polls anyway come
- * from its register cache; other requests go to the device through the modbus task (the only user of the
- * RS485 bus), limited per device. Writes only where switched on. One task serves every socket, one request
- * per client at a time.
+ * id, a device may also have its own port where any unit id reaches it. Reads come from the cache when the
+ * gateway polled those registers or a client read them within the device's cache time; a read another
+ * client is waiting for already is not sent again; everything else goes to the device through the modbus
+ * task (the only user of the RS485 bus), limited per device. Writes only where switched on. One task serves
+ * every socket, one request per client at a time.
  */
 
 #define KEY_SRV "mb_srv" /* str JSON {"enabled", "port", "devices": [{device, unit, port, write, allow, rate}]} */
@@ -31,6 +32,9 @@ static const char *TAG = "mb_server";
 #define ALLOW_MAX 4
 #define RATE_DEFAULT 5
 #define RATE_MAX 50
+#define CACHE_MS_DEFAULT 2000
+#define CACHE_MS_MIN 1500
+#define CACHE_MS_MAX 5000
 #define IDLE_US (120 * 1000000LL)
 
 typedef struct {
@@ -41,6 +45,7 @@ typedef struct {
     uint8_t nallow;
     uint32_t allow[ALLOW_MAX]; /* addresses allowed to write (network order), none = anyone */
     uint8_t rate;              /* requests per second passed to the device */
+    uint16_t cache_ms;         /* answers to clients kept this long; 0: no cache at all (registers changing on read) */
     /* runtime */
     double tokens;
     int64_t refill_us;
@@ -70,6 +75,7 @@ typedef struct {
     size_t got;
     uint8_t buf[MB_TCP_MAX];
     bool pending; /* a job runs, also after the client is gone */
+    int follow;   /* waits for the job of this slot (the same read), -1 for its own */
     int entry;
     uint16_t tid;
     uint8_t unit;
@@ -142,7 +148,8 @@ static const char *parse(const cJSON *root, cfg_t *c, bool devices)
         entry_t *e = &c->e[c->n];
         const cJSON *dev = cJSON_GetObjectItem(j, "device"), *unit = cJSON_GetObjectItem(j, "unit"),
                     *port = cJSON_GetObjectItem(j, "port"), *write = cJSON_GetObjectItem(j, "write"),
-                    *allow = cJSON_GetObjectItem(j, "allow"), *rate = cJSON_GetObjectItem(j, "rate");
+                    *allow = cJSON_GetObjectItem(j, "allow"), *rate = cJSON_GetObjectItem(j, "rate"),
+                    *cache = cJSON_GetObjectItem(j, "cache_ms");
         if (!cJSON_IsString(dev) || strlen(dev->valuestring) >= sizeof(e->dev)
             || (devices && !modbus_srv_device(dev->valuestring, NULL, 0))) {
             snprintf(why, sizeof(why), "devices[%d]: device: the id of a configured Modbus device", c->n);
@@ -187,6 +194,11 @@ static const char *parse(const cJSON *root, cfg_t *c, bool devices)
             return why;
         }
         e->rate = rate ? (uint8_t)rate->valueint : RATE_DEFAULT;
+        if (cache && (!cJSON_IsNumber(cache) || (cache->valueint && (cache->valueint < CACHE_MS_MIN || cache->valueint > CACHE_MS_MAX)))) {
+            snprintf(why, sizeof(why), "devices[%d]: cache_ms: 0 or %d-%d", c->n, CACHE_MS_MIN, CACHE_MS_MAX);
+            return why;
+        }
+        e->cache_ms = cache ? (uint16_t)cache->valueint : CACHE_MS_DEFAULT;
         for (int k = 0; k < c->n; k++) {
             const entry_t *o = &c->e[k];
             if (!strcmp(o->dev, e->dev) || (e->unit && o->unit == e->unit) || (e->port && o->port == e->port)) {
@@ -225,6 +237,7 @@ static cJSON *config_json(const cfg_t *c, bool stats)
             cJSON_AddItemToArray(allow, cJSON_CreateString(ip));
         }
         cJSON_AddNumberToObject(j, "rate", e->rate);
+        cJSON_AddNumberToObject(j, "cache_ms", e->cache_ms);
         if (stats) {
             char name[100] = "";
             cJSON_AddBoolToObject(j, "missing", !modbus_srv_device(e->dev, name, sizeof(name)));
@@ -372,11 +385,29 @@ static void handle(int i, size_t len)
     }
     uint8_t ans[MB_PDU_MAX];
     size_t dlen = sizeof(job->data);
-    if (job->req.fc <= MB_FC_READ_INPUT && modbus_srv_cache(e->dev, &job->req, job->data, &dlen) == MB_OK) {
+    bool read = job->req.fc <= MB_FC_READ_INPUT;
+    err = read ? modbus_srv_cache(e->dev, &job->req, e->cache_ms, job->data, &dlen) : MB_ERR_ARG;
+    if (err > 0) {
+        e->cached++;
+        send_exception(c, job->req.fc, (uint8_t)err); /* the same read got it a moment ago */
+        return;
+    }
+    if (err == MB_OK) {
         size_t n = mb_pdu_answer(&job->req, job->data, dlen, ans, sizeof(ans));
         if (n) {
             e->cached++;
             send_pdu(c, ans, n);
+            return;
+        }
+    }
+    for (int k = 0; read && e->cache_ms && k < CLIENTS_MAX; k++) {
+        const mb_srv_job_t *o = &s_job[k];
+        if (k != i && s_cli[k].pending && s_cli[k].follow < 0 && !strcmp(o->dev, e->dev) && o->req.fc == job->req.fc
+            && o->req.addr == job->req.addr && o->req.count == job->req.count) {
+            e->cached++; /* the same read is on its way: its answer serves this client too */
+            c->pending = true;
+            c->follow = k;
+            c->entry = ei;
             return;
         }
     }
@@ -393,6 +424,7 @@ static void handle(int i, size_t len)
     }
     e->tokens -= 1;
     strlcpy(job->dev, e->dev, sizeof(job->dev));
+    job->cache = e->cache_ms != 0;
     err = modbus_srv_submit(job);
     if (err) {
         e->failed++;
@@ -401,14 +433,14 @@ static void handle(int i, size_t len)
     }
     e->passed++;
     c->pending = true;
+    c->follow = -1;
     c->entry = ei;
 }
 
-/* the job of client slot i is done; under s_lock */
-static void finish(int i)
+/* the answer of job to client slot i; under s_lock */
+static void answer(int i, const mb_srv_job_t *job)
 {
     client_t *c = &s_cli[i];
-    const mb_srv_job_t *job = &s_job[i];
     c->pending = false;
     if (c->sock < 0) {
         return; /* gone meanwhile */
@@ -425,6 +457,20 @@ static void finish(int i)
     }
     int code = job->result > 0 ? job->result : job->result == MB_ERR_IO ? 0x0a : 0x0b;
     send_exception(c, job->req.fc, (uint8_t)code);
+}
+
+static void drain(int i);
+
+/* the job of client slot i is done: its answer, also to the clients waiting for the same read; under s_lock */
+static void finish(int i)
+{
+    answer(i, &s_job[i]);
+    for (int k = 0; k < CLIENTS_MAX; k++) {
+        if (s_cli[k].pending && s_cli[k].follow == i) {
+            answer(k, &s_job[i]);
+            drain(k);
+        }
+    }
 }
 
 /* complete requests in the buffer of slot i, while no job runs; under s_lock */
@@ -472,7 +518,7 @@ static void accept_client(int li)
     struct timeval tv = {.tv_sec = 2};
     setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
     client_t *c = &s_cli[slot];
-    *c = (client_t){.sock = s, .lst = li, .ip = peer.sin_addr.s_addr, .since_us = esp_timer_get_time()};
+    *c = (client_t){.sock = s, .lst = li, .ip = peer.sin_addr.s_addr, .since_us = esp_timer_get_time(), .follow = -1};
     c->last_us = c->since_us;
 }
 
@@ -519,7 +565,7 @@ static void task(void *arg)
         }
         for (int i = 0; i < CLIENTS_MAX; i++) {
             client_t *c = &s_cli[i];
-            if (c->pending && s_job[i].done) {
+            if (c->pending && c->follow < 0 && s_job[i].done) {
                 finish(i);
                 drain(i);
             }
@@ -596,6 +642,8 @@ static esp_err_t server_get(httpd_req_t *req)
     cJSON_AddNumberToObject(lim, "clients_per_port", CLIENTS_PER_PORT);
     cJSON_AddNumberToObject(lim, "clients", CLIENTS_MAX);
     cJSON_AddNumberToObject(lim, "rate", RATE_MAX);
+    cJSON_AddNumberToObject(lim, "cache_ms_min", CACHE_MS_MIN);
+    cJSON_AddNumberToObject(lim, "cache_ms_max", CACHE_MS_MAX);
     xSemaphoreGive(s_lock);
     return gw_http_send_json(req, j);
 }

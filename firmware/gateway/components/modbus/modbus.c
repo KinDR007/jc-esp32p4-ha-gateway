@@ -41,7 +41,8 @@ static const char *TAG = "modbus";
 #define OFFLINE_RETRY_S 30
 #define EXPOSE_INTEGRATION 1
 #define EXPOSE_MQTT 2
-#define CACHE_SLACK_US 2000000    /* a cached block is fresh for the poll interval and this */
+#define CACHE_SLACK_US 2000000    /* a polled block is fresh for the poll interval and this */
+#define CLIENT_BLOCKS 16          /* answers to Modbus TCP clients kept per device, beside the polled blocks */
 
 extern const char templates_json_start[] asm("_binary_templates_json_start");
 
@@ -51,11 +52,13 @@ typedef struct {
     int slot;     /* NVS slot of a user template, -1 built in */
 } tpl_t;
 
-/* a block as read, for the Modbus TCP server: registers big endian or packed bits */
+/* a block as read, for the Modbus TCP server: registers big endian or packed bits; slots [0, nent) hold
+ * what the polling read, [nent, nent + CLIENT_BLOCKS) answers to clients */
 typedef struct {
     uint8_t space;
     uint16_t addr, count;
     int64_t at_us; /* 0 = empty */
+    uint8_t exc;   /* a client's read answered with this exception (2: no such register), no data */
     uint16_t cap;
     uint8_t *data; /* PSRAM, cap bytes */
 } cblock_t;
@@ -87,7 +90,7 @@ typedef struct {
     uint8_t *vstate; /* VAL_* */
     bool *single;
     char **text;     /* str entities */
-    cblock_t *cache; /* nent (a poll has at most a block per entity), PSRAM */
+    cblock_t *cache; /* nent + CLIENT_BLOCKS (a poll has at most a block per entity), PSRAM */
 } mbdev_t;
 
 enum { VAL_NONE, VAL_OK, VAL_UNSUPPORTED };
@@ -223,7 +226,7 @@ static void free_runtime(mbdev_t *d)
     free(d->single);
     free(d->text);
     if (d->cache) {
-        for (int i = 0; i < d->nent; i++) {
+        for (int i = 0; i < d->nent + CLIENT_BLOCKS; i++) {
             free(d->cache[i].data);
         }
     }
@@ -243,7 +246,7 @@ static bool alloc_runtime(mbdev_t *d)
     d->vstate = ps_calloc(n, 1);
     d->single = ps_calloc(n, sizeof(bool));
     d->text = ps_calloc(n, sizeof(char *));
-    d->cache = ps_calloc(n, sizeof(cblock_t));
+    d->cache = ps_calloc(n + CLIENT_BLOCKS, sizeof(cblock_t));
     return d->val && d->vstate && d->single && d->text && d->cache;
 }
 
@@ -470,15 +473,24 @@ static void save_config(void)
 
 /* ---------------------------------------------------------------- requests */
 
+static void cache_forget(mbdev_t *d, const mb_req_t *req);
+static void server_jobs(void);
+
 static int request(mbdev_t *d, const mb_req_t *req, uint8_t *data, size_t *len)
 {
     const mb_template_t *t = &d->t->t;
     uint16_t timeout = t->timeout_ms > s_timeout_ms ? t->timeout_ms : s_timeout_ms;
+    int err;
     if (d->udp) {
-        return mb_udp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len);
+        err = mb_udp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len);
+    } else {
+        err = d->tcp ? mb_tcp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len)
+                     : mb_rtu_request(d->slave, req, timeout, t->gap_ms, data, len);
     }
-    return d->tcp ? mb_tcp_request(&d->conn, d->host, d->port, d->slave, req, timeout, data, len)
-                  : mb_rtu_request(d->slave, req, timeout, t->gap_ms, data, len);
+    if (req->fc >= MB_FC_WRITE_COIL) {
+        cache_forget(d, req); /* also when it failed: the device may have taken it */
+    }
+    return err;
 }
 
 static uint8_t read_fc(mb_space_t space)
@@ -532,14 +544,20 @@ static void store_block(mbdev_t *d, const uint16_t *idx, const mb_block_t *b, co
 
 static cJSON *values_json(const mbdev_t *d);
 
-/* keeps the raw block for the Modbus TCP server; under s_lock */
-static void cache_put(mbdev_t *d, const mb_block_t *b, const uint8_t *data, size_t len)
+static const int8_t s_fc_space[] = {[MB_FC_READ_COILS] = MB_SPACE_COIL, [MB_FC_READ_DISCRETE] = MB_SPACE_DISCRETE,
+                                    [MB_FC_READ_HOLDING] = MB_SPACE_HOLDING, [MB_FC_READ_INPUT] = MB_SPACE_INPUT,
+                                    [MB_FC_WRITE_COIL] = MB_SPACE_COIL, [MB_FC_WRITE_REG] = MB_SPACE_HOLDING,
+                                    [MB_FC_WRITE_COILS] = MB_SPACE_COIL, [MB_FC_WRITE_REGS] = MB_SPACE_HOLDING};
+
+/* keeps a raw block for the Modbus TCP server in the slots [from, to); exc: a client's read answered with
+ * an exception; under s_lock */
+static void cache_store(mbdev_t *d, int from, int to, const mb_block_t *b, const uint8_t *data, size_t len, uint8_t exc)
 {
     if (!d->cache) {
         return;
     }
-    cblock_t *slot = &d->cache[0];
-    for (int k = 0; k < d->nent; k++) {
+    cblock_t *slot = &d->cache[from];
+    for (int k = from; k < to; k++) {
         cblock_t *c = &d->cache[k];
         if (c->at_us && c->space == b->space && c->addr == b->addr && c->count == b->count) {
             slot = c;
@@ -548,6 +566,10 @@ static void cache_put(mbdev_t *d, const mb_block_t *b, const uint8_t *data, size
         if (c->at_us < slot->at_us) {
             slot = c; /* the oldest, or an empty one */
         }
+    }
+    slot->exc = exc;
+    if (exc) {
+        len = 0;
     }
     if (slot->cap < len) {
         free(slot->data);
@@ -562,16 +584,39 @@ static void cache_put(mbdev_t *d, const mb_block_t *b, const uint8_t *data, size
     slot->addr = b->addr;
     slot->count = b->count;
     slot->at_us = esp_timer_get_time();
-    memcpy(slot->data, data, len);
+    if (len) {
+        memcpy(slot->data, data, len);
+    }
 }
 
-int modbus_srv_cache(const char *dev, const mb_req_t *req, uint8_t *data, size_t *len)
+static void cache_put(mbdev_t *d, const mb_block_t *b, const uint8_t *data, size_t len)
 {
-    static const int8_t space[] = {[MB_FC_READ_COILS] = MB_SPACE_COIL, [MB_FC_READ_DISCRETE] = MB_SPACE_DISCRETE,
-                                   [MB_FC_READ_HOLDING] = MB_SPACE_HOLDING, [MB_FC_READ_INPUT] = MB_SPACE_INPUT};
-    if (req->fc < MB_FC_READ_COILS || req->fc > MB_FC_READ_INPUT) {
+    cache_store(d, 0, d->nent, b, data, len, 0);
+}
+
+/* a write: the blocks holding any written address are dropped */
+static void cache_forget(mbdev_t *d, const mb_req_t *req)
+{
+    if (req->fc >= sizeof(s_fc_space) || !d->cache) {
+        return;
+    }
+    int count = req->fc == MB_FC_WRITE_COIL || req->fc == MB_FC_WRITE_REG ? 1 : req->count;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    for (int k = 0; k < d->nent + CLIENT_BLOCKS; k++) {
+        cblock_t *c = &d->cache[k];
+        if (c->at_us && c->space == s_fc_space[req->fc] && req->addr < c->addr + c->count && c->addr < req->addr + count) {
+            c->at_us = 0;
+        }
+    }
+    xSemaphoreGive(s_lock);
+}
+
+int modbus_srv_cache(const char *dev, const mb_req_t *req, uint16_t ttl_ms, uint8_t *data, size_t *len)
+{
+    if (req->fc < MB_FC_READ_COILS || req->fc > MB_FC_READ_INPUT || !ttl_ms) {
         return MB_ERR_ARG;
     }
+    const int8_t *space = s_fc_space;
     bool bits = req->fc <= MB_FC_READ_DISCRETE;
     int64_t now = esp_timer_get_time();
     int done = 0;
@@ -580,15 +625,24 @@ int modbus_srv_cache(const char *dev, const mb_req_t *req, uint8_t *data, size_t
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
     mbdev_t *d = find_dev(dev);
+    int exc = 0;
     if (d && d->enabled && d->online && d->cache && d->t) {
-        int64_t max_age = (d->poll_s ? d->poll_s : d->t->t.poll_s) * 1000000LL + CACHE_SLACK_US;
+        int64_t polled_age = (d->poll_s ? d->poll_s : d->t->t.poll_s) * 1000000LL + CACHE_SLACK_US, client_age = ttl_ms * 1000LL;
+        /* the same read answered with an exception a moment ago */
+        for (int k = d->nent; k < d->nent + CLIENT_BLOCKS && !exc; k++) {
+            const cblock_t *b = &d->cache[k];
+            if (b->at_us && b->exc && now - b->at_us <= client_age && b->space == space[req->fc] && b->addr == req->addr && b->count == req->count) {
+                exc = b->exc;
+            }
+        }
         /* the request may span several blocks read one after another */
-        while (done < req->count) {
+        while (!exc && done < req->count) {
             uint16_t a = req->addr + done;
             const cblock_t *c = NULL;
-            for (int k = 0; k < d->nent && !c; k++) {
+            for (int k = 0; k < d->nent + CLIENT_BLOCKS && !c; k++) {
                 const cblock_t *b = &d->cache[k];
-                if (b->at_us && now - b->at_us <= max_age && b->space == space[req->fc] && a >= b->addr && a < b->addr + b->count) {
+                if (b->at_us && !b->exc && now - b->at_us <= (k < d->nent ? polled_age : client_age) && b->space == space[req->fc]
+                    && a >= b->addr && a < b->addr + b->count) {
                     c = b;
                 }
             }
@@ -603,7 +657,7 @@ int modbus_srv_cache(const char *dev, const mb_req_t *req, uint8_t *data, size_t
     }
     xSemaphoreGive(s_lock);
     *len = bits ? (req->count + 7u) / 8 : 2u * req->count;
-    return done == req->count ? MB_OK : MB_ERR_ARG;
+    return exc ? exc : done == req->count ? MB_OK : MB_ERR_ARG;
 }
 
 bool modbus_srv_device(const char *dev, char *name, size_t len)
@@ -640,6 +694,9 @@ static void poll_device(mbdev_t *d, int64_t now)
     int answered = 0, last_err = MB_OK;
     for (int k = 0; k < nb; k++) {
         const mb_block_t *b = &blocks[k];
+        if (k) {
+            server_jobs(); /* clients do not wait for the whole poll */
+        }
         mb_req_t req = {.fc = read_fc(b->space), .addr = b->addr, .count = b->count};
         size_t len = sizeof(data);
         int err = request(d, &req, data, &len);
@@ -981,23 +1038,30 @@ int modbus_srv_submit(mb_srv_job_t *job)
     return err;
 }
 
-/* one request of the Modbus TCP server, in the task */
-static void server_job(void)
+/* the requests of the Modbus TCP server waiting, in the task: between two polls and between the blocks
+ * of a poll, so a client waits for one transaction at most, not for a whole poll */
+static void server_jobs(void)
 {
     mb_srv_job_t *job;
-    if (xQueueReceive(s_sq, &job, 0) != pdTRUE) {
-        return;
+    while (xQueueReceive(s_sq, &job, 0) == pdTRUE) {
+        mbdev_t *d = find_dev(job->dev);
+        job->len = sizeof(job->data);
+        if (!d || !d->enabled || !d->t) {
+            job->result = 0x0a;
+        } else if (s_probe.running && !s_probe.tcp && !d->tcp) {
+            job->result = 6; /* the RS485 bus belongs to the search */
+        } else {
+            job->result = request(d, &job->req, job->data, &job->len);
+            bool read = job->req.fc <= MB_FC_READ_INPUT;
+            if (read && job->cache && (job->result == MB_OK || job->result == 2)) {
+                mb_block_t b = {.space = s_fc_space[job->req.fc], .addr = job->req.addr, .count = job->req.count};
+                xSemaphoreTake(s_lock, portMAX_DELAY);
+                cache_store(d, d->nent, d->nent + CLIENT_BLOCKS, &b, job->data, job->len, job->result == 2 ? 2 : 0);
+                xSemaphoreGive(s_lock);
+            }
+        }
+        job->done = true;
     }
-    mbdev_t *d = find_dev(job->dev);
-    job->len = sizeof(job->data);
-    if (!d || !d->enabled || !d->t) {
-        job->result = 0x0a;
-    } else if (s_probe.running && !s_probe.tcp && !d->tcp) {
-        job->result = 6; /* the RS485 bus belongs to the search */
-    } else {
-        job->result = request(d, &job->req, job->data, &job->len);
-    }
-    job->done = true;
 }
 
 static void task(void *arg)
@@ -1021,7 +1085,7 @@ static void task(void *arg)
         if (s_job.busy) {
             run_job();
         }
-        server_job(); /* one per round, polls and the search in between */
+        server_jobs(); /* polls and the search in between */
         queued_write_t w;
         while (xQueueReceive(s_wq, &w, 0) == pdTRUE) {
             mbdev_t *d = find_dev(w.dev);

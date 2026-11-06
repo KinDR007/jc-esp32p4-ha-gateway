@@ -1093,7 +1093,10 @@ def tc55_modbus_tcp_server():
     port 502 routes by unit id and an unknown unit gets exception 10, an own port takes any unit id, polled
     registers come from the cache without traffic to the device, others pass through (the device's exception
     too), the per-device rate refuses with exception 6, writes refused until switched on and allowed for this
-    computer, a third client on a port turned away, the GoodWe UDP device answers as Modbus TCP. The
+    computer, a third client on a port turned away, the GoodWe UDP device answers as Modbus TCP. A slow device
+    (a second simulator answering after 300 ms): answers to clients kept for the cache time and an exception
+    too, a write drops them, two clients reading the same at once cost one read, a client waits for one
+    transaction during a poll and not for the whole poll, cache_ms 0 sends every read to the device. The
     configuration of before comes back."""
     import subprocess
     here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -1105,8 +1108,11 @@ def tc55_modbus_tcp_server():
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     udp = subprocess.Popen([sys.executable, sim_py, '--udp', '--port', '8899', 'goodwe_xs:127'],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    log = []
+    slow = subprocess.Popen([sys.executable, '-u', sim_py, '--port', '1508', '--log-reads', '--lenient', '--delay', '300', 'eastron_sdm630:1'],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    log, slog = [], []
     threading.Thread(target=lambda: [log.append(line) for line in sim.stdout], daemon=True).start()
+    threading.Thread(target=lambda: [slog.append(line.strip()) for line in slow.stdout], daemon=True).start()
     before = http('GET', '/api/modbus')[1]
     keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
                         for d in before['devices']]}
@@ -1125,7 +1131,8 @@ def tc55_modbus_tcp_server():
         ok = {'device': meter, 'unit': 10, 'port': 1505, 'rate': 3}
         for bad, why in (({'device': 'd999', 'unit': 10}, 'unknown device'), (dict(ok, unit=248), 'unit 248'), (dict(ok, port=80), 'port 80'),
                          (dict(ok, port=502), 'own port = the shared one'), (dict(ok, unit=0, port=0), 'neither unit nor port'),
-                         (dict(ok, rate=0), 'rate 0'), (dict(ok, allow=['10.0.0']), 'allow not an address'), (dict(ok, write=1), 'write 1')):
+                         (dict(ok, rate=0), 'rate 0'), (dict(ok, allow=['10.0.0']), 'allow not an address'), (dict(ok, write=1), 'write 1'),
+                         (dict(ok, cache_ms=1000), 'cache_ms 1000'), (dict(ok, cache_ms=6000), 'cache_ms 6000')):
             check(http('PUT', '/api/modbus/server', {'devices': [bad]})[0] == 400, f'refused: {why}')
         check(http('PUT', '/api/modbus/server', {'devices': [ok, {'device': gw, 'unit': 10}]})[0] == 400, 'refused: unit used twice')
         check(http('PUT', '/api/modbus/server', {'port': 8081})[0] == 400, 'refused: shared port 8081')
@@ -1150,8 +1157,13 @@ def tc55_modbus_tcp_server():
         time.sleep(0.3)
         check(any('holding 0x1234 1' in l for l in log[reads:]), 'the simulator got that read')
 
+        reads = len(log)
+        check(exc(mbtcp(H, 502, 10, bytes([3, 0x12, 0x34, 0, 1]))) == 2, 'the same read again: exception 2')
+        time.sleep(0.3)
+        check(not any('holding 0x1234 1' in l for l in log[reads:]), 'from the cache: the exception kept for the cache time')
+        time.sleep(1.2)
         s = socket.create_connection((H, 1505), timeout=5)
-        answers = [exc(mbtcp(H, 1505, 1, bytes([3, 0x12, 0x34, 0, 1]), tid=i + 1, sock=s)) for i in range(8)]
+        answers = [exc(mbtcp(H, 1505, 1, bytes([3, 0x12, 0x40 + i, 0, 1]), tid=i + 1, sock=s)) for i in range(8)]
         s.close()
         check(answers.count(6) >= 3 and answers.count(2) >= 2, f'rate 3 per second: busy (6) after the burst {answers}')
 
@@ -1180,10 +1192,64 @@ def tc55_modbus_tcp_server():
         wait_until('GoodWe polled', lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['id'] == gw)['values'], 30, 1)
         a = mbtcp(H, 1506, 1, bytes([3, 0x75, 0x34, 0, 8]))
         check(a[:2] == bytes([3, 16]) and a[2:] == b'SERIAL-012345678', f'GoodWe over UDP as Modbus TCP on port 1506: {a[2:]!r}')
+
+        devs.append({'name': 'TC55 slow', 'template': 'eastron_sdm630', 'transport': 'tcp', 'host': my_ip, 'port': 1508, 'slave': 1, 'poll_s': 1, 'expose': 'none'})
+        devs = [dict(d, id=next(x['id'] for x in http('GET', '/api/modbus')[1]['devices'] if x['name'] == d['name'])) if d['name'] != 'TC55 slow' else d for d in devs]
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + devs})[0] == 200, 'slow device added (answers after 300 ms, polled every second)')
+        sl = next(d['id'] for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == 'TC55 slow')
+        slow_e = {'device': sl, 'port': 1507, 'rate': 50, 'write': True}
+        check(http('PUT', '/api/modbus/server', {'devices': [ok, {'device': gw, 'port': 1506}, slow_e]})[0] == 200, 'slow device on port 1507, cache 2000 ms')
+        wait_until('slow device polled', lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['id'] == sl)['values'], 30, 1)
+        rd = lambda addr, n=4, sock=None: mbtcp(H, 1507, 1, bytes([3, addr >> 8, addr & 0xff, 0, n]), sock=sock)
+        n = len(slog)
+        a1, a2 = rd(0x2000), rd(0x2000)
+        time.sleep(0.4)
+        got = [l for l in slog[n:] if l.endswith('holding 0x2000 4')]
+        check(a1 == a2 == bytes([3, 8]) + bytes(8) and len(got) == 1, f'a client read kept: the second one from the cache ({len(got)} reads reached the device)')
+        time.sleep(2.2)
+        n = len(slog)
+        rd(0x2000)
+        time.sleep(0.4)
+        check(any(l.endswith('holding 0x2000 4') for l in slog[n:]), 'after the cache time the read goes to the device again')
+        check(mbtcp(H, 1507, 1, bytes([6, 0x20, 0x01, 0, 7])) == bytes([6, 0x20, 0x01, 0, 7]), 'write of 7 to holding 0x2001')
+        n = len(slog)
+        a3 = rd(0x2000)
+        time.sleep(0.4)
+        check(a3[4:6] == bytes([0, 7]) and any(l.endswith('holding 0x2000 4') for l in slog[n:]), f'the write dropped the cached block: read again, 0x2001 = 7 ({a3.hex()})')
+
+        socks = [socket.create_connection((H, 1507), timeout=5) for _ in range(2)]
+        res = [None, None]
+        n = len(slog)
+        th = [threading.Thread(target=lambda k=k: res.__setitem__(k, rd(0x3000, 2, socks[k]))) for k in range(2)]
+        for x in th:
+            x.start()
+        for x in th:
+            x.join()
+        for x in socks:
+            x.close()
+        time.sleep(0.4)
+        got = [l for l in slog[n:] if l.endswith('holding 0x3000 2')]
+        check(res[0] == res[1] == bytes([3, 4]) + bytes(4) and len(got) == 1, f'two clients reading the same at once: one read on the device ({len(got)})')
+
+        lat = []
+        for k in range(10):
+            t0 = time.time()
+            rd(0x4000 + 4 * k)
+            lat.append(time.time() - t0)
+            time.sleep(0.25)
+        polls = [l for l in slog if l.startswith('read unit eastron_sdm630 input')]
+        check(max(lat) < 1.0, f'during the polls (several blocks of 300 ms) a client waits one transaction at most: {max(lat):.2f} s (blocks per poll {len(set(polls))})')
+
+        check(http('PUT', '/api/modbus/server', {'devices': [ok, {'device': gw, 'port': 1506}, dict(slow_e, cache_ms=0)]})[0] == 200, 'slow device without cache')
+        n = len(slog)
+        rd(0x0000, 2), rd(0x0000, 2)
+        time.sleep(0.4)
+        got = [l for l in slog[n:] if l.endswith('holding 0x0000 2')]
+        check(len(got) == 2, f'cache_ms 0: both reads reach the device ({len(got)})')
     finally:
         http('PUT', '/api/modbus/server', srv_keep)
         http('PUT', '/api/modbus', keep)
-        for p in (sim, udp):
+        for p in (sim, udp, slow):
             p.terminate()
             p.wait(timeout=5)
     r = http('GET', '/api/modbus/server')[1]

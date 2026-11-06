@@ -15,13 +15,15 @@ typedef struct {
     uint8_t data[MB_PDU_MAX];
     size_t len;
     int result;
+    bool cache; /* keep the answer of a read for the next clients */
     volatile bool done;
 } mb_srv_job_t;
 
 /* ---- modbus.c ---- */
-/* Answers a read from the registers the gateway polled within the device's poll interval: MB_OK with
- * data, or MB_ERR_ARG when the cache does not hold all of it. */
-int modbus_srv_cache(const char *dev, const mb_req_t *req, uint8_t *data, size_t *len);
+/* Answers a read from the registers the gateway polled within the device's poll interval and from answers
+ * to clients within ttl_ms: MB_OK with data, the exception the same read got (2), or MB_ERR_ARG when the
+ * cache does not hold all of it (always with ttl_ms 0). */
+int modbus_srv_cache(const char *dev, const mb_req_t *req, uint16_t ttl_ms, uint8_t *data, size_t *len);
 /* Queues a request for the device: MB_OK, or the exception to answer at once (0x0a no such device or
  * off, 0x0b offline). */
 int modbus_srv_submit(mb_srv_job_t *job);

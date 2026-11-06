@@ -4886,8 +4886,8 @@ document.addEventListener('click', async e => {
 /* ---------------- Modbus TCP server (docs/modbus.md) ---------------- */
 views['system/mbserver'] = () => `<div class="grid">
   <div class="card wide">${h3('server-network', L('Devices in the network', 'Zařízení v síti'))}
-    <p class="muted">${L('Offers the gateway\'s Modbus devices (RS485, Modbus TCP, GoodWe UDP) to other Modbus TCP clients: on the shared port by unit id, or on an own port with any unit id. Values the gateway polls anyway are answered from its cache; other requests go to the device, at most the rate per second (the RS485 bus manages about 10-20 requests a second for everything). Writes only where switched on, optionally from the listed addresses only. At most 8 ports, 2 clients a port, 8 clients in all.',
-      'Nabídne zařízení Modbus brány (RS485, Modbus TCP, GoodWe UDP) dalším klientům Modbus TCP: na sdíleném portu podle unit id, nebo na vlastním portu s jakýmkoli unit id. Hodnoty, které brána beztak čte, odpoví z cache; ostatní dotazy jdou na zařízení, nejvýš zadaný počet za sekundu (sběrnice RS485 zvládne zhruba 10–20 dotazů za sekundu na všechno). Zápis jen kde je zapnutý, případně jen z uvedených adres. Nejvýš 8 portů, 2 klienti na port, 8 klientů celkem.')}</p>
+    <p class="muted">${L('Offers the gateway\'s Modbus devices (RS485, Modbus TCP, GoodWe UDP) to other Modbus TCP clients: on the shared port by unit id, or on an own port with any unit id. Values the gateway polls anyway, and answers to clients for the cache time, come from its cache (the same read of two clients goes to the device once); other requests go to the device, at most the rate per second (the RS485 bus manages about 10-20 requests a second for everything). Writes only where switched on, optionally from the listed addresses only. At most 8 ports, 2 clients a port, 8 clients in all.',
+      'Nabídne zařízení Modbus brány (RS485, Modbus TCP, GoodWe UDP) dalším klientům Modbus TCP: na sdíleném portu podle unit id, nebo na vlastním portu s jakýmkoli unit id. Hodnoty, které brána beztak čte, a po dobu cache i odpovědi klientům jdou z cache (stejné čtení dvou klientů jde na zařízení jednou); ostatní dotazy jdou na zařízení, nejvýš zadaný počet za sekundu (sběrnice RS485 zvládne zhruba 10–20 dotazů za sekundu na všechno). Zápis jen kde je zapnutý, případně jen z uvedených adres. Nejvýš 8 portů, 2 klienti na port, 8 klientů celkem.')}</p>
     <div class="row"><label><input type="checkbox" id="mv-enabled"> ${L('Shared port', 'Sdílený port')}</label>
       <label class="field" style="margin:0"><span>${L('Port', 'Port')}</span><input type="number" id="mv-port" min="1" max="65535" style="width:100px" data-notr></label></div>
     <div class="table-wrap" id="mv-list"><p class="muted">${L('Loading…', 'Načítám…')}</p></div>
@@ -4929,12 +4929,14 @@ function renderMvList() {
   const ro = perm('system/rs485') < 2 ? 'disabled' : '';
   const opts = cur => mvDevs.map(d => `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${esc(d.name)} (${d.transport === 'rtu' ? 'RS485' : d.transport.toUpperCase()})</option>`).join('');
   $('#mv-list').innerHTML = !mvRows.length ? `<p class="muted">${mvDevs.length ? L('No device offered yet.', 'Zatím žádné nabídnuté zařízení.') : L('Add a Modbus device first: System › RS485.', 'Nejdřív přidejte zařízení Modbus: Systém › RS485.')}</p>`
-    : `<table class="hw-stack"><tr>${[L('Device', 'Zařízení'), L('Unit id on the shared port', 'Unit id na sdíleném portu'), L('Own port', 'Vlastní port'), L('Requests / s', 'Dotazů / s'),
+    : `<table class="hw-stack"><tr>${[L('Device', 'Zařízení'), L('Unit id on the shared port', 'Unit id na sdíleném portu'), L('Own port', 'Vlastní port'), L('Requests / s', 'Dotazů / s'), L('Cache (ms)', 'Cache (ms)'),
       L('Writes', 'Zápis'), L('Writes only from', 'Zápis jen z'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${mvRows.map((e, i) => `<tr>
       <td><select data-mv="${i}" data-k="device" ${ro}>${opts(e.device)}</select></td>
       <td><input type="number" min="0" max="247" value="${e.unit}" data-mv="${i}" data-k="unit" style="width:80px" title="${L('0: not on the shared port', '0: ne na sdíleném portu')}" ${ro} data-notr></td>
       <td><input type="number" min="0" max="65535" value="${e.port}" data-mv="${i}" data-k="port" style="width:90px" title="${L('0: none', '0: žádný')}" ${ro} data-notr></td>
       <td><input type="number" min="1" max="${mv.limits.rate}" value="${e.rate}" data-mv="${i}" data-k="rate" style="width:70px" ${ro} data-notr></td>
+      <td><input type="number" min="0" max="${mv.limits.cache_ms_max}" step="500" value="${e.cache_ms}" data-mv="${i}" data-k="cache_ms" style="width:80px"
+        title="${L(`How long an answer to a client serves the next ones (${mv.limits.cache_ms_min}-${mv.limits.cache_ms_max} ms); 0: no cache, every read goes to the device (registers that change when read)`, `Jak dlouho odpověď klientovi slouží dalším (${mv.limits.cache_ms_min}–${mv.limits.cache_ms_max} ms); 0: bez cache, každé čtení jde na zařízení (registry, které se čtením mění)`)}" ${ro} data-notr></td>
       <td><input type="checkbox" data-mv="${i}" data-k="write" ${e.write ? 'checked' : ''} ${ro}></td>
       <td><input type="text" value="${esc(e.allow)}" data-mv="${i}" data-k="allow" placeholder="${L('anyone', 'kdokoli')}" style="width:150px" ${ro} data-notr></td>
       <td><button class="btn" data-mv-del="${i}" ${ro}>${ic('delete-outline')}</button></td></tr>`).join('')}</table>`;
@@ -4955,14 +4957,14 @@ document.addEventListener('click', async e => {
     const units = mvRows.map(r => r.unit);
     let unit = free.transport === 'rtu' && !units.includes(free.slave) ? free.slave : 1;
     while (units.includes(unit)) unit++;
-    mvRows.push({ device: free.id, unit, port: 0, rate: 5, write: false, allow: '' });
+    mvRows.push({ device: free.id, unit, port: 0, rate: 5, cache_ms: 2000, write: false, allow: '' });
     renderMvList();
   } else if (t.dataset.mvDel) {
     mvRows.splice(+t.dataset.mvDel, 1);
     renderMvList();
   } else {
     try {
-      const devices = mvRows.map(r => ({ device: r.device, unit: +r.unit, port: +r.port, rate: +r.rate, write: !!r.write, allow: r.allow.split(/[\s,;]+/).filter(Boolean) }));
+      const devices = mvRows.map(r => ({ device: r.device, unit: +r.unit, port: +r.port, rate: +r.rate, cache_ms: +r.cache_ms, write: !!r.write, allow: r.allow.split(/[\s,;]+/).filter(Boolean) }));
       await api('/api/modbus/server', { method: 'PUT', json: { enabled: $('#mv-enabled').checked, port: +$('#mv-port').value, devices } });
       toast(L('Saved', 'Uloženo'));
       loadMbServer(true);

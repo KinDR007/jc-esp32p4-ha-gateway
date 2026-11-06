@@ -2824,6 +2824,7 @@ Response:
       "write": false,
       "allow": [],
       "rate": 5,
+      "cache_ms": 2000,
       "missing": false,
       "name": "Eastron SDM630",
       "requests": 120,
@@ -2861,12 +2862,14 @@ Response:
     "ports": 8,
     "clients_per_port": 2,
     "clients": 8,
-    "rate": 50
+    "rate": 50,
+    "cache_ms_min": 1500,
+    "cache_ms_max": 5000
   }
 }
 ```
 
-Effects: devices: unit is the unit id on the shared port (0: not there), port an own port (0: none) where any unit id reaches the device. cached: reads answered from the registers the gateway polled within the device's poll interval; passed: requests sent to the device; refused: over the rate (exception 6), a write not allowed (1) or an invalid request (1, 3); failed: the device off, offline or silent (10, 11). missing: the Modbus device was removed (its requests get exception 10). ports: ok false with error when the port could not be opened. turned_away: connections closed at once because the port or the gateway had its clients.
+Effects: devices: unit is the unit id on the shared port (0: not there), port an own port (0: none) where any unit id reaches the device. cache_ms: how long answers to clients serve the next ones (0: no cache at all). cached: reads answered from the registers the gateway polled within the device's poll interval, from answers to clients within cache_ms, or by joining the same read of another client on its way; passed: requests sent to the device; refused: over the rate (exception 6), a write not allowed (1) or an invalid request (1, 3); failed: the device off, offline or silent (10, 11). missing: the Modbus device was removed (its requests get exception 10). ports: ok false with error when the port could not be opened. turned_away: connections closed at once because the port or the gateway had its clients.
 
 #### PUT `/api/modbus/server`
 
@@ -2883,7 +2886,8 @@ Body:
       "port": 1502,
       "write": false,
       "allow": [],
-      "rate": 5
+      "rate": 5,
+      "cache_ms": 2000
     },
     {
       "device": "d2",
@@ -2893,7 +2897,8 @@ Body:
       "allow": [
         "192.168.88.20"
       ],
-      "rate": 2
+      "rate": 2,
+      "cache_ms": 2000
     }
   ]
 }
@@ -2905,9 +2910,9 @@ Response:
 {}
 ```
 
-Errors: 400 port not 1-65535 or 80, 8081, the Zigbee port; more than 16 devices; device not a configured Modbus device; unit not 0-247 or port not 0-65535; neither unit nor port; an own port equal to the shared one; a device, unit or port twice; write not a bool; allow not up to 4 IPv4 addresses; rate not 1-50; more than 8 ports (the shared one counts).
+Errors: 400 port not 1-65535 or 80, 8081, the Zigbee port; more than 16 devices; device not a configured Modbus device; unit not 0-247 or port not 0-65535; neither unit nor port; an own port equal to the shared one; a device, unit or port twice; write not a bool; allow not up to 4 IPv4 addresses; rate not 1-50; cache_ms not 0 or 1500-5000; more than 8 ports (the shared one counts).
 
-Effects: What is not sent stays. The shared port (default 502, enabled) listens while a device has a unit id there and routes by it; unknown unit ids get exception 10. Reads of registers the gateway polls are answered from its cache, everything else goes to the device through the Modbus task (the RS485 bus is shared with the polling), at most rate requests per second per device, else exception 6. Writes (functions 5, 6, 15, 16) only with write and, when allow lists addresses, only from them; else exception 1. Up to 2 clients per port and 8 in all, one request at a time per client; idle clients are closed after 120 s. Answers the GET.
+Effects: What is not sent stays. The shared port (default 502, enabled) listens while a device has a unit id there and routes by it; unknown unit ids get exception 10. Reads of registers the gateway polls, and for cache_ms (default 2000) answers to clients, come from its cache; a write drops the blocks it touches; the same read of two clients goes to the device once. Everything else goes to the device through the Modbus task (the RS485 bus is shared with the polling; requests wait for one transaction of a poll at most), at most rate requests per second per device, else exception 6. Writes (functions 5, 6, 15, 16) only with write and, when allow lists addresses, only from them; else exception 1. Up to 2 clients per port and 8 in all, one request at a time per client; idle clients are closed after 120 s. Answers the GET.
 
 ### GPIO of header JP1
 
