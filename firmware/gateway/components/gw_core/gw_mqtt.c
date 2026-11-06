@@ -843,12 +843,13 @@ static esp_err_t mqtt_post(httpd_req_t *req)
     cJSON_Delete(body);
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    /* Discovery or groups switched off: remove the entities while still connected with the old settings. */
+    /* Discovery or groups switched off: remove the entities while still connected with the old settings.
+       Groups switched on are left to the new connection, which may be another broker. */
     bool on = gw_config_get_u8(KEY_DISCOVERY, 1);
     uint16_t now = groups_stored();
     if (s_discovery && gw_mqtt_connected() && (!on || (s_groups & ~now))) {
         s_discovery = on;
-        s_groups = now;
+        s_groups &= now;
         publish_discovery();
         vTaskDelay(pdMS_TO_TICKS(500)); /* let the removals go out before the client stops */
     }

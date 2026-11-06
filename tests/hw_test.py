@@ -2290,8 +2290,8 @@ def tc51_time_settings():
     """Clock of the gateway (System › LAN › Time): SNTP synced, invalid settings refused, new servers sync
     again without a restart, the zone reaches /api/status and the Telegram settings, the old Telegram field
     still sets it, an empty list stops the sync, the settings survive a restart. The settings of before come back."""
-    code, before = http('GET', '/api/time')
-    check(code == 200 and before['synced'] > 1700000000 and before['time'] >= before['synced'],
+    before = wait_until('SNTP synced (a restart just before)', lambda: (lambda t: t if t['synced'] > 1700000000 else None)(http('GET', '/api/time')[1]), 60, 2)
+    check(before['time'] >= before['synced'],
           f'synced at {before["synced"]} from {[s["name"] for s in before["servers"]]}, zone {before["tz_name"] or before["tz"]}')
     check(status()['tz_name'] == before['tz_name'], 'zone name in /api/status')
     keep = {'servers': [s['name'] for s in before['servers']], 'tz': before['tz'], 'tz_name': before['tz_name']}
@@ -2398,7 +2398,9 @@ def tc52_gpio():
 def tc53_gpio_mqtt():
     """GPIO of JP1 over MQTT against a plain test broker (--mqtt-broker host:port): the device "<host> GPIO" via the
     gateway with a switch, binary sensor, light (brightness = duty) and two counter sensors, retained state, commands
-    ON/OFF/PULSE and duty, a mode change replaces the entity, the gpio group off removes them; then the original settings."""
+    ON/OFF/PULSE and duty, a mode change replaces the entity, pins removed while MQTT is off and a restart
+    follows lose their entities on connect, the gpio group off removes them; then the original settings. Pins are set only once on the test broker,
+    so nothing reaches the gateway's own broker."""
     if not ARGS.mqtt_broker:
         raise Skip('needs --mqtt-broker <host>:<port> (anonymous mosquitto, e.g. mosquitto -p 18883)')
     import subprocess
@@ -2421,15 +2423,16 @@ def tc53_gpio_mqtt():
 
     retained = lambda component, oid: sub(f'homeassistant/{component}/{name}/{oid}/config')
     pin = lambda g: next((p for p in http('GET', '/api/gpio')[1]['pins'] if p['gpio'] == g), None)
+    connected = lambda: wait_until('connected', lambda: http('GET', '/api/mqtt')[1]['connected'], 25, 1)
     try:
+        code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle', 'base': '',
+                                             'prefix': 'homeassistant', 'discovery': True, 'discovery_groups': ['gpio'], 'enabled': True})
+        check(code == 200 and connected(), 'test broker, group gpio only')
         check(http('PUT', '/api/gpio', {'pins': [
             {'gpio': 2, 'mode': 'output', 'name': 'Relé', 'expose': 'mqtt'},
             {'gpio': 3, 'mode': 'input', 'pull': 'up', 'name': 'Tlačítko', 'expose': 'both'},
             {'gpio': 1, 'mode': 'pwm', 'freq': 1000, 'expose': 'mqtt'},
             {'gpio': 45, 'mode': 'counter', 'pull': 'down', 'name': 'Vodoměr', 'expose': 'mqtt'}]})[0] == 200, 'pins set to MQTT')
-        code, _ = http('POST', '/api/mqtt', {'uri': f'mqtt://{host}:{port}', 'user': '', 'password': '', 'tls': 'bundle', 'base': '',
-                                             'prefix': 'homeassistant', 'discovery': True, 'discovery_groups': ['gpio'], 'enabled': True})
-        check(code == 200 and wait_until('connected', lambda: http('GET', '/api/mqtt')[1]['connected'], 25, 1), 'test broker, group gpio only')
         time.sleep(2)
         sw = json.loads(retained('switch', 'gpio_2_output_level') or '{}')
         check(sw.get('name') == 'Relé' and sw.get('command_topic') == f'{base}/gpio/2/set' and sw['device']['identifiers'] == [f'{name}_gpio']
@@ -2465,9 +2468,19 @@ def tc53_gpio_mqtt():
         check(pin(1)['light']['color'] == {'r': 10, 'g': 20, 'b': 30} and st.get('brightness') == 99 and st.get('state') == 'ON', f'strip set from MQTT, state {st}')
         check(not retained('switch', 'gpio_2_output_level') and retained('binary_sensor', 'gpio_2_input_level')
               and not retained('light', 'gpio_1_pwm_duty'), 'mode changed: old entities removed, new ones published')
+        http('POST', '/api/mqtt', {'enabled': False})
+        http('PUT', '/api/gpio', {'pins': [{'gpio': 3, 'mode': 'input', 'expose': 'mqtt'}]})
+        role = status()['role']['active']
+        http('POST', '/api/reboot', {})
+        wait_restart(role)
+        http('POST', '/api/mqtt', {'enabled': True})
+        connected()
+        time.sleep(2)
+        check(not retained('light', 'gpio_1_ws2812_light') and not retained('binary_sensor', 'gpio_2_input_level')
+              and retained('binary_sensor', 'gpio_3_input_level'), 'pins replaced while MQTT was off, then a restart: old entities removed on connect')
         check(http('POST', '/api/mqtt', {'discovery_groups': ['sound_triggers']})[0] == 200, 'group gpio off')
         time.sleep(3)
-        check(not retained('binary_sensor', 'gpio_2_input_level'), 'GPIO entities removed (empty retained config)')
+        check(not retained('binary_sensor', 'gpio_3_input_level'), 'GPIO entities removed (empty retained config)')
     finally:
         http('PUT', '/api/gpio', {'pins': [{k: p[k] for k in ('gpio', 'mode', 'name', 'expose', 'invert', 'pull', 'debounce_ms', 'open_drain', 'restore', 'freq', 'edge', 'filter_ns') if k in p}
                                            for p in gpio_before]})

@@ -33,6 +33,7 @@ static const char *TAG = "gpio_ctl";
 
 #define KEY_CFG "gpio_cfg"   /* str JSON {"pins": [{gpio, mode, name, ...}]} */
 #define KEY_LAST "gpio_last" /* str JSON {"<gpio>": value}: last output level or PWM duty, for restore "last" */
+#define KEY_PUB "gpio_pub"   /* blob pub_t[]: discovery entries on the broker, removed once their pin is gone */
 #define NAME_CHARS 32
 #define TICK_MS 10
 #define RATE_WINDOW_US 1000000
@@ -1296,7 +1297,7 @@ static void mqtt_command(const char *suffix, const char *payload)
     }
 }
 
-/* discovery entries sent, to remove them when a pin changes */
+/* discovery entries sent, to remove them when a pin changes (also after a restart: kept in KEY_PUB) */
 #define PUB_MAX (MAX_PINS * 2 + 2 * OW_MAX)
 typedef struct {
     char oid[40];
@@ -1457,8 +1458,16 @@ static void mqtt_discovery(void)
     for (int i = 0; i < n; i++) {
         gw_mqtt_discovery(GW_MQTT_GPIO, now[i].component, now[i].oid, cfgs[i]);
     }
-    memcpy(s_pub, now, n * sizeof(pub_t));
-    s_npub = n;
+    /* lost connection: the next connect runs this again, the removals still pending */
+    if (gw_mqtt_connected() && (n != s_npub || memcmp(s_pub, now, n * sizeof(pub_t)))) {
+        memcpy(s_pub, now, n * sizeof(pub_t));
+        s_npub = n;
+        if (n) {
+            gw_config_set_blob(KEY_PUB, s_pub, n * sizeof(pub_t));
+        } else {
+            gw_config_erase(KEY_PUB);
+        }
+    }
     free(snap);
     free(now);
     free(cfgs);
@@ -1500,6 +1509,11 @@ esp_err_t gpio_ctl_init(void)
     if (!cJSON_IsObject(s_last)) {
         cJSON_Delete(s_last);
         s_last = cJSON_CreateObject();
+    }
+    size_t len = 0;
+    if (gw_config_blob_size(KEY_PUB, &len) == ESP_OK && len % sizeof(pub_t) == 0 && len <= sizeof(s_pub)
+        && gw_config_get_blob(KEY_PUB, s_pub, len)) {
+        s_npub = len / sizeof(pub_t);
     }
     pin_t *list = calloc(MAX_PINS, sizeof(pin_t));
     int n = 0;

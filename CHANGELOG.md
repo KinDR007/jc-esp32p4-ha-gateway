@@ -23,6 +23,9 @@
   shows the bus), 1-Wire DS18B20/DS1822/DS18S20 (each a temperature in Home Assistant), WS2812 LED strip
   (colour, brightness, rainbow effect; MQTT JSON light). MQTT commands may carry up to 191 bytes.
 - Tests: TC52, TC53, TC54, UI36, integration tests of the GPIO device.
+- Fix: an MQTT settings change that switched groups on and off at once (e.g. a new broker with other
+  groups) published the newly switched-on groups to the old broker before reconnecting; now only the
+  removals go there.
 
 ## v1.12 (2026-11-04)
 

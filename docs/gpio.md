@@ -60,7 +60,9 @@ the gateway:
 
 State: topic `gpio` (retained) `{"<n>": level or duty, "<n>": {"count", "rate", "frequency"}}`, published on
 every change, a running counter at most every 5 s; the integration gets it over `/api/ws`. MQTT discovery
-group `gpio` (a stored selection of all eight groups of v1.11-v1.12 gets it too).
+group `gpio` (a stored selection of all eight groups of v1.11-v1.12 gets it too). The gateway keeps the list
+of GPIO entities it published (NVS `gpio_pub`), so a pin removed while MQTT was off, also across a
+restart, loses its entity on the next connect.
 
 ## Pins
 
