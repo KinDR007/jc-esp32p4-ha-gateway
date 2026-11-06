@@ -82,6 +82,47 @@ does not answer at night. Through `tools/modbus/udp_relay.py` on that computer t
 234.9 V 2.4 A, energy total 15145.4 kWh, serial, model); the total input power register (30137) reads
 0xFFFF on the XS and is left out of the template.
 
+## Modbus TCP server (plan, 2026-11-06)
+
+Devices the gateway already talks to (RS485 RTU, GoodWe UDP, Modbus TCP) offered again as Modbus TCP
+servers in the network, for clients other than Home Assistant (Victron GX, SCADA, PLC, vendor apps).
+Not implemented yet; decisions of 2026-11-06:
+
+- **Ports**: a shared port 502 routes by unit id (one unit id per exposed device); a device may also get
+  its own port with the unit id remapped (for clients fixed to unit 1 or 255).
+- **Data**: registers the gateway polls anyway are answered from a register cache (no bus load, at most
+  one poll interval old); other requests pass through to the device, limited per port (requests per
+  second). Writes always pass through.
+- **Writes** (FC 5, 6, 15, 16): off by default, switched on per server; optional list of allowed client
+  addresses (else anyone in the LAN).
+- **Devices**: RS485 RTU, GoodWe UDP (becomes plain Modbus TCP), Modbus TCP devices (the gateway is the
+  device's only client and shares it, e.g. Huawei SUN2000 with its connection limit).
+- **UI**: System › RS485 › Modbus TCP server (permission `system/rs485`), a list of servers: device,
+  port, unit id, writes, allowed addresses; live clients, requests, cache hits, refusals.
+
+### Limits
+
+The RS485 bus is the bottleneck, not the P4. All RTU devices share one half-duplex line served one
+request at a time: reading 10 registers at 9600 Bd is about 35 ms on the wire plus gaps and the device's
+answer time (20-100 ms for meters), 60-120 ms in all, so roughly 8-15 transactions per second for the
+gateway's own polling, writes and every TCP client together (15-25 at 19200 Bd); a silent device holds
+the bus for its timeout. More ports do not add bus capacity, hence the cache and the per-port limit.
+
+On the P4 side one task serves every listening and client socket with `select()` (as the UART bridge),
+frames are at most 260 bytes, CPU load is negligible. The limit is lwIP: 24 sockets today, of which the
+web server takes about 10, MQTT and Telegram 2, the OTBR 3-4, the Zigbee and UART bridges 2 each and
+every network Modbus device 1. Plan: lwIP sockets 24 -> 40, active TCP 16 -> 32, listening 16 -> 24
+(allocated on use, a few kB); at most **8 servers** (port 502 counts as one), **2 clients per server**,
+**8 clients in all**: up to 16 sockets and about 20 kB internal RAM in the worst case.
+
+| Phase | Content | Done when |
+|---|---|---|
+| S1 | lwIP limits, server task, shared port 502 with unit id routing, pass-through reads | TC with a TCP client against the RTU simulator |
+| S2 | register cache of the polled blocks, per-port rate limit, own ports with unit remap | TC: cache hits without bus traffic, limit refuses (exception 6, busy) |
+| S3 | writes per server, allowed addresses, GoodWe UDP and Modbus TCP devices as sources | TC: write refused / passed, UDP source answers as TCP |
+| S4 | UI page, API, docs (user docs with screenshots) | UI test |
+| S5 | load test: 8 clients polling, gateway roles and the web UI stay responsive (heap, latency) | measured report |
+
 ## Home Assistant
 
 Each device is a device of its own, connected via the gateway:
