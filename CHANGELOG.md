@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.14 (2026-11-06)
+
+Summary: Modbus TCP server for the gateway's Modbus devices (RS485, Modbus TCP, GoodWe UDP): shared port 502 by unit id or own ports, cache of polled registers and of answers to clients, rate limit, optional writes with an address allowlist.
+
 - Modbus TCP server, System › Modbus TCP server (`GET`/`PUT /api/modbus/server`): the gateway's Modbus
   devices (RS485, Modbus TCP, GoodWe UDP) for other Modbus TCP clients in the network. The shared port
   502 routes by unit id, a device may also get its own port (any unit id). Reads of polled registers come
