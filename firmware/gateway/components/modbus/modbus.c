@@ -17,6 +17,7 @@
 #include "gw.h"
 #include "mb_bus.h"
 #include "mb_scan.h"
+#include "mb_server.h"
 #include "mb_template.h"
 #include "sdkconfig.h"
 
@@ -40,6 +41,7 @@ static const char *TAG = "modbus";
 #define OFFLINE_RETRY_S 30
 #define EXPOSE_INTEGRATION 1
 #define EXPOSE_MQTT 2
+#define CACHE_SLACK_US 2000000    /* a cached block is fresh for the poll interval and this */
 
 extern const char templates_json_start[] asm("_binary_templates_json_start");
 
@@ -48,6 +50,15 @@ typedef struct {
     uint32_t rev; /* CRC of its JSON: the integration refetches a changed template */
     int slot;     /* NVS slot of a user template, -1 built in */
 } tpl_t;
+
+/* a block as read, for the Modbus TCP server: registers big endian or packed bits */
+typedef struct {
+    uint8_t space;
+    uint16_t addr, count;
+    int64_t at_us; /* 0 = empty */
+    uint16_t cap;
+    uint8_t *data; /* PSRAM, cap bytes */
+} cblock_t;
 
 typedef struct {
     /* configuration */
@@ -76,6 +87,7 @@ typedef struct {
     uint8_t *vstate; /* VAL_* */
     bool *single;
     char **text;     /* str entities */
+    cblock_t *cache; /* nent (a poll has at most a block per entity), PSRAM */
 } mbdev_t;
 
 enum { VAL_NONE, VAL_OK, VAL_UNSUPPORTED };
@@ -210,7 +222,13 @@ static void free_runtime(mbdev_t *d)
     free(d->vstate);
     free(d->single);
     free(d->text);
-    d->val = NULL, d->vstate = NULL, d->single = NULL, d->text = NULL;
+    if (d->cache) {
+        for (int i = 0; i < d->nent; i++) {
+            free(d->cache[i].data);
+        }
+    }
+    free(d->cache);
+    d->val = NULL, d->vstate = NULL, d->single = NULL, d->text = NULL, d->cache = NULL;
 }
 
 static bool alloc_runtime(mbdev_t *d)
@@ -225,7 +243,8 @@ static bool alloc_runtime(mbdev_t *d)
     d->vstate = ps_calloc(n, 1);
     d->single = ps_calloc(n, sizeof(bool));
     d->text = ps_calloc(n, sizeof(char *));
-    return d->val && d->vstate && d->single && d->text;
+    d->cache = ps_calloc(n, sizeof(cblock_t));
+    return d->val && d->vstate && d->single && d->text && d->cache;
 }
 
 static const char *parse_expose(const char *s, uint8_t *out)
@@ -419,7 +438,7 @@ static void apply_config(const cJSON *root)
             old->enabled && d->enabled) {
             /* same device: keep its runtime */
             memcpy(&d->t, &old->t, sizeof(*d) - offsetof(mbdev_t, t));
-            old->val = NULL, old->vstate = NULL, old->single = NULL, old->text = NULL;
+            old->val = NULL, old->vstate = NULL, old->single = NULL, old->text = NULL, old->cache = NULL;
             old->conn.sock = -1;
             d->next_us = 0;
         } else if (!alloc_runtime(d)) {
@@ -513,6 +532,91 @@ static void store_block(mbdev_t *d, const uint16_t *idx, const mb_block_t *b, co
 
 static cJSON *values_json(const mbdev_t *d);
 
+/* keeps the raw block for the Modbus TCP server; under s_lock */
+static void cache_put(mbdev_t *d, const mb_block_t *b, const uint8_t *data, size_t len)
+{
+    if (!d->cache) {
+        return;
+    }
+    cblock_t *slot = &d->cache[0];
+    for (int k = 0; k < d->nent; k++) {
+        cblock_t *c = &d->cache[k];
+        if (c->at_us && c->space == b->space && c->addr == b->addr && c->count == b->count) {
+            slot = c;
+            break;
+        }
+        if (c->at_us < slot->at_us) {
+            slot = c; /* the oldest, or an empty one */
+        }
+    }
+    if (slot->cap < len) {
+        free(slot->data);
+        slot->data = heap_caps_malloc(len, MALLOC_CAP_SPIRAM);
+        slot->cap = slot->data ? (uint16_t)len : 0;
+        if (!slot->data) {
+            slot->at_us = 0;
+            return;
+        }
+    }
+    slot->space = b->space;
+    slot->addr = b->addr;
+    slot->count = b->count;
+    slot->at_us = esp_timer_get_time();
+    memcpy(slot->data, data, len);
+}
+
+int modbus_srv_cache(const char *dev, const mb_req_t *req, uint8_t *data, size_t *len)
+{
+    static const int8_t space[] = {[MB_FC_READ_COILS] = MB_SPACE_COIL, [MB_FC_READ_DISCRETE] = MB_SPACE_DISCRETE,
+                                   [MB_FC_READ_HOLDING] = MB_SPACE_HOLDING, [MB_FC_READ_INPUT] = MB_SPACE_INPUT};
+    if (req->fc < MB_FC_READ_COILS || req->fc > MB_FC_READ_INPUT) {
+        return MB_ERR_ARG;
+    }
+    bool bits = req->fc <= MB_FC_READ_DISCRETE;
+    int64_t now = esp_timer_get_time();
+    int done = 0;
+    if (bits) {
+        memset(data, 0, (req->count + 7u) / 8); /* the bits past the last one are 0 */
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    mbdev_t *d = find_dev(dev);
+    if (d && d->enabled && d->online && d->cache && d->t) {
+        int64_t max_age = (d->poll_s ? d->poll_s : d->t->t.poll_s) * 1000000LL + CACHE_SLACK_US;
+        /* the request may span several blocks read one after another */
+        while (done < req->count) {
+            uint16_t a = req->addr + done;
+            const cblock_t *c = NULL;
+            for (int k = 0; k < d->nent && !c; k++) {
+                const cblock_t *b = &d->cache[k];
+                if (b->at_us && now - b->at_us <= max_age && b->space == space[req->fc] && a >= b->addr && a < b->addr + b->count) {
+                    c = b;
+                }
+            }
+            if (!c) {
+                break;
+            }
+            int n = c->addr + c->count - a;
+            n = n < req->count - done ? n : req->count - done;
+            mb_extract(bits, c->data, c->addr, a, (uint16_t)n, data, done);
+            done += n;
+        }
+    }
+    xSemaphoreGive(s_lock);
+    *len = bits ? (req->count + 7u) / 8 : 2u * req->count;
+    return done == req->count ? MB_OK : MB_ERR_ARG;
+}
+
+bool modbus_srv_device(const char *dev, char *name, size_t len)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    mbdev_t *d = find_dev(dev);
+    if (d && name) {
+        strlcpy(name, d->name, len);
+    }
+    xSemaphoreGive(s_lock);
+    return d != NULL;
+}
+
 /* One poll of a device: the entities due in this cycle, block by block. */
 static void poll_device(mbdev_t *d, int64_t now)
 {
@@ -542,6 +646,7 @@ static void poll_device(mbdev_t *d, int64_t now)
         if (err == MB_OK) {
             xSemaphoreTake(s_lock, portMAX_DELAY);
             store_block(d, idx, b, data);
+            cache_put(d, b, data, len);
             xSemaphoreGive(s_lock);
             answered++;
             continue;
@@ -858,10 +963,47 @@ static void run_job(void)
     xSemaphoreGive(s_job.done);
 }
 
+static QueueHandle_t s_sq; /* mb_srv_job_t * of the Modbus TCP server */
+
+int modbus_srv_submit(mb_srv_job_t *job)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    mbdev_t *d = find_dev(job->dev);
+    int err = !d || !d->enabled || !d->t ? 0x0a : !d->online && d->fails >= OFFLINE_AFTER ? 0x0b : MB_OK;
+    xSemaphoreGive(s_lock);
+    if (err == MB_OK) {
+        job->done = false;
+        if (xQueueSend(s_sq, &job, 0) != pdTRUE) {
+            return 6; /* busy */
+        }
+        xTaskNotifyGive(s_task);
+    }
+    return err;
+}
+
+/* one request of the Modbus TCP server, in the task */
+static void server_job(void)
+{
+    mb_srv_job_t *job;
+    if (xQueueReceive(s_sq, &job, 0) != pdTRUE) {
+        return;
+    }
+    mbdev_t *d = find_dev(job->dev);
+    job->len = sizeof(job->data);
+    if (!d || !d->enabled || !d->t) {
+        job->result = 0x0a;
+    } else if (s_probe.running && !s_probe.tcp && !d->tcp) {
+        job->result = 6; /* the RS485 bus belongs to the search */
+    } else {
+        job->result = request(d, &job->req, job->data, &job->len);
+    }
+    job->done = true;
+}
+
 static void task(void *arg)
 {
     while (true) {
-        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(s_probe.running ? 1 : 200));
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(s_probe.running || uxQueueMessagesWaiting(s_sq) ? 1 : 200));
         if (s_cfg_dirty) {
             xSemaphoreTake(s_lock, portMAX_DELAY);
             cJSON *j = cJSON_Parse(s_cfg_pending);
@@ -879,6 +1021,7 @@ static void task(void *arg)
         if (s_job.busy) {
             run_job();
         }
+        server_job(); /* one per round, polls and the search in between */
         queued_write_t w;
         while (xQueueReceive(s_wq, &w, 0) == pdTRUE) {
             mbdev_t *d = find_dev(w.dev);
@@ -1671,9 +1814,10 @@ esp_err_t modbus_init(void)
     s_job.lock = xSemaphoreCreateMutex();
     s_job.done = xSemaphoreCreateBinary();
     s_wq = xQueueCreate(8, sizeof(queued_write_t));
+    s_sq = xQueueCreate(8, sizeof(mb_srv_job_t *));
     s_tpl = ps_calloc(MAX_TPL, sizeof(tpl_t));
     s_dev = ps_calloc(MAX_DEVICES, sizeof(mbdev_t));
-    if (!s_lock || !s_job.lock || !s_job.done || !s_wq || !s_tpl || !s_dev) {
+    if (!s_lock || !s_job.lock || !s_job.done || !s_wq || !s_sq || !s_tpl || !s_dev) {
         return ESP_ERR_NO_MEM;
     }
     load_templates();
@@ -1699,6 +1843,7 @@ esp_err_t modbus_init(void)
     gw_http_register("/api/modbus/probe", HTTP_GET, probe_get);
     gw_http_register("/api/modbus/probe", HTTP_POST, probe_post);
     mb_scan_init();
+    mb_server_init();
     gw_bot_command("modbus", "values of the Modbus devices", "hodnoty zařízení Modbus", "system/rs485", 1, false, bot_modbus);
     gw_mqtt_set_extension(mqtt_discovery, NULL);
     gw_mqtt_add_command("modbus/+/+/set", mqtt_command);

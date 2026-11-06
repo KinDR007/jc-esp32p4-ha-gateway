@@ -141,6 +141,62 @@ static void test_aa55(void)
     CHECK(mb_aa55_unframe(0x7f, ans, sizeof(ans), &p, &plen) == MB_ERR_CRC, "bad CRC detected");
 }
 
+static void test_server(void)
+{
+    /* requests a client sends, decoded and answered as the gateway's Modbus TCP server does */
+    uint16_t regs[MB_PDU_MAX / 2];
+    mb_req_t r;
+    const uint8_t rd[] = {0x03, 0x00, 0x10, 0x00, 0x02};
+    CHECK(mb_pdu_parse(rd, sizeof(rd), &r, regs) == MB_OK && r.fc == 3 && r.addr == 0x10 && r.count == 2, "read holding parsed");
+    const uint8_t data[] = {0x12, 0x34, 0x56, 0x78};
+    uint8_t ans[MB_PDU_MAX];
+    size_t n = mb_pdu_answer(&r, data, sizeof(data), ans, sizeof(ans));
+    CHECK(n == 6 && ans[0] == 3 && ans[1] == 4 && !memcmp(ans + 2, data, 4), "read answer");
+    CHECK(mb_pdu_answer(&r, data, 2, ans, sizeof(ans)) == 0, "read answer with the wrong data length refused");
+    const uint8_t big[] = {0x04, 0x00, 0x00, 0x00, 126};
+    CHECK(mb_pdu_parse(big, sizeof(big), &r, regs) == 3, "126 registers: exception 3");
+    const uint8_t bits[] = {0x01, 0x00, 0x00, 0x07, 0xd1};
+    CHECK(mb_pdu_parse(bits, sizeof(bits), &r, regs) == 3, "2001 coils: exception 3");
+    const uint8_t fn[] = {0x2b, 0x0e, 0x01, 0x00};
+    CHECK(mb_pdu_parse(fn, sizeof(fn), &r, regs) == 1, "function 0x2b: exception 1");
+    const uint8_t extra[] = {0x03, 0x00, 0x10, 0x00, 0x02, 0x00};
+    CHECK(mb_pdu_parse(extra, sizeof(extra), &r, regs) == 3, "a byte too many: exception 3");
+
+    const uint8_t w16[] = {0x10, 0x00, 0x20, 0x00, 0x02, 0x04, 0x00, 0x0a, 0x01, 0x02};
+    CHECK(mb_pdu_parse(w16, sizeof(w16), &r, regs) == MB_OK && r.count == 2 && r.regs[0] == 10 && r.regs[1] == 0x0102, "write registers parsed");
+    uint8_t enc[MB_PDU_MAX];
+    CHECK(mb_pdu_encode(&r, enc, sizeof(enc)) == sizeof(w16) && !memcmp(enc, w16, sizeof(w16)), "write registers encode back to the same PDU");
+    n = mb_pdu_answer(&r, NULL, 0, ans, sizeof(ans));
+    CHECK(n == 5 && ans[0] == 0x10 && ans[2] == 0x20 && ans[4] == 2, "write registers answer: address and count");
+    const uint8_t w16bad[] = {0x10, 0x00, 0x20, 0x00, 0x02, 0x03, 0x00, 0x0a, 0x01};
+    CHECK(mb_pdu_parse(w16bad, sizeof(w16bad), &r, regs) == 3, "byte count not 2 * count: exception 3");
+    const uint8_t w5[] = {0x05, 0x00, 0x03, 0xff, 0x00};
+    CHECK(mb_pdu_parse(w5, sizeof(w5), &r, regs) == MB_OK && r.value == 0xff00, "write coil parsed");
+    n = mb_pdu_answer(&r, NULL, 0, ans, sizeof(ans));
+    CHECK(n == 5 && !memcmp(ans, w5, 5), "write coil answer echoes the request");
+    const uint8_t w5bad[] = {0x05, 0x00, 0x03, 0x12, 0x34};
+    CHECK(mb_pdu_parse(w5bad, sizeof(w5bad), &r, regs) == 3, "write coil value 0x1234: exception 3");
+    const uint8_t w15[] = {0x0f, 0x00, 0x00, 0x00, 0x0a, 0x02, 0xcd, 0x01};
+    CHECK(mb_pdu_parse(w15, sizeof(w15), &r, regs) == MB_OK && r.count == 10 && r.bits[0] == 0xcd && r.bits[1] == 0x01, "write coils parsed");
+
+    /* the cache answers a part of a block read earlier */
+    const uint8_t block[] = {0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04};
+    uint8_t out[16] = {0};
+    mb_extract(false, block, 100, 101, 2, out, 0);
+    CHECK(out[1] == 2 && out[3] == 3, "registers 101-102 of a block at 100");
+    mb_extract(false, block, 100, 100, 1, out, 2);
+    CHECK(out[1] == 2 && out[3] == 3 && out[5] == 1, "register 100 appended as the third");
+    const uint8_t coils[] = {0xb5, 0x03}; /* bits 0..9: 1 0 1 0 1 1 0 1 1 1 */
+    memset(out, 0xff, sizeof(out));
+    mb_extract(true, coils, 10, 13, 6, out, 0);
+    CHECK((out[0] & 0x3f) == 0x36, "coils 13-18 (0 1 1 0 1 1) of a block at 10: %02x", out[0]);
+    mb_extract(true, coils, 10, 10, 10, out, 0);
+    CHECK(out[0] == 0xb5 && (out[1] & 3) == 0x03, "the whole bit block");
+    memset(out, 0, sizeof(out));
+    mb_extract(true, coils, 10, 18, 2, out, 7);
+    CHECK(out[0] == 0x80 && out[1] == 0x01, "coils 18-19 as bits 7-8 of the answer: %02x %02x", out[0], out[1]);
+}
+
 static void test_values(void)
 {
     /* 0x12345678 in the four orders as they come over the wire */
@@ -344,6 +400,7 @@ int main(int argc, char **argv)
     test_writes();
     test_tcp();
     test_aa55();
+    test_server();
     test_values();
     test_templates();
     test_builtin(argc, argv);

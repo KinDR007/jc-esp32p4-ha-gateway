@@ -64,6 +64,18 @@ size_t mb_pdu_answer_len(const mb_req_t *req);
  * their data at *data (registers big endian, coils packed) with *data_len bytes. */
 int mb_pdu_check(const mb_req_t *req, const uint8_t *pdu, size_t len, const uint8_t **data, size_t *data_len);
 
+/* Server side: decodes a request PDU of the standard functions (1-6, 15, 16) into req; written registers go
+ * to regs (MB_PDU_MAX / 2 values), written coils point into pdu. MB_OK, or the exception to answer:
+ * 1 for another function, 3 for an invalid count or length. */
+int mb_pdu_parse(const uint8_t *pdu, size_t len, mb_req_t *req, uint16_t *regs);
+/* The answer PDU to a successful req: reads carry data (data_len bytes as a device sends them), writes
+ * echo the address and value or count. Returns its length, 0 when it does not fit. */
+size_t mb_pdu_answer(const mb_req_t *req, const uint8_t *data, size_t data_len, uint8_t *pdu, size_t len);
+/* Copies the part [addr, addr + count) of a read block starting at block_addr into out from register or
+ * bit pos on: registers (2 bytes each) or packed bits (coils, discrete inputs; the bits of out not
+ * written stay). */
+void mb_extract(bool bits, const uint8_t *block, uint16_t block_addr, uint16_t addr, uint16_t count, uint8_t *out, int pos);
+
 /* RTU: address + PDU + CRC (low byte first). */
 size_t mb_rtu_frame(uint8_t slave, const uint8_t *pdu, size_t pdu_len, uint8_t *out, size_t out_len);
 /* Checks a received RTU frame: MB_OK with the PDU at *pdu, MB_ERR_CRC or MB_ERR_FRAME. */

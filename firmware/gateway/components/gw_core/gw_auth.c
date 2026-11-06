@@ -865,6 +865,8 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/modbus/raw", -1, "system/rs485", 2},
     {"/api/modbus/probe", HTTP_GET, "system/rs485", 1},
     {"/api/modbus/probe", HTTP_POST, "system/rs485", 2},
+    {"/api/modbus/server", HTTP_GET, "system/rs485", 1},
+    {"/api/modbus/server", HTTP_PUT, "system/rs485", 2},
     {"/api/modbus/scan", HTTP_GET, "system/rs485", 1},
     {"/api/modbus/scan", HTTP_POST, "system/rs485", 2},
     {"/api/ws", -1, "*", 1},

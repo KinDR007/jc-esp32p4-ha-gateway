@@ -15,7 +15,9 @@ import json
 import os
 import re
 import socket
+import struct
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -1050,6 +1052,142 @@ def tc50_modbus_goodwe_udp():
         sim.communicate(timeout=5)
     code, r = http('GET', '/api/modbus')
     check(code == 200 and len(r['devices']) == len(keep['devices']), 'configuration of before restored')
+
+
+def mbtcp(host, port, unit, pdu, tid=1, timeout=5, sock=None):
+    """One Modbus TCP request; the answer PDU (an exception too), b'' when the connection closed."""
+    s = sock or socket.create_connection((host, port), timeout=timeout)
+    try:
+        return _mbtcp(s, unit, pdu, tid, timeout)
+    except (ConnectionResetError, BrokenPipeError):
+        return b''
+    finally:
+        if not sock:
+            s.close()
+
+
+def _mbtcp(s, unit, pdu, tid, timeout):
+    s.settimeout(timeout)
+    s.sendall(struct.pack('>HHHB', tid, 0, len(pdu) + 1, unit) + pdu)
+    head = b''
+    while len(head) < 7:
+        chunk = s.recv(7 - len(head))
+        if not chunk:
+            return b''
+        head += chunk
+    rtid, proto, length, runit = struct.unpack('>HHHB', head)
+    body = b''
+    while len(body) < length - 1:
+        chunk = s.recv(length - 1 - len(body))
+        if not chunk:
+            return b''
+        body += chunk
+    if rtid != tid or proto != 0 or runit != unit:
+        raise Fail(f'MBAP answer {rtid} {proto} {runit} to {tid} 0 {unit}')
+    return body
+
+
+def tc55_modbus_tcp_server():
+    """Modbus TCP server of the gateway (/api/modbus/server) against the simulator of this computer (an Eastron
+    SDM630 on Modbus TCP, logging every read, and a GoodWe XS over UDP): invalid settings refused, the shared
+    port 502 routes by unit id and an unknown unit gets exception 10, an own port takes any unit id, polled
+    registers come from the cache without traffic to the device, others pass through (the device's exception
+    too), the per-device rate refuses with exception 6, writes refused until switched on and allowed for this
+    computer, a third client on a port turned away, the GoodWe UDP device answers as Modbus TCP. The
+    configuration of before comes back."""
+    import subprocess
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    sim = subprocess.Popen([sys.executable, '-u', sim_py, '--port', '1504', '--log-reads', 'eastron_sdm630:1'],
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    udp = subprocess.Popen([sys.executable, sim_py, '--udp', '--port', '8899', 'goodwe_xs:127'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log = []
+    threading.Thread(target=lambda: [log.append(line) for line in sim.stdout], daemon=True).start()
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+    srv_before = http('GET', '/api/modbus/server')[1]
+    srv_keep = {k: srv_before[k] for k in ('enabled', 'port', 'devices')}
+    srv_keep['devices'] = [{k: e[k] for k in ('device', 'unit', 'port', 'write', 'allow', 'rate')} for e in srv_keep['devices']]
+    H = ARGS.host
+    exc = lambda pdu: pdu[1] if len(pdu) == 2 and pdu[0] & 0x80 else None
+    try:
+        time.sleep(1)
+        devs = [{'name': 'TC55 meter', 'template': 'eastron_sdm630', 'transport': 'tcp', 'host': my_ip, 'port': 1504, 'slave': 1, 'poll_s': 3, 'expose': 'none'},
+                {'name': 'TC55 GoodWe', 'template': 'goodwe_xs', 'transport': 'udp', 'host': my_ip, 'slave': 127, 'poll_s': 5, 'expose': 'none'}]
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + devs})[0] == 200, 'meter on Modbus TCP and GoodWe on UDP added')
+        ids = {d['name']: d['id'] for d in http('GET', '/api/modbus')[1]['devices']}
+        meter, gw = ids['TC55 meter'], ids['TC55 GoodWe']
+        ok = {'device': meter, 'unit': 10, 'port': 1505, 'rate': 3}
+        for bad, why in (({'device': 'd999', 'unit': 10}, 'unknown device'), (dict(ok, unit=248), 'unit 248'), (dict(ok, port=80), 'port 80'),
+                         (dict(ok, port=502), 'own port = the shared one'), (dict(ok, unit=0, port=0), 'neither unit nor port'),
+                         (dict(ok, rate=0), 'rate 0'), (dict(ok, allow=['10.0.0']), 'allow not an address'), (dict(ok, write=1), 'write 1')):
+            check(http('PUT', '/api/modbus/server', {'devices': [bad]})[0] == 400, f'refused: {why}')
+        check(http('PUT', '/api/modbus/server', {'devices': [ok, {'device': gw, 'unit': 10}]})[0] == 400, 'refused: unit used twice')
+        check(http('PUT', '/api/modbus/server', {'port': 8081})[0] == 400, 'refused: shared port 8081')
+        code, r = http('PUT', '/api/modbus/server', {'enabled': True, 'port': 502, 'devices': [ok, {'device': gw, 'port': 1506}]})
+        check(code == 200 and sorted((p['port'], p['ok']) for p in r['ports']) == [(502, True), (1505, True), (1506, True)], f'ports 502, 1505, 1506 open: {r.get("ports")}')
+
+        # the strict simulator refuses the first block read: the voltages come one by one in the next poll
+        wait_until('voltages polled', lambda: {'voltage_l1', 'voltage_l2', 'voltage_l3'} <= set(next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['id'] == meter)['values']), 30, 1)
+        direct = mbtcp(my_ip, 1504, 1, bytes([4, 0, 0, 0, 6]))
+        time.sleep(0.3)
+        reads = len(log)
+        a = mbtcp(H, 502, 10, bytes([4, 0, 0, 0, 6]))
+        check(a == direct and len(a) == 14, f'port 502 unit 10: voltages L1-L3 as the device has them ({a.hex()})')
+        b = mbtcp(H, 1505, 255, bytes([4, 0, 2, 0, 4]))
+        check(b == bytes([4, 8]) + direct[6:14], 'own port 1505, unit 255: voltages L2-L3')
+        time.sleep(0.5)
+        passed = [l.strip() for l in log[reads:] if l.strip().endswith(('input 0x0000 6', 'input 0x0002 4'))]
+        check(not passed, f'answered from the cache: no such read reached the device {passed}')
+        check(exc(mbtcp(H, 502, 11, bytes([4, 0, 0, 0, 2]))) == 0x0a, 'unit 11 on 502: exception 10 (no such device)')
+        reads = len(log)
+        check(exc(mbtcp(H, 502, 10, bytes([3, 0x12, 0x34, 0, 1]))) == 2, 'holding 0x1234 passes through: the device answers exception 2')
+        time.sleep(0.3)
+        check(any('holding 0x1234 1' in l for l in log[reads:]), 'the simulator got that read')
+
+        s = socket.create_connection((H, 1505), timeout=5)
+        answers = [exc(mbtcp(H, 1505, 1, bytes([3, 0x12, 0x34, 0, 1]), tid=i + 1, sock=s)) for i in range(8)]
+        s.close()
+        check(answers.count(6) >= 3 and answers.count(2) >= 2, f'rate 3 per second: busy (6) after the burst {answers}')
+
+        check(exc(mbtcp(H, 1505, 1, bytes([6, 0xf0, 0x10, 0, 0]))) == 1, 'write refused: writes off (exception 1)')
+        http('PUT', '/api/modbus/server', {'devices': [dict(ok, write=True, allow=['192.0.2.1']), {'device': gw, 'port': 1506}]})
+        check(exc(mbtcp(H, 1505, 1, bytes([6, 0xf0, 0x10, 0, 0]))) == 1, 'write refused: this computer not allowed')
+        http('PUT', '/api/modbus/server', {'devices': [dict(ok, write=True, allow=[my_ip]), {'device': gw, 'port': 1506}]})
+        time.sleep(1.2)
+        n = len(log)
+        check(mbtcp(H, 1505, 1, bytes([6, 0xf0, 0x10, 0, 0])) == bytes([6, 0xf0, 0x10, 0, 0]), 'write allowed for this computer: echo')
+        time.sleep(0.3)
+        check(any('write unit eastron_sdm630 holding 0xf010 = [0]' in l for l in log[n:]), 'the simulator got the write')
+
+        c1, c2 = socket.create_connection((H, 1505), timeout=5), socket.create_connection((H, 1505), timeout=5)
+        check(mbtcp(H, 1505, 1, bytes([4, 0, 0, 0, 2]), sock=c1)[:2] == bytes([4, 4]) and mbtcp(H, 1505, 1, bytes([4, 0, 0, 0, 2]), sock=c2)[:2] == bytes([4, 4]), 'two clients served')
+        c3 = socket.create_connection((H, 1505), timeout=5)
+        check(mbtcp(H, 1505, 1, bytes([4, 0, 0, 0, 2]), sock=c3) == b'', 'third client on the port turned away')
+        r = http('GET', '/api/modbus/server')[1]
+        p = next(p for p in r['ports'] if p['port'] == 1505)
+        check(len(p['clients']) == 2 and p['clients'][0]['address'] == my_ip and r['turned_away'] >= 1, f'status: 2 clients from {my_ip}, turned away {r["turned_away"]}')
+        for c in (c1, c2, c3):
+            c.close()
+        e = next(e for e in r['devices'] if e['device'] == meter)
+        check(e['cached'] >= 2 and e['passed'] >= 3 and e['refused'] >= 5 and e['name'] == 'TC55 meter', f'counters: {e}')
+
+        wait_until('GoodWe polled', lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['id'] == gw)['values'], 30, 1)
+        a = mbtcp(H, 1506, 1, bytes([3, 0x75, 0x34, 0, 8]))
+        check(a[:2] == bytes([3, 16]) and a[2:] == b'SERIAL-012345678', f'GoodWe over UDP as Modbus TCP on port 1506: {a[2:]!r}')
+    finally:
+        http('PUT', '/api/modbus/server', srv_keep)
+        http('PUT', '/api/modbus', keep)
+        for p in (sim, udp):
+            p.terminate()
+            p.wait(timeout=5)
+    r = http('GET', '/api/modbus/server')[1]
+    check(len(r['devices']) == len(srv_keep['devices']), 'server configuration of before restored')
 
 
 def tc13_rcp_reflash():
@@ -2571,7 +2709,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2598,7 +2736,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

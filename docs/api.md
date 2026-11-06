@@ -2388,6 +2388,8 @@ Effects: Takes up to a few seconds (an SCD4x needs 0.5 s). Configured sensors an
 | POST | `/api/modbus/probe` | Starts a search of addresses (and baud rates), or stops it. | page `system/rs485`, edit |
 | GET | `/api/modbus/scan` | State and result of the Modbus TCP search in a network. | page `system/rs485`, read |
 | POST | `/api/modbus/scan` | Starts a Modbus TCP search in a network, or stops it. | page `system/rs485`, edit |
+| GET | `/api/modbus/server` | Modbus TCP server: the devices offered in the network, ports, clients and counters. | page `system/rs485`, read |
+| PUT | `/api/modbus/server` | Sets the Modbus TCP server: the shared port and the devices offered. | page `system/rs485`, edit |
 
 #### GET `/api/modbus`
 
@@ -2805,6 +2807,107 @@ Response:
 Errors: 400 net not a.b.c.d/n or prefix out of 22-32, ports not a list of 1-4, units not a list of 1-8 ids 0-255.; 409 A search is running.; 503 No memory for the search task.
 
 Effects: Connects to the ports of every address (4 at a time, 300 ms each), reads holding register 0 of the units on each open port (an exception is an answer too), then recognises Victron GX and GoodWe by their serial numbers. With udp (default) also asks GoodWe dongles on UDP 8899 and sends their discovery broadcast. Runs beside the device polling; a /24 takes about 20-60 s. Ports default [502], units [1, 247, 255]. {"stop": true} ends it.
+
+#### GET `/api/modbus/server`
+
+Response:
+
+```json
+{
+  "enabled": true,
+  "port": 502,
+  "devices": [
+    {
+      "device": "d1",
+      "unit": 10,
+      "port": 1502,
+      "write": false,
+      "allow": [],
+      "rate": 5,
+      "missing": false,
+      "name": "Eastron SDM630",
+      "requests": 120,
+      "cached": 96,
+      "passed": 24,
+      "refused": 0,
+      "failed": 0
+    }
+  ],
+  "ports": [
+    {
+      "port": 502,
+      "ok": true,
+      "error": "",
+      "clients": [
+        {
+          "address": "192.168.88.20",
+          "requests": 80,
+          "connected_s": 3600
+        }
+      ]
+    },
+    {
+      "port": 1502,
+      "device": "d1",
+      "ok": true,
+      "error": "",
+      "clients": []
+    }
+  ],
+  "clients": 1,
+  "turned_away": 0,
+  "limits": {
+    "devices": 16,
+    "ports": 8,
+    "clients_per_port": 2,
+    "clients": 8,
+    "rate": 50
+  }
+}
+```
+
+Effects: devices: unit is the unit id on the shared port (0: not there), port an own port (0: none) where any unit id reaches the device. cached: reads answered from the registers the gateway polled within the device's poll interval; passed: requests sent to the device; refused: over the rate (exception 6), a write not allowed (1) or an invalid request (1, 3); failed: the device off, offline or silent (10, 11). missing: the Modbus device was removed (its requests get exception 10). ports: ok false with error when the port could not be opened. turned_away: connections closed at once because the port or the gateway had its clients.
+
+#### PUT `/api/modbus/server`
+
+Body:
+
+```json
+{
+  "enabled": true,
+  "port": 502,
+  "devices": [
+    {
+      "device": "d1",
+      "unit": 10,
+      "port": 1502,
+      "write": false,
+      "allow": [],
+      "rate": 5
+    },
+    {
+      "device": "d2",
+      "unit": 0,
+      "port": 1503,
+      "write": true,
+      "allow": [
+        "192.168.88.20"
+      ],
+      "rate": 2
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{}
+```
+
+Errors: 400 port not 1-65535 or 80, 8081, the Zigbee port; more than 16 devices; device not a configured Modbus device; unit not 0-247 or port not 0-65535; neither unit nor port; an own port equal to the shared one; a device, unit or port twice; write not a bool; allow not up to 4 IPv4 addresses; rate not 1-50; more than 8 ports (the shared one counts).
+
+Effects: What is not sent stays. The shared port (default 502, enabled) listens while a device has a unit id there and routes by it; unknown unit ids get exception 10. Reads of registers the gateway polls are answered from its cache, everything else goes to the device through the Modbus task (the RS485 bus is shared with the polling), at most rate requests per second per device, else exception 6. Writes (functions 5, 6, 15, 16) only with write and, when allow lists addresses, only from them; else exception 1. Up to 2 clients per port and 8 in all, one request at a time per client; idle clients are closed after 120 s. Answers the GET.
 
 ### GPIO of header JP1
 

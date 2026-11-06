@@ -109,6 +109,102 @@ size_t mb_pdu_encode(const mb_req_t *req, uint8_t *pdu, size_t len)
     }
 }
 
+int mb_pdu_parse(const uint8_t *pdu, size_t len, mb_req_t *req, uint16_t *regs)
+{
+    memset(req, 0, sizeof(*req));
+    if (len < 1) {
+        return 3;
+    }
+    req->fc = pdu[0];
+    if (!standard(req->fc)) {
+        return 1;
+    }
+    if (len < 5) {
+        return 3;
+    }
+    req->addr = get16(pdu + 1);
+    switch (req->fc) {
+    case MB_FC_READ_COILS:
+    case MB_FC_READ_DISCRETE:
+    case MB_FC_READ_HOLDING:
+    case MB_FC_READ_INPUT: {
+        req->count = get16(pdu + 3);
+        bool bits = req->fc <= MB_FC_READ_DISCRETE;
+        return len == 5 && req->count >= 1 && req->count <= (bits ? MB_READ_BITS_MAX : MB_READ_REGS_MAX) ? MB_OK : 3;
+    }
+    case MB_FC_WRITE_COIL:
+        req->value = get16(pdu + 3);
+        return len == 5 && (req->value == 0xff00 || req->value == 0) ? MB_OK : 3;
+    case MB_FC_WRITE_REG:
+        req->value = get16(pdu + 3);
+        return len == 5 ? MB_OK : 3;
+    case MB_FC_WRITE_COILS:
+        req->count = get16(pdu + 3);
+        if (len < 6 || req->count < 1 || req->count > 1968 || pdu[5] != (req->count + 7) / 8 || len != 6u + pdu[5]) {
+            return 3;
+        }
+        req->bits = pdu + 6;
+        return MB_OK;
+    default: /* MB_FC_WRITE_REGS */
+        req->count = get16(pdu + 3);
+        if (len < 6 || req->count < 1 || req->count > 123 || pdu[5] != 2 * req->count || len != 6u + pdu[5]) {
+            return 3;
+        }
+        for (int i = 0; i < req->count; i++) {
+            regs[i] = get16(pdu + 6 + 2 * i);
+        }
+        req->regs = regs;
+        return MB_OK;
+    }
+}
+
+size_t mb_pdu_answer(const mb_req_t *req, const uint8_t *data, size_t data_len, uint8_t *pdu, size_t len)
+{
+    size_t n = mb_pdu_answer_len(req);
+    if (n > len || n < 2) {
+        return 0;
+    }
+    pdu[0] = req->fc;
+    switch (req->fc) {
+    case MB_FC_READ_COILS:
+    case MB_FC_READ_DISCRETE:
+    case MB_FC_READ_HOLDING:
+    case MB_FC_READ_INPUT:
+        if (data_len != n - 2) {
+            return 0;
+        }
+        pdu[1] = (uint8_t)data_len;
+        memcpy(pdu + 2, data, data_len);
+        return n;
+    case MB_FC_WRITE_COIL:
+    case MB_FC_WRITE_REG:
+        put16(pdu + 1, req->addr);
+        put16(pdu + 3, req->value);
+        return n;
+    default: /* write coils, write registers */
+        put16(pdu + 1, req->addr);
+        put16(pdu + 3, req->count);
+        return n;
+    }
+}
+
+void mb_extract(bool bits, const uint8_t *block, uint16_t block_addr, uint16_t addr, uint16_t count, uint8_t *out, int pos)
+{
+    int off = addr - block_addr;
+    if (!bits) {
+        memcpy(out + 2 * pos, block + 2 * off, 2u * count);
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        int b = off + i, o = pos + i;
+        if ((block[b / 8] >> (b % 8)) & 1) {
+            out[o / 8] |= (uint8_t)(1 << (o % 8));
+        } else {
+            out[o / 8] &= (uint8_t)~(1 << (o % 8));
+        }
+    }
+}
+
 size_t mb_pdu_answer_len(const mb_req_t *req)
 {
     switch (req->fc) {

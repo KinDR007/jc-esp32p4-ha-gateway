@@ -1034,6 +1034,40 @@ await test('UI36', 'System › GPIO (JP1): header of 26 pins with radio A locked
   }
 });
 
+await test('UI37', 'System › Modbus TCP server: Add offers a Modbus device with a unit id, an own port, writes and an allowed address; Save stores it, the state lists the shared and the own port open; removing it empties the list; configuration restored', async () => {
+  const before = await (await page.request.get(base + 'api/modbus/server')).json();
+  const keep = { enabled: before.enabled, port: before.port, devices: before.devices.map(({ device, unit, port, write, allow, rate }) => ({ device, unit, port, write, allow, rate })) };
+  const devs = (await (await page.request.get(base + 'api/modbus')).json()).devices;
+  if (!devs.length) { check(true, 'no Modbus device configured: nothing to offer (skipped)'); return; }
+  try {
+    await page.request.put(base + 'api/modbus/server', { data: { enabled: true, port: 502, devices: [] } });
+    await tab('system/mbserver');
+    await page.waitForSelector('#mv-add:not([disabled])', { timeout: 10000 });
+    await page.click('#mv-add');
+    await page.fill('[data-mv="0"][data-k="unit"]', '77');
+    await page.fill('[data-mv="0"][data-k="port"]', '1520');
+    await page.fill('[data-mv="0"][data-k="rate"]', '4');
+    await page.check('[data-mv="0"][data-k="write"]');
+    await page.fill('[data-mv="0"][data-k="allow"]', '192.0.2.5');
+    await page.click('#mv-save');
+    await page.waitForFunction(() => /Saved|Uloženo/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
+    const r = await (await page.request.get(base + 'api/modbus/server')).json();
+    const e = r.devices[0] || {};
+    check(r.devices.length === 1 && e.device === devs[0].id && e.unit === 77 && e.port === 1520 && e.rate === 4 && e.write && e.allow.join() === '192.0.2.5',
+      `stored: ${JSON.stringify(r.devices)}`);
+    await page.waitForFunction(() => (document.querySelector('#mv-state')?.textContent.match(/(open|otevřený)/g) || []).length === 2, null, { timeout: 8000 });
+    const state = await page.textContent('#mv-state');
+    check(state.includes('502') && state.includes('1520'), 'state: the shared port 502 and the own port 1520 open');
+    await page.click('[data-mv-del="0"]');
+    await page.click('#mv-save');
+    await page.waitForFunction(() => /no device offered|žádné zařízení není/i.test(document.querySelector('#mv-state')?.textContent || ''), null, { timeout: 8000 });
+    check((await (await page.request.get(base + 'api/modbus/server')).json()).devices.length === 0, 'removed: no device offered');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/modbus/server', { data: keep });
+  }
+});
+
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it
 async function legendClear(box) {
   return page.evaluate(box => {

@@ -515,7 +515,7 @@ let me = null;
  * Elements with data-notr (and their content) are left alone: class names, user data, code. */
 const CS = {
   'Roles': 'Role', 'Status and maintenance': 'Stav a údržba', 'Radio surroundings': 'Rádiové okolí', 'Integration': 'Integrace',
-  'Maintenance and backup': 'Údržba a záloha', 'Modbus TCP search': 'Hledání Modbus TCP',
+  'Maintenance and backup': 'Údržba a záloha', 'Modbus TCP search': 'Hledání Modbus TCP', 'Modbus TCP server': 'Server Modbus TCP',
   'Notifications': 'Notifikace', 'User management': 'Správa uživatelů', 'Users': 'Uživatelé', 'Roles and permissions': 'Role a oprávnění', 'API tokens': 'API tokeny',
   'Reset requests': 'Žádosti o reset', 'Security': 'Zabezpečení', 'My account': 'Můj účet',
   'Overview': 'Přehled', 'Data flows': 'Toky dat', 'Information': 'Informace', 'Network and devices': 'Síť a zařízení', 'Hardware': 'Hardware', 'I2C sensors': 'I2C senzory', 'Modbus devices': 'Zařízení Modbus', 'Zigbee2MQTT': 'Zigbee2MQTT',
@@ -1315,6 +1315,7 @@ const ICONS = {
   'school-outline': 'M12 3L1 9L5 11.18V17.18L12 21L19 17.18V11.18L21 10.09V17H23V9L12 3M18.82 9L12 12.72L5.18 9L12 5.28L18.82 9M17 16L12 18.72L7 16V12.27L12 15L17 12.27V16Z',
   'send': 'M2,21L23,12L2,3V10L17,12L2,14V21Z',
   'serial-port': 'M7,3H17V5H19V8H16V14H8V8H5V5H7V3M17,9H19V14H17V9M11,15H13V22H11V15M5,9H7V14H5V9Z',
+  'server-network': 'M13,19H14A1,1 0 0,1 15,20H22V22H15A1,1 0 0,1 14,23H10A1,1 0 0,1 9,22H2V20H9A1,1 0 0,1 10,19H11V17H4A1,1 0 0,1 3,16V12A1,1 0 0,1 4,11H20A1,1 0 0,1 21,12V16A1,1 0 0,1 20,17H13V19M4,3H20A1,1 0 0,1 21,4V8A1,1 0 0,1 20,9H4A1,1 0 0,1 3,8V4A1,1 0 0,1 4,3M9,7H10V5H9V7M9,15H10V13H9V15M5,5V7H7V5H5M5,13V15H7V13H5Z',
   'shield-account-outline': 'M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,3.18L19,6.3V11.22C19,12.92 18.5,14.65 17.65,16.17C16,14.94 13.26,14.5 12,14.5C10.74,14.5 8,14.94 6.35,16.17C5.5,14.65 5,12.92 5,11.22V6.3L12,3.18M12,6A3.5,3.5 0 0,0 8.5,9.5A3.5,3.5 0 0,0 12,13A3.5,3.5 0 0,0 15.5,9.5A3.5,3.5 0 0,0 12,6M12,8A1.5,1.5 0 0,1 13.5,9.5A1.5,1.5 0 0,1 12,11A1.5,1.5 0 0,1 10.5,9.5A1.5,1.5 0 0,1 12,8M12,16.5C13.57,16.5 15.64,17.11 16.53,17.84C15.29,19.38 13.7,20.55 12,21C10.3,20.55 8.71,19.38 7.47,17.84C8.37,17.11 10.43,16.5 12,16.5Z',
   'shield-lock-outline': 'M21,11C21,16.55 17.16,21.74 12,23C6.84,21.74 3,16.55 3,11V5L12,1L21,5V11M12,21C15.75,20 19,15.54 19,11.22V6.3L12,3.18L5,6.3V11.22C5,15.54 8.25,20 12,21M14.8,11V9.5C14.8,8.1 13.4,7 12,7C10.6,7 9.2,8.1 9.2,9.5V11C8.6,11 8,11.6 8,12.2V15.7C8,16.4 8.6,17 9.2,17H14.7C15.4,17 16,16.4 16,15.8V12.3C16,11.6 15.4,11 14.8,11M13.5,11H10.5V9.5C10.5,8.7 11.2,8.2 12,8.2C12.8,8.2 13.5,8.7 13.5,9.5V11Z',
   'signal': 'M3,21H6V18H3M8,21H11V14H8M13,21H16V9H13M18,21H21V3H18V21Z',
@@ -1423,6 +1424,7 @@ const NAV = [
     { id: 'info', label: 'Information', icon: 'information-outline' }, { id: 'lan', label: 'LAN', icon: 'ethernet' },
     { id: 'wifi', label: 'Wi-Fi', icon: 'wifi' }, { id: 'hw', label: 'Hardware', icon: 'expansion-card-variant' }, { id: 'gpio', label: 'GPIO (JP1)', icon: 'chip' },
     { id: 'rs485', label: 'RS485', icon: 'serial-port' }, { id: 'mbscan', label: 'Modbus TCP search', icon: 'lan-pending' },
+    { id: 'mbserver', label: 'Modbus TCP server', icon: 'server-network' },
     { id: 'firmware', label: 'Firmware', icon: 'upload', subs: [
       { id: 'online', label: 'Online update', icon: 'cloud-download-outline' }, { id: 'manual', label: 'Manual update', icon: 'upload' }] },
     { id: 'maint', label: 'Maintenance and backup', icon: 'wrench-outline' }, { id: 'diag', label: 'Diagnostics', icon: 'stethoscope' },
@@ -1440,7 +1442,7 @@ const OLD_ROUTES = { tools: 'system/diag', thread: 'thread/info', zigbee: 'zigbe
   role: 'radios/roles', 'system/radios': 'radios/status', 'system/netscan': 'radios/scan', 'ha/esphome': 'esphome',
   'system/settings': 'system/maint', 'system/firmware/settings': 'system/firmware/online' };
 /* permission area (gw_auth.c) of pages whose route differs from it; the others use their route */
-const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'system/mbscan': 'system/rs485', 'system/gpio': 'system/hw', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
+const PERM = { flows: 'overview', 'system/wifi': 'system/lan', 'system/mbscan': 'system/rs485', 'system/mbserver': 'system/rs485', 'system/gpio': 'system/hw', 'radios/roles': 'role', 'radios/status': 'system/maint', 'radios/scan': 'system/netscan', esphome: 'ha/esphome', 'ha/matter': 'system/settings' };
 
 let tab = 'overview', sub = '';
 /* routes: section, section/page or section/page/subpage (System › User management › …) */
@@ -4881,6 +4883,95 @@ document.addEventListener('click', async e => {
   }
 });
 
+/* ---------------- Modbus TCP server (docs/modbus.md) ---------------- */
+views['system/mbserver'] = () => `<div class="grid">
+  <div class="card wide">${h3('server-network', L('Devices in the network', 'Zařízení v síti'))}
+    <p class="muted">${L('Offers the gateway\'s Modbus devices (RS485, Modbus TCP, GoodWe UDP) to other Modbus TCP clients: on the shared port by unit id, or on an own port with any unit id. Values the gateway polls anyway are answered from its cache; other requests go to the device, at most the rate per second (the RS485 bus manages about 10-20 requests a second for everything). Writes only where switched on, optionally from the listed addresses only. At most 8 ports, 2 clients a port, 8 clients in all.',
+      'Nabídne zařízení Modbus brány (RS485, Modbus TCP, GoodWe UDP) dalším klientům Modbus TCP: na sdíleném portu podle unit id, nebo na vlastním portu s jakýmkoli unit id. Hodnoty, které brána beztak čte, odpoví z cache; ostatní dotazy jdou na zařízení, nejvýš zadaný počet za sekundu (sběrnice RS485 zvládne zhruba 10–20 dotazů za sekundu na všechno). Zápis jen kde je zapnutý, případně jen z uvedených adres. Nejvýš 8 portů, 2 klienti na port, 8 klientů celkem.')}</p>
+    <div class="row"><label><input type="checkbox" id="mv-enabled"> ${L('Shared port', 'Sdílený port')}</label>
+      <label class="field" style="margin:0"><span>${L('Port', 'Port')}</span><input type="number" id="mv-port" min="1" max="65535" style="width:100px" data-notr></label></div>
+    <div class="table-wrap" id="mv-list"><p class="muted">${L('Loading…', 'Načítám…')}</p></div>
+    <div class="row"><button class="btn" id="mv-add">${ic('plus')}${L('Add a device', 'Přidat zařízení')}</button><button class="btn primary" id="mv-save">${ic('content-save-outline')}${L('Save', 'Uložit')}</button></div></div>
+  <div class="card wide">${h3('lan-connect', L('State', 'Stav'))}<div class="table-wrap" id="mv-state"></div></div>
+</div>`;
+
+let mv = null, mvRows = [], mvDevs = [], mvTimer = null;
+async function loadMbServer(first) {
+  if (route() !== 'system/mbserver') { clearInterval(mvTimer); mvTimer = null; return; }
+  try {
+    mv = await api('/api/modbus/server');
+    if (first) mvDevs = (await api('/api/modbus')).devices;
+  } catch (e) { if ($('#mv-state')) $('#mv-state').textContent = e.message; return; }
+  if (!$('#mv-state')) return;
+  if (first) {
+    $('#mv-enabled').checked = mv.enabled;
+    $('#mv-port').value = mv.port;
+    mvRows = mv.devices.map(e => ({ ...e, allow: e.allow.join(', ') }));
+    renderMvList();
+  }
+  if (!mvTimer) mvTimer = setInterval(loadMbServer, 3000);
+  const name = id => (mvDevs.find(d => d.id === id) || {}).name || id;
+  const ports = mv.ports.map(p => `<tr><td data-notr>${p.port}</td><td>${p.device ? esc(name(p.device)) : L('shared, by unit id', 'sdílený, podle unit id')}</td>
+    <td>${p.ok ? pill('ok', L('open', 'otevřený')) : pill('err', esc(p.error))}</td>
+    <td class="hw-wrap" data-notr>${p.clients.map(c => `${esc(c.address)} (${c.requests})`).join(', ') || '—'}</td></tr>`).join('');
+  const off = id => (mvDevs.find(d => d.id === id) || {}).enabled === false;
+  const devs = mv.devices.map(e => `<tr><td>${esc(e.name || e.device)}${e.missing ? ' ' + pill('err', L('device removed', 'zařízení odebráno'))
+    : off(e.device) ? ' ' + pill('warn', L('off in RS485', 'vypnuté v RS485')) : ''}</td>
+    <td data-notr>${e.requests}</td><td data-notr>${e.cached}</td><td data-notr>${e.passed}</td><td data-notr>${e.refused}</td><td data-notr>${e.failed}</td></tr>`).join('');
+  $('#mv-state').innerHTML = !mv.devices.length ? `<p class="muted">${L('No device offered.', 'Žádné zařízení není nabídnuté.')}</p>`
+    : `<table class="hw-stack"><tr>${['Port', L('Device', 'Zařízení'), L('State', 'Stav'), L('Clients (requests)', 'Klienti (dotazy)')].map(x => `<th>${x}</th>`).join('')}</tr>${ports}</table>
+      <table class="hw-stack" style="margin-top:12px"><tr>${[L('Device', 'Zařízení'), L('Requests', 'Dotazy'), L('From the cache', 'Z cache'), L('To the device', 'Na zařízení'),
+        L('Refused', 'Odmítnuto'), L('Failed', 'Selhalo')].map(x => `<th>${x}</th>`).join('')}</tr>${devs}</table>
+      <p class="muted">${L('Refused: over the rate (exception 6), a write not allowed (1) or an invalid request. Failed: the device did not answer.', 'Odmítnuto: nad limit (výjimka 6), nepovolený zápis (1) nebo neplatný dotaz. Selhalo: zařízení neodpovědělo.')}
+        ${mv.turned_away ? L(` Clients turned away (port full): ${mv.turned_away}.`, ` Odmítnutí klienti (port plný): ${mv.turned_away}.`) : ''}</p>`;
+}
+function renderMvList() {
+  const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  const opts = cur => mvDevs.map(d => `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${esc(d.name)} (${d.transport === 'rtu' ? 'RS485' : d.transport.toUpperCase()})</option>`).join('');
+  $('#mv-list').innerHTML = !mvRows.length ? `<p class="muted">${mvDevs.length ? L('No device offered yet.', 'Zatím žádné nabídnuté zařízení.') : L('Add a Modbus device first: System › RS485.', 'Nejdřív přidejte zařízení Modbus: Systém › RS485.')}</p>`
+    : `<table class="hw-stack"><tr>${[L('Device', 'Zařízení'), L('Unit id on the shared port', 'Unit id na sdíleném portu'), L('Own port', 'Vlastní port'), L('Requests / s', 'Dotazů / s'),
+      L('Writes', 'Zápis'), L('Writes only from', 'Zápis jen z'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${mvRows.map((e, i) => `<tr>
+      <td><select data-mv="${i}" data-k="device" ${ro}>${opts(e.device)}</select></td>
+      <td><input type="number" min="0" max="247" value="${e.unit}" data-mv="${i}" data-k="unit" style="width:80px" title="${L('0: not on the shared port', '0: ne na sdíleném portu')}" ${ro} data-notr></td>
+      <td><input type="number" min="0" max="65535" value="${e.port}" data-mv="${i}" data-k="port" style="width:90px" title="${L('0: none', '0: žádný')}" ${ro} data-notr></td>
+      <td><input type="number" min="1" max="${mv.limits.rate}" value="${e.rate}" data-mv="${i}" data-k="rate" style="width:70px" ${ro} data-notr></td>
+      <td><input type="checkbox" data-mv="${i}" data-k="write" ${e.write ? 'checked' : ''} ${ro}></td>
+      <td><input type="text" value="${esc(e.allow)}" data-mv="${i}" data-k="allow" placeholder="${L('anyone', 'kdokoli')}" style="width:150px" ${ro} data-notr></td>
+      <td><button class="btn" data-mv-del="${i}" ${ro}>${ic('delete-outline')}</button></td></tr>`).join('')}</table>`;
+  $('#mv-add').disabled = !!ro || !mvDevs.length || mvRows.length >= mv.limits.devices;
+  $('#mv-save').disabled = !!ro;
+}
+document.addEventListener('input', e => {
+  const t = e.target.closest('[data-mv]');
+  if (!t) return;
+  const r = mvRows[+t.dataset.mv], k = t.dataset.k;
+  r[k] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value;
+});
+document.addEventListener('click', async e => {
+  const t = e.target.closest('#mv-add, #mv-save, [data-mv-del]');
+  if (!t) return;
+  if (t.id === 'mv-add') {
+    const free = mvDevs.find(d => !mvRows.some(r => r.device === d.id)) || mvDevs[0];
+    const units = mvRows.map(r => r.unit);
+    let unit = free.transport === 'rtu' && !units.includes(free.slave) ? free.slave : 1;
+    while (units.includes(unit)) unit++;
+    mvRows.push({ device: free.id, unit, port: 0, rate: 5, write: false, allow: '' });
+    renderMvList();
+  } else if (t.dataset.mvDel) {
+    mvRows.splice(+t.dataset.mvDel, 1);
+    renderMvList();
+  } else {
+    try {
+      const devices = mvRows.map(r => ({ device: r.device, unit: +r.unit, port: +r.port, rate: +r.rate, write: !!r.write, allow: r.allow.split(/[\s,;]+/).filter(Boolean) }));
+      await api('/api/modbus/server', { method: 'PUT', json: { enabled: $('#mv-enabled').checked, port: +$('#mv-port').value, devices } });
+      toast(L('Saved', 'Uloženo'));
+      loadMbServer(true);
+    } catch (err) {
+      toast(L('Error: ', 'Chyba: ') + err.message);
+    }
+  }
+});
+
 /* ---------------- GPIO of header JP1 (docs/gpio.md) ---------------- */
 views['system/gpio'] = () => `<div class="grid">
   <div class="card wide">${h3('chip', L('Header JP1', 'Konektor JP1'))}
@@ -6166,6 +6257,7 @@ function render(full) {
     if (route() === 'system/hw') loadHw();
     if (route() === 'system/rs485') loadModbus();
     if (route() === 'system/mbscan') loadMbScan(true);
+    if (route() === 'system/mbserver') loadMbServer(true);
     if (route() === 'system/gpio') loadGpio(true);
     if (route() === 'esphome') loadEsphomeWifi();
     if (route().startsWith('system/users/')) loadUsersPage();

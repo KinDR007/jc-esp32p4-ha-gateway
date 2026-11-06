@@ -10,6 +10,7 @@ Addresses no entity covers answer exception 2 (like a strict device), unless --l
   sim_tcp.py --udp [--port 8899] [--split] goodwe_xs:127   a GoodWe Wi-Fi module: Modbus RTU frames over UDP,
                                           answers with AA 55 (--split: long ones in two datagrams); discovery on 48899
   sim_tcp.py --expect eastron_sdm630      print the values the gateway must show, as JSON
+  --log-reads                             also log every read (tests of the gateway's register cache)
 
 The value of an entity: a number derived from its key (stable), within the range its type can hold;
 bool entities alternate; map entities take their first option."""
@@ -134,6 +135,7 @@ class Unit:
 
 
 UNITS = {}
+LOG_READS = False
 SPACES = {1: 'coil', 2: 'discrete', 3: 'holding', 4: 'input'}
 
 
@@ -171,6 +173,8 @@ class Handler(socketserver.BaseRequestHandler):
         exc = lambda code: bytes([fc | 0x80, code])
         if fc in SPACES:
             addr, count = struct.unpack('>HH', pdu[1:5])
+            if LOG_READS:
+                print(f'read unit {u.t["id"]} {SPACES[fc]} 0x{addr:04x} {count}', flush=True)
             regs = u.read(SPACES[fc], addr, count)
             if regs is None:
                 return exc(2)
@@ -244,11 +248,14 @@ def main():
     p.add_argument('--udp', action='store_true', help='GoodWe Modbus RTU over UDP (AA 55 answers)')
     p.add_argument('--split', action='store_true', help='--udp: answers over 32 bytes in two datagrams')
     p.add_argument('--expect', metavar='TEMPLATE')
+    p.add_argument('--log-reads', action='store_true', help='log every read')
     p.add_argument('units', nargs='*', metavar='TEMPLATE:UNIT')
     a = p.parse_args()
     if a.expect:
         print(json.dumps(Unit(a.expect, True).expect, ensure_ascii=False))
         return 0
+    global LOG_READS
+    LOG_READS = a.log_reads
     for spec in a.units:
         tid, unit = spec.rsplit(':', 1)
         UNITS[int(unit)] = Unit(tid, not a.lenient)
