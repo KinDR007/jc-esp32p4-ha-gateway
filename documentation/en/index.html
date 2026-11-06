@@ -225,12 +225,12 @@
        <li>A GoodWe Wi-Fi module (XS, MS, D-NS) answers only on UDP 8899: keep <i>GoodWe dongles on UDP 8899</i> checked, it is added on connection GoodWe UDP with unit 127.</li></ol></div>
 <details><summary>Whole page (1)</summary><div class="fulls"><figure><a href="../screenshots/system_mbscan.jpg" class="zoom"><img class="shot full" src="../screenshots/system_mbscan.jpg" alt="System › Modbus TCP search" width="1440" height="900" loading="lazy"></a><figcaption>Whole page</figcaption></figure></div></details>
 </section><section class="card wide" id="system-mbserver"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M13,19H14A1,1 0 0,1 15,20H22V22H15A1,1 0 0,1 14,23H10A1,1 0 0,1 9,22H2V20H9A1,1 0 0,1 10,19H11V17H4A1,1 0 0,1 3,16V12A1,1 0 0,1 4,11H20A1,1 0 0,1 21,12V16A1,1 0 0,1 20,17H13V19M4,3H20A1,1 0 0,1 21,4V8A1,1 0 0,1 20,9H4A1,1 0 0,1 3,8V4A1,1 0 0,1 4,3M9,7H10V5H9V7M9,15H10V13H9V15M5,5V7H7V5H5M5,13V15H7V13H5Z"/></svg><span>System › Modbus TCP server</span></h3><p>Offers the gateway's Modbus devices to other Modbus TCP clients in the network (Victron, SCADA, a PLC, a vendor app).</p>
-<div class="item"><div class="item-text"><h4>Devices in the network</h4><p>The shared port (default 502) and the devices offered: unit id there (0: not there), own port (any unit id reaches the device; for clients fixed to unit 1 or 255), requests per second to the device, writes and the addresses allowed to write (empty: anyone in the network).</p></div><div class="item-pic"><a href="../screenshots/system_mbserver__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_mbserver__1.jpg" alt="DEVICES IN THE NETWORK" width="1156" height="353" loading="lazy"></a></div></div>
-<div class="item"><div class="item-text"><h4>State</h4><p>Every port with its clients, and per device the requests answered from the cache, sent to the device, refused (over the rate: exception 6, a write not allowed: 1) and failed (no answer: 11).</p></div><div class="item-pic"><a href="../screenshots/system_mbserver__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_mbserver__2.jpg" alt="STATE" width="1156" height="329" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>Devices in the network</h4><p>The shared port (default 502) and the devices offered: unit id there (0: not there), own port (any unit id reaches the device; for clients fixed to unit 1 or 255), requests per second to the device, cache time (how long an answer to a client serves the next ones; 0: every read to the device), writes and the addresses allowed to write (empty: anyone in the network).</p></div><div class="item-pic"><a href="../screenshots/system_mbserver__1.jpg" class="zoom"><img class="shot" src="../screenshots/system_mbserver__1.jpg" alt="DEVICES IN THE NETWORK" width="1156" height="373" loading="lazy"></a></div></div>
+<div class="item"><div class="item-text"><h4>State</h4><p>Every port with its clients, and per device the requests answered from the cache, sent to the device, refused (over the rate: exception 6, a write not allowed: 1) and failed (no answer: 11).</p></div><div class="item-pic"><a href="../screenshots/system_mbserver__2.jpg" class="zoom"><img class="shot" src="../screenshots/system_mbserver__2.jpg" alt="STATE" width="1156" height="328" loading="lazy"></a></div></div>
 <div class="howto"><h4><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 10H3V12H14V10M14 6H3V8H14V6M3 16H10V14H3V16M21.5 11.5L23 13L16 20L11.5 15.5L13 14L16 17L21.5 11.5Z"/></svg>How to</h4><ol><li>Add the device under System › RS485 first (RS485, Modbus TCP or GoodWe UDP).</li>
        <li><b>Add a device</b>, choose it, give it a unit id on the shared port and/or an own port, <b>Save</b>.</li>
        <li>Point the client to the gateway's address, port 502 with that unit id (or the own port).</li>
-       <li>Values the gateway reads anyway come from its cache within the read interval and do not load the device; other registers go to the device, at most the set rate. The RS485 bus manages about 10-20 requests a second for everything (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server">modbus.md</a>).</li>
+       <li>Values the gateway reads anyway come from its cache within the read interval, answers to clients for the cache time; the same read of two clients goes to the device once. Other registers go to the device, at most the set rate. The RS485 bus manages about 10-20 requests a second for everything (<a href="https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server">modbus.md</a>).</li>
        <li>Modbus TCP has no sign-in: switch writes on only where needed and list the client's address.</li></ol></div>
 <details><summary>Whole page (1)</summary><div class="fulls"><figure><a href="../screenshots/system_mbserver.jpg" class="zoom"><img class="shot full" src="../screenshots/system_mbserver.jpg" alt="System › Modbus TCP server" width="1440" height="900" loading="lazy"></a><figcaption>Whole page</figcaption></figure></div></details>
 </section><section class="card wide" id="system-firmware-online"><h3><svg class="mdi" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 20Q4.22 20 2.61 18.43 1 16.85 1 14.58 1 12.63 2.17 11.1 3.35 9.57 5.25 9.15 5.68 7.35 7.38 5.73 9.07 4.1 11 4.1 11.83 4.1 12.41 4.69 13 5.28 13 6.1V12.15L14.6 10.6L16 12L12 16L8 12L9.4 10.6L11 12.15V6.1Q9.1 6.45 8.05 7.94 7 9.43 7 11H6.5Q5.05 11 4.03 12.03 3 13.05 3 14.5 3 15.95 4.03 17 5.05 18 6.5 18H18.5Q19.55 18 20.27 17.27 21 16.55 21 15.5 21 14.45 20.27 13.73 19.55 13 18.5 13H17V11Q17 9.8 16.45 8.76 15.9 7.73 15 7V4.68Q16.85 5.55 17.93 7.26 19 9 19 11 20.73 11.2 21.86 12.5 23 13.78 23 15.5 23 17.38 21.69 18.69 20.38 20 18.5 20M12 11.05Z"/></svg><span>System › Firmware › Online update</span></h3><p>Updates from the manifest (by default the latest GitHub release), older releases (rollback).</p>
@@ -733,7 +733,8 @@ advanced:
       &quot;port&quot;: 1502,
       &quot;write&quot;: false,
       &quot;allow&quot;: [],
-      &quot;rate&quot;: 5
+      &quot;rate&quot;: 5,
+      &quot;cache_ms&quot;: 2000
     },
     {
       &quot;device&quot;: &quot;d2&quot;,
@@ -743,7 +744,8 @@ advanced:
       &quot;allow&quot;: [
         &quot;192.168.88.20&quot;
       ],
-      &quot;rate&quot;: 2
+      &quot;rate&quot;: 2,
+      &quot;cache_ms&quot;: 2000
     }
   ]
 }</pre></details></td><td>system/rs485 · edit</td></tr>

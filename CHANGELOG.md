@@ -5,11 +5,13 @@
 - Modbus TCP server, System › Modbus TCP server (`GET`/`PUT /api/modbus/server`): the gateway's Modbus
   devices (RS485, Modbus TCP, GoodWe UDP) for other Modbus TCP clients in the network. The shared port
   502 routes by unit id, a device may also get its own port (any unit id). Reads of polled registers come
-  from a cache of the blocks read, others go to the device at most `rate` per second (else exception 6);
+  from a cache of the blocks read, and for `cache_ms` (1500-5000 ms, default 2000; 0 off) so do answers to
+  clients; a write drops what it touches; the same read of two clients goes to the device once. Requests
+  wait between the blocks of a poll, not for the whole poll; at most `rate` per second (else exception 6);
   writes only where switched on, optionally only from listed addresses. Up to 8 ports, 2 clients per port,
   8 in all. lwIP limits raised: 40 sockets, 32 active and 24 listening TCP connections.
 - Tests: TC55, UI37, unit tests of the server's request decoding; `tools/modbus/server_load.py` (load
-  test, results in docs/modbus.md); the simulator logs reads with `--log-reads`.
+  test, results in docs/modbus.md); the simulator logs reads with `--log-reads`, `--delay` plays a slow device.
 
 ## v1.13 (2026-11-06)
 

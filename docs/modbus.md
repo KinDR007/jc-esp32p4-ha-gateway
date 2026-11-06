@@ -91,12 +91,17 @@ clients other than Home Assistant (Victron GX, SCADA, a PLC, a vendor app). Sinc
 - **Ports**: the shared port (default 502, can be switched off) routes by unit id, one unit id per
   device; an unknown unit id gets exception 10. A device may also have its own port where any unit id
   reaches it (clients fixed to unit 1 or 255). Not 80, 8081 or the Zigbee port.
-- **Data**: reads of registers the gateway polls anyway come from a cache of the raw blocks read
-  (PSRAM, one block per template entity at most, fresh for the poll interval + 2 s; a request may span
-  several blocks). Everything else goes to the device through the Modbus task, which owns the RS485 bus
-  and runs one such request between two polls; at most `rate` per second per device (1-50, default 5),
-  else exception 6. A device off or offline answers exception 10 or 11 at once, without the bus; during
-  an RS485 search RTU devices answer 6.
+- **Cache** (PSRAM, only the blocks actually read): registers the gateway polls anyway are fresh for the
+  poll interval + 2 s; answers to clients (16 per device, an exception 2 too) serve the next clients for
+  `cache_ms` (1500-5000 ms, default 2000). A request may span several blocks. A write (from a client, the
+  API, MQTT or Home Assistant) drops every cached block it touches. `cache_ms` 0 turns the cache off for
+  the device (registers that change when read: alarms cleared, event queues): every read goes to it.
+- **Queue**: everything else goes to the device through the Modbus task, which owns the RS485 bus. It
+  takes the waiting requests in order between two polls and between the blocks of a poll, so a client
+  waits for one transaction at most, not for a whole poll (measured: 0.5 s instead of 1.6 s with blocks of
+  300 ms). Two clients reading the same while it is on its way cost one transaction. At most `rate`
+  requests per second per device go to it (1-50, default 5), else exception 6. A device off or offline
+  answers exception 10 or 11 at once, without the bus; during an RS485 search RTU devices answer 6.
 - **Writes** (functions 5, 6, 15, 16) only with `write`, and when `allow` lists addresses (up to 4),
   only from them; else exception 1. Modbus TCP has no sign-in.
 - **Limits**: 16 devices, 8 ports (the shared one counts), 2 clients per port, 8 clients in all (more
@@ -112,16 +117,18 @@ transactions per second for the gateway's own polling, writes and every TCP clie
 task serves every socket with `select()`; frames are at most 260 bytes.
 
 Measured 2026-11-06 with `tools/modbus/server_load.py` (8 clients on 502 and three own ports, three
-SDM630 on the Modbus TCP simulator, poll 3 s, rate 50, role Thread border router):
+SDM630 on the Modbus TCP simulator, poll 3 s, rate 50, cache 2000 ms, role Thread border router; every
+read meant for the device asks another address, so the cache of answers does not catch it):
 
 | Load | Answers/s | Cache p50 / p95 | Device p50 / p95 | `/api/status` p50 / max | Internal heap |
 |---|---|---|---|---|---|
 | idle (no client) | - | - | - | 62 / 142 ms | - |
-| 8 clients, a request every 0.5 s each | 16 | 1.3 / 3.8 ms | 8 / 25 ms | 32 / 138 ms | -6 kB |
-| 8 clients as fast as answered | 1020 | 3.2 / 8.2 ms | 8 / 27 ms (52/s per device, the rest exception 6) | 179 / 310 ms | -6.5 kB |
+| 8 clients, a request every 0.5 s each | 16 | 1.6 / 4.4 ms | 8 / 11 ms | 32 / 135 ms | -4 kB |
+| 8 clients as fast as answered (two runs) | 1160-1220 | 1.3 / 2.7 ms | 24 / 60 ms (about 65/s per device, the rest exception 6) | 141 / 236-1400 ms | -10 kB |
 
-No restart, the role and the device polling (every 3 s) went on in both runs. A device on RS485 is
-slower than the simulator: its requests take the bus times above.
+No restart, the role and the device polling (every 3 s) went on in every run; at full load one sample of
+`/api/status` took 1.4 s in one of the two runs and 4 of 11 500 device reads timed out (exception 11).
+A device on RS485 is slower than the simulator: its requests take the bus times above.
 
 ## Home Assistant
 
@@ -267,7 +274,10 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   GoodWe on UDP: invalid settings refused, routing by unit id on 502 and any unit id on an own port,
   polled registers from the cache with no read reaching the device, other reads passed through (the
   device's exception too), the rate refusing with 6, writes refused and allowed per address, a third
-  client turned away, the GoodWe answering as Modbus TCP. UI37: the page. The unit test checks the
+  client turned away, the GoodWe answering as Modbus TCP; with a second simulator answering after 300 ms
+  (`--delay`): answers to clients and an exception kept for the cache time, a write dropping them, one
+  device read for two clients reading the same, a client waiting one transaction during a poll,
+  `cache_ms` 0. UI37: the page. The unit test checks the
   request decoding and answers of the server and the cache's block extraction.
   `tools/modbus/server_load.py`: the load test above.
 - Integration tests (`tests/ha_integration`), UI32.
