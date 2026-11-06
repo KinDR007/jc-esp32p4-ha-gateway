@@ -739,5 +739,18 @@
     "file": "system_gpio__3"
    }
   ]
+ },
+ "system/mbserver": {
+  "page": "system_mbserver",
+  "cards": [
+   {
+    "title": "DEVICES IN THE NETWORK",
+    "file": "system_mbserver__1"
+   },
+   {
+    "title": "STATE",
+    "file": "system_mbserver__2"
+   }
+  ]
  }
 }

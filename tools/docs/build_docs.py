@@ -433,6 +433,24 @@ PAGES = [
        <li>U rozpoznaného zařízení stiskněte <b>Přidat</b>; objeví se v Systém › RS485 › Zařízení. Neznámé zařízení: <b>RS485</b> a zvolte nebo napište šablonu.</li>
        <li>Modul Wi-Fi GoodWe (XS, MS, D-NS) odpovídá jen na UDP 8899: nechte zaškrtnuté <i>Moduly GoodWe na UDP 8899</i>, přidá se s připojením GoodWe UDP a jednotkou 127.</li></ol>"""),
      ["system_mbscan"]),
+    ("system/mbserver", "server-network", T("System › Modbus TCP server", "Systém › Server Modbus TCP"),
+     T("Offers the gateway's Modbus devices to other Modbus TCP clients in the network (Victron, SCADA, a PLC, a vendor app).",
+       "Nabídne zařízení Modbus brány dalším klientům Modbus TCP v síti (Victron, SCADA, PLC, aplikace výrobce)."),
+     {"DEVICES IN THE NETWORK": T("The shared port (default 502) and the devices offered: unit id there (0: not there), own port (any unit id reaches the device; for clients fixed to unit 1 or 255), requests per second to the device, writes and the addresses allowed to write (empty: anyone in the network).",
+                                  "Sdílený port (výchozí 502) a nabídnutá zařízení: unit id na něm (0: tam ne), vlastní port (zařízení dosáhne jakékoli unit id; pro klienty pevně na jednotce 1 nebo 255), dotazů za sekundu na zařízení, zápis a adresy, které smějí zapisovat (prázdné: kdokoli v síti)."),
+      "STATE": T("Every port with its clients, and per device the requests answered from the cache, sent to the device, refused (over the rate: exception 6, a write not allowed: 1) and failed (no answer: 11).",
+                 "Každý port s klienty a po zařízeních dotazy zodpovězené z cache, poslané na zařízení, odmítnuté (nad limit: výjimka 6, nepovolený zápis: 1) a neúspěšné (bez odpovědi: 11).")},
+     T("""<ol><li>Add the device under System › RS485 first (RS485, Modbus TCP or GoodWe UDP).</li>
+       <li><b>Add a device</b>, choose it, give it a unit id on the shared port and/or an own port, <b>Save</b>.</li>
+       <li>Point the client to the gateway's address, port 502 with that unit id (or the own port).</li>
+       <li>Values the gateway reads anyway come from its cache within the read interval and do not load the device; other registers go to the device, at most the set rate. The RS485 bus manages about 10-20 requests a second for everything (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server\">modbus.md</a>).</li>
+       <li>Modbus TCP has no sign-in: switch writes on only where needed and list the client's address.</li></ol>""",
+       """<ol><li>Nejdřív přidejte zařízení v Systém › RS485 (RS485, Modbus TCP nebo GoodWe UDP).</li>
+       <li><b>Přidat zařízení</b>, zvolte ho, dejte mu unit id na sdíleném portu a/nebo vlastní port, <b>Uložit</b>.</li>
+       <li>V klientovi zadejte adresu brány, port 502 s tím unit id (nebo vlastní port).</li>
+       <li>Hodnoty, které brána beztak čte, jdou z cache v rámci intervalu čtení a zařízení nezatěžují; ostatní registry jdou na zařízení, nejvýš v nastaveném limitu. Sběrnice RS485 zvládne zhruba 10–20 dotazů za sekundu na všechno (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server\">modbus.md</a>).</li>
+       <li>Modbus TCP nemá přihlášení: zápis zapněte jen kde je potřeba a uveďte adresu klienta.</li></ol>"""),
+     ["system_mbserver"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
      {"ONLINE UPDATE": T("Installed and offered version of the gateway firmware and of the <b>C6 package</b> with their state and <b>Install</b>; <b>Check</b> reads the manifest now. <i>Firmwares in the C6 package</i> lists every C6 firmware installed and offered.",

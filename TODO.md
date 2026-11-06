@@ -190,13 +190,14 @@ Rozhodnutí: RTU na J4 (MAX485, TX GPIO26, RX GPIO27, UART3, automatický směr)
 - [x] M12 GoodWe GW3000-XS: nalezen 2026-11-04 9:00 z Macu přes VPN na 192.168.1.170 (modul Solar-WiFi…, MAC 34:EA:E7:xx:xx:xx), Modbus jen UDP 8899 (AA 55), unit 0x7F; TCP zavřené. Přidán přenos `udp` (GoodWe AA55) do komponenty modbus, šablona goodwe_xs, hledání v síti ho přidá jedním klikem; TC50, UI34 se simulátorem
 - [ ] M13 GW3000-XS ze skutečné brány: 2026-11-04 přes `tools/modbus/udp_relay.py` na Macu (VPN) čte brána všech 17 hodnot jako zařízení d4 (expose none, host = Mac:18899, dočasné). Trvale: trasa z 192.168.88.x do 192.168.1.0/24 na routeru, pak d4 přepnout na 192.168.1.170:8899 a expose integration; porovnat s aplikací SEMS
 
-## Modbus TCP server (zadání 2026-11-06, plán [docs/modbus.md](docs/modbus.md#modbus-tcp-server-plan-2026-11-06))
+## Modbus TCP server (zadání 2026-11-06, [docs/modbus.md](docs/modbus.md#modbus-tcp-server))
 Rozhodnutí: sdílený port 502 se směrováním podle unit id + volitelně vlastní port s přemapováním unit id; registry dotazované bránou z cache, ostatní průchodem s limitem na port; zápis volbou u serveru (výchozí jen čtení) a seznam povolených IP; zdroje RS485, GoodWe UDP i Modbus TCP zařízení; strop 8 serverů, 2 klienti na server, 8 celkem; lwIP sockety 24 → 40.
-- [ ] S1 Limity lwIP, task serveru, port 502 se směrováním podle unit id, průchod čtení
-- [ ] S2 Cache registrů dotazovaných bloků, limit dotazů na port, vlastní porty s přemapováním unit id
-- [ ] S3 Zápis u serveru, povolené IP, zdroje GoodWe UDP a Modbus TCP
-- [ ] S4 UI Systém › RS485 › Modbus TCP server, API, dokumentace
-- [ ] S5 Zátěžový test: 8 klientů, role a web UI dál reagují
+- [x] S1 Limity lwIP, task serveru, port 502 se směrováním podle unit id, průchod čtení
+- [x] S2 Cache registrů dotazovaných bloků, limit dotazů na port, vlastní porty s přemapováním unit id
+- [x] S3 Zápis u serveru, povolené IP, zdroje GoodWe UDP a Modbus TCP
+- [x] S4 UI Systém › RS485 › Modbus TCP server, API, dokumentace
+- [x] S5 Zátěžový test: 8 klientů, role a web UI dál reagují (výsledky v docs/modbus.md); TC55, UI37
+- [ ] Server Modbus TCP se skutečným zařízením na RS485 (časování sběrnice s klientem v síti)
 
 ## Čas a NTP (zadání 2026-11-05)
 - [x] Systém › LAN › Čas (`/api/time`): až 3 servery SNTP, časové pásmo brány (seznam IANA nebo pravidlo POSIX), platí hned; pásmo pro celou bránu (časy v UI a logu, tiché hodiny Telegramu, noční záloha Zigbee 03:00–04:00 místního času); pásmo přesunuto z Telegramu (stejný klíč `tz`); TC51, UI35

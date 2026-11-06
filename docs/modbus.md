@@ -82,46 +82,46 @@ does not answer at night. Through `tools/modbus/udp_relay.py` on that computer t
 234.9 V 2.4 A, energy total 15145.4 kWh, serial, model); the total input power register (30137) reads
 0xFFFF on the XS and is left out of the template.
 
-## Modbus TCP server (plan, 2026-11-06)
+## Modbus TCP server
 
-Devices the gateway already talks to (RS485 RTU, GoodWe UDP, Modbus TCP) offered again as Modbus TCP
-servers in the network, for clients other than Home Assistant (Victron GX, SCADA, PLC, vendor apps).
-Not implemented yet; decisions of 2026-11-06:
+System › Modbus TCP server (`GET`/`PUT /api/modbus/server`, [api.md](api.md)) offers the devices the
+gateway already talks to (RS485 RTU, Modbus TCP, GoodWe UDP) as Modbus TCP servers in the network, for
+clients other than Home Assistant (Victron GX, SCADA, a PLC, a vendor app). Since v1.14.
 
-- **Ports**: a shared port 502 routes by unit id (one unit id per exposed device); a device may also get
-  its own port with the unit id remapped (for clients fixed to unit 1 or 255).
-- **Data**: registers the gateway polls anyway are answered from a register cache (no bus load, at most
-  one poll interval old); other requests pass through to the device, limited per port (requests per
-  second). Writes always pass through.
-- **Writes** (FC 5, 6, 15, 16): off by default, switched on per server; optional list of allowed client
-  addresses (else anyone in the LAN).
-- **Devices**: RS485 RTU, GoodWe UDP (becomes plain Modbus TCP), Modbus TCP devices (the gateway is the
-  device's only client and shares it, e.g. Huawei SUN2000 with its connection limit).
-- **UI**: System › RS485 › Modbus TCP server (permission `system/rs485`), a list of servers: device,
-  port, unit id, writes, allowed addresses; live clients, requests, cache hits, refusals.
+- **Ports**: the shared port (default 502, can be switched off) routes by unit id, one unit id per
+  device; an unknown unit id gets exception 10. A device may also have its own port where any unit id
+  reaches it (clients fixed to unit 1 or 255). Not 80, 8081 or the Zigbee port.
+- **Data**: reads of registers the gateway polls anyway come from a cache of the raw blocks read
+  (PSRAM, one block per template entity at most, fresh for the poll interval + 2 s; a request may span
+  several blocks). Everything else goes to the device through the Modbus task, which owns the RS485 bus
+  and runs one such request between two polls; at most `rate` per second per device (1-50, default 5),
+  else exception 6. A device off or offline answers exception 10 or 11 at once, without the bus; during
+  an RS485 search RTU devices answer 6.
+- **Writes** (functions 5, 6, 15, 16) only with `write`, and when `allow` lists addresses (up to 4),
+  only from them; else exception 1. Modbus TCP has no sign-in.
+- **Limits**: 16 devices, 8 ports (the shared one counts), 2 clients per port, 8 clients in all (more
+  are closed at once and counted as `turned_away`), one request at a time per client, idle clients
+  closed after 120 s. lwIP: 40 sockets, 32 active and 24 listening TCP connections (were 24/16/16).
+- **State**: per port its clients, per device the requests answered from the cache, sent to the
+  device, refused and failed.
 
-### Limits
+The RS485 bus is the bottleneck, not the P4: reading 10 registers at 9600 Bd is about 35 ms on the wire
+plus gaps and the device's answer time (20-100 ms for meters), 60-120 ms in all, so roughly 8-15
+transactions per second for the gateway's own polling, writes and every TCP client together (15-25 at
+19200 Bd); a silent device holds the bus for its timeout. Hence the cache and the per-device rate. One
+task serves every socket with `select()`; frames are at most 260 bytes.
 
-The RS485 bus is the bottleneck, not the P4. All RTU devices share one half-duplex line served one
-request at a time: reading 10 registers at 9600 Bd is about 35 ms on the wire plus gaps and the device's
-answer time (20-100 ms for meters), 60-120 ms in all, so roughly 8-15 transactions per second for the
-gateway's own polling, writes and every TCP client together (15-25 at 19200 Bd); a silent device holds
-the bus for its timeout. More ports do not add bus capacity, hence the cache and the per-port limit.
+Measured 2026-11-06 with `tools/modbus/server_load.py` (8 clients on 502 and three own ports, three
+SDM630 on the Modbus TCP simulator, poll 3 s, rate 50, role Thread border router):
 
-On the P4 side one task serves every listening and client socket with `select()` (as the UART bridge),
-frames are at most 260 bytes, CPU load is negligible. The limit is lwIP: 24 sockets today, of which the
-web server takes about 10, MQTT and Telegram 2, the OTBR 3-4, the Zigbee and UART bridges 2 each and
-every network Modbus device 1. Plan: lwIP sockets 24 -> 40, active TCP 16 -> 32, listening 16 -> 24
-(allocated on use, a few kB); at most **8 servers** (port 502 counts as one), **2 clients per server**,
-**8 clients in all**: up to 16 sockets and about 20 kB internal RAM in the worst case.
+| Load | Answers/s | Cache p50 / p95 | Device p50 / p95 | `/api/status` p50 / max | Internal heap |
+|---|---|---|---|---|---|
+| idle (no client) | - | - | - | 62 / 142 ms | - |
+| 8 clients, a request every 0.5 s each | 16 | 1.3 / 3.8 ms | 8 / 25 ms | 32 / 138 ms | -6 kB |
+| 8 clients as fast as answered | 1020 | 3.2 / 8.2 ms | 8 / 27 ms (52/s per device, the rest exception 6) | 179 / 310 ms | -6.5 kB |
 
-| Phase | Content | Done when |
-|---|---|---|
-| S1 | lwIP limits, server task, shared port 502 with unit id routing, pass-through reads | TC with a TCP client against the RTU simulator |
-| S2 | register cache of the polled blocks, per-port rate limit, own ports with unit remap | TC: cache hits without bus traffic, limit refuses (exception 6, busy) |
-| S3 | writes per server, allowed addresses, GoodWe UDP and Modbus TCP devices as sources | TC: write refused / passed, UDP source answers as TCP |
-| S4 | UI page, API, docs (user docs with screenshots) | UI test |
-| S5 | load test: 8 clients polling, gateway roles and the web UI stay responsive (heap, latency) | measured report |
+No restart, the role and the device polling (every 3 s) went on in both runs. A device on RS485 is
+slower than the simulator: its requests take the bus times above.
 
 ## Home Assistant
 
@@ -263,6 +263,13 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   manual request reads the serial number, an absent unit times out, invalid devices are refused, a device
   on `udp` with `goodwe_xs` reads every value. UI34: the search page adds it in one click. The unit test
   checks the AA 55 framing against the request bytes of the goodwe library (`7F 03 75 31 00 28 04 09`).
+- TC55: the Modbus TCP server against the simulator (`--log-reads`) playing an SDM630 on Modbus TCP and a
+  GoodWe on UDP: invalid settings refused, routing by unit id on 502 and any unit id on an own port,
+  polled registers from the cache with no read reaching the device, other reads passed through (the
+  device's exception too), the rate refusing with 6, writes refused and allowed per address, a third
+  client turned away, the GoodWe answering as Modbus TCP. UI37: the page. The unit test checks the
+  request decoding and answers of the server and the cache's block extraction.
+  `tools/modbus/server_load.py`: the load test above.
 - Integration tests (`tests/ha_integration`), UI32.
 - **Not yet tested on a real RS485 device**: the RS485 path ran only without a device (timeouts);
   real meters will confirm the serial timing and the maps marked "community" above.

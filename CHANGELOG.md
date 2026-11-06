@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Modbus TCP server, System › Modbus TCP server (`GET`/`PUT /api/modbus/server`): the gateway's Modbus
+  devices (RS485, Modbus TCP, GoodWe UDP) for other Modbus TCP clients in the network. The shared port
+  502 routes by unit id, a device may also get its own port (any unit id). Reads of polled registers come
+  from a cache of the blocks read, others go to the device at most `rate` per second (else exception 6);
+  writes only where switched on, optionally only from listed addresses. Up to 8 ports, 2 clients per port,
+  8 in all. lwIP limits raised: 40 sockets, 32 active and 24 listening TCP connections.
+- Tests: TC55, UI37, unit tests of the server's request decoding; `tools/modbus/server_load.py` (load
+  test, results in docs/modbus.md); the simulator logs reads with `--log-reads`.
+
 ## v1.13 (2026-11-06)
 
 Summary: free GPIO of header JP1 (input, output, PWM, counter, UART-TCP bridge, second I2C bus, 1-Wire DS18B20, WS2812) in the web UI and Home Assistant (integration 1.7.0, MQTT group `gpio`); SNTP servers and the gateway time zone for the whole gateway.
