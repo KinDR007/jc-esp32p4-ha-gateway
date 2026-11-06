@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.13 (2026-11-06)
+
+Summary: free GPIO of header JP1 (input, output, PWM, counter, UART-TCP bridge, second I2C bus, 1-Wire DS18B20, WS2812) in the web UI and Home Assistant (integration 1.7.0, MQTT group `gpio`); SNTP servers and the gateway time zone for the whole gateway.
+
 - Time settings, System › LAN › Time (`GET`/`POST /api/time`): up to three SNTP servers (default
   pool.ntp.org) and the gateway time zone (a listed IANA zone or a POSIX rule), applied at once. The zone
   holds for the whole gateway: the web UI shows times (header clock, log, backups, events) in it instead of

@@ -44,7 +44,8 @@ Inside the module only SDIO (P4 GPIO14–19) and the C6 reset (CHIP_PU = P4 GPIO
 SDIO is unused since the ESPHome role runs on the radio itself (v1.8). The radio roles need a UART,
 which exists only via header **JP1**, so three jumper wires are required for them and for flashing
 the C6. A second radio (XIAO ESP32-C5) also goes on JP1: wiring and power in
-[dual-radio.md](dual-radio.md#wiring-jp1--xiao-esp32-c5).
+[dual-radio.md](dual-radio.md#wiring-jp1--xiao-esp32-c5). The pins of JP1 no radio uses are free GPIO
+(System › GPIO (JP1)): [gpio.md](gpio.md).
 
 ### JP1 pinout (2×13, odd pins in one row, even in the other)
 

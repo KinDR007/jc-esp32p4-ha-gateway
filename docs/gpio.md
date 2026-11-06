@@ -1,10 +1,10 @@
 # GPIO on JP1
 
 Free pins of header JP1 configured and controlled from System › GPIO (JP1), the API and Home Assistant
-(device "P4 GPIO" through the integration or MQTT). Status: G1 and G2 done (pins, reservations, input,
-output, PWM, counter, API, web UI, Telegram `/gpio`), G3 (Home Assistant through the integration
-1.7.0 and MQTT) and G4 (UART-TCP bridge, second I2C bus, 1-Wire DS18B20, WS2812 strip); G5 (tests with a
-jumper on the pins) open.
+(device "<host> GPIO" through the integration or MQTT), since firmware v1.13 and integration 1.7.0.
+Status: G1-G4 done (pins, reservations, input, output, PWM, counter, API, web UI, Telegram `/gpio`,
+Home Assistant, UART-TCP bridge, second I2C bus, 1-Wire DS18B20, WS2812 strip); G5 (tests with a jumper on
+the pins) and checks with real 1-Wire, WS2812, UART and I2C devices open.
 
 ## Use
 
@@ -109,9 +109,9 @@ B, 3 RS485), one HP I2C port, LEDC (8 PWM channels), PCNT, RMT, SPI2/3.
   brightness, simple effects).
 - API `/api/gpio` (configuration, state, writes), changes pushed over the WebSocket. Permission
   `system/hw` (read 1, control and settings 2).
-- Web UI, System › Hardware: the 2×13 header drawn, pins coloured by state (power, reserved with lock
+- Web UI, System › GPIO (JP1): the 2×13 header drawn, pins coloured by state (power, reserved with lock
   and reason, free, configured), a pin opens its settings; live level, output switch, PWM slider.
-- Home Assistant, device "P4 GPIO" (via the gateway), per pin integration, MQTT, both or none: input
+- Home Assistant, device "<host> GPIO" (via the gateway), per pin integration, MQTT, both or none: input
   binary_sensor, output switch, PWM light (brightness) or number, counter sensor (total_increasing) and
   frequency, DS18B20 temperature sensors, WS2812 light with colour and effects; MQTT group `gpio` with
   command topics. Needs an integration release (1.7.0).
@@ -125,7 +125,7 @@ B, 3 RS485), one HP I2C port, LEDC (8 PWM channels), PCNT, RMT, SPI2/3.
 |---|---|---|
 | G1 | pin table and reservations, JP1 drawing read only, GPIO1 and GPIO45 checked on the board | UI shows the header with reasons; radio B role frees and takes its pins |
 | G2 | input, output, PWM, counter; API, UI control, NVS, state after restart | hw test without jumper, UI test |
-| G3 | P4 GPIO device in the integration and MQTT (group `gpio`) | HA tests, integration 1.7.0 |
+| G3 | <host> GPIO device in the integration and MQTT (group `gpio`) | HA tests, integration 1.7.0 |
 | G4 | UART-TCP bridge, I2C bus 2, 1-Wire DS18B20, WS2812 | each with its test |
 | G5 | hw tests with the jumper JP1 9-11 (output to input, PWM to counter, UART loop), docs | TC with measured levels and frequency |
 

@@ -18,7 +18,9 @@ At most one Thread network, one Zigbee network and one ESPHome proxy at a time. 
 roles: **sound recognition** with the onboard microphone,
 YAMNet on the P4 (521 AudioSet classes, about 60 ms per 0.96 s of audio, off by default) and
 sounds learned on the board (samples, tone or embedding profiles), see
-[docs/sound-detection.md](docs/sound-detection.md).
+[docs/sound-detection.md](docs/sound-detection.md). Further: I2C sensors, Modbus (RS485, TCP), the free
+**GPIO of header JP1** as inputs, outputs, PWM, counters, a UART-TCP bridge, a second I2C bus, 1-Wire
+thermometers or a WS2812 strip ([docs/gpio.md](docs/gpio.md)), all in Home Assistant.
 
 Status: all roles and transitions pass the automated hardware tests (10/10 regression, see
 [tests/results/2026-10-28/report.md](tests/results/2026-10-28/report.md)); the OTBR integration
@@ -41,7 +43,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 | [documentation/](https://kindr007.github.io/jc-esp32p4-ha-gateway/) | user documentation in Czech and English with screenshots of every page (HTML, [sources](documentation/)) |
 | [docs/modbus.md](docs/modbus.md) | Modbus on RS485 (J4), Modbus TCP and GoodWe UDP: templates, network search, Home Assistant |
 | [docs/sensors.md](docs/sensors.md) | I2C sensors on connector CN3 |
-| [docs/gpio.md](docs/gpio.md) | free GPIO of header JP1: plan (inputs, outputs, PWM, buses, Home Assistant) |
+| [docs/gpio.md](docs/gpio.md) | free GPIO of header JP1: input, output, PWM, counter, UART-TCP bridge, I2C bus 2, 1-Wire, WS2812, Home Assistant |
 | [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |
 | [docs/notifications.md](docs/notifications.md) | notifications, Home Assistant, Telegram bot and its commands |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
