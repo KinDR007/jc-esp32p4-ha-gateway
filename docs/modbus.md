@@ -226,10 +226,12 @@ checked by a second, independent research (sources below). "Not confirmed" items
 | `peacefair_pzem017` | Peacefair PZEM-017 / 003 (DC) | 9600 **8N2** | shunt range select, alarm thresholds, energy reset |
 | `victron_gx_system` | Victron GX (Cerbo, MultiPlus-II GX, Venus OS), system values | TCP, unit 100 | consumption, grid, generator, AC-coupled PV, battery V/A/W/SOC/state, DC PV, serial; L1 only |
 | `victron_vebus` | Victron MultiPlus / Quattro via a GX | TCP, unit 228 (MultiPlus-II GX; 227 Cerbo, 242 Venus GX, 246 CCGX) | AC in/out V, A, Hz, W, battery, state, switch position, alarms; read only; L1 only |
+| `abb_b21` | ABB B21 (EQ, single phase) | 19200 8E1, address 1 (third party; ABB gives no default) | voltage, current, power, reactive and apparent power, frequency, power factor, energies (u64, 0.01 kWh); serial, firmware, type |
+| `abb_b23` | ABB B23 / B24 (EQ, three phase) | as B21 | per phase V, A, W, PF and import/export energy; B24 shows primary values (the meter applies the CT ratio) |
 | `goodwe_xs` | GoodWe XS / MS / D-NS (single phase DT family) | UDP 8899 (Wi-Fi module) or TCP 502, unit 127 | power, PV1/PV2 V and A, grid V, A, Hz, energy today/total, temperature, work mode, error and warning codes, hours, serial, model; read only |
 
 The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/modbus/gen_other.py` and
-`tools/modbus/gen_victron.py`, `tools/modbus/gen_goodwe.py`.
+`tools/modbus/gen_victron.py`, `tools/modbus/gen_goodwe.py`, `tools/modbus/gen_abb.py`.
 
 ### Findings worth knowing
 
@@ -245,6 +247,13 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   registers answer too, so reads span gaps. A unit without a device answers exception 10 or 11. The
   "Scalefactor" column divides (10 → ×0.1, 0.1 → ×10, -10 → ×-0.1). VE.Bus state of charge stays 0
   when a BMS or the GX computes it: use the system's. Checked on a MultiPlus-II GX (2026-11-04).
+- ABB B21/B23/B24 share one map (both user manuals, chapter 9, identical tables): function 3 only (no
+  4), up to 125 registers, any read within 0x1000-0x8EFF answers, gaps included, so the templates read
+  0x5B00-0x5B3D in one request. Addresses are protocol addresses as printed. An absent quantity (B21: all
+  per phase values; 3-wire: L-N voltages, L2) reads all ones (unsigned) or the largest positive value
+  (signed), mapped to no value. Energies are u64 in 0.01 kWh. The factory serial settings are in no ABB
+  document: 19200 Bd, even parity, address 1 are the third party claims (Victron guide: "factory default
+  even"; Eniris: 19200 8E2), stop bits not confirmed. Steel variants do not measure export.
 - The Adafruit/evcc/mbmd/Tasmota sources sometimes disagree on parity (ORNO 516: 8E1 by three
   sources, odd by one); the template follows the majority with a note.
 
@@ -270,6 +279,8 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   manual request reads the serial number, an absent unit times out, invalid devices are refused, a device
   on `udp` with `goodwe_xs` reads every value. UI34: the search page adds it in one click. The unit test
   checks the AA 55 framing against the request bytes of the goodwe library (`7F 03 75 31 00 28 04 09`).
+- TC56: both ABB templates against the simulator answering gaps (`--lenient`): every value as encoded, and
+  the meter's "no value" (u64 all ones, s16 and s32 largest positive) shows no value.
 - TC55: the Modbus TCP server against the simulator (`--log-reads`) playing an SDM630 on Modbus TCP and a
   GoodWe on UDP: invalid settings refused, routing by unit id on 502 and any unit id on an own port,
   polled registers from the cache with no read reaching the device, other reads passed through (the
@@ -294,6 +305,9 @@ manuals, lmatula/ha_chint_pm. Peacefair PZEM-014/016 and PZEM-003/017 manuals, E
 `pzemdc`, mandulaj/PZEM-004T-v30. Hiking: fawno/Modbus, alphp and gabrielcolceriu gists,
 nicodupont/esphome-hiking-dds238-2-zn-s-rs485. ORNO: TapHome OR-WE-515 page, evcc `orno.yaml`,
 HARDWARIO and Grenton integration pages, apichlinski/orno-reader-domoticz, ioBroker forum.
+ABB: B21 user manual 2CMC485004M0201 rev C, B23/B24 user manual 2CMC485003M0201 rev E, EQ B-Serie
+Produkthandbuch 2CDC512084D0101; volkszaehler/mbmd `abb.go`, victronenergy/dbus-modbus-client `abb.py` and the
+Victron ABB meter guide, openWB `b23.py`, evcc `abb-ab.yaml`.
 Template formats compared: evcc, ESPHome `modbus_controller`, Home Assistant `modbus`, Tasmota
 `modbus.json`, jollyjinx/modbus-2-mqtt-bridge. Board: schematic sheets 2, 4, 5 and 8
 ([unofficial_guition_esp32p4_repo](https://github.com/p1ngb4ck/unofficial_guition_esp32p4_repo/tree/main/JC-ESP32P4-M3-Dev)).

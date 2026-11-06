@@ -1256,6 +1256,53 @@ def tc55_modbus_tcp_server():
     check(len(r['devices']) == len(srv_keep['devices']), 'server configuration of before restored')
 
 
+def tc56_modbus_abb():
+    """ABB B21 and B23/B24 templates against the simulator of this computer answering gaps like the meter
+    (--lenient): every value as encoded, u64 energies included; the meter's "no value" (all ones unsigned,
+    the largest positive signed) shows no value. The configuration of before comes back."""
+    import subprocess
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    port = 1509
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    units = {1: 'abb_b21', 2: 'abb_b23'}
+    sim = subprocess.Popen([sys.executable, sim_py, '--port', str(port), '--lenient'] + [f'{t}:{u}' for u, t in units.items()],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+
+    def values():
+        return {d['name']: d for d in http('GET', '/api/modbus')[1]['devices']}
+
+    def close(a, b):
+        return a == b or (isinstance(a, (int, float)) and isinstance(b, (int, float)) and abs(a - b) <= 1e-6 + abs(b) * 1e-6 + 0.011)
+
+    try:
+        time.sleep(1)
+        devs = [{'name': f'TC56 {t}', 'template': t, 'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': u, 'poll_s': 2, 'expose': 'none'}
+                for u, t in units.items()]
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + devs})[0] == 200, 'B21 and B23 on Modbus TCP added')
+        for u, t in units.items():
+            exp = json.loads(subprocess.run([sys.executable, sim_py, '--expect', t], capture_output=True, text=True).stdout)
+            d = wait_until(f'values of {t}', lambda: (lambda d: d if len(d['values']) >= len(exp) else None)(values()[f'TC56 {t}']), 30, 2)
+            bad = {k: (v, d['values'].get(k)) for k, v in exp.items() if not close(d['values'].get(k), v)}
+            check(not bad and d['state'] == 'ok', f'{t}: all {len(exp)} values as encoded' + (f', different {bad}' if bad else ''))
+        for addr, regs, key in ((0x5004, [0xffff] * 4, 'export_energy'), (0x5B3A, [0x7fff], 'power_factor'), (0x5B16, [0x7fff, 0xffff], 'power_l1')):
+            code, r = http('POST', '/api/modbus/raw', {'transport': 'tcp', 'host': my_ip, 'port': port, 'slave': 2, 'fc': 16, 'addr': addr, 'values': regs})
+            check(code == 200 and r['ok'], f'simulator set to "no value" at 0x{addr:04x}')
+            wait_until(f'{key} without a value', lambda: key not in values()['TC56 abb_b23']['values'], 15, 1)
+        d = values()['TC56 abb_b23']
+        check(d['state'] == 'ok' and 'import_energy' in d['values'], 'the other values stay')
+    finally:
+        http('PUT', '/api/modbus', keep)
+        sim.terminate()
+        sim.wait(timeout=5)
+    check(len(http('GET', '/api/modbus')[1]['devices']) == len(keep['devices']), 'devices of before restored')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -2775,7 +2822,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC56', tc56_modbus_abb), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2802,7 +2849,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55', 'TC56')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

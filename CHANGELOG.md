@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Modbus templates `abb_b21` (ABB B21) and `abb_b23` (ABB B23 / B24): voltages, currents, powers, power
+  factors, frequency, energies (per phase on B23/B24), serial, firmware and type; over RS485 or a Modbus TCP
+  gateway. The meter's "no value" shows no value. Tests: TC56.
+
 ## v1.14 (2026-11-06)
 
 Summary: Modbus TCP server for the gateway's Modbus devices (RS485, Modbus TCP, GoodWe UDP): shared port 502 by unit id or own ports, cache of polled registers and of answers to clients, rate limit, optional writes with an address allowlist.
