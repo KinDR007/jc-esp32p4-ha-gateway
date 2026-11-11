@@ -130,7 +130,31 @@ No restart, the role and the device polling (every 3 s) went on in every run; at
 `/api/status` took 1.4 s in one of the two runs and 4 of 11 500 device reads timed out (exception 11).
 A device on RS485 is slower than the simulator: its requests take the bus times above.
 
-## Home Assistant
+## Emulation (virtual devices)
+
+**Plan (2026-11-11), phases E1-E3 in TODO.md.** A virtual device shows the values of a device the
+gateway reads (the source, e.g. an Eastron SDM630 on RS485) as another device (the target template, e.g.
+`abb_b23`), for clients that only accept a certain meter (an inverter's zero export, a Victron GX).
+
+- Configuration: a device with `"transport": "virtual"`, `"source": "<device id>"` and the target
+  `template`; no address. The source must be a real device (no chains). It is a device like the others:
+  Modbus TCP server, MQTT, the integration, Telegram reports. Exposed to Home Assistant next to its source
+  it shows the same quantities twice; the page says so.
+- Mapping, automatic: an entity's quantity is its `q` (a new optional template field), else its key.
+  Eastron's `total_power`, `total_reactive_power`, `total_apparent_power`, `total_power_factor` and
+  `serial_number` get `q` of `power`, `reactive_power`, `apparent_power`, `power_factor`, `serial` (keys
+  stay: they are part of the Home Assistant ids). Units convert between W and kW, Wh and kWh, var and kvar,
+  varh and kvarh. A quantity the source lacks is derived where it can be: a total as the sum of the three
+  phases (power, reactive and apparent power, import and export energy), power as import minus export
+  power. The API lists per target entity where its value comes from.
+- Values follow the source: computed after every poll of the source, offline with it.
+- Modbus TCP server: every read is answered from the values, encoded as the target template says (type,
+  word order, scale); no read reaches the source. A target entity without a value reads the template's
+  "no value" (`nan`), else 0; registers no entity covers read `fill` (a new template field: ABB 65535,
+  default 0); `emulate` (a new entity field) is a fixed value for identification (ABB type "B23 112-100" at
+  0x8960). Writes answer exception 1, a virtual device whose source is offline exception 11.
+- Not on RS485: the gateway is the bus master there (decided 2026-11-11).
+
 
 Each device is a device of its own, connected via the gateway:
 

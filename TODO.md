@@ -199,6 +199,15 @@ Rozhodnutí: sdílený port 502 se směrováním podle unit id + volitelně vlas
 - [x] S5 Zátěžový test: 8 klientů, role a web UI dál reagují (výsledky v docs/modbus.md); TC55, UI37
 - [ ] Server Modbus TCP se skutečným zařízením na RS485 (časování sběrnice s klientem v síti)
 
+## Emulace zařízení a periodické zprávy (zadání 2026-11-11)
+Rozhodnutí: emulace jako virtuální zařízení (zdroj + cílová šablona), vystavitelné kdekoliv; jen přes TCP, RS485 zůstává master; zprávy do Telegramu pro Modbus, I2C senzory a GPIO, aktuální hodnoty + statistika za období; nastavuje každý uživatel sám.
+- [ ] E1 Šablony: pole `q` (veličina), `fill`, `emulate`; `q` u Eastronu; ABB typ pro emulaci; unit testy
+- [ ] E2 Virtuální zařízení: konfigurace, mapování (jednotky, součty fází), hodnoty po pollu zdroje, Modbus TCP server z hodnot, MQTT a integrace
+- [ ] E3 Web UI (zdroj, tabulka mapování, upozornění na duplicitu), dokumentace, TC57 (SDM630 jako ABB B23 přes server), UI test
+- [ ] R1 Jádro zpráv (gw_report): zdroje Modbus, I2C, GPIO; vzorkování 60 s, statistika, počátky čítačů v NVS; odeslání tiše v tichých hodinách
+- [ ] R2 API a web UI (Můj účet › Telegram): zprávy, zařízení, perioda, čas, Odeslat teď, náhled
+- [ ] R3 Testy (TC58 přes náhled, UI test), dokumentace
+
 ## Čas a NTP (zadání 2026-11-05)
 - [x] Systém › LAN › Čas (`/api/time`): až 3 servery SNTP, časové pásmo brány (seznam IANA nebo pravidlo POSIX), platí hned; pásmo pro celou bránu (časy v UI a logu, tiché hodiny Telegramu, noční záloha Zigbee 03:00–04:00 místního času); pásmo přesunuto z Telegramu (stejný klíč `tz`); TC51, UI35
 - [ ] Volitelně servery NTP z DHCP (volba 42): lwIP při obnově zápůjčky přepíše i ručně zadané servery, proto zatím vynecháno

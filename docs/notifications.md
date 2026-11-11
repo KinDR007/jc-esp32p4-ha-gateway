@@ -64,6 +64,22 @@ A command that changes something shows Confirm / Cancel buttons (valid 2 minutes
 with two-factor sign-in the bot then asks for the authenticator code. Commands run from Telegram are
 security notifications.
 
+### Periodic reports
+
+**Plan (2026-11-11), phases R1-R3 in TODO.md.** Each user, My account › Telegram and notifications, may
+set up to 4 reports: a name, devices (Modbus devices, virtual ones included, I2C sensors, GPIO pins; only
+those the user may read: System › RS485 or System › Hardware) and a period: 15 min, 30 min, 1 h, 6 h,
+12 h, 1 day (default), 7 days, or any from 15 min, aligned to the clock from a time of day (7 days: also a
+weekday). **Send now** sends it at once (also `POST /api/auth/telegram/reports/send`; with `preview` the
+text comes back instead).
+
+- Content per device: the current value of each quantity; over the period the minimum, maximum and
+  average of measured quantities (power, voltage, temperature...) and the difference of counters
+  (energy, pulses). Samples every 60 s.
+- Counters' values at the start of the period are kept in NVS, so the difference survives a restart;
+  minimum, maximum and average start again after a restart (the report says so).
+- In quiet hours a report comes without sound. Texts over 4096 characters are split.
+
 ### How it runs
 
 One task long-polls `getUpdates` (5 s) over a kept TLS connection to `api.telegram.org` and sends
