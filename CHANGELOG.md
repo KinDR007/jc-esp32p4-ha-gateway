@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Periodic Telegram reports, My account › Periodic reports (`/api/auth/telegram/reports`): each user up to
+  4 reports of Modbus devices (virtual ones too), I2C sensors and GPIO pins, every 15 min to 7 days (or own
+  minutes) aligned to the clock from a time of day: current values, minimum, maximum and average of
+  measured values and the difference of counters over the period (start values in NVS, they survive a
+  restart); without sound in quiet hours; Preview and Send now. Tests: TC58, UI39.
+- `/api/modbus/raw` refuses register values over 65535 (they were cut to 16 bits).
 - Emulation, System › RS485 › Add device, connection *Emulation*: a virtual device shows the values of
   another device as a device of another template (e.g. an Eastron SDM630 as an ABB B23 for an inverter or
   a Victron GX), over the Modbus TCP server (every read answered from the values, the target's types,

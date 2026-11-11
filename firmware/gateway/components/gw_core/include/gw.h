@@ -203,6 +203,33 @@ typedef void (*gw_bot_fn)(const char *args, bool czech, char *out, size_t len);
 /* /name for users with level (1 read, 2 edit) on page; confirm: changes something (button, TOTP). */
 void gw_bot_command(const char *name, const char *help_en, const char *help_cs, const char *page, int level,
                     bool confirm, gw_bot_fn fn);
+/* A message (Telegram HTML) to a user's chat, without sound in their quiet hours; false when the user has no
+ * chat or the bot is off. Sent within 5 s. */
+bool gw_telegram_send_user(int user, const char *text);
+
+/* ---- periodic Telegram reports (gw_report.c, docs/notifications.md) ---- */
+/* STATE: shown as it is; MEASURE: minimum, maximum and average over the period; TOTAL: a counter, the
+ * difference over the period */
+typedef enum { GW_RV_STATE, GW_RV_MEASURE, GW_RV_TOTAL } gw_rv_kind_t;
+typedef struct {
+    char key[32];  /* stable within the device */
+    char name[48]; /* in the language asked for */
+    char unit[16];
+    char text[32]; /* the value as a text when !num (a state, an option) */
+    double value;
+    bool num;
+    int8_t precision;
+    uint8_t kind;  /* gw_rv_kind_t */
+} gw_rv_t;
+typedef struct {
+    char id[16];
+    char name[100];
+} gw_rdev_t;
+/* A source of report devices (Modbus, I2C sensors, GPIO); users need level 1 on page. devices: up to max
+ * into out, the count; values: of one device up to max, -1 when it has none now (off, offline). */
+void gw_report_source(const char *id, const char *name_en, const char *name_cs, const char *page,
+                      int (*devices)(gw_rdev_t *out, int max), int (*values)(const char *dev, bool czech, gw_rv_t *out, int max));
+void gw_report_start(void);
 
 /* ---- HTTP ---- */
 esp_err_t gw_http_start(void);

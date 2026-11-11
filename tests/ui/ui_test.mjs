@@ -1099,6 +1099,59 @@ await test('UI38', 'System › RS485: a virtual device (emulation) is added from
   }
 });
 
+await test('UI39', 'My account › Periodic reports: a temporary user signs in, adds a report (a Modbus device, every 7 days on Wednesday from 06:30, the weekday shown only for 7 days, an own period in minutes), Save stores it; Preview shows the report text in a dialog; removed and saved, the list is empty', async () => {
+  const devs = (await (await page.request.get(base + 'api/modbus')).json()).devices;
+  if (!devs.length) { check(true, 'no Modbus device configured: nothing to report (skipped)'); return; }
+  const name = 'ui39user', pw = 'ui39-Reports-pass';
+  check((await page.request.post(base + 'api/users', { data: { name, role: 'admin', password: pw, must_change: false } })).ok(), 'temporary user');
+  const ctx = await browser.newContext({ locale: 'en-US' });
+  const p2 = await ctx.newPage();
+  const errs = [];
+  p2.on('pageerror', e => errs.push(e.message));
+  try {
+    if (args.html && args.html !== true) {
+      const html = readFileSync(args.html, 'utf8');
+      await p2.route(base, route => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
+    }
+    await p2.goto(base + '#profile');
+    await p2.waitForSelector('#lg-user', { timeout: 15000 });
+    await p2.fill('#lg-user', name);
+    await p2.fill('#lg-pass', pw);
+    await p2.click('#login-form button[type=submit]');
+    await p2.waitForSelector('#rep-add', { timeout: 15000 });
+    await p2.click('#rep-add');
+    const dev = `modbus:${devs[0].id}`;
+    await p2.check(`[data-rep="0"] [data-rk-dev="${dev}"]`);
+    await p2.fill('[data-rep="0"] [data-rk="name"]', 'UI39 week');
+    check(!(await p2.isVisible('[data-rep="0"] [data-rk="weekday"]')), 'weekday hidden for 1 day');
+    await p2.selectOption('[data-rep="0"] [data-rk="period"]', 'custom');
+    check(await p2.isVisible('[data-rep="0"] [data-rk="minutes"]'), 'own period: minutes shown');
+    await p2.selectOption('[data-rep="0"] [data-rk="period"]', '10080');
+    check(await p2.isVisible('[data-rep="0"] [data-rk="weekday"]') && !(await p2.isVisible('[data-rep="0"] [data-rk="minutes"]')), '7 days: weekday shown, minutes hidden');
+    await p2.selectOption('[data-rep="0"] [data-rk="weekday"]', '2');
+    await p2.fill('[data-rep="0"] [data-rk="at"]', '06:30');
+    await p2.click('#rep-save');
+    await p2.waitForFunction(() => /Saved|Uloženo/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
+    const r = await (await p2.request.get(base + 'api/auth/telegram/reports')).json();
+    const x = r.reports[0] || {};
+    check(r.reports.length === 1 && x.name === 'UI39 week' && x.period_min === 10080 && x.weekday === 2 && x.at === 390 && x.devices.join() === dev && x.enabled,
+      `stored: ${JSON.stringify(r.reports)}`);
+    await p2.click('[data-rep-preview="0"]');
+    await p2.waitForSelector('#form-dlg-form b', { timeout: 8000 });
+    const text = await p2.textContent('#form-dlg-form');
+    check(text.includes('📊') && text.includes('UI39 week') && text.includes(devs[0].name), `preview: ${text.replace(/\s+/g, ' ').slice(0, 120)}`);
+    await p2.click('#form-dlg-form button[type=submit]');
+    await p2.click('[data-rep-del="0"]');
+    await p2.click('#rep-save');
+    await p2.waitForFunction(() => !document.querySelector('[data-rep]'), null, { timeout: 8000 });
+    check((await (await p2.request.get(base + 'api/auth/telegram/reports')).json()).reports.length === 0, 'removed and saved: no report');
+    check(errs.length === 0, `no uncaught script errors ${errs.join('; ')}`);
+  } finally {
+    await ctx.close();
+    await page.request.post(base + 'api/users/delete', { data: { name } });
+  }
+});
+
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it
 async function legendClear(box) {
   return page.evaluate(box => {

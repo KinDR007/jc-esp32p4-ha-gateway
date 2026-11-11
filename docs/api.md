@@ -3632,6 +3632,9 @@ Effects: host is a name or an IPv4/IPv6 address; count 1..10 (default 4, clamped
 | POST | `/api/auth/telegram` | Changes own Telegram notification preferences. | own account |
 | POST | `/api/auth/telegram/pair` | Creates a code to pair the own Telegram chat with the bot. | own account |
 | POST | `/api/auth/telegram/test` | Sends a test message to the own paired Telegram chat. | own account |
+| GET | `/api/auth/telegram/reports` | The own periodic Telegram reports, the devices they may cover and the limits. | own account |
+| PUT | `/api/auth/telegram/reports` | Replaces the own periodic Telegram reports. | own account |
+| POST | `/api/auth/telegram/reports/send` | Sends an own report now (the period so far), or returns its text. | own account |
 | POST | `/api/auth/telegram/unpair` | Removes the pairing of the own Telegram chat. | own account |
 | GET | `/api/notify` | Recent gateway notifications, oldest first. | any signed-in client |
 | GET | `/api/telegram` | Telegram bot settings and state (admin). | administrators |
@@ -3732,6 +3735,128 @@ Response:
 ```
 
 Errors: 409 Not paired, the bot is off, or not a signed-in user.; 503 Outgoing queue full.
+
+#### GET `/api/auth/telegram/reports`
+
+Response:
+
+```json
+{
+  "reports": [
+    {
+      "id": 1,
+      "name": "Daily summary",
+      "devices": [
+        "modbus:d1",
+        "sensors:i2c_76",
+        "gpio:2"
+      ],
+      "period_min": 1440,
+      "at": 420,
+      "weekday": 0,
+      "enabled": true,
+      "period_start": 1794380400,
+      "period_end": 1794466800,
+      "next_s": 52000
+    }
+  ],
+  "sources": [
+    {
+      "id": "modbus",
+      "name": "Modbus",
+      "name_cs": "Modbus",
+      "devices": [
+        {
+          "id": "modbus:d1",
+          "name": "House meter"
+        }
+      ]
+    }
+  ],
+  "limits": {
+    "reports": 4,
+    "devices": 8,
+    "period_min": 15,
+    "period_max": 10080,
+    "presets": [
+      15,
+      30,
+      60,
+      360,
+      720,
+      1440,
+      10080
+    ]
+  },
+  "paired": true
+}
+```
+
+Errors: 409 Not a signed-in user (an API token has no reports).
+
+Effects: sources lists only the devices the user may read (Modbus: System › RS485, I2C sensors and GPIO: System › Hardware). period_start and period_end: the current period (Unix time); next_s: seconds to the next report, -1 when off. Periods run by the gateway's clock and time zone: whole days from at (minutes after midnight) of a day, 7 days from at of weekday (0 Monday), parts of a day from at + k × period, other periods in steps from at of Monday 2024-01-01.
+
+#### PUT `/api/auth/telegram/reports`
+
+Body:
+
+```json
+{
+  "reports": [
+    {
+      "id": 1,
+      "name": "Daily summary",
+      "devices": [
+        "modbus:d1",
+        "sensors:i2c_76",
+        "gpio:2"
+      ],
+      "period_min": 1440,
+      "at": 420,
+      "weekday": 0,
+      "enabled": true
+    }
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "...": "same as GET /api/auth/telegram/reports"
+}
+```
+
+Errors: 400 More than 4 reports; name not 1-40 characters; devices not 1-8 of the listed ones; period_min not 15-10080; at not 0-1439; weekday not 0-6; id not 1-255 or twice.; 409 Not a signed-in user.
+
+Effects: Send the reports to keep with their id; a report without id gets one. One whose devices and schedule stay keeps its period and samples. Saving makes the gateway sample at once (else every 60 s). at defaults to 420 (07:00), enabled to true.
+
+#### POST `/api/auth/telegram/reports/send`
+
+Body:
+
+```json
+{
+  "id": 1,
+  "preview": false
+}
+```
+
+Response:
+
+```json
+{
+  "parts": [
+    "📊 <b>Daily summary</b> · p4gw-xxxxxx\n11.11. 07:00 – 11.11. 08:27\n\n<b>House meter</b>\n• Voltage L1: 230.1 V <i>(min 228.4 · max 233.0 · ⌀ 230.6)</i>\n• Import energy: 1012.34 kWh <i>(+12.34 kWh in the period)</i>"
+  ],
+  "sent": true
+}
+```
+
+Errors: 404 No such report.; 409 Not paired with Telegram (unless preview), the clock is not set, or not a signed-in user.
+
+Effects: parts: the Telegram HTML messages (split at 4000 bytes). The period goes on. Values: current; measured ones with minimum, maximum and average since the start of the period (since a restart within it, said in the text); counters with the difference since the start of the period (start values kept in NVS). In the user's quiet hours a report comes without sound.
 
 #### POST `/api/auth/telegram/unpair`
 

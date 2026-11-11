@@ -1500,6 +1500,76 @@ static void bot_gpio(const char *args, bool cz, char *out, size_t len)
     xSemaphoreGive(s_lock);
 }
 
+/* ---------------------------------------------------------------- reports */
+
+static bool reported(const pin_t *p)
+{
+    return p->mode == M_INPUT || p->mode == M_OUTPUT || p->mode == M_PWM || p->mode == M_COUNTER || p->mode == M_ONEWIRE;
+}
+
+static int report_devices(gw_rdev_t *out, int max)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int n = 0;
+    for (int i = 0; i < s_npin && n < max; i++) {
+        const pin_t *p = &s_pin[i];
+        if (reported(p)) {
+            snprintf(out[n].id, sizeof(out[n].id), "%d", p->gpio);
+            snprintf(out[n].name, sizeof(out[n].name), "GPIO%d%s%s", p->gpio, p->name[0] ? " " : "", p->name);
+            n++;
+        }
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
+static gw_rv_t *rv(gw_rv_t *v, const char *key, const char *name, const char *unit, int prec, uint8_t kind)
+{
+    memset(v, 0, sizeof(*v));
+    strlcpy(v->key, key, sizeof(v->key));
+    strlcpy(v->name, name, sizeof(v->name));
+    strlcpy(v->unit, unit, sizeof(v->unit));
+    v->precision = (int8_t)prec;
+    v->kind = kind;
+    v->num = kind != GW_RV_STATE;
+    return v;
+}
+
+static int report_values(const char *dev, bool cz, gw_rv_t *out, int max)
+{
+    int n = -1;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    for (int i = 0; i < s_npin && n < 0; i++) {
+        const pin_t *p = &s_pin[i];
+        char id[8];
+        snprintf(id, sizeof(id), "%d", p->gpio);
+        if (strcmp(id, dev) != 0 || !reported(p) || !p->active || max < OW_MAX) {
+            continue;
+        }
+        n = 0;
+        if (p->mode == M_INPUT || p->mode == M_OUTPUT) {
+            gw_rv_t *v = rv(&out[n++], "state", cz ? "Stav" : "State", "", 0, GW_RV_STATE);
+            strlcpy(v->text, p->level ? (cz ? "zap" : "on") : (cz ? "vyp" : "off"), sizeof(v->text));
+        } else if (p->mode == M_PWM) {
+            rv(&out[n++], "duty", cz ? "Střída" : "Duty", "%", 1, GW_RV_MEASURE)->value = p->duty;
+        } else if (p->mode == M_COUNTER) {
+            rv(&out[n++], "count", cz ? "Počet pulzů" : "Pulses", "", 0, GW_RV_TOTAL)->value = p->count;
+            rv(&out[n++], "rate", cz ? "Frekvence" : "Frequency", "Hz", 1, GW_RV_MEASURE)->value = p->rate;
+        } else {
+            for (int k = 0; k < p->ow_n && k < OW_MAX; k++) {
+                char rom[17], name[48];
+                rom_hex(p->ow_dev[k].rom, rom);
+                if (p->ow_dev[k].ok) {
+                    snprintf(name, sizeof(name), "%s %.6s", cz ? "Teplota" : "Temperature", rom + 10);
+                    rv(&out[n++], rom, name, "°C", 1, GW_RV_MEASURE)->value = roundf(p->ow_dev[k].temp * 10) / 10;
+                }
+            }
+        }
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
 esp_err_t gpio_ctl_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
@@ -1532,6 +1602,7 @@ esp_err_t gpio_ctl_init(void)
     gw_http_register("/api/gpio", HTTP_PUT, gpio_put);
     gw_http_register("/api/gpio/set", HTTP_POST, set_post);
     gw_bot_command("gpio", "GPIO of JP1", "GPIO na JP1", "system/hw", 1, false, bot_gpio);
+    gw_report_source("gpio", "GPIO (JP1)", "GPIO (JP1)", "system/hw", report_devices, report_values);
     gw_mqtt_set_extension(mqtt_discovery, NULL);
     gw_mqtt_add_command("gpio/+/set", mqtt_command);
     gw_mqtt_add_command("gpio/+/duty/set", mqtt_command);

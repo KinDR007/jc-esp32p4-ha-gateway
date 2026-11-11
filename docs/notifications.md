@@ -66,19 +66,23 @@ security notifications.
 
 ### Periodic reports
 
-**Plan (2026-11-11), phases R1-R3 in TODO.md.** Each user, My account › Telegram and notifications, may
-set up to 4 reports: a name, devices (Modbus devices, virtual ones included, I2C sensors, GPIO pins; only
-those the user may read: System › RS485 or System › Hardware) and a period: 15 min, 30 min, 1 h, 6 h,
-12 h, 1 day (default), 7 days, or any from 15 min, aligned to the clock from a time of day (7 days: also a
-weekday). **Send now** sends it at once (also `POST /api/auth/telegram/reports/send`; with `preview` the
-text comes back instead).
+Each user, My account › Periodic reports (`/api/auth/telegram/reports`, [api.md](api.md)), sets up to 4
+reports: a name, 1-8 devices (Modbus devices, virtual ones included, I2C sensors, GPIO pins in input,
+output, PWM, counter or 1-Wire mode; only those the user may read: System › RS485 or System › Hardware)
+and a period: 15 min, 30 min, 1 h, 6 h, 12 h, 1 day (default), 7 days, or own minutes from 15 to 10 080,
+aligned to the gateway's clock from a time of day (default 07:00; 7 days: also a weekday). **Preview**
+shows the text, **Send now** sends the period so far (the period goes on).
 
-- Content per device: the current value of each quantity; over the period the minimum, maximum and
-  average of measured quantities (power, voltage, temperature...) and the difference of counters
-  (energy, pulses). Samples every 60 s.
-- Counters' values at the start of the period are kept in NVS, so the difference survives a restart;
-  minimum, maximum and average start again after a restart (the report says so).
-- In quiet hours a report comes without sound. Texts over 4096 characters are split.
+- Content per device: the current value of each measurement (Modbus: the template's entities without
+  settings, diagnostics and controls); over the period the minimum, maximum and average of measured
+  values (state class measurement: power, voltage, temperature) and the difference of counters (total:
+  energy, pulses). A device without values reads "unavailable".
+- The gateway samples the devices of the reports every 60 s (and at once when they are saved). Counters'
+  values at the start of the period are kept in NVS, so their difference survives a restart; minimum,
+  maximum and average start again after a restart and the report says since when.
+- A report goes out at the end of its period, in the bot's language of the user, as Telegram HTML split
+  into messages of at most 4000 bytes; in the user's quiet hours without sound. A user deleted takes the
+  reports along; a new user in the same slot does not get them.
 
 ### How it runs
 
@@ -88,4 +92,5 @@ what is queued between the polls: a notification leaves within about 5 s and onl
 in a settings backup with passwords.
 
 API: `GET/POST /api/telegram` (admins: `token`, `enabled`, `tz`), `GET/POST /api/auth/telegram`
-(own levels, quiet hours, language), `POST /api/auth/telegram/{pair,unpair,test}`.
+(own levels, quiet hours, language), `POST /api/auth/telegram/{pair,unpair,test}`, `GET/PUT
+/api/auth/telegram/reports`, `POST /api/auth/telegram/reports/send` (periodic reports, `gw_report.c`).

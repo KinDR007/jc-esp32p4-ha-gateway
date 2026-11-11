@@ -659,6 +659,7 @@ void app_main(void)
     sensors_init();
     modbus_init();
     gpio_ctl_init();
+    gw_report_start(); /* after the components that are its sources */
     gw_mqtt_start();
     gw_update_start();
     gw_inet_start();

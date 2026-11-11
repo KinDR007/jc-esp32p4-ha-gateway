@@ -204,9 +204,11 @@ Rozhodnutí: emulace jako virtuální zařízení (zdroj + cílová šablona), v
 - [x] E1 Šablony: pole `q` (veličina), `fill`, `emulate`; `q` u Eastronu; ABB typ pro emulaci; unit testy
 - [x] E2 Virtuální zařízení: konfigurace, mapování (jednotky, součty fází), hodnoty po pollu zdroje, Modbus TCP server z hodnot, MQTT a integrace
 - [x] E3 Web UI (zdroj, tabulka mapování, upozornění na duplicitu), dokumentace, TC57 (SDM630 jako ABB B23 přes server), UI test
-- [ ] R1 Jádro zpráv (gw_report): zdroje Modbus, I2C, GPIO; vzorkování 60 s, statistika, počátky čítačů v NVS; odeslání tiše v tichých hodinách
-- [ ] R2 API a web UI (Můj účet › Telegram): zprávy, zařízení, perioda, čas, Odeslat teď, náhled
-- [ ] R3 Testy (TC58 přes náhled, UI test), dokumentace
+- [x] R1 Jádro zpráv (gw_report): zdroje Modbus, I2C, GPIO; vzorkování 60 s, statistika, počátky čítačů v NVS; odeslání tiše v tichých hodinách
+- [x] R2 API a web UI (Můj účet › Telegram): zprávy, zařízení, perioda, čas, Odeslat teď, náhled
+- [x] R3 Testy (TC58 přes náhled, UI39), dokumentace
+- [ ] Ověřit doručení zprávy na konci období do skutečného spárovaného chatu (testy jdou přes náhled)
+- [ ] Emulace se skutečným klientem (Victron GX nebo střídač čtoucí ABB B23)
 
 ## Čas a NTP (zadání 2026-11-05)
 - [x] Systém › LAN › Čas (`/api/time`): až 3 servery SNTP, časové pásmo brány (seznam IANA nebo pravidlo POSIX), platí hned; pásmo pro celou bránu (časy v UI a logu, tiché hodiny Telegramu, noční záloha Zigbee 03:00–04:00 místního času); pásmo přesunuto z Telegramu (stejný klíč `tz`); TC51, UI35

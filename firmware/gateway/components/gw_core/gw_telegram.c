@@ -63,6 +63,7 @@ typedef struct {
 typedef struct {
     int64_t chat;
     char *text;
+    bool silent; /* without sound (a report in quiet hours) */
 } out_t;
 
 static char s_token[64];
@@ -194,17 +195,25 @@ static cJSON *tg_call(const char *method, cJSON *body, int timeout_s)
     return result;
 }
 
-static void send_text(int64_t chat, const char *text, cJSON *markup)
+static void send_message(int64_t chat, const char *text, cJSON *markup, bool silent)
 {
     cJSON *b = cJSON_CreateObject();
     cJSON_AddNumberToObject(b, "chat_id", (double)chat);
     cJSON_AddStringToObject(b, "text", text);
     cJSON_AddStringToObject(b, "parse_mode", "HTML");
     cJSON_AddBoolToObject(b, "disable_web_page_preview", true);
+    if (silent) {
+        cJSON_AddBoolToObject(b, "disable_notification", true);
+    }
     if (markup) {
         cJSON_AddItemToObject(b, "reply_markup", markup);
     }
     cJSON_Delete(tg_call("sendMessage", b, 10));
+}
+
+static void send_text(int64_t chat, const char *text, cJSON *markup)
+{
+    send_message(chat, text, markup, false);
 }
 
 static cJSON *buttons(int user, int slot)
@@ -564,7 +573,7 @@ static void tg_task(void *arg)
         }
         out_t o;
         while (xQueueReceive(s_out, &o, 0) == pdTRUE) {
-            send_text(o.chat, o.text, NULL);
+            send_message(o.chat, o.text, NULL, o.silent);
             free(o.text);
         }
         cJSON *b = cJSON_CreateObject();
@@ -987,6 +996,22 @@ static esp_err_t unpair_post(httpd_req_t *req)
     cJSON *j = self_json(u);
     gw_auth_unlock();
     return gw_http_send_json(req, j);
+}
+
+bool gw_telegram_send_user(int user, const char *text)
+{
+    gw_auth_lock();
+    const gw_tg_prefs_t *p = gw_auth_user_valid(user) ? gw_auth_user_tg(user) : NULL;
+    out_t o = {.chat = p ? p->chat : 0, .silent = p && quiet_now(p)};
+    gw_auth_unlock();
+    if (!o.chat || !s_enabled || !s_out || !(o.text = strdup(text))) {
+        return false;
+    }
+    if (xQueueSend(s_out, &o, 0) != pdTRUE) {
+        free(o.text);
+        return false;
+    }
+    return true; /* sent between two polls of getUpdates, within 5 s */
 }
 
 static esp_err_t test_post(httpd_req_t *req)

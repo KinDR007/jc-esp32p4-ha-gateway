@@ -883,6 +883,8 @@ static const auth_rule_t AUTH_MAP[] = {
     {"/api/auth/telegram/pair", -1, "self", 1},
     {"/api/auth/telegram/unpair", -1, "self", 1},
     {"/api/auth/telegram/test", -1, "self", 1},
+    {"/api/auth/telegram/reports", -1, "self", 1},
+    {"/api/auth/telegram/reports/send", -1, "self", 1},
 };
 
 static const auth_rule_t *rule_for(const char *uri, int method)

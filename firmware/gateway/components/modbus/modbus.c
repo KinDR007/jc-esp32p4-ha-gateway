@@ -1674,6 +1674,13 @@ static esp_err_t raw_post(httpd_req_t *req)
                                                           cJSON_GetArraySize(values) > (f == 5 || f == 6 ? 1 : 123))) {
         why = "values: the value(s) to write (16-bit numbers; coils 0/1)";
     }
+    const cJSON *item;
+    cJSON_ArrayForEach(item, (why || f < 5 ? NULL : values))
+    {
+        if (!cJSON_IsNumber(item) || item->valuedouble < 0 || item->valuedouble > 65535 || item->valuedouble != floor(item->valuedouble)) {
+            why = "values: 16-bit numbers 0-65535 (coils 0/1)";
+        }
+    }
     if (why) {
         cJSON_Delete(body);
         return gw_http_send_error(req, 400, why);
@@ -2031,6 +2038,57 @@ static void bot_modbus(const char *args, bool cz, char *out, size_t len)
     xSemaphoreGive(s_lock);
 }
 
+/* ---------------------------------------------------------------- reports */
+
+static int report_devices(gw_rdev_t *out, int max)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int n = 0;
+    for (int i = 0; i < s_ndev && n < max; i++, n++) {
+        strlcpy(out[n].id, s_dev[i].id, sizeof(out[n].id));
+        strlcpy(out[n].name, s_dev[i].name, sizeof(out[n].name));
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
+/* the measurements of a device (not its settings, diagnostics or controls) */
+static int report_values(const char *dev, bool cz, gw_rv_t *out, int max)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const mbdev_t *d = find_dev(dev);
+    if (!d || !d->enabled || !d->online || !d->t || d->nent != d->t->t.nent) {
+        xSemaphoreGive(s_lock);
+        return -1;
+    }
+    int n = 0;
+    for (int k = 0; k < d->nent && n < max; k++) {
+        const mb_entity_t *e = &d->t->t.ent[k];
+        if (e->category[0] || e->write || e->space_none || e->type == MB_T_STR || d->vstate[k] != VAL_OK) {
+            continue;
+        }
+        gw_rv_t *v = &out[n++];
+        memset(v, 0, sizeof(*v));
+        strlcpy(v->key, e->key, sizeof(v->key));
+        strlcpy(v->name, cz && e->name_cs[0] ? e->name_cs : e->name, sizeof(v->name));
+        strlcpy(v->unit, e->unit, sizeof(v->unit));
+        v->precision = e->precision;
+        const char *label = e->nopts ? mb_entity_label(e, d->val[k]) : NULL;
+        if (label || e->type == MB_T_BOOL) {
+            strlcpy(v->text, label ? label : d->val[k] ? (cz ? "zap" : "on") : (cz ? "vyp" : "off"), sizeof(v->text));
+            v->kind = GW_RV_STATE;
+        } else {
+            v->num = true;
+            v->value = d->val[k];
+            v->kind = !strcmp(e->state_class, "measurement") ? GW_RV_MEASURE
+                      : !strncmp(e->state_class, "total", 5) ? GW_RV_TOTAL
+                                                             : GW_RV_STATE;
+        }
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
 /* ---------------------------------------------------------------- start */
 
 esp_err_t modbus_init(void)
@@ -2070,6 +2128,7 @@ esp_err_t modbus_init(void)
     mb_scan_init();
     mb_server_init();
     gw_bot_command("modbus", "values of the Modbus devices", "hodnoty zařízení Modbus", "system/rs485", 1, false, bot_modbus);
+    gw_report_source("modbus", "Modbus", "Modbus", "system/rs485", report_devices, report_values);
     gw_mqtt_set_extension(mqtt_discovery, NULL);
     gw_mqtt_add_command("modbus/+/+/set", mqtt_command);
     ESP_LOGI(TAG, "%d devices", s_ndev);

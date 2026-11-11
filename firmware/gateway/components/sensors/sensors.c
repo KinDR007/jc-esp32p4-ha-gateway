@@ -782,6 +782,62 @@ static void bot_sensors(const char *args, bool cz, char *out, size_t len)
     xSemaphoreGive(s_lock);
 }
 
+/* ---------------------------------------------------------------- reports */
+
+static void sensor_id(const sensor_t *s, char *id, size_t len)
+{
+    snprintf(id, len, s->bus ? "i2c2_%02x" : "i2c_%02x", s->addr);
+}
+
+static int report_devices(gw_rdev_t *out, int max)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    int n = 0;
+    for (int i = 0; i < s_count && n < max; i++, n++) {
+        sensor_id(&s_sens[i], out[n].id, sizeof(out[n].id));
+        strlcpy(out[n].name, s_sens[i].name, sizeof(out[n].name));
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
+static int report_values(const char *dev, bool cz, gw_rv_t *out, int max)
+{
+    static const char *const cs_names[SQ_COUNT] = {
+        [SQ_TEMPERATURE] = "Teplota", [SQ_HUMIDITY] = "Vlhkost", [SQ_PRESSURE] = "Tlak", [SQ_ILLUMINANCE] = "Osvětlení",
+        [SQ_AQI] = "Index kvality vzduchu", [SQ_GAS] = "Odpor plynu",
+    };
+    int64_t now = esp_timer_get_time();
+    int n = -1;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    for (int i = 0; i < s_count && n < 0; i++) {
+        const sensor_t *s = &s_sens[i];
+        char id[16];
+        sensor_id(s, id, sizeof(id));
+        if (strcmp(id, dev) != 0 || !fresh(s, now)) {
+            continue;
+        }
+        n = 0;
+        for (int q = 0; q < SQ_COUNT && n < max; q++) {
+            if (!(s->val.have & (1u << q))) {
+                continue;
+            }
+            const sdrv_quantity_t *qd = &sdrv_quantity[q];
+            gw_rv_t *v = &out[n++];
+            memset(v, 0, sizeof(*v));
+            strlcpy(v->key, qd->key, sizeof(v->key));
+            strlcpy(v->name, cz && cs_names[q] ? cs_names[q] : qd->name, sizeof(v->name));
+            strlcpy(v->unit, qd->unit ? qd->unit : "", sizeof(v->unit));
+            v->precision = (int8_t)qd->precision;
+            v->value = rounded(s->val.v[q], qd->precision);
+            v->num = true;
+            v->kind = GW_RV_MEASURE;
+        }
+    }
+    xSemaphoreGive(s_lock);
+    return n;
+}
+
 /* ---------------------------------------------------------------- second bus */
 
 void sensors_set_bus2(i2c_master_bus_handle_t bus, int sda, int scl, uint32_t hz)
@@ -826,6 +882,7 @@ esp_err_t sensors_init(void)
     gw_http_register("/api/sensors", HTTP_PUT, sensors_put);
     gw_http_register("/api/sensors/scan", HTTP_POST, scan_post);
     gw_bot_command("sensors", "values of the I2C sensors", "hodnoty I2C senzorů", "system/hw", 1, false, bot_sensors);
+    gw_report_source("sensors", "I2C sensors", "Senzory I2C", "system/hw", report_devices, report_values);
     gw_mqtt_set_extension(mqtt_discovery, mqtt_state);
     if (!gw_i2c_bus()) {
         ESP_LOGE(TAG, "no I2C bus, sensors off");

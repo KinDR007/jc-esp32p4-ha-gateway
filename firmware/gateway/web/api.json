@@ -5277,6 +5277,172 @@
           ]
         },
         {
+          "method": "GET",
+          "path": "/api/auth/telegram/reports",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "The own periodic Telegram reports, the devices they may cover and the limits.",
+            "cs": "Vlastní periodické zprávy do Telegramu, zařízení, která mohou zahrnout, a limity."
+          },
+          "body": null,
+          "body_type": "none",
+          "response": {
+            "reports": [
+              {
+                "id": 1,
+                "name": "Daily summary",
+                "devices": [
+                  "modbus:d1",
+                  "sensors:i2c_76",
+                  "gpio:2"
+                ],
+                "period_min": 1440,
+                "at": 420,
+                "weekday": 0,
+                "enabled": true,
+                "period_start": 1794380400,
+                "period_end": 1794466800,
+                "next_s": 52000
+              }
+            ],
+            "sources": [
+              {
+                "id": "modbus",
+                "name": "Modbus",
+                "name_cs": "Modbus",
+                "devices": [
+                  {
+                    "id": "modbus:d1",
+                    "name": "House meter"
+                  }
+                ]
+              }
+            ],
+            "limits": {
+              "reports": 4,
+              "devices": 8,
+              "period_min": 15,
+              "period_max": 10080,
+              "presets": [
+                15,
+                30,
+                60,
+                360,
+                720,
+                1440,
+                10080
+              ]
+            },
+            "paired": true
+          },
+          "errors": [
+            {
+              "code": 409,
+              "when": {
+                "en": "Not a signed-in user (an API token has no reports).",
+                "cs": "Nejde o přihlášeného uživatele (API token zprávy nemá)."
+              }
+            }
+          ],
+          "effects": {
+            "en": "sources lists only the devices the user may read (Modbus: System › RS485, I2C sensors and GPIO: System › Hardware). period_start and period_end: the current period (Unix time); next_s: seconds to the next report, -1 when off. Periods run by the gateway's clock and time zone: whole days from at (minutes after midnight) of a day, 7 days from at of weekday (0 Monday), parts of a day from at + k × period, other periods in steps from at of Monday 2024-01-01.",
+            "cs": "sources obsahuje jen zařízení, která uživatel smí číst (Modbus: Systém › RS485, senzory I2C a GPIO: Systém › Hardware). period_start a period_end: aktuální období (Unix čas); next_s: sekundy do další zprávy, -1 když je vypnutá. Období běží podle hodin a časového pásma brány: celé dny od at (minuty po půlnoci) dne, 7 dní od at dne weekday (0 pondělí), části dne od at + k × perioda, jiné periody po krocích od at pondělí 2024-01-01."
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/auth/telegram/reports",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Replaces the own periodic Telegram reports.",
+            "cs": "Nahradí vlastní periodické zprávy do Telegramu."
+          },
+          "body": {
+            "reports": [
+              {
+                "id": 1,
+                "name": "Daily summary",
+                "devices": [
+                  "modbus:d1",
+                  "sensors:i2c_76",
+                  "gpio:2"
+                ],
+                "period_min": 1440,
+                "at": 420,
+                "weekday": 0,
+                "enabled": true
+              }
+            ]
+          },
+          "body_type": "json",
+          "response": {
+            "...": "same as GET /api/auth/telegram/reports"
+          },
+          "errors": [
+            {
+              "code": 400,
+              "when": {
+                "en": "More than 4 reports; name not 1-40 characters; devices not 1-8 of the listed ones; period_min not 15-10080; at not 0-1439; weekday not 0-6; id not 1-255 or twice.",
+                "cs": "Víc než 4 zprávy; name mimo 1-40 znaků; devices mimo 1-8 z nabízených; period_min mimo 15-10080; at mimo 0-1439; weekday mimo 0-6; id mimo 1-255 nebo dvakrát."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Not a signed-in user.",
+                "cs": "Nejde o přihlášeného uživatele."
+              }
+            }
+          ],
+          "effects": {
+            "en": "Send the reports to keep with their id; a report without id gets one. One whose devices and schedule stay keeps its period and samples. Saving makes the gateway sample at once (else every 60 s). at defaults to 420 (07:00), enabled to true.",
+            "cs": "Pošlete i zprávy, které mají zůstat, s jejich id; zpráva bez id ho dostane. Zpráva se stejnými zařízeními a časováním si ponechá období a vzorky. Uložení spustí vzorkování hned (jinak každých 60 s). at je výchozí 420 (07:00), enabled true."
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/telegram/reports/send",
+          "perm": "self",
+          "level": 1,
+          "summary": {
+            "en": "Sends an own report now (the period so far), or returns its text.",
+            "cs": "Pošle vlastní zprávu hned (dosavadní období), nebo vrátí její text."
+          },
+          "body": {
+            "id": 1,
+            "preview": false
+          },
+          "body_type": "json",
+          "response": {
+            "parts": [
+              "📊 <b>Daily summary</b> · p4gw-xxxxxx\n11.11. 07:00 – 11.11. 08:27\n\n<b>House meter</b>\n• Voltage L1: 230.1 V <i>(min 228.4 · max 233.0 · ⌀ 230.6)</i>\n• Import energy: 1012.34 kWh <i>(+12.34 kWh in the period)</i>"
+            ],
+            "sent": true
+          },
+          "errors": [
+            {
+              "code": 404,
+              "when": {
+                "en": "No such report.",
+                "cs": "Taková zpráva není."
+              }
+            },
+            {
+              "code": 409,
+              "when": {
+                "en": "Not paired with Telegram (unless preview), the clock is not set, or not a signed-in user.",
+                "cs": "Nespárováno s Telegramem (kromě preview), hodiny nejsou nastavené, nebo nejde o přihlášeného uživatele."
+              }
+            }
+          ],
+          "effects": {
+            "en": "parts: the Telegram HTML messages (split at 4000 bytes). The period goes on. Values: current; measured ones with minimum, maximum and average since the start of the period (since a restart within it, said in the text); counters with the difference since the start of the period (start values kept in NVS). In the user's quiet hours a report comes without sound.",
+            "cs": "parts: zprávy v HTML Telegramu (dělené po 4000 bajtech). Období běží dál. Hodnoty: aktuální; měřené s minimem, maximem a průměrem od začátku období (od restartu v něm, text to uvádí); čítače s rozdílem od začátku období (počáteční hodnoty v NVS). V tichých hodinách uživatele přijde zpráva bez zvuku."
+          }
+        },
+        {
           "method": "POST",
           "path": "/api/auth/telegram/unpair",
           "perm": "self",

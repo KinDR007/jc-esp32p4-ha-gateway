@@ -45,7 +45,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 | [docs/sensors.md](docs/sensors.md) | I2C sensors on connector CN3 |
 | [docs/gpio.md](docs/gpio.md) | free GPIO of header JP1: input, output, PWM, counter, UART-TCP bridge, I2C bus 2, 1-Wire, WS2812, Home Assistant |
 | [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |
-| [docs/notifications.md](docs/notifications.md) | notifications, Home Assistant, Telegram bot and its commands |
+| [docs/notifications.md](docs/notifications.md) | notifications, Home Assistant, Telegram bot and its commands, periodic reports |
 | [docs/home-assistant.md](docs/home-assistant.md) | Home Assistant setup per role, P4 Gateway integration, MQTT |
 | [docs/zadani.md](docs/zadani.md) | original assignment and feasibility analysis (Czech) |
 | [docs/sound-detection.md](docs/sound-detection.md) | sound event detection: research and proposal (Czech, pending) |

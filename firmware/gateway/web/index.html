@@ -927,13 +927,14 @@ function accountSetup(why) {
   return setupPromise;
 }
 
-/* Generic modal form: fields by name; submit resolves after save(values) succeeds, errors stay in the dialog. */
+/* Generic modal form: fields by name; submit resolves after save(values) succeeds, errors stay in the dialog.
+ * opts.ok: the submit label; opts.required: no way out but submit; opts.single: no Cancel (a dialog to read). */
 function formDialog(title, html, save, opts = {}) {
   return new Promise(resolve => {
     const dlg = $('#form-dlg'), form = $('#form-dlg-form');
     form.innerHTML = `<h3 style="margin-top:0">${title}</h3>${html}<div class="login-err" id="fd-err"></div>
       <div class="row"><button class="btn primary" type="submit">${ic('check')}${opts.ok || L('Save', 'Uložit')}</button>
-      ${opts.required ? '' : `<button class="btn" type="button" id="fd-cancel">${L('Cancel', 'Zrušit')}</button>`}</div>`;
+      ${opts.required || opts.single ? '' : `<button class="btn" type="button" id="fd-cancel">${L('Cancel', 'Zrušit')}</button>`}</div>`;
     const done = v => { dlg.close(); resolve(v); };
     $('#fd-cancel') && ($('#fd-cancel').onclick = () => done(null));
     dlg.oncancel = ev => { ev.preventDefault(); if (!opts.required) done(null); };
@@ -1250,6 +1251,7 @@ const ICONS = {
   'book-open-variant': 'M12 21.5C10.65 20.65 8.2 20 6.5 20C4.85 20 3.15 20.3 1.75 21.05C1.65 21.1 1.6 21.1 1.5 21.1C1.25 21.1 1 20.85 1 20.6V6C1.6 5.55 2.25 5.25 3 5C4.11 4.65 5.33 4.5 6.5 4.5C8.45 4.5 10.55 4.9 12 6C13.45 4.9 15.55 4.5 17.5 4.5C18.67 4.5 19.89 4.65 21 5C21.75 5.25 22.4 5.55 23 6V20.6C23 20.85 22.75 21.1 22.5 21.1C22.4 21.1 22.35 21.1 22.25 21.05C20.85 20.3 19.15 20 17.5 20C15.8 20 13.35 20.65 12 21.5M12 8V19.5C13.35 18.65 15.8 18 17.5 18C18.7 18 19.9 18.15 21 18.5V7C19.9 6.65 18.7 6.5 17.5 6.5C15.8 6.5 13.35 7.15 12 8M13 11.5C14.11 10.82 15.6 10.5 17.5 10.5C18.41 10.5 19.26 10.59 20 10.78V9.23C19.13 9.08 18.29 9 17.5 9C15.73 9 14.23 9.28 13 9.84V11.5M17.5 11.67C15.79 11.67 14.29 11.93 13 12.46V14.15C14.11 13.5 15.6 13.16 17.5 13.16C18.54 13.16 19.38 13.24 20 13.4V11.9C19.13 11.74 18.29 11.67 17.5 11.67M20 14.57C19.13 14.41 18.29 14.33 17.5 14.33C15.67 14.33 14.17 14.6 13 15.13V16.82C14.11 16.16 15.6 15.83 17.5 15.83C18.54 15.83 19.38 15.91 20 16.07V14.57Z',
   'brain': 'M21.33,12.91C21.42,14.46 20.71,15.95 19.44,16.86L20.21,18.35C20.44,18.8 20.47,19.33 20.27,19.8C20.08,20.27 19.69,20.64 19.21,20.8L18.42,21.05C18.25,21.11 18.06,21.14 17.88,21.14C17.37,21.14 16.89,20.91 16.56,20.5L14.44,18C13.55,17.85 12.71,17.47 12,16.9C11.5,17.05 11,17.13 10.5,17.13C9.62,17.13 8.74,16.86 8,16.34C7.47,16.5 6.93,16.57 6.38,16.56C5.59,16.57 4.81,16.41 4.08,16.11C2.65,15.47 1.7,14.07 1.65,12.5C1.57,11.78 1.69,11.05 2,10.39C1.71,9.64 1.68,8.82 1.93,8.06C2.3,7.11 3,6.32 3.87,5.82C4.45,4.13 6.08,3 7.87,3.12C9.47,1.62 11.92,1.46 13.7,2.75C14.12,2.64 14.56,2.58 15,2.58C16.36,2.55 17.65,3.15 18.5,4.22C20.54,4.75 22,6.57 22.08,8.69C22.13,9.8 21.83,10.89 21.22,11.82C21.29,12.18 21.33,12.54 21.33,12.91M16.33,11.5C16.9,11.57 17.35,12 17.35,12.57A1,1 0 0,1 16.35,13.57H15.72C15.4,14.47 14.84,15.26 14.1,15.86C14.35,15.95 14.61,16 14.87,16.07C20,16 19.4,12.87 19.4,12.82C19.34,11.39 18.14,10.27 16.71,10.33A1,1 0 0,1 15.71,9.33A1,1 0 0,1 16.71,8.33C17.94,8.36 19.12,8.82 20.04,9.63C20.09,9.34 20.12,9.04 20.12,8.74C20.06,7.5 19.5,6.42 17.25,6.21C16,3.25 12.85,4.89 12.85,5.81V5.81C12.82,6.04 13.06,6.53 13.1,6.56A1,1 0 0,1 14.1,7.56C14.1,8.11 13.65,8.56 13.1,8.56V8.56C12.57,8.54 12.07,8.34 11.67,8C11.19,8.31 10.64,8.5 10.07,8.56V8.56C9.5,8.61 9.03,8.21 9,7.66C8.92,7.1 9.33,6.61 9.88,6.56C10.04,6.54 10.82,6.42 10.82,5.79V5.79C10.82,5.13 11.07,4.5 11.5,4C10.58,3.75 9.59,4.08 8.59,5.29C6.75,5 6,5.25 5.45,7.2C4.5,7.67 4,8 3.78,9C4.86,8.78 5.97,8.87 7,9.25C7.5,9.44 7.78,10 7.59,10.54C7.4,11.06 6.82,11.32 6.3,11.13C5.57,10.81 4.75,10.79 4,11.07C3.68,11.34 3.68,11.9 3.68,12.34C3.68,13.08 4.05,13.77 4.68,14.17C5.21,14.44 5.8,14.58 6.39,14.57C6.24,14.31 6.11,14.04 6,13.76C5.81,13.22 6.1,12.63 6.64,12.44C7.18,12.25 7.77,12.54 7.96,13.08C8.36,14.22 9.38,15 10.58,15.13C11.95,15.06 13.17,14.25 13.77,13C14,11.62 15.11,11.5 16.33,11.5M18.33,18.97L17.71,17.67L17,17.83L18,19.08L18.33,18.97M13.68,10.36C13.7,9.83 13.3,9.38 12.77,9.33C12.06,9.29 11.37,9.53 10.84,10C10.27,10.58 9.97,11.38 10,12.19A1,1 0 0,0 11,13.19C11.57,13.19 12,12.74 12,12.19C12,11.92 12.07,11.65 12.23,11.43C12.35,11.33 12.5,11.28 12.66,11.28C13.21,11.31 13.68,10.9 13.68,10.36Z',
   'bridge': 'M7,14V10.91C6.28,10.58 5.61,10.18 5,9.71V14H7M5,18H3V16H1V14H3V7H5V8.43C6.8,10 9.27,11 12,11C14.73,11 17.2,10 19,8.43V7H21V14H23V16H21V18H19V16H5V18M17,10.91V14H19V9.71C18.39,10.18 17.72,10.58 17,10.91M16,14V11.32C15.36,11.55 14.69,11.72 14,11.84V14H16M13,14V11.96L12,12L11,11.96V14H13M10,14V11.84C9.31,11.72 8.64,11.55 8,11.32V14H10Z',
+  'calendar-clock': 'M15,13H16.5V15.82L18.94,17.23L18.19,18.53L15,16.69V13M19,8H5V19H9.67C9.24,18.09 9,17.07 9,16A7,7 0 0,1 16,9C17.07,9 18.09,9.24 19,9.67V8M5,21C3.89,21 3,20.1 3,19V5C3,3.89 3.89,3 5,3H6V1H8V3H16V1H18V3H19A2,2 0 0,1 21,5V11.1C22.24,12.36 23,14.09 23,16A7,7 0 0,1 16,23C14.09,23 12.36,22.24 11.1,21H5M16,11.15A4.85,4.85 0 0,0 11.15,16C11.15,18.68 13.32,20.85 16,20.85A4.85,4.85 0 0,0 20.85,16C20.85,13.32 18.68,11.15 16,11.15Z',
   'cellphone-key': 'M7 1C5.9 1 5 1.9 5 3V7H7V4H17V20H7V17H5V21C5 22.1 5.9 23 7 23H17C18.1 23 19 22.1 19 21V3C19 1.9 18.1 1 17 1H7M6 9C4.3 9 3 10.3 3 12S4.3 15 6 15C7.3 15 8.4 14.2 8.8 13H11V15H13V13H15V11H8.8C8.4 9.8 7.3 9 6 9M6 11C6.6 11 7 11.4 7 12S6.6 13 6 13 5 12.6 5 12 5.4 11 6 11Z',
   'check': 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z',
   'chevron-down': 'M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z',
@@ -5402,7 +5404,8 @@ views['profile'] = () => `<div class="grid"><div class="card">${h3('account-circ
     <div class="row" style="margin-top:12px"><button class="btn" id="prof-pass">${ic('key-outline')}${L('Change password', 'Změnit heslo')}</button>
       <button class="btn" id="prof-revoke">${ic('logout')}${L('Sign out other sessions', 'Odhlásit ostatní relace')}</button></div></div>
   <div class="card">${h3('cellphone-key', L('Two-factor sign-in', 'Dvoufázové přihlášení'))}<div id="prof-totp"></div></div>
-  <div class="card wide">${h3('send', L('Telegram and notifications', 'Telegram a notifikace'))}<div id="prof-tg"></div></div></div>`;
+  <div class="card wide">${h3('send', L('Telegram and notifications', 'Telegram a notifikace'))}<div id="prof-tg"></div></div>
+  <div class="card wide">${h3('calendar-clock', L('Periodic reports', 'Periodické zprávy'))}<div id="prof-rep"></div></div></div>`;
 
 const TOPIC_NAMES = () => ({ security: L('Security', 'Zabezpečení'), system: L('System', 'Systém'), network: L('Network', 'Síť'), sound: L('Sounds', 'Zvuky') });
 const TG_LEVELS = () => [L('Off', 'Vypnuto'), L('Critical only', 'Jen kritické'), L('Warnings and critical', 'Varování a kritické'), L('All', 'Vše')];
@@ -5427,9 +5430,91 @@ async function loadProfileTelegram() {
     <p class="muted">${L('Sound notifications can be muted for a while from the chat: /mute 1h.', 'Notifikace zvuků jde z chatu na chvíli ztlumit: /mute 1h.')}</p></div>`;
 }
 
+/* periodic reports to the own Telegram chat (/api/auth/telegram/reports) */
+let rep = null;
+const REP_PERIODS = () => [[15, '15 min'], [30, '30 min'], [60, L('1 hour', '1 hodina')], [360, L('6 hours', '6 hodin')], [720, L('12 hours', '12 hodin')],
+  [1440, L('1 day', '1 den')], [10080, L('7 days', '7 dní')]];
+const REP_DAYS = () => L('Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', 'pondělí,úterý,středa,čtvrtek,pátek,sobota,neděle').split(',');
+const repHM = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+/* the report text as Telegram shows it: only <b> and <i> */
+const repHtml = t => esc(t).replace(/&lt;(\/?)(b|i)&gt;/g, '<$1$2>');
+async function loadProfileReports() {
+  if (!$('#prof-rep')) return;
+  try { rep = await api('/api/auth/telegram/reports'); } catch (e) { $('#prof-rep').innerHTML = `<p class="muted" data-notr>${esc(e.message)}</p>`; return; }
+  renderReports();
+}
+function renderReports() {
+  const box = $('#prof-rep');
+  if (!box || !rep) return;
+  const custom = r => !REP_PERIODS().some(([m]) => m === r.period_min);
+  box.innerHTML = `<div data-notr><p class="muted">${L('Values of the chosen devices sent to your Telegram chat: the current ones, and over the period the minimum, maximum and average of measured values and the difference of counters (energy, pulses). Periods run by the clock from the time given; in quiet hours a report comes without sound.',
+    'Hodnoty zvolených zařízení do vašeho chatu v Telegramu: aktuální, a za období minimum, maximum a průměr měřených veličin a rozdíl čítačů (energie, pulzy). Období běží podle hodin od zadaného času; v tichých hodinách přijde zpráva bez zvuku.')}</p>
+    ${rep.paired ? '' : `<p class="warn-text">${L('Pair your Telegram chat above to receive them.', 'Aby chodily, spárujte výše svůj chat v Telegramu.')}</p>`}
+    ${rep.reports.map((r, i) => `<div class="rep" data-rep="${i}" style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px">
+      <div class="row">
+        <label class="field" style="margin:0;flex:1"><span>${L('Name', 'Název')}</span><input type="text" data-rk="name" maxlength="40" value="${esc(r.name)}"></label>
+        <label class="field" style="margin:0"><span>${L('Every', 'Každých')}</span><select data-rk="period">${REP_PERIODS().map(([m, l]) => `<option value="${m}" ${m === r.period_min ? 'selected' : ''}>${l}</option>`).join('')}
+          <option value="custom" ${custom(r) ? 'selected' : ''}>${L('own (minutes)', 'vlastní (minuty)')}</option></select></label>
+        <label class="field ${custom(r) ? '' : 'hidden'}" style="margin:0" data-rk-show="custom"><span>${L('Minutes', 'Minut')}</span><input type="number" data-rk="minutes" min="${rep.limits.period_min}" max="${rep.limits.period_max}" value="${r.period_min}" style="width:90px"></label>
+        <label class="field ${r.period_min === 10080 ? '' : 'hidden'}" style="margin:0" data-rk-show="week"><span>${L('Day', 'Den')}</span><select data-rk="weekday">${REP_DAYS().map((d, k) => `<option value="${k}" ${k === r.weekday ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+        <label class="field" style="margin:0"><span>${L('From', 'Od')}</span><input type="time" data-rk="at" value="${repHM(r.at ?? 420)}"></label>
+        <label style="align-self:end"><input type="checkbox" data-rk="enabled" ${r.enabled !== false ? 'checked' : ''}> ${L('on', 'zapnuto')}</label></div>
+      <div class="row" style="flex-wrap:wrap;gap:4px 16px;margin-top:6px">${rep.sources.map(s => s.devices.length ? `<div><b>${esc(lang === 'cs' ? s.name_cs : s.name)}</b>${s.devices.map(d =>
+        `<label style="display:block"><input type="checkbox" data-rk-dev="${esc(d.id)}" ${(r.devices || []).includes(d.id) ? 'checked' : ''}> ${esc(d.name)}</label>`).join('')}</div>` : '').join('')
+        || `<span class="muted">${L('No device to report yet (Modbus, I2C sensors, GPIO).', 'Zatím žádné zařízení (Modbus, senzory I2C, GPIO).')}</span>`}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" data-rep-preview="${i}" ${r.id ? '' : 'disabled'}>${ic('eye-outline')}${L('Preview', 'Náhled')}</button>
+        <button class="btn" data-rep-send="${i}" ${r.id && rep.paired ? '' : 'disabled'}>${ic('send')}${L('Send now', 'Odeslat teď')}</button>
+        <button class="btn icon" data-rep-del="${i}" title="${L('Remove', 'Odebrat')}">${ic('delete-outline')}</button>
+        <span class="muted">${r.id && r.enabled && r.next_s >= 0 ? L(`next ${fmtTime(r.period_end)}`, `další ${fmtTime(r.period_end)}`) : r.id ? '' : L('not saved yet', 'zatím neuloženo')}</span></div></div>`).join('')}
+    <div class="row" style="margin-top:12px"><button class="btn" id="rep-add" ${rep.reports.length >= rep.limits.reports ? 'disabled' : ''}>${ic('plus')}${L('Add a report', 'Přidat zprávu')}</button>
+      <button class="btn primary" id="rep-save">${ic('check')}${L('Save', 'Uložit')}</button></div></div>`;
+}
+/* the reports as the form shows them */
+function repCollect() {
+  return [...document.querySelectorAll('[data-rep]')].map(el => {
+    const r = rep.reports[+el.dataset.rep], q = k => el.querySelector(`[data-rk="${k}"]`);
+    const per = q('period').value, [h, m] = (q('at').value || '07:00').split(':').map(Number);
+    const o = { name: q('name').value.trim(), devices: [...el.querySelectorAll('[data-rk-dev]:checked')].map(x => x.dataset.rkDev),
+      period_min: per === 'custom' ? +q('minutes').value : +per, at: h * 60 + m, weekday: +q('weekday').value, enabled: q('enabled').checked };
+    if (r.id) o.id = r.id;
+    return o;
+  });
+}
+document.addEventListener('change', e => {
+  const el = e.target.closest('[data-rep]');
+  if (el && e.target.dataset.rk === 'period') {
+    el.querySelector('[data-rk-show="custom"]').classList.toggle('hidden', e.target.value !== 'custom');
+    el.querySelector('[data-rk-show="week"]').classList.toggle('hidden', e.target.value !== '10080');
+  }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('#rep-add, #rep-save, [data-rep-preview], [data-rep-send], [data-rep-del]');
+  if (!b || !rep) return;
+  try {
+    if (b.id === 'rep-add') {
+      rep.reports = [...repCollect(), { name: L('Daily summary', 'Denní souhrn'), devices: [], period_min: 1440, at: 420, weekday: 0, enabled: true }];
+      renderReports();
+    } else if (b.dataset.repDel !== undefined) {
+      rep.reports = repCollect().filter((_, i) => i !== +b.dataset.repDel);
+      renderReports();
+      toast(L('Removed; Save to keep it so', 'Odebráno; uložte, aby to platilo'));
+    } else if (b.id === 'rep-save') {
+      rep = await api('/api/auth/telegram/reports', { method: 'PUT', json: { reports: repCollect() } });
+      renderReports();
+      toast(L('Saved', 'Uloženo'));
+    } else {
+      const r = rep.reports[+(b.dataset.repPreview ?? b.dataset.repSend)];
+      const res = await api('/api/auth/telegram/reports/send', { json: { id: r.id, preview: b.dataset.repPreview !== undefined } });
+      if (res.sent) toast(L('Sent; it arrives within a few seconds', 'Odesláno; dorazí do několika sekund'));
+      else formDialog(L('Preview', 'Náhled'), `<div style="white-space:pre-wrap;max-height:60vh;overflow:auto" data-notr>${res.parts.map(repHtml).join('<hr>')}</div>`, () => true, { ok: L('Close', 'Zavřít'), single: true });
+    }
+  } catch (err) { toast(err.message); }
+});
+
 async function loadProfile() {
   try { me = await api('/api/auth/me'); } catch (e) { return toast(e.message); }
-  if (!me.open) loadProfileTelegram();
+  if (!me.open) loadProfileTelegram(), loadProfileReports();
   if (me.open) {
     $('#prof-info').innerHTML = `<p data-notr>${L('The gateway has no users yet.', 'Brána zatím nemá uživatele.')} <a href="#system/users/list">${L('Create the admin account', 'Vytvořte účet správce')}</a>.</p>`;
     $('#prof-totp').innerHTML = '';

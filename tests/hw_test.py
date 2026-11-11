@@ -1413,6 +1413,130 @@ def tc57_modbus_emulation():
     check(len(http('GET', '/api/modbus')[1]['devices']) == len(keep['devices']), 'devices of before restored')
 
 
+def tc58_reports():
+    """Periodic Telegram reports (/api/auth/telegram/reports) of a temporary user, checked through the preview: an
+    ABB B23 of the simulator of this computer as the device, its values changed between samples (a save makes
+    the gateway sample at once): current values, minimum, maximum and average of a measured value, the
+    difference of a counter; periods aligned to the clock (15 min, a day from 07:00, a week from Wednesday
+    07:00); invalid reports refused; sending without a paired chat refused; after a restart the counter's
+    difference stays (start values in NVS) and the report says min/max/average restarted. The configuration
+    of before comes back."""
+    import subprocess
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    sim_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus', 'sim_tcp.py')
+    sim = subprocess.Popen([sys.executable, sim_py, '--port', '1512', '--lenient', 'abb_b23:1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'source', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+    name, pw = 'tc58user', 'tc58-Reports-pass'
+    user = Client()
+
+    def sign_in():
+        code, r = user.req('POST', '/api/auth/login', {'user': name, 'password': pw})
+        check(code == 200, f'{name} signed in')
+
+    def write(addr, regs):
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'tcp', 'host': my_ip, 'port': 1512, 'slave': 1, 'fc': 16, 'addr': addr, 'values': regs})
+        check(code == 200 and r['ok'], f'simulator 0x{addr:04x} = {regs}')
+
+    def resample(reports):
+        time.sleep(4)  # the device read again (every 2 s)
+        check(user.req('PUT', '/api/auth/telegram/reports', {'reports': reports})[0] == 200, 'saved again: sampled at once')
+        time.sleep(1.5)
+
+    def preview(rid):
+        code, r = user.req('POST', '/api/auth/telegram/reports/send', {'id': rid, 'preview': True})
+        check(code == 200 and r['parts'] and not r['sent'], f'preview of report {rid}')
+        return '\n'.join(r['parts'])
+
+    try:
+        check(http('POST', '/api/users', {'name': name, 'role': 'admin', 'password': pw, 'must_change': False})[0] == 200, 'temporary user')
+        sign_in()
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + [{'name': 'TC58 B23', 'template': 'abb_b23', 'transport': 'tcp', 'host': my_ip,
+                                                                         'port': 1512, 'slave': 1, 'poll_s': 2, 'expose': 'none'}]})[0] == 200, 'ABB B23 added')
+        mid = next(d['id'] for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == 'TC58 B23')
+        dev = f'modbus:{mid}'
+        code, r = user.req('GET', '/api/auth/telegram/reports')
+        devs = [d['id'] for s in r['sources'] for d in s['devices']]
+        check(code == 200 and dev in devs and r['limits']['reports'] == 4 and 1440 in r['limits']['presets'], f'sources offer {dev} ({len(devs)} devices)')
+        check(http('GET', '/api/auth/telegram/reports')[0] == 409, 'an API token has no reports (409)')
+        good = {'name': 'TC58 day', 'devices': [dev], 'period_min': 1440, 'at': 420}
+        for bad, why in (([dict(good, period_min=10)], 'period 10 min'), ([dict(good, devices=['modbus:zz9'])], 'unknown device'),
+                         ([dict(good, name='')], 'no name'), ([good] * 5, 'five reports'), ([dict(good, at=1440)], 'at 1440'),
+                         ([dict(good, devices=[dev] * 9)], 'nine devices')):
+            check(user.req('PUT', '/api/auth/telegram/reports', {'reports': bad})[0] == 400, f'refused: {why}')
+
+        write(0x5B00, [0, 2300])
+        write(0x5000, [0, 0, 1, 0x86a0])  # 1000.00 kWh
+        time.sleep(4)
+        reports = [good, {'name': 'TC58 quarter', 'devices': [dev], 'period_min': 15, 'at': 0},
+                   {'name': 'TC58 week', 'devices': [dev], 'period_min': 10080, 'at': 420, 'weekday': 2, 'enabled': False}]
+        code, r = user.req('PUT', '/api/auth/telegram/reports', {'reports': reports})
+        check(code == 200 and len(r['reports']) == 3, 'three reports stored')
+        reports = [{k: x[k] for k in ('id', 'name', 'devices', 'period_min', 'at', 'weekday', 'enabled')} for x in r['reports']]
+        day, quarter, week = r['reports']
+        tz = ZoneInfo(status()['tz_name'] or 'UTC')
+        local = lambda t: datetime.fromtimestamp(t, tz)
+        check(quarter['period_end'] - quarter['period_start'] == 900 and local(quarter['period_start']).minute % 15 == 0 and 0 < quarter['next_s'] <= 900,
+              f'15 min: {local(quarter["period_start"]):%H:%M}-{local(quarter["period_end"]):%H:%M}, next in {quarter["next_s"]} s')
+        check((local(day['period_start']).hour, local(day['period_start']).minute) == (7, 0) and day['period_end'] - day['period_start'] in (82800, 86400, 90000),
+              f'day from 07:00: {local(day["period_start"]):%d.%m. %H:%M}-{local(day["period_end"]):%d.%m. %H:%M}')
+        ws = local(week['period_start'])
+        check(ws.weekday() == 2 and (ws.hour, ws.minute) == (7, 0) and week['next_s'] == -1,
+              f'week from Wednesday 07:00: {ws:%a %d.%m. %H:%M}, off: next_s {week["next_s"]}')
+
+        write(0x5B00, [0, 2400])
+        write(0x5000, [0, 0, 1, 0x8b72])  # 1012.34 kWh
+        resample(reports)
+        write(0x5B00, [0, 2200])
+        resample(reports)
+        text = preview(day['id'])
+        line = lambda key: next((l for l in text.split('\n') if key in l), '')
+        check('TC58 B23' in text and 'TC58 day' in text, 'report names itself and the device')
+        check(re.search(r'L1: 220\.0 V <i>\(min 220\.0 · max 240\.0 · ⌀ 230\.0\)', text), f'voltage L1 now, min, max, average: {line(" L1: 2")}')
+        check(re.search(r': 1012\.34 kWh <i>\(\+12\.34 kWh', text), f'import energy and its difference: {line("1012.34")}')
+        code, r = user.req('POST', '/api/auth/telegram/reports/send', {'id': day['id']})
+        check(code == 409, f'sending without a paired chat refused ({code})')
+        code, r = http('POST', '/api/modbus/raw', {'transport': 'tcp', 'host': my_ip, 'port': 1512, 'slave': 1, 'fc': 16, 'addr': 0x5000, 'values': [70000]})
+        check(code == 400, 'a manual write of a register over 65535 refused')
+        check(user.req('POST', '/api/auth/telegram/reports/send', {'id': 99, 'preview': True})[0] == 404, 'unknown report: 404')
+
+        http('POST', '/api/reboot', {})
+        time.sleep(15)
+        wait_until('gateway back', lambda: status()['uptime_s'] < 300, 180, 3)
+        wait_until('the meter read again', lambda: next(d for d in http('GET', '/api/modbus')[1]['devices'] if d['id'] == mid)['state'] == 'ok', 60, 2)
+        sign_in()
+        time.sleep(2)
+        check(user.req('PUT', '/api/auth/telegram/reports', {'reports': reports})[0] == 200, 'saved again after the restart: sampled at once')
+        time.sleep(1.5)
+        text = preview(day['id'])
+        check(re.search(r': 1012\.34 kWh <i>\(\+12\.34 kWh', text), 'after the restart: the difference of the counter stays')
+        check(re.search(r'(restart brány|gateway restart)', text) and re.search(r'L1: 220\.0 V <i>\(min 220\.0 · max 220\.0', text),
+              'after the restart: min/max/average from then on, said so')
+
+        # the user goes with the reports left: a new user (likely in the same slot) does not get them
+        check(http('POST', '/api/users/delete', {'name': name})[0] == 200, 'user deleted with its reports left')
+        check(http('POST', '/api/users', {'name': 'tc58other', 'role': 'admin', 'password': pw, 'must_change': False})[0] == 200, 'another user')
+        other = Client()
+        check(other.req('POST', '/api/auth/login', {'user': 'tc58other', 'password': pw})[0] == 200, 'tc58other signed in')
+        code, r = other.req('GET', '/api/auth/telegram/reports')
+        check(code == 200 and r['reports'] == [], f'the new user has no reports ({len(r.get("reports", []))})')
+        check(other.req('POST', '/api/auth/telegram/reports/send', {'id': day['id'], 'preview': True})[0] == 404, 'nor a preview of the old one')
+    finally:
+        user.req('PUT', '/api/auth/telegram/reports', {'reports': []})
+        http('POST', '/api/users/delete', {'name': name})
+        http('POST', '/api/users/delete', {'name': 'tc58other'})
+        http('PUT', '/api/modbus', keep)
+        sim.terminate()
+        sim.wait(timeout=5)
+    check(len(http('GET', '/api/modbus')[1]['devices']) == len(keep['devices']), 'devices of before restored')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -2932,7 +3056,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC56', tc56_modbus_abb), ('TC57', tc57_modbus_emulation), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC56', tc56_modbus_abb), ('TC57', tc57_modbus_emulation), ('TC58', tc58_reports), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2959,7 +3083,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55', 'TC56', 'TC57')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55', 'TC56', 'TC57', 'TC58')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')
