@@ -402,8 +402,10 @@ PAGES = [
      T("Modbus devices on RS485 (connector J4) and Modbus TCP, from templates: values, writes, search, own templates.",
        "Zařízení Modbus na RS485 (konektor J4) a Modbus TCP podle šablon: hodnoty, zápisy, hledání, vlastní šablony."),
      {"RS485 BUS": T("Wiring and the bus settings (baud rate, parity, stop bits, timeout) shared by all RS485 devices; request statistics.", "Zapojení a nastavení sběrnice (rychlost, parita, stop bity, časový limit) společné všem zařízením na RS485; statistika dotazů."),
-      "ADD A DEVICE": T("Template, name, connection (RS485, Modbus TCP or GoodWe UDP) with its address, read interval and how Home Assistant shows it (integration, MQTT, both, none).", "Šablona, jméno, připojení (RS485, Modbus TCP nebo GoodWe UDP) s adresou, interval čtení a jak ho ukáže Home Assistant (integrace, MQTT, obojí, nic)."),
-      "DEVICES": T("State, main values, Home Assistant and enable per device; the arrow shows every value with controls for the writable ones.", "Stav, hlavní hodnoty, Home Assistant a zapnutí po zařízeních; šipka ukáže všechny hodnoty s ovládáním zapisovatelných."),
+      "ADD A DEVICE": T("Template, name, connection (RS485, Modbus TCP, GoodWe UDP, or <b>Emulation</b>: a virtual device showing the values of another device as this template's device) with its address or source, read interval and how Home Assistant shows it (integration, MQTT, both, none).",
+                        "Šablona, jméno, připojení (RS485, Modbus TCP, GoodWe UDP, nebo <b>Emulace</b>: virtuální zařízení, které ukazuje hodnoty jiného zařízení jako zařízení této šablony) s adresou nebo zdrojem, interval čtení a jak ho ukáže Home Assistant (integrace, MQTT, obojí, nic)."),
+      "DEVICES": T("State, main values, Home Assistant and enable per device; the arrow shows every value with controls for the writable ones. A virtual device says what it emulates and how many of its values come from the source; opened, where each value comes from.",
+                   "Stav, hlavní hodnoty, Home Assistant a zapnutí po zařízeních; šipka ukáže všechny hodnoty s ovládáním zapisovatelných. Virtuální zařízení uvádí, co emuluje a kolik jeho hodnot pochází ze zdroje; rozbalené ukáže původ každé hodnoty."),
       "FIND DEVICES": T("Tries every address (and baud rates) with a read of a template.", "Zkusí každou adresu (a rychlosti) čtením podle šablony."),
       "MANUAL REQUEST": T("Reads or writes registers; shows them as u16, s16, u32 and float32 in both word orders.", "Čte nebo zapisuje registry; ukáže je jako u16, s16, u32 a float32 v obou pořadích slov."),
       "TEMPLATES": T("Built-in and own templates: export, copy as a new one, edit with a check, import, delete (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md\">modbus.md</a>).",
@@ -411,11 +413,13 @@ PAGES = [
      T("""<ol><li>Connect A and B of the bus to J4 (and GND), set the bus to the devices' baud rate.</li>
        <li>Pick the template, the device's address and a name, press <b>Add</b>; not sure about the address: <b>Find devices</b>.</li>
        <li>The integration shows the device as its own device in Home Assistant; for MQTT choose it per device and allow the group <i>Modbus devices</i>.</li>
-       <li>No template for your device: copy a similar one, edit the registers (the manual request helps) and save.</li></ol>""",
+       <li>No template for your device: copy a similar one, edit the registers (the manual request helps) and save.</li></ol>
+       <p><b>Emulation</b> (a client that accepts only a certain meter, e.g. an inverter or a Victron GX expecting an ABB B23 while an Eastron SDM630 is connected): Add a device, template <i>ABB B23 / B24</i>, connection <i>Emulation</i>, the SDM630 as the source; then offer it under System › Modbus TCP server. Matching quantities are taken over, units converted, totals summed from the phases; it is read only (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#emulation-virtual-devices\">modbus.md</a>).</p>""",
        """<ol><li>Připojte A a B sběrnice na J4 (a GND), nastavte sběrnici na rychlost zařízení.</li>
        <li>Zvolte šablonu, adresu zařízení a jméno a stiskněte <b>Přidat</b>; adresu neznáte: <b>Najít zařízení</b>.</li>
        <li>Integrace ukáže zařízení jako samostatné zařízení v Home Assistant; pro MQTT ho zvolte po zařízení a povolte skupinu <i>Zařízení Modbus</i>.</li>
-       <li>Šablona pro vaše zařízení chybí: zkopírujte podobnou, upravte registry (pomůže ruční dotaz) a uložte.</li></ol>"""),
+       <li>Šablona pro vaše zařízení chybí: zkopírujte podobnou, upravte registry (pomůže ruční dotaz) a uložte.</li></ol>
+       <p><b>Emulace</b> (klient, který přijme jen určitý elektroměr, např. střídač nebo Victron GX čekající ABB B23, a připojený je Eastron SDM630): Přidat zařízení, šablona <i>ABB B23 / B24</i>, připojení <i>Emulace</i>, jako zdroj SDM630; pak ho nabídněte v Systém › Server Modbus TCP. Převezmou se stejné veličiny, jednotky se převedou, součty se sečtou z fází; je jen pro čtení (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#emulation-virtual-devices\">modbus.md</a>).</p>"""),
      ["system_rs485"]),
     ("system/mbscan", "lan-pending", T("System › Modbus TCP search", "Systém › Hledání Modbus TCP"),
      T("Finds Modbus TCP devices and GoodWe Wi-Fi modules in a network and adds a recognised one in one click.",
@@ -444,12 +448,14 @@ PAGES = [
        <li><b>Add a device</b>, choose it, give it a unit id on the shared port and/or an own port, <b>Save</b>.</li>
        <li>Point the client to the gateway's address, port 502 with that unit id (or the own port).</li>
        <li>Values the gateway reads anyway come from its cache within the read interval, answers to clients for the cache time; the same read of two clients goes to the device once. Other registers go to the device, at most the set rate. The RS485 bus manages about 10-20 requests a second for everything (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server\">modbus.md</a>).</li>
-       <li>Modbus TCP has no sign-in: switch writes on only where needed and list the client's address.</li></ol>""",
+       <li>Modbus TCP has no sign-in: switch writes on only where needed and list the client's address.</li>
+       <li>A virtual device (emulation) answers every read from its values in the format of its template; no read reaches its source, writes are refused (exception 1), its source offline answers exception 11.</li></ol>""",
        """<ol><li>Nejdřív přidejte zařízení v Systém › RS485 (RS485, Modbus TCP nebo GoodWe UDP).</li>
        <li><b>Přidat zařízení</b>, zvolte ho, dejte mu unit id na sdíleném portu a/nebo vlastní port, <b>Uložit</b>.</li>
        <li>V klientovi zadejte adresu brány, port 502 s tím unit id (nebo vlastní port).</li>
        <li>Hodnoty, které brána beztak čte, jdou z cache v rámci intervalu čtení, odpovědi klientům po dobu cache; stejné čtení dvou klientů jde na zařízení jednou. Ostatní registry jdou na zařízení, nejvýš v nastaveném limitu. Sběrnice RS485 zvládne zhruba 10–20 dotazů za sekundu na všechno (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/modbus.md#modbus-tcp-server\">modbus.md</a>).</li>
-       <li>Modbus TCP nemá přihlášení: zápis zapněte jen kde je potřeba a uveďte adresu klienta.</li></ol>"""),
+       <li>Modbus TCP nemá přihlášení: zápis zapněte jen kde je potřeba a uveďte adresu klienta.</li>
+       <li>Virtuální zařízení (emulace) odpovídá na každé čtení ze svých hodnot ve formátu své šablony; ke zdroji žádné čtení nejde, zápis odmítne (výjimka 1), při zdroji offline odpoví výjimkou 11.</li></ol>"""),
      ["system_mbserver"]),
     ("system/firmware/online", "cloud-download-outline", T("System › Firmware › Online update", "Systém › Firmware › Online aktualizace"),
      T("Updates from the manifest (by default the latest GitHub release), older releases (rollback).", "Aktualizace z manifestu (výchozí je poslední vydání na GitHubu), starší vydání (návrat zpět)."),
@@ -530,14 +536,18 @@ PAGES = [
                             "Odhlášení po nečinnosti, jak dlouho platí „Zůstat přihlášen“, minimální délka hesla, pokusy do zamčení a jeho délka, povinné dvoufázové přihlášení podle role.")},
      None, ["system_users_policy"]),
     ("profile", "account-circle-outline", T("My account", "Můj účet"),
-     T("Own account: password, two-factor sign-in, Telegram and notifications.", "Vlastní účet: heslo, dvoufázové přihlášení, Telegram a notifikace."),
+     T("Own account: password, two-factor sign-in, Telegram and notifications, periodic reports.", "Vlastní účet: heslo, dvoufázové přihlášení, Telegram a notifikace, periodické zprávy."),
      {"ACCOUNT": T("Change password (other sessions end), sign out other sessions.", "Změna hesla (ostatní relace skončí), odhlášení ostatních relací."),
       "TWO-FACTOR SIGN-IN": T("Set up with Google Authenticator (or another TOTP app) and 10 recovery codes.", "Nastavení s Google Authenticator (nebo jinou aplikací TOTP) a 10 záložními kódy."),
-      "TELEGRAM AND NOTIFICATIONS": T("Pair a chat, level per topic, quiet hours, language of the bot, test message.", "Spárování chatu, úroveň pro každé téma, tiché hodiny, jazyk bota, testovací zpráva.")},
+      "TELEGRAM AND NOTIFICATIONS": T("Pair a chat, level per topic, quiet hours, language of the bot, test message.", "Spárování chatu, úroveň pro každé téma, tiché hodiny, jazyk bota, testovací zpráva."),
+      "PERIODIC REPORTS": T("Up to 4 reports to the own chat: name, devices (Modbus, virtual ones too, I2C sensors, GPIO; only those the account may read), every 15 min to 7 days or own minutes, from a time of day (7 days: a weekday), on/off; <b>Preview</b>, <b>Send now</b>, the next report.",
+                            "Až 4 zprávy do vlastního chatu: název, zařízení (Modbus, i virtuální, senzory I2C, GPIO; jen ta, která účet smí číst), každých 15 min až 7 dní nebo vlastní minuty, od času (7 dní: den v týdnu), zapnutí; <b>Náhled</b>, <b>Odeslat teď</b>, další zpráva.")},
      T("""<p><b>Two-factor sign-in</b>: <b>Set up</b> › scan the QR code › enter the 6-digit code › keep the recovery codes (each signs in once instead of the app code).</p>
-       <p><b>Telegram</b>: <b>Pair</b> › open the link in Telegram and press Start (or send <code>/start &lt;code&gt;</code>). Then set the levels per topic and save.</p>""",
+       <p><b>Telegram</b>: <b>Pair</b> › open the link in Telegram and press Start (or send <code>/start &lt;code&gt;</code>). Then set the levels per topic and save.</p>
+       <p><b>Periodic reports</b>: <b>Add a report</b> › tick the devices, choose the period and the time › <b>Save</b>. A report holds the current values, the minimum, maximum and average of measured values and the difference of counters (energy, pulses) over the period; the counters' start values survive a restart. In quiet hours it comes without sound (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/notifications.md#periodic-reports\">notifications.md</a>).</p>""",
        """<p><b>Dvoufázové přihlášení</b>: <b>Nastavit</b> › naskenujte QR kód › zadejte 6místný kód › uložte si záložní kódy (každý jednou přihlásí místo kódu z aplikace).</p>
-       <p><b>Telegram</b>: <b>Spárovat</b> › otevřete odkaz v Telegramu a stiskněte Start (nebo pošlete <code>/start &lt;kód&gt;</code>). Pak nastavte úrovně pro témata a uložte.</p>"""),
+       <p><b>Telegram</b>: <b>Spárovat</b> › otevřete odkaz v Telegramu a stiskněte Start (nebo pošlete <code>/start &lt;kód&gt;</code>). Pak nastavte úrovně pro témata a uložte.</p>
+       <p><b>Periodické zprávy</b>: <b>Přidat zprávu</b> › zaškrtněte zařízení, zvolte periodu a čas › <b>Uložit</b>. Zpráva obsahuje aktuální hodnoty, minimum, maximum a průměr měřených veličin a rozdíl čítačů (energie, pulzy) za období; počáteční stavy čítačů přežijí restart. V tichých hodinách přijde bez zvuku (<a href=\"https://github.com/KinDR007/jc-esp32p4-ha-gateway/blob/main/docs/notifications.md#periodic-reports\">notifications.md</a>).</p>"""),
      ["profile"]),
 ]
 
@@ -548,7 +558,9 @@ HA = T(
     <li>With user accounts on the gateway it asks for an <b>API token</b>: create one under System › User management › API tokens (role admin, or user when the integration should not restart or update) and paste it. The token does not depend on any user or their 2FA.</li>
     <li><b>Configure</b> (integration options): per topic from which level a persistent notification appears (off, critical only, warnings and critical, all).</li></ol>
     <p>Entities: active role, Thread state, noise and noise max in dB(A), role select, sound recognition switch, one event and binary sensor per sound event,
-    <b>Notification</b> event (for automations), firmware update and <b>C6 radio firmware</b> update, restart, identify, Zigbee backup and update check buttons, diagnostic sensors.</p>
+    <b>Notification</b> event (for automations), firmware update and <b>C6 radio firmware</b> update, restart, identify, Zigbee backup and update check buttons, diagnostic sensors.
+    Devices of their own, connected via the gateway: each Modbus device set to <i>integration</i> (System › RS485) with the entities of its template, a virtual device (emulation) with its sensors only,
+    the I2C sensors (System › Hardware) and <b>&lt;host&gt; GPIO</b> with the pins set to <i>integration</i> (System › GPIO). Through MQTT instead: choose <i>MQTT</i> per device and allow its discovery group.</p>
     <h3>Thread and Matter</h3>
     <ol><li>Settings › Devices & services › Add integration › <b>OpenThread Border Router</b>, URL <code>http://&lt;gateway&gt;:8081</code>.</li>
     <li>Thread › Configure: mark the network as preferred, or join the gateway to the existing network (Thread › Settings › Apply dataset).</li>
@@ -569,7 +581,9 @@ advanced:
     <li>Když má brána uživatelské účty, integrace chce <b>API token</b>: vytvořte ho v Systém › Správa uživatelů › API tokeny (role správce, nebo uživatel, když integrace nemá restartovat ani aktualizovat) a vložte ho. Token nezávisí na žádném uživateli ani jeho 2FA.</li>
     <li><b>Konfigurovat</b> (volby integrace): pro každé téma, od jaké úrovně se zobrazí trvalé oznámení (vypnuto, jen kritické, varování a kritické, vše).</li></ol>
     <p>Entity: aktivní role, stav Thread, hluk a hluk max v dB(A), výběr role, přepínač rozpoznávání zvuků, událost a binární senzor pro každou zvukovou událost,
-    událost <b>Notifikace</b> (pro automatizace), aktualizace firmwaru a <b>firmwaru rádia C6</b>, tlačítka restart, identifikace, záloha Zigbee a kontrola aktualizace, diagnostické senzory.</p>
+    událost <b>Notifikace</b> (pro automatizace), aktualizace firmwaru a <b>firmwaru rádia C6</b>, tlačítka restart, identifikace, záloha Zigbee a kontrola aktualizace, diagnostické senzory.
+    Samostatná zařízení připojená přes bránu: každé zařízení Modbus nastavené na <i>integrace</i> (Systém › RS485) s entitami své šablony, virtuální zařízení (emulace) jen se senzory,
+    senzory I2C (Systém › Hardware) a <b>&lt;host&gt; GPIO</b> s piny nastavenými na <i>integrace</i> (Systém › GPIO). Místo toho přes MQTT: u zařízení zvolte <i>MQTT</i> a povolte jeho skupinu discovery.</p>
     <h3>Thread a Matter</h3>
     <ol><li>Nastavení › Zařízení a služby › Přidat integraci › <b>OpenThread Border Router</b>, URL <code>http://&lt;brána&gt;:8081</code>.</li>
     <li>Thread › Konfigurovat: označte síť jako preferovanou, nebo bránu připojte do existující sítě (Thread › Nastavení › Použít dataset).</li>
@@ -593,15 +607,18 @@ TELEGRAM = T(
     <tr><td><code>/thread</code>, <code>/zigbee</code></td><td>state of the role</td><td>Information, read</td><td>–</td></tr>
     <tr><td><code>/noise</code></td><td>noise in dB(A)</td><td>Sound › Live, read</td><td>–</td></tr>
     <tr><td><code>/events</code></td><td>last detections</td><td>Sound › Detection log, read</td><td>–</td></tr>
+    <tr><td><code>/modbus</code>, <code>/sensors</code>, <code>/gpio</code></td><td>values of the Modbus devices, I2C sensors, GPIO pins</td><td>System › RS485 / Hardware, read</td><td>–</td></tr>
     <tr><td><code>/update</code></td><td>gateway and C6 versions, build, release notes</td><td>System › Firmware, read</td><td>–</td></tr>
-    <tr><td><code>/install</code>, <code>/install c6</code></td><td>install the gateway firmware or the C6 package</td><td>System › Firmware, edit</td><td>yes</td></tr>
+    <tr><td><code>/releases</code></td><td>releases this gateway can install (rollback)</td><td>System › Firmware, read</td><td>–</td></tr>
+    <tr><td><code>/install</code>, <code>/install c6</code>, <code>/install v1.14</code></td><td>install the gateway firmware or the C6 package, or a listed release</td><td>System › Firmware, edit</td><td>yes</td></tr>
     <tr><td><code>/restart</code></td><td>restart C6 and P4</td><td>Radios › Status and maintenance, edit</td><td>yes</td></tr>
     <tr><td><code>/identify</code></td><td>blink the identify icon</td><td>Overview, edit</td><td>yes</td></tr>
     <tr><td><code>/role &lt;name&gt;</code></td><td>switch the role</td><td>Role, edit</td><td>yes</td></tr>
     <tr><td><code>/sound on|off</code></td><td>sound recognition</td><td>Sound › Live, edit</td><td>yes</td></tr>
     <tr><td><code>/mute 1h</code></td><td>mute sound notifications (<code>30m</code>, <code>1d</code>, <code>off</code>)</td><td>–</td><td>–</td></tr></tbody></table>
     <p>Confirmation: <b>Confirm</b> / <b>Cancel</b> buttons (2 minutes); for an account with two-factor sign-in the bot then asks for the authenticator code — send it as a normal message.
-    Notifications arrive within about 5 s; security ones only to admins; in quiet hours only critical ones.</p>""",
+    Notifications arrive within about 5 s; security ones only to admins; in quiet hours only critical ones.
+    Periodic reports of chosen devices: My account › Periodic reports.</p>""",
     """<table><thead><tr><th>Příkaz</th><th>Co dělá</th><th>Oprávnění</th><th>Potvrzení</th></tr></thead><tbody>
     <tr><td><code>/help</code></td><td>příkazy, které účet smí použít</td><td>–</td><td>–</td></tr>
     <tr><td><code>/status</code></td><td>role, LAN, internet, MQTT, doba běhu, teplota</td><td>Přehled, číst</td><td>–</td></tr>
@@ -609,15 +626,18 @@ TELEGRAM = T(
     <tr><td><code>/thread</code>, <code>/zigbee</code></td><td>stav role</td><td>Informace, číst</td><td>–</td></tr>
     <tr><td><code>/noise</code></td><td>hluk v dB(A)</td><td>Zvuk › Živě, číst</td><td>–</td></tr>
     <tr><td><code>/events</code></td><td>poslední detekce</td><td>Zvuk › Log detekcí, číst</td><td>–</td></tr>
+    <tr><td><code>/modbus</code>, <code>/sensors</code>, <code>/gpio</code></td><td>hodnoty zařízení Modbus, senzorů I2C, pinů GPIO</td><td>Systém › RS485 / Hardware, číst</td><td>–</td></tr>
     <tr><td><code>/update</code></td><td>verze brány a C6, sestavení, poznámky k vydání</td><td>Systém › Firmware, číst</td><td>–</td></tr>
-    <tr><td><code>/install</code>, <code>/install c6</code></td><td>instalace firmwaru brány nebo balíku C6</td><td>Systém › Firmware, upravovat</td><td>ano</td></tr>
+    <tr><td><code>/releases</code></td><td>vydání, která jde na bránu nainstalovat (návrat zpět)</td><td>Systém › Firmware, číst</td><td>–</td></tr>
+    <tr><td><code>/install</code>, <code>/install c6</code>, <code>/install v1.14</code></td><td>instalace firmwaru brány nebo balíku C6, nebo uvedeného vydání</td><td>Systém › Firmware, upravovat</td><td>ano</td></tr>
     <tr><td><code>/restart</code></td><td>restart C6 a P4</td><td>Rádia › Stav a údržba, upravovat</td><td>ano</td></tr>
     <tr><td><code>/identify</code></td><td>rozblikání ikony identifikace</td><td>Přehled, upravovat</td><td>ano</td></tr>
     <tr><td><code>/role &lt;název&gt;</code></td><td>přepnutí role</td><td>Role, upravovat</td><td>ano</td></tr>
     <tr><td><code>/sound on|off</code></td><td>rozpoznávání zvuků</td><td>Zvuk › Živě, upravovat</td><td>ano</td></tr>
     <tr><td><code>/mute 1h</code></td><td>ztlumení notifikací zvuků (<code>30m</code>, <code>1d</code>, <code>off</code>)</td><td>–</td><td>–</td></tr></tbody></table>
     <p>Potvrzení: tlačítka <b>Potvrdit</b> / <b>Zrušit</b> (2 minuty); u účtu s dvoufázovým přihlášením si bot pak vyžádá kód z Authenticatoru — pošlete ho jako běžnou zprávu.
-    Notifikace dorazí do zhruba 5 s; o zabezpečení jen správcům; v tichých hodinách jen kritické.</p>""")
+    Notifikace dorazí do zhruba 5 s; o zabezpečení jen správcům; v tichých hodinách jen kritické.
+    Periodické zprávy o zvolených zařízeních: Můj účet › Periodické zprávy.</p>""")
 
 RECOVERY = T(
     """<table><thead><tr><th>Situation</th><th>What to do</th></tr></thead><tbody>
