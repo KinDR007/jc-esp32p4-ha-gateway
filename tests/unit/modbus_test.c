@@ -1,5 +1,5 @@
 /* Modbus protocol layer (CRC, RTU and TCP framing, answer checks, value coding in every word order) and
- * device templates (validation, read planning); every built-in template given as an argument must parse.
+ * device templates (validation, read planning, emulation); every built-in template given as an argument must parse.
  *   cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -I firmware/gateway/components/modbus -I <cJSON dir> \
  *      -o /tmp/modbus_test tests/unit/modbus_test.c firmware/gateway/components/modbus/mb_proto.c \
  *      firmware/gateway/components/modbus/mb_template.c <cJSON dir>/cJSON.c -lm \
@@ -350,6 +350,103 @@ static void test_templates(void)
 }
 
 /* every built-in template parses, and its registers are what the source says about the family */
+static uint16_t reg_at(const uint8_t *img, int r)
+{
+    return (uint16_t)(img[2 * r] << 8 | img[2 * r + 1]);
+}
+
+/* a three phase meter with Eastron's keys shown as an ABB-like one */
+static void test_emulation(void)
+{
+    mb_template_t src, dst;
+    char err[160] = "";
+    CHECK(parse_text("{\"id\":\"src\",\"manufacturer\":\"M\",\"model\":\"S\",\"entities\":["
+                     "{\"key\":\"voltage_l1\",\"name\":\"V\",\"reg\":\"input\",\"addr\":0,\"type\":\"f32\",\"unit\":\"V\"},"
+                     "{\"key\":\"total_power\",\"q\":\"power\",\"name\":\"P\",\"reg\":\"input\",\"addr\":2,\"type\":\"f32\",\"unit\":\"kW\"},"
+                     "{\"key\":\"reactive_power_l1\",\"name\":\"Q1\",\"reg\":\"input\",\"addr\":4,\"type\":\"f32\",\"unit\":\"var\"},"
+                     "{\"key\":\"reactive_power_l2\",\"name\":\"Q2\",\"reg\":\"input\",\"addr\":6,\"type\":\"f32\",\"unit\":\"var\"},"
+                     "{\"key\":\"reactive_power_l3\",\"name\":\"Q3\",\"reg\":\"input\",\"addr\":8,\"type\":\"f32\",\"unit\":\"var\"},"
+                     "{\"key\":\"import_energy\",\"name\":\"E\",\"reg\":\"input\",\"addr\":10,\"type\":\"f32\",\"unit\":\"kWh\"},"
+                     "{\"key\":\"serial_number\",\"q\":\"serial\",\"name\":\"S\",\"reg\":\"holding\",\"addr\":0,\"type\":\"u32\"},"
+                     "{\"key\":\"firmware\",\"name\":\"F\",\"reg\":\"holding\",\"addr\":2,\"type\":\"u16\"}]}",
+                     &src, err, sizeof(err)),
+          "source template: %s", err);
+    CHECK(parse_text("{\"id\":\"dst\",\"manufacturer\":\"M\",\"model\":\"D\",\"fill\":65535,\"entities\":["
+                     "{\"key\":\"voltage_l1\",\"name\":\"V\",\"reg\":\"holding\",\"addr\":0,\"type\":\"u32\",\"scale\":0.1,\"unit\":\"V\",\"nan\":4294967295},"
+                     "{\"key\":\"power\",\"name\":\"P\",\"reg\":\"holding\",\"addr\":4,\"type\":\"s32\",\"scale\":0.01,\"unit\":\"W\",\"nan\":2147483647},"
+                     "{\"key\":\"reactive_power\",\"name\":\"Q\",\"reg\":\"holding\",\"addr\":6,\"type\":\"s32\",\"scale\":0.01,\"unit\":\"var\"},"
+                     "{\"key\":\"frequency\",\"name\":\"f\",\"reg\":\"holding\",\"addr\":8,\"type\":\"u16\",\"scale\":0.01,\"nan\":65535},"
+                     "{\"key\":\"import_energy\",\"name\":\"E\",\"reg\":\"holding\",\"addr\":10,\"type\":\"u64\",\"scale\":0.01,\"unit\":\"kWh\","
+                     "\"nan\":18446744073709551615},"
+                     "{\"key\":\"export_energy\",\"name\":\"X\",\"reg\":\"holding\",\"addr\":14,\"type\":\"u64\",\"scale\":0.01,\"unit\":\"kWh\","
+                     "\"nan\":18446744073709551615},"
+                     "{\"key\":\"type\",\"name\":\"T\",\"reg\":\"holding\",\"addr\":20,\"type\":\"str\",\"count\":3,\"emulate\":\"B23 \"},"
+                     "{\"key\":\"serial\",\"name\":\"S\",\"reg\":\"holding\",\"addr\":24,\"type\":\"u32\"},"
+                     "{\"key\":\"firmware\",\"name\":\"F\",\"reg\":\"holding\",\"addr\":26,\"type\":\"str\",\"count\":1}]}",
+                     &dst, err, sizeof(err)),
+          "target template: %s", err);
+    mb_map_t map[9];
+    char how[64];
+    int n = mb_map_resolve(&dst, &src, map);
+    CHECK(n == 6, "resolved %d of 9", n);
+    mb_map_describe(&map[1], &src, how, sizeof(how));
+    CHECK(map[1].kind == MB_MAP_ONE && strcmp(how, "total_power x1000") == 0, "power from total_power in kW: %s", how);
+    mb_map_describe(&map[2], &src, how, sizeof(how));
+    CHECK(map[2].kind == MB_MAP_SUM3 && strcmp(how, "reactive_power_l1+reactive_power_l2+reactive_power_l3") == 0, "reactive power summed: %s", how);
+    CHECK(map[3].kind == MB_MAP_NONE && map[5].kind == MB_MAP_NONE, "frequency and export energy not in the source");
+    CHECK(map[6].kind == MB_MAP_CONST, "type fixed");
+    CHECK(map[7].kind == MB_MAP_ONE && map[7].src[0] == 6, "serial from serial_number by q");
+    CHECK(map[8].kind == MB_MAP_NONE, "a number does not become a text");
+
+    double sval[8] = {230.4, 1.5, 100, 110, 120, 1234.56, 12345678, 7};
+    uint8_t sok[8] = {1, 1, 1, 1, 0, 1, 1, 1};
+    double dval[9];
+    uint8_t dok[9];
+    for (int i = 0; i < 9; i++) {
+        dok[i] = mb_map_value(&map[i], sval, sok, &dval[i]);
+    }
+    CHECK(dok[0] && dval[0] == 230.4 && dok[1] && dval[1] == 1500 && !dok[2], "values: %g %g, a phase missing leaves the sum out", dval[0], dval[1]);
+    sok[4] = 1;
+    CHECK(mb_map_value(&map[2], sval, sok, &dval[2]) && dval[2] == 330, "sum of the phases %g", dval[2]);
+    dok[2] = 1;
+
+    uint8_t img[2 * 30];
+    mb_template_image(&dst, MB_SPACE_HOLDING, 0, 28, dval, dok, NULL, img);
+    CHECK(reg_at(img, 0) == 0 && reg_at(img, 1) == 2304, "voltage 230.4 V as 2304: %04x %04x", reg_at(img, 0), reg_at(img, 1));
+    CHECK(reg_at(img, 2) == 0xffff && reg_at(img, 3) == 0xffff, "a gap reads fill");
+    CHECK(reg_at(img, 4) == 0x0002 && reg_at(img, 5) == 0x49f0, "power 1500 W as 150000: %04x %04x", reg_at(img, 4), reg_at(img, 5));
+    CHECK(reg_at(img, 8) == 0xffff, "frequency without value reads its nan");
+    CHECK(reg_at(img, 10) == 0 && reg_at(img, 11) == 0 && reg_at(img, 12) == 0x0001 && reg_at(img, 13) == 0xe240,
+          "energy 1234.56 kWh as u64 123456: %04x %04x", reg_at(img, 12), reg_at(img, 13));
+    CHECK(reg_at(img, 14) == 0xffff && reg_at(img, 17) == 0xffff, "u64 without value: all ones");
+    CHECK(reg_at(img, 20) == 0x4232 && reg_at(img, 21) == 0x3320 && reg_at(img, 22) == 0, "type \"B23 \": %04x %04x %04x", reg_at(img, 20),
+          reg_at(img, 21), reg_at(img, 22));
+    CHECK(reg_at(img, 24) == 0x00bc && reg_at(img, 25) == 0x614e, "serial 12345678: %04x %04x", reg_at(img, 24), reg_at(img, 25));
+    CHECK(reg_at(img, 26) == 0 && reg_at(img, 27) == 0xffff, "a str without value reads 0, past the template fill");
+    mb_template_image(&dst, MB_SPACE_HOLDING, 5, 2, dval, dok, NULL, img);
+    CHECK(reg_at(img, 0) == 0x49f0 && reg_at(img, 1) == 0, "a read starting inside a value: %04x %04x", reg_at(img, 0), reg_at(img, 1));
+    mb_template_image(&dst, MB_SPACE_INPUT, 0, 2, dval, dok, NULL, img);
+    CHECK(reg_at(img, 0) == 0xffff, "another space reads fill");
+
+    cJSON *j = mb_template_json(&dst);
+    mb_template_t again;
+    CHECK(mb_template_parse(j, &again, err, sizeof(err)) && again.fill == 65535 && strcmp(again.ent[6].emulate, "B23 ") == 0,
+          "fill and emulate round trip: %s", err);
+    cJSON_Delete(j);
+    mb_template_free(&again);
+    j = mb_template_json(&src);
+    CHECK(mb_template_parse(j, &again, err, sizeof(err)) && strcmp(again.ent[1].q, "power") == 0, "q round trip: %s", err);
+    cJSON_Delete(j);
+    mb_template_free(&again);
+    expect_refused(T_HEAD "{\"key\":\"t\",\"name\":\"T\",\"reg\":\"holding\",\"addr\":0,\"type\":\"str\",\"count\":1,\"emulate\":\"ABC\"}]}", "emulate");
+    expect_refused(T_HEAD "{\"key\":\"t\",\"name\":\"T\",\"reg\":\"holding\",\"addr\":0,\"emulate\":\"1\"}]}", "emulate");
+    expect_refused(T_HEAD "{\"key\":\"t\",\"q\":\"Power\",\"name\":\"T\",\"reg\":\"holding\",\"addr\":0}]}", "q:");
+    expect_refused("{\"id\":\"x\",\"manufacturer\":\"M\",\"model\":\"X\",\"fill\":70000,\"entities\":[{\"key\":\"a\",\"name\":\"A\",\"reg\":\"holding\",\"addr\":0}]}",
+                   "fill");
+    mb_template_free(&src);
+    mb_template_free(&dst);
+}
+
 static void test_builtin(int argc, char **argv)
 {
     for (int i = 1; i < argc; i++) {
@@ -403,6 +500,7 @@ int main(int argc, char **argv)
     test_server();
     test_values();
     test_templates();
+    test_emulation();
     test_builtin(argc, argv);
     printf("%s\n", failures ? "FAILED" : "all passed");
     return failures ? 1 : 0;

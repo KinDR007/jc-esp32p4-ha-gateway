@@ -195,7 +195,8 @@
    "precision": 0,
    "count": 6,
    "category": "diagnostic",
-   "every": 0
+   "every": 0,
+   "emulate": "B21 112-100"
   }
  ],
  "serial": {
@@ -208,5 +209,6 @@
  "gap_ms": 20,
  "poll_s": 10,
  "max_regs": 125,
- "max_gap": 40
+ "max_gap": 40,
+ "fill": 65535
 }

@@ -35,7 +35,7 @@ def KWH(key, name, cs, addr): return e(key, name, cs, addr, 'u64', 'kWh', 'energ
 def KVARH(key, name, cs, addr): return e(key, name, cs, addr, 'u64', 'kvarh', 'reactive_energy', 'total_increasing', prec=2, scale=0.01)
 
 
-def common_tail():
+def common_tail(model):
     return [
         e('reactive_power', 'Total reactive power', 'Celkový jalový výkon', 0x5B1C, 's32', 'var', 'reactive_power', scale=0.01),
         e('apparent_power', 'Total apparent power', 'Celkový zdánlivý výkon', 0x5B24, 's32', 'VA', 'apparent_power', scale=0.01),
@@ -47,7 +47,7 @@ def common_tail():
         KVARH('export_reactive_energy', 'Export reactive energy', 'Dodaná jalová energie', 0x5010),
         e('serial', 'Serial number', 'Sériové číslo', 0x8900, 'u32', sc=None, category='diagnostic', every=0),
         e('firmware', 'Firmware', 'Firmware', 0x8908, 'str', sc=None, count=8, category='diagnostic', every=0),
-        e('type', 'Type', 'Typ', 0x8960, 'str', sc=None, count=6, category='diagnostic', every=0),
+        e('type', 'Type', 'Typ', 0x8960, 'str', sc=None, count=6, category='diagnostic', every=0, emulate=model),
     ]
 
 
@@ -56,7 +56,7 @@ SOURCE = 'https://library.e.abb.com/public/216665241d8a4d17b50906705d5a9207/2CMC
 T = []
 
 b21 = [V('voltage', 'Voltage', 'Napětí', 0x5B00), A('current', 'Current', 'Proud', 0x5B0C),
-       W('power', 'Power', 'Výkon', 0x5B14)] + common_tail()
+       W('power', 'Power', 'Výkon', 0x5B14)] + common_tail('B21 112-100')
 T.append({'id': 'abb_b21', 'manufacturer': 'ABB', 'model': 'B21 (EQ meter)', 'category': 'energy_meter',
           'notes': 'Single phase. Usually 19200 Bd 8E1, address 1 (not in the ABB manual): check the meter menu. '
                    'Steel variants do not measure export.',
@@ -70,7 +70,7 @@ b23 += [A(f'current_l{i + 1}', f'Current L{i + 1}', f'Proud L{i + 1}', 0x5B0C + 
 b23 += [W('power', 'Total power', 'Celkový výkon', 0x5B14)]
 b23 += [W(f'power_l{i + 1}', f'Power L{i + 1}', f'Výkon L{i + 1}', 0x5B16 + 2 * i) for i in range(3)]
 b23 += [PF(f'power_factor_l{i + 1}', f'Power factor L{i + 1}', f'Účiník L{i + 1}', 0x5B3B + i) for i in range(3)]
-b23 += common_tail()
+b23 += common_tail('B23 112-100')
 b23 += [KWH(f'import_energy_l{i + 1}', f'Import energy L{i + 1}', f'Odebraná energie L{i + 1}', 0x5460 + 4 * i) for i in range(3)]
 b23 += [KWH(f'export_energy_l{i + 1}', f'Export energy L{i + 1}', f'Dodaná energie L{i + 1}', 0x546C + 4 * i) for i in range(3)]
 T.append({'id': 'abb_b23', 'manufacturer': 'ABB', 'model': 'B23 / B24 (EQ meter)', 'category': 'energy_meter',
@@ -81,8 +81,9 @@ T.append({'id': 'abb_b23', 'manufacturer': 'ABB', 'model': 'B23 / B24 (EQ meter)
           'source': SOURCE, 'entities': b23})
 
 for t in T:
-    # the meter answers every read within 0x1000-0x8eff, gaps included, up to 125 registers
+    # the meter answers every read within 0x1000-0x8eff, gaps included, up to 125 registers; unused ones read
+    # 0xffff (fill, when another meter plays this one); the type an inverter checks (0x8960) is fixed then
     t = {'schema': 1, **t, 'serial': SERIAL, 'slave': 1, 'timeout_ms': 500, 'gap_ms': 20, 'poll_s': 10,
-         'max_regs': 125, 'max_gap': 40}
+         'max_regs': 125, 'max_gap': 40, 'fill': 65535}
     (OUT / f"{t['id']}.json").write_text(json.dumps(t, ensure_ascii=False, indent=1) + '\n')
     print(t['id'], len(t['entities']), 'entities')

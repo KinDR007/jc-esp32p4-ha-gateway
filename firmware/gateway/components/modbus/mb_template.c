@@ -91,6 +91,9 @@ static bool parse_entity(const cJSON *j, mb_entity_t *e, char *err, size_t err_l
         FAIL("key: a-z, 0-9 and _, up to %d characters", MB_KEY_LEN - 1);
     }
     strcpy(e->key, s);
+    if (!copy_str(j, "q", e->q, sizeof(e->q), false) || (e->q[0] && !valid_name(e->q, sizeof(e->q)))) {
+        FAIL("%s: q: a-z, 0-9 and _, up to %d characters", e->key, MB_KEY_LEN - 1);
+    }
     if (!copy_str(j, "name", e->name, sizeof(e->name), true) || !copy_str(j, "name_cs", e->name_cs, sizeof(e->name_cs), false)) {
         FAIL("%s: name up to %d characters", e->key, (int)sizeof(e->name) - 1);
     }
@@ -235,6 +238,19 @@ static bool parse_entity(const cJSON *j, mb_entity_t *e, char *err, size_t err_l
     } else if (e->space_none) {
         FAIL("%s: reg none only for a button", e->key);
     }
+    const cJSON *em = cJSON_GetObjectItem(j, "emulate");
+    if (em) {
+        bool text = e->type == MB_T_STR;
+        if (text ? !cJSON_IsString(em) || strlen(em->valuestring) > 2u * e->count || strlen(em->valuestring) >= sizeof(e->emulate)
+                 : !cJSON_IsNumber(em)) {
+            FAIL("%s: emulate: a number, or a text that fits (str)", e->key);
+        }
+        if (text) {
+            strcpy(e->emulate, em->valuestring);
+        } else {
+            snprintf(e->emulate, sizeof(e->emulate), "%.15g", em->valuedouble);
+        }
+    }
     return true;
 }
 
@@ -306,6 +322,10 @@ bool mb_template_parse(const cJSON *json, mb_template_t *out, char *err, size_t 
         FAIL("max_gap 0-100");
     }
     t->max_gap = (uint8_t)v;
+    if (!opt_num(json, "fill", 0, 65535, 0, &v) || v != floor(v)) {
+        FAIL("fill 0-65535");
+    }
+    t->fill = (uint16_t)v;
 
     const cJSON *list = cJSON_GetObjectItem(json, "entities");
     int n = cJSON_GetArraySize(list);
@@ -391,11 +411,13 @@ cJSON *mb_template_json(const mb_template_t *t)
     cJSON_AddNumberToObject(j, "poll_s", t->poll_s);
     cJSON_AddNumberToObject(j, "max_regs", t->max_regs);
     add_num_if(j, "max_gap", t->max_gap, 0);
+    add_num_if(j, "fill", t->fill, 0);
     cJSON *list = cJSON_AddArrayToObject(j, "entities");
     for (int i = 0; i < t->nent; i++) {
         const mb_entity_t *e = &t->ent[i];
         cJSON *o = cJSON_CreateObject();
         cJSON_AddStringToObject(o, "key", e->key);
+        add_str_if(o, "q", e->q);
         cJSON_AddStringToObject(o, "name", e->name);
         add_str_if(o, "name_cs", e->name_cs);
         cJSON_AddStringToObject(o, "reg", e->space_none ? "none" : s_spaces[e->space]);
@@ -447,6 +469,13 @@ cJSON *mb_template_json(const mb_template_t *t)
                 cJSON_AddNumberToObject(w, "value", e->press);
             }
         }
+        if (e->emulate[0]) {
+            if (e->type == MB_T_STR) {
+                cJSON_AddStringToObject(o, "emulate", e->emulate);
+            } else {
+                cJSON_AddNumberToObject(o, "emulate", strtod(e->emulate, NULL));
+            }
+        }
         cJSON_AddItemToArray(list, o);
     }
     return j;
@@ -488,6 +517,211 @@ const char *mb_entity_label(const mb_entity_t *e, double raw)
         }
     }
     return NULL;
+}
+
+/* ---------------------------------------------------------------- emulation */
+
+const char *mb_entity_q(const mb_entity_t *e)
+{
+    return e->q[0] ? e->q : e->key;
+}
+
+/* factor from a source unit to a target unit (W -> kW: 0.001), 0 when they do not convert */
+static double unit_factor(const char *from, const char *to)
+{
+    if (strcmp(from, to) == 0) {
+        return 1;
+    }
+    if (from[0] == 'k' && strcmp(from + 1, to) == 0) {
+        return 1000;
+    }
+    if (to[0] == 'k' && strcmp(to + 1, from) == 0) {
+        return 0.001;
+    }
+    return 0;
+}
+
+/* the source entity of quantity q a target entity can take its value from */
+static int find_q(const mb_template_t *s, const char *q, const mb_entity_t *te, double *factor)
+{
+    for (int i = 0; i < s->nent; i++) {
+        const mb_entity_t *se = &s->ent[i];
+        if (se->space_none || strcmp(mb_entity_q(se), q) != 0 || (te->type == MB_T_STR) != (se->type == MB_T_STR) ||
+            (te->type == MB_T_BOOL) != (se->type == MB_T_BOOL) || te->nopts != se->nopts) {
+            continue;
+        }
+        bool same = true;
+        for (int k = 0; k < te->nopts; k++) {
+            same &= te->opts[k].raw == se->opts[k].raw && strcmp(te->opts[k].label, se->opts[k].label) == 0;
+        }
+        double f = te->type == MB_T_STR || te->type == MB_T_BOOL || te->nopts ? 1 : unit_factor(se->unit, te->unit);
+        if (same && f != 0) {
+            *factor = f;
+            return i;
+        }
+    }
+    return -1;
+}
+
+int mb_map_resolve(const mb_template_t *target, const mb_template_t *source, mb_map_t *map)
+{
+    static const char *const sums[] = {"power", "reactive_power", "apparent_power", "import_energy", "export_energy",
+                                       "import_reactive_energy", "export_reactive_energy"};
+    int resolved = 0;
+    for (int i = 0; i < target->nent; i++) {
+        const mb_entity_t *te = &target->ent[i];
+        const char *q = mb_entity_q(te);
+        mb_map_t *m = &map[i];
+        memset(m, 0, sizeof(*m));
+        m->src[0] = m->src[1] = m->src[2] = -1;
+        double f[3];
+        char name[MB_KEY_LEN + 4];
+        if (te->emulate[0]) {
+            m->kind = MB_MAP_CONST;
+        } else if (te->space_none) {
+            m->kind = MB_MAP_NONE;
+        } else if ((m->src[0] = (int16_t)find_q(source, q, te, &m->factor)) >= 0) {
+            m->kind = MB_MAP_ONE;
+        } else {
+            for (size_t k = 0; k < sizeof(sums) / sizeof(sums[0]) && m->kind == MB_MAP_NONE; k++) {
+                if (strcmp(q, sums[k]) != 0) {
+                    continue;
+                }
+                int found = 0;
+                for (int p = 0; p < 3; p++) {
+                    snprintf(name, sizeof(name), "%s_l%d", q, p + 1);
+                    found += (m->src[p] = (int16_t)find_q(source, name, te, &f[p])) >= 0;
+                }
+                if (found == 3 && f[0] == f[1] && f[1] == f[2]) {
+                    m->kind = MB_MAP_SUM3;
+                    m->factor = f[0];
+                }
+            }
+            if (m->kind == MB_MAP_NONE && strcmp(q, "power") == 0 && (m->src[0] = (int16_t)find_q(source, "import_power", te, &f[0])) >= 0 &&
+                (m->src[1] = (int16_t)find_q(source, "export_power", te, &f[1])) >= 0 && f[0] == f[1]) {
+                m->kind = MB_MAP_DIFF;
+                m->factor = f[0];
+            }
+            size_t n = strlen(q);
+            if (m->kind == MB_MAP_NONE && n > 3 && strcmp(q + n - 3, "_l1") == 0) {
+                /* a single phase source on L1 */
+                snprintf(name, sizeof(name), "%.*s_l2", (int)(n - 3), q);
+                char base[MB_KEY_LEN];
+                snprintf(base, sizeof(base), "%.*s", (int)(n - 3), q);
+                if (find_q(source, name, te, &f[1]) < 0 && (m->src[0] = (int16_t)find_q(source, base, te, &m->factor)) >= 0) {
+                    m->kind = MB_MAP_ONE;
+                }
+            }
+        }
+        if (m->kind == MB_MAP_NONE) {
+            m->src[0] = m->src[1] = m->src[2] = -1;
+        }
+        resolved += m->kind != MB_MAP_NONE;
+    }
+    return resolved;
+}
+
+bool mb_map_value(const mb_map_t *m, const double *val, const uint8_t *ok, double *out)
+{
+    switch (m->kind) {
+    case MB_MAP_ONE:
+        if (ok[m->src[0]] != 1) {
+            return false;
+        }
+        *out = val[m->src[0]] * m->factor;
+        return true;
+    case MB_MAP_SUM3:
+        if (ok[m->src[0]] != 1 || ok[m->src[1]] != 1 || ok[m->src[2]] != 1) {
+            return false;
+        }
+        *out = (val[m->src[0]] + val[m->src[1]] + val[m->src[2]]) * m->factor;
+        return true;
+    case MB_MAP_DIFF:
+        if (ok[m->src[0]] != 1 || ok[m->src[1]] != 1) {
+            return false;
+        }
+        *out = (val[m->src[0]] - val[m->src[1]]) * m->factor;
+        return true;
+    default:
+        return false;
+    }
+}
+
+void mb_map_describe(const mb_map_t *m, const mb_template_t *source, char *out, size_t len)
+{
+    const char *k[3] = {"", "", ""};
+    for (int p = 0; p < 3; p++) {
+        if (m->src[p] >= 0 && m->src[p] < source->nent) {
+            k[p] = source->ent[m->src[p]].key;
+        }
+    }
+    int n = m->kind == MB_MAP_ONE    ? snprintf(out, len, "%s", k[0])
+            : m->kind == MB_MAP_SUM3 ? snprintf(out, len, "%s+%s+%s", k[0], k[1], k[2])
+            : m->kind == MB_MAP_DIFF ? snprintf(out, len, "%s-%s", k[0], k[1])
+            : m->kind == MB_MAP_CONST ? snprintf(out, len, "fixed")
+                                      : snprintf(out, len, "%s", "");
+    if (n > 0 && (size_t)n < len && m->factor != 0 && m->factor != 1) {
+        snprintf(out + n, len - n, " x%g", m->factor);
+    }
+}
+
+void mb_template_image(const mb_template_t *t, mb_space_t space, uint16_t addr, uint16_t count, const double *val, const uint8_t *ok,
+                       char *const *text, uint8_t *out)
+{
+    bool bits = space == MB_SPACE_COIL || space == MB_SPACE_DISCRETE;
+    if (bits) {
+        memset(out, 0, (count + 7u) / 8);
+    } else {
+        for (int r = 0; r < count; r++) {
+            out[2 * r] = (uint8_t)(t->fill >> 8);
+            out[2 * r + 1] = (uint8_t)t->fill;
+        }
+    }
+    for (int i = 0; i < t->nent; i++) {
+        const mb_entity_t *e = &t->ent[i];
+        int n = mb_entity_regs(e);
+        if (e->space_none || e->space != space || e->addr + n <= addr || e->addr >= addr + count) {
+            continue;
+        }
+        double v = 0;
+        bool have = e->emulate[0] ? (v = strtod(e->emulate, NULL), true) : ok[i] == 1 ? (v = val[i], true) : false;
+        if (bits || e->bit >= 0) {
+            bool on = have && v != 0;
+            if (bits) {
+                int pos = e->addr - addr;
+                out[pos / 8] |= (uint8_t)(on << (pos % 8));
+            } else {
+                uint8_t *w = &out[2 * (e->addr - addr)];
+                uint16_t reg = (uint16_t)(w[0] << 8 | w[1]);
+                reg = on ? reg | (1u << e->bit) : reg & ~(1u << e->bit);
+                w[0] = (uint8_t)(reg >> 8), w[1] = (uint8_t)reg;
+            }
+            continue;
+        }
+        uint16_t regs[64] = {0};
+        int nr = n;
+        if (e->type == MB_T_STR) {
+            const char *s = e->emulate[0] ? e->emulate : have && text && text[i] ? text[i] : "";
+            for (int c = 0; c < 2 * n && s[c]; c++) {
+                regs[c / 2] |= (uint16_t)((uint8_t)s[c] << (c % 2 ? 0 : 8));
+            }
+        } else {
+            double raw = e->nopts || e->emulate[0] ? v : (v - e->offset) / e->scale;
+            if (!have || !mb_encode(raw, e->type, e->order, regs, &nr)) {
+                memset(regs, 0, sizeof(regs));
+                if (e->has_nan && !mb_encode(e->nan_raw, e->type, e->order, regs, &nr)) {
+                    memset(regs, 0xff, sizeof(regs)); /* u64 all ones does not fit a double exactly */
+                }
+            }
+        }
+        for (int r = 0; r < n; r++) {
+            int pos = e->addr + r - addr;
+            if (pos >= 0 && pos < count) {
+                out[2 * pos] = (uint8_t)(regs[r] >> 8);
+                out[2 * pos + 1] = (uint8_t)regs[r];
+            }
+        }
+    }
 }
 
 /* ---------------------------------------------------------------- planning */

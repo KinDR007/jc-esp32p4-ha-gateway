@@ -198,13 +198,15 @@ Device fields: `id` (a-z, 0-9, _; up to 31), `manufacturer`, `model` required; `
 9600 8N1; `slave` the usual address; `timeout_ms` (50-5000, default 500) and `gap_ms` (pause
 before each request, default 20) per request; `poll_s` (1-3600, default 10); `max_regs` registers
 per request (1-125, default 40); `max_gap` unread registers a combined read may span (default 0;
-only for devices that answer reads of undocumented registers).
+only for devices that answer reads of undocumented registers); `fill` what registers no entity covers
+read when another device plays this template (0-65535, default 0; ABB 65535).
 
 Entity fields:
 
 | Field | Values | Notes |
 |---|---|---|
 | `key` | a-z, 0-9, _ (up to 23) | stable: part of the Home Assistant ids |
+| `q` | a-z, 0-9, _ (up to 23) | quantity for emulation when it differs from the key (Eastron `total_power`: `power`) |
 | `name`, `name_cs` | up to 47 characters | `name_cs` used when Home Assistant / the page runs in Czech |
 | `reg` | `coil`, `discrete`, `input`, `holding`, `none` | function 1, 2, 4, 3; `none` only for a button sending a device function |
 | `addr` | 0-65535, number or `"0x..."` | protocol address (0 based): subtract 1 from 1-based tables, 30001/40001 from the "3xxxx/4xxxx" notation |
@@ -222,6 +224,7 @@ Entity fields:
 | `write.min`, `max`, `step` | numbers | number: required limits in shown units |
 | `write.on`, `off` | raw values | switch on holding registers (default 1/0) |
 | `write.value` | raw value | button |
+| `emulate` | number, or text (`str`) | fixed value when another device plays this template (ABB type `B23 112-100`) |
 | `write.fc` | 5, 6, 15, 16, or a device function | default: coil 5, one register 6, more 16; `16` for devices that take only function 16 (DDS238, Eastron); a device function (e.g. 66 = 0x42 PZEM energy reset) with `reg: none` |
 
 A template is checked when saved; the error names the entity and field. Own templates (up to 16,

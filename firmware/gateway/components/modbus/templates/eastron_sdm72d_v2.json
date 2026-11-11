@@ -162,6 +162,7 @@
   },
   {
    "key": "total_power",
+   "q": "power",
    "name": "Total power",
    "name_cs": "Celkový výkon",
    "reg": "input",
@@ -174,6 +175,7 @@
   },
   {
    "key": "total_apparent_power",
+   "q": "apparent_power",
    "name": "Total apparent power",
    "name_cs": "Celkový zdánlivý výkon",
    "reg": "input",
@@ -186,6 +188,7 @@
   },
   {
    "key": "total_reactive_power",
+   "q": "reactive_power",
    "name": "Total reactive power",
    "name_cs": "Celkový jalový výkon",
    "reg": "input",
@@ -198,6 +201,7 @@
   },
   {
    "key": "total_power_factor",
+   "q": "power_factor",
    "name": "Total power factor",
    "name_cs": "Celkový účiník",
    "reg": "input",
@@ -341,6 +345,7 @@
   },
   {
    "key": "serial_number",
+   "q": "serial",
    "name": "Serial number",
    "name_cs": "Výrobní číslo",
    "reg": "holding",

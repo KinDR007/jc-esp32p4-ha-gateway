@@ -27,6 +27,7 @@ typedef struct {
 
 typedef struct {
     char key[MB_KEY_LEN];
+    char q[MB_KEY_LEN]; /* quantity for emulation, empty = the key */
     char name[48], name_cs[48];
     bool space_none;    /* a button sending a device specific function (no register) */
     mb_space_t space;
@@ -46,6 +47,7 @@ typedef struct {
     mb_write_t write;
     uint8_t write_fc;   /* 0 = automatic (5, 6 or 16), else 5, 6, 15, 16 or a device function */
     double min, max, step, on, off, press;
+    char emulate[32];   /* fixed value when another device plays this template (number or text) */
 } mb_entity_t;
 
 typedef struct {
@@ -59,6 +61,7 @@ typedef struct {
     uint16_t timeout_ms, gap_ms, poll_s;
     uint8_t max_regs;   /* registers per read request */
     uint8_t max_gap;    /* unread registers a block read may span */
+    uint16_t fill;      /* what registers no entity covers read when emulated */
     bool builtin;
     int nent;
     mb_entity_t *ent;
@@ -78,6 +81,33 @@ int mb_entity_regs(const mb_entity_t *e);
 double mb_entity_value(const mb_entity_t *e, double raw);
 /* label of a raw value of an entity with options, NULL when none fits */
 const char *mb_entity_label(const mb_entity_t *e, double raw);
+
+/* ---- emulation: values of one template shown as another (docs/modbus.md) ---- */
+
+typedef enum { MB_MAP_NONE, MB_MAP_CONST, MB_MAP_ONE, MB_MAP_SUM3, MB_MAP_DIFF } mb_map_kind_t;
+
+/* where a target entity's value comes from: source entities src[] times factor */
+typedef struct {
+    uint8_t kind;
+    int16_t src[3];
+    double factor;
+} mb_map_t;
+
+const char *mb_entity_q(const mb_entity_t *e);
+/* Resolves every entity of target (map[target->nent]) against the entities of source: the same quantity
+ * (units converted between W and kW and alike), else the sum of the three phases or import minus export
+ * power; text only from text, options only from the same options. Returns the entities resolved. */
+int mb_map_resolve(const mb_template_t *target, const mb_template_t *source, mb_map_t *map);
+/* The value of a mapped entity from the source's values (ok[i]: the value is there); false when none. */
+bool mb_map_value(const mb_map_t *m, const double *val, const uint8_t *ok, double *out);
+/* How a map entry reads, e.g. "total_power", "power_l1+power_l2+power_l3", "fixed": for the API. */
+void mb_map_describe(const mb_map_t *m, const mb_template_t *source, char *out, size_t len);
+
+/* Registers (big endian, 2 per register) or packed bits of a read of the target template as emulated:
+ * entities from val/ok (shown values: raw for entities with options) and text (str), no value as the
+ * entity's nan (else 0), registers no entity covers as fill. */
+void mb_template_image(const mb_template_t *t, mb_space_t space, uint16_t addr, uint16_t count, const double *val, const uint8_t *ok,
+                       char *const *text, uint8_t *out);
 
 /* ---- read planning ---- */
 

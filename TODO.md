@@ -201,7 +201,7 @@ Rozhodnutí: sdílený port 502 se směrováním podle unit id + volitelně vlas
 
 ## Emulace zařízení a periodické zprávy (zadání 2026-11-11)
 Rozhodnutí: emulace jako virtuální zařízení (zdroj + cílová šablona), vystavitelné kdekoliv; jen přes TCP, RS485 zůstává master; zprávy do Telegramu pro Modbus, I2C senzory a GPIO, aktuální hodnoty + statistika za období; nastavuje každý uživatel sám.
-- [ ] E1 Šablony: pole `q` (veličina), `fill`, `emulate`; `q` u Eastronu; ABB typ pro emulaci; unit testy
+- [x] E1 Šablony: pole `q` (veličina), `fill`, `emulate`; `q` u Eastronu; ABB typ pro emulaci; unit testy
 - [ ] E2 Virtuální zařízení: konfigurace, mapování (jednotky, součty fází), hodnoty po pollu zdroje, Modbus TCP server z hodnot, MQTT a integrace
 - [ ] E3 Web UI (zdroj, tabulka mapování, upozornění na duplicitu), dokumentace, TC57 (SDM630 jako ABB B23 přes server), UI test
 - [ ] R1 Jádro zpráv (gw_report): zdroje Modbus, I2C, GPIO; vzorkování 60 s, statistika, počátky čítačů v NVS; odeslání tiše v tichých hodinách

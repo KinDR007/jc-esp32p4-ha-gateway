@@ -55,7 +55,11 @@ REG = {
     'export_power': (0x502, 'Export power', 'Dodávaný výkon', 'W', 'power', 'measurement', 0, 1),
 }
 
-SERIAL = {'key': 'serial_number', 'name': 'Serial number', 'name_cs': 'Výrobní číslo', 'reg': 'holding', 'addr': '0xfc00',
+# quantity of a key for emulation (docs/modbus.md): the keys stay, they are part of the Home Assistant ids
+Q = {'total_power': 'power', 'total_apparent_power': 'apparent_power', 'total_reactive_power': 'reactive_power',
+     'total_power_factor': 'power_factor'}
+
+SERIAL = {'key': 'serial_number', 'q': 'serial', 'name': 'Serial number', 'name_cs': 'Výrobní číslo', 'reg': 'holding', 'addr': '0xfc00',
           'type': 'u32', 'precision': 0, 'category': 'diagnostic', 'every': 0}
 RESET_DEMAND = {'key': 'reset_max_demand', 'name': 'Reset maximum demand', 'name_cs': 'Nulovat maximum', 'reg': 'holding',
                 'addr': '0xf010', 'type': 'u16', 'category': 'config', 'write': {'kind': 'button', 'value': 0, 'fc': 16}}
@@ -94,7 +98,7 @@ for tid, model, baud, max_regs, keys, extra, notes, source in MODELS:
     ents = []
     for k in keys:
         addr, name, name_cs, unit, dc, sc, prec, every = REG[k]
-        e = {'key': k, 'name': name, 'name_cs': name_cs, 'reg': 'input', 'addr': f'0x{addr:04x}', 'type': 'f32', 'precision': prec}
+        e = {'key': k, **({'q': Q[k]} if k in Q else {}), 'name': name, 'name_cs': name_cs, 'reg': 'input', 'addr': f'0x{addr:04x}', 'type': 'f32', 'precision': prec}
         if unit:
             e['unit'] = unit
         if dc:

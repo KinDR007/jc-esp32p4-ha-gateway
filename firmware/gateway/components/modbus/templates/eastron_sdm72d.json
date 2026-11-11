@@ -21,6 +21,7 @@
  "entities": [
   {
    "key": "total_power",
+   "q": "power",
    "name": "Total power",
    "name_cs": "Celkový výkon",
    "reg": "input",

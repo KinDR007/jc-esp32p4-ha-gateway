@@ -332,7 +332,8 @@
    "precision": 0,
    "count": 6,
    "category": "diagnostic",
-   "every": 0
+   "every": 0,
+   "emulate": "B23 112-100"
   },
   {
    "key": "import_energy_l1",
@@ -429,5 +430,6 @@
  "gap_ms": 20,
  "poll_s": 10,
  "max_regs": 125,
- "max_gap": 40
+ "max_gap": 40,
+ "fill": 65535
 }
