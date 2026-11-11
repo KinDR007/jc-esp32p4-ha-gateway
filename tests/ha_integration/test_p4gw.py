@@ -423,6 +423,10 @@ async def test_modbus_device(hass: HomeAssistant, gateway) -> None:
     assert hass.states.get(eid("select", "shunt")).state == "100 A"
     assert eid("button", "reset_energy") is not None
     assert reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_mb_d2_voltage") is None  # MQTT only
+    # a virtual device (emulation): what it shows, nothing to write
+    assert hass.states.get(reg.async_get_entity_id("sensor", DOMAIN, f"{MAC}_mb_d3_voltage")).state == "52.31"
+    for platform, key in (("number", "high_voltage_threshold"), ("select", "shunt"), ("button", "reset_energy"), ("switch", "relay")):
+        assert reg.async_get_entity_id(platform, DOMAIN, f"{MAC}_mb_d3_{key}") is None
 
     entry_id = hass.config_entries.async_entries(DOMAIN)[0].entry_id
     devices = dr.async_get(hass)

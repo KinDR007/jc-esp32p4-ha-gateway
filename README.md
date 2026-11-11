@@ -41,7 +41,7 @@ Native integration **P4 Gateway** (HACS, no MQTT broker needed): see
 | [docs/hardware.md](docs/hardware.md) | board, chip revision, **JP1 jumpers**, pinout, USB notes |
 | [docs/installation.md](docs/installation.md) | build, first installation, updates, role switching, recovery |
 | [documentation/](https://kindr007.github.io/jc-esp32p4-ha-gateway/) | user documentation in Czech and English with screenshots of every page (HTML, [sources](documentation/)) |
-| [docs/modbus.md](docs/modbus.md) | Modbus on RS485 (J4), Modbus TCP and GoodWe UDP: templates, network search, Home Assistant, Modbus TCP server for other clients |
+| [docs/modbus.md](docs/modbus.md) | Modbus on RS485 (J4), Modbus TCP and GoodWe UDP: templates, network search, Home Assistant, Modbus TCP server for other clients, emulation of one device as another |
 | [docs/sensors.md](docs/sensors.md) | I2C sensors on connector CN3 |
 | [docs/gpio.md](docs/gpio.md) | free GPIO of header JP1: input, output, PWM, counter, UART-TCP bridge, I2C bus 2, 1-Wire, WS2812, Home Assistant |
 | [docs/users.md](docs/users.md) | users, roles, permissions, 2FA, API tokens |

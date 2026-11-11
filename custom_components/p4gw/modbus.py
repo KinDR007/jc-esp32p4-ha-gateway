@@ -131,6 +131,8 @@ def add_modbus_entities(
             if device.get("expose") not in EXPOSED or not template:
                 continue
             for entity in template["entities"]:
+                if device.get("transport") == "virtual" and platform_of(entity) not in ("sensor", "binary_sensor"):
+                    continue  # a virtual device (emulation) is read only
                 if platform_of(entity) == platform and (device_id, entity["key"]) not in known:
                     known.add((device_id, entity["key"]))
                     new.append(factory(coordinator, device_id, entity))

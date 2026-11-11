@@ -1069,6 +1069,36 @@ await test('UI37', 'System › Modbus TCP server: Add offers a Modbus device wit
   }
 });
 
+await test('UI38', 'System › RS485: a virtual device (emulation) is added from the form (connection Emulation, template ABB B23, the source chosen), with a note on duplicates in Home Assistant; its row says what it emulates and how many values come from the source; opened, it lists where each value comes from; configuration restored', async () => {
+  const before = await (await page.request.get(base + 'api/modbus')).json();
+  const keep = before.devices.map(d => Object.fromEntries(Object.entries(d).filter(([k]) => ['id', 'name', 'template', 'transport', 'slave', 'source', 'host', 'port', 'poll_s', 'expose', 'enabled'].includes(k))));
+  try {
+    await page.request.put(base + 'api/modbus', { data: { devices: [...keep, { name: 'UI38 SDM630', template: 'eastron_sdm630', transport: 'tcp', host: '192.0.2.1', port: 502, slave: 1, expose: 'none' }] } });
+    const src = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.name === 'UI38 SDM630');
+    await tab('system/rs485');
+    await page.waitForSelector('#mb-add-tpl option[value="abb_b23"]', { state: 'attached', timeout: 10000 });
+    await page.selectOption('#mb-add-tpl', 'abb_b23');
+    await page.selectOption('#mb-add-tr', 'virtual');
+    check(await page.isVisible('#mb-add-src') && !(await page.isVisible('#mb-add-slave')) && !(await page.isVisible('#mb-add-host')), 'Emulation: the source instead of address and host');
+    await page.selectOption('#mb-add-src', src.id);
+    await page.selectOption('#mb-add-expose', 'integration');
+    check(/twice|dvakrát/.test(await page.textContent('#mb-add-note')), 'note: the same values twice in Home Assistant');
+    await page.fill('#mb-add-name', 'UI38 B23');
+    await page.click('#mb-add');
+    await page.waitForFunction(() => /UI38 B23/.test(document.querySelector('#toast').textContent), null, { timeout: 8000 });
+    const v = (await (await page.request.get(base + 'api/modbus')).json()).devices.find(d => d.name === 'UI38 B23');
+    check(v && v.transport === 'virtual' && v.source === src.id && v.template === 'abb_b23' && v.expose === 'integration', `stored: ${JSON.stringify(v && { transport: v.transport, source: v.source })}`);
+    const row = await page.textContent(`tr[data-mbdev="${v.id}"]`);
+    check(/(emulates|emuluje) UI38 SDM630/.test(row) && /29 (of|z) 30/.test(row), `row: emulates the source, 29 of 30 values (${row.replace(/\s+/g, ' ').slice(0, 160)})`);
+    await page.click(`[data-mb-open="${v.id}"]`);
+    const full = await page.textContent(`#mb-full-${v.id}`);
+    check(full.includes('total_power') && full.includes('import_energy_l1') && /(fixed|pevná)/.test(full) && /(no value|bez hodnoty)/.test(full), 'opened: where each value comes from');
+    check(pageErrors.length === 0, `no uncaught script errors ${pageErrors.join('; ')}`);
+  } finally {
+    await page.request.put(base + 'api/modbus', { data: { devices: keep } });
+  }
+});
+
 // the legend sits beside or over an empty part of the map: no node, label or the details box under it
 async function legendClear(box) {
   return page.evaluate(box => {

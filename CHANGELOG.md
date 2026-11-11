@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Emulation, System › RS485 › Add device, connection *Emulation*: a virtual device shows the values of
+  another device as a device of another template (e.g. an Eastron SDM630 as an ABB B23 for an inverter or
+  a Victron GX), over the Modbus TCP server (every read answered from the values, the target's types,
+  scales, "no value" and fixed identification, no read reaching the source), MQTT and the integration;
+  read only. Mapping by quantity (new template field `q`), units converted, totals summed from the
+  phases; the page and `/api/modbus` show where each value comes from. Template fields `q`, `fill`,
+  `emulate`. Integration 1.7.1 leaves writable entities of a virtual device out. Tests: TC57, UI38.
 - Modbus templates `abb_b21` (ABB B21) and `abb_b23` (ABB B23 / B24): voltages, currents, powers, power
   factors, frequency, energies (per phase on B23/B24), serial, firmware and type; over RS485 or a Modbus TCP
   gateway. The meter's "no value" shows no value. Tests: TC56.

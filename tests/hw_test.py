@@ -1303,6 +1303,116 @@ def tc56_modbus_abb():
     check(len(http('GET', '/api/modbus')[1]['devices']) == len(keep['devices']), 'devices of before restored')
 
 
+def tc57_modbus_emulation():
+    """A virtual device (emulation): an Eastron SDM630 of the simulator of this computer shown as an ABB B23 and
+    read over the Modbus TCP server the way a Victron GX reads an ABB meter: every register as the ABB template
+    encodes the SDM630's values (encoded here by the simulator's code), the fixed type "B23 112-100", gaps and
+    values the source lacks as ABB's "no value", the mapping in the API; invalid sources refused, writes
+    refused, the source offline answers exception 11. The configuration of before comes back."""
+    import subprocess
+    import importlib.util
+    here = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    here.connect((ARGS.host, 80))
+    my_ip = here.getsockname()[0]
+    here.close()
+    tools = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tools', 'modbus')
+    spec = importlib.util.spec_from_file_location('sim_tcp', os.path.join(tools, 'sim_tcp.py'))
+    sim_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sim_mod)
+    sim = subprocess.Popen([sys.executable, os.path.join(tools, 'sim_tcp.py'), '--port', '1510', 'eastron_sdm630:1'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    before = http('GET', '/api/modbus')[1]
+    keep = {'devices': [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'source', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+                        for d in before['devices']]}
+    srv_before = http('GET', '/api/modbus/server')[1]
+    srv_keep = {k: srv_before[k] for k in ('enabled', 'port')}
+    srv_keep['devices'] = [{k: e[k] for k in ('device', 'unit', 'port', 'write', 'allow', 'rate', 'cache_ms')} for e in srv_before['devices']]
+    abb = sim_mod.load('abb_b23')
+    src_exp = json.loads(subprocess.run([sys.executable, os.path.join(tools, 'sim_tcp.py'), '--expect', 'eastron_sdm630'], capture_output=True, text=True).stdout)
+    # target key -> source key: the same quantity (Eastron's total_* and serial_number by their q)
+    rename = {'power': 'total_power', 'reactive_power': 'total_reactive_power', 'apparent_power': 'total_apparent_power',
+              'power_factor': 'total_power_factor', 'serial': 'serial_number'}
+    want = {e['key']: src_exp[rename.get(e['key'], e['key'])] for e in abb['entities'] if rename.get(e['key'], e['key']) in src_exp}
+
+    def image(addr, count):
+        """registers of the ABB template with the values of want, independent of the gateway"""
+        regs = {a: abb['fill'] for a in range(addr, addr + count)}
+        for e in abb['entities']:
+            a0, n = int(e['addr'], 16), e.get('count', sim_mod.REGS.get(e['type'], 1))
+            if e['type'] == 'str':
+                text = (e.get('emulate', '') + '\0' * 2 * n)[:2 * n].encode()
+                words = [text[2 * i] << 8 | text[2 * i + 1] for i in range(n)]
+            else:
+                raw = round(want[e['key']] / e.get('scale', 1)) if e['key'] in want else None
+                try:
+                    words = sim_mod.encode(e['type'], 'ABCD', raw) if raw is not None else None
+                except OverflowError:
+                    words = None
+                if words is None:
+                    words = [0xffff] * n if e['type'] == 'u64' else sim_mod.encode(e['type'], 'ABCD', e['nan'])
+            for i, w in enumerate(words):
+                if a0 + i in regs:
+                    regs[a0 + i] = w
+        return [regs[a] for a in range(addr, addr + count)]
+
+    def read(addr, count):
+        pdu = mbtcp(ARGS.host, 1511, 1, struct.pack('>BHH', 3, addr, count))
+        if len(pdu) == 2 + 2 * count and pdu[0] == 3:
+            return list(struct.unpack(f'>{count}H', pdu[2:]))
+        return pdu
+
+    try:
+        time.sleep(1)
+        src = {'name': 'TC57 SDM630', 'template': 'eastron_sdm630', 'transport': 'tcp', 'host': my_ip, 'port': 1510, 'slave': 1, 'poll_s': 2, 'expose': 'none'}
+        check(http('PUT', '/api/modbus', {'devices': keep['devices'] + [src]})[0] == 200, 'source SDM630 on Modbus TCP added')
+        sid = next(d['id'] for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == src['name'])
+        cur = [{k: d[k] for k in ('id', 'name', 'template', 'transport', 'slave', 'source', 'host', 'port', 'poll_s', 'expose', 'enabled') if k in d}
+               for d in http('GET', '/api/modbus')[1]['devices']]
+        virt = {'name': 'TC57 B23', 'template': 'abb_b23', 'transport': 'virtual', 'source': sid, 'expose': 'none'}
+        for bad, why in ((dict(virt, source='zz9'), 'unknown source'), (dict(virt, source=None), 'no source'),
+                         (dict(virt, id='v1', source='v1'), 'itself (a virtual source)')):
+            check(http('PUT', '/api/modbus', {'devices': cur + [{k: v for k, v in bad.items() if v is not None}]})[0] == 400, f'refused: {why}')
+        check(http('PUT', '/api/modbus', {'devices': cur + [virt]})[0] == 200, 'virtual B23 showing the SDM630 added')
+        vid = next(d['id'] for d in http('GET', '/api/modbus')[1]['devices'] if d['name'] == virt['name'])
+        d = wait_until('values of the virtual device', lambda: (lambda d: d if len(d['values']) >= len(want) else None)(
+            next(x for x in http('GET', '/api/modbus')[1]['devices'] if x['id'] == vid)), 30, 2)
+        check(d['transport'] == 'virtual' and d['source'] == sid and d['state'] == 'ok', f'state {d["state"]}, source {d["source"]}')
+        check(d['mapped'] == 29 and d['map']['power'] == 'total_power' and d['map']['type'] == 'fixed' and d['map']['firmware'] == '',
+              f'mapped {d["mapped"]} of {d["entities"]}: power from {d["map"]["power"]}, type {d["map"]["type"]}, firmware "{d["map"]["firmware"]}"')
+        prec = {e['key']: e.get('precision', 0) for e in abb['entities']}
+        bad = {k: (v, d['values'].get(k)) for k, v in want.items() if d['values'].get(k) != round(v, prec[k])}
+        check(not bad and d['values']['type'] == 'B23 112-100', 'values as the source\'s' + (f', different {bad}' if bad else ''))
+        check(http('POST', '/api/modbus/write', {'device': vid, 'key': 'power', 'value': 1})[0] == 400, 'write to a virtual device refused')
+
+        check(http('PUT', '/api/modbus/server', {'enabled': True, 'port': 502, 'devices': [{'device': vid, 'port': 1511, 'write': True, 'rate': 50}]})[0] == 200,
+              'virtual device on port 1511')
+        time.sleep(1)
+        for addr, count, what in ((0x8960, 6, 'type'), (0x8900, 2, 'serial'), (0x5B00, 0x3E, 'instantaneous values with the gap 5B34-5B36'),
+                                  (0x5000, 24, 'energies'), (0x5460, 24, 'energies per phase'), (0x8908, 8, 'firmware (not in the source)')):
+            got, exp = read(addr, count), image(addr, count)
+            diff = [f'{addr + i:04x}: {g:04x}/{w:04x}' for i, (g, w) in enumerate(zip(got, exp)) if g != w] if isinstance(got, list) else got
+            check(isinstance(got, list) and not diff, f'0x{addr:04x} x{count} ({what}) as an ABB B23 encodes it' + (f': {diff[:4]}' if diff else ''))
+        got = read(0x8960, 6)
+        check(bytes(b for w in got for b in (w >> 8, w & 0xff)).rstrip(b'\0') == b'B23 112-100', 'type reads "B23 112-100"')
+        pdu = mbtcp(ARGS.host, 1511, 1, struct.pack('>BHH', 6, 0x8C04, 1))
+        check(pdu == bytes([0x86, 1]), f'write answered exception 1: {pdu.hex()}')
+        srv = http('GET', '/api/modbus/server')[1]['devices'][0]
+        check(srv['passed'] == 0, f'no read went to the source ({srv["passed"]} passed)')
+
+        sim.terminate()
+        sim.wait(timeout=5)
+        wait_until('the virtual device offline with its source', lambda: next(x for x in http('GET', '/api/modbus')[1]['devices'] if x['id'] == vid)['state'] == 'offline', 60, 2)
+        pdu = mbtcp(ARGS.host, 1511, 1, struct.pack('>BHH', 3, 0x5B00, 2))
+        check(pdu == bytes([0x83, 0x0b]), f'source offline: exception 11 ({pdu.hex()})')
+    finally:
+        http('PUT', '/api/modbus/server', srv_keep)
+        http('PUT', '/api/modbus', keep)
+        if sim.poll() is None:
+            sim.terminate()
+            sim.wait(timeout=5)
+    check(len(http('GET', '/api/modbus')[1]['devices']) == len(keep['devices']), 'devices of before restored')
+
+
 def tc13_rcp_reflash():
     """Forced C6 reflash from the UI restores the current role's firmware."""
     role = status()['role']['active']
@@ -2822,7 +2932,7 @@ TESTS = [
     ('TC26', tc26_zigbee_backup), ('TC27', tc27_online_update_checks),
     ('TC28', tc28_learned_sounds), ('TC29', tc29_mqtt_options), ('TC30', tc30_ha_integration_interface),
     ('TC31', tc31_sound_pressure), ('TC32', tc32_lan_settings_traffic), ('TC33', tc33_full_restart), ('TC34', tc34_users), ('TC35', tc35_telegram), ('TC36', tc36_c6_online_update), ('TC37', tc37_release_list), ('TC39', tc39_two_radios), ('TC40', tc40_thread_per_radio),
-    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC56', tc56_modbus_abb), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
+    ('TC46', tc46_mqtt_discovery_groups), ('TC47', tc47_i2c_sensors), ('TC48', tc48_modbus), ('TC49', tc49_modbus_scan), ('TC50', tc50_modbus_goodwe_udp), ('TC51', tc51_time_settings), ('TC52', tc52_gpio), ('TC53', tc53_gpio_mqtt), ('TC54', tc54_gpio_functions), ('TC55', tc55_modbus_tcp_server), ('TC56', tc56_modbus_abb), ('TC57', tc57_modbus_emulation), ('TC41', tc41_wifi_uplink), ('TC42', tc42_wifi_failover), ('TC43', tc43_wifi_wrong_network),
     ('TC44', tc44_wifi_setup_portal), ('TC45', tc45_wifi_swap),
 ]
 
@@ -2849,7 +2959,7 @@ def main():
     selected = [t for t in TESTS if not ARGS.only or t[0] in ARGS.only]
     b_role = None
     # cases that leave radio B alone or set it up themselves
-    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55', 'TC56')
+    keep_b = ('TC24', 'TC32', 'TC33', 'TC39', 'TC40', 'TC41', 'TC42', 'TC43', 'TC44', 'TC45', 'TC46', 'TC47', 'TC48', 'TC49', 'TC50', 'TC51', 'TC52', 'TC53', 'TC54', 'TC55', 'TC56', 'TC57')
     if any(tid not in keep_b for tid, _ in selected):
         try:
             b_role = status()['role'].get('b', {}).get('desired', 'none')

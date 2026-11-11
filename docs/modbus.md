@@ -132,29 +132,34 @@ A device on RS485 is slower than the simulator: its requests take the bus times 
 
 ## Emulation (virtual devices)
 
-**Plan (2026-11-11), phases E1-E3 in TODO.md.** A virtual device shows the values of a device the
-gateway reads (the source, e.g. an Eastron SDM630 on RS485) as another device (the target template, e.g.
-`abb_b23`), for clients that only accept a certain meter (an inverter's zero export, a Victron GX).
+A virtual device shows the values of a device the gateway reads (its source, e.g. an Eastron SDM630 on
+RS485) as a device of another template (e.g. `abb_b23`), for clients that accept only a certain meter (an
+inverter's zero export, a Victron GX). System › RS485 › Add device, connection *Emulation*: the template it
+plays and the device whose values it shows.
 
-- Configuration: a device with `"transport": "virtual"`, `"source": "<device id>"` and the target
-  `template`; no address. The source must be a real device (no chains). It is a device like the others:
-  Modbus TCP server, MQTT, the integration, Telegram reports. Exposed to Home Assistant next to its source
-  it shows the same quantities twice; the page says so.
-- Mapping, automatic: an entity's quantity is its `q` (a new optional template field), else its key.
-  Eastron's `total_power`, `total_reactive_power`, `total_apparent_power`, `total_power_factor` and
-  `serial_number` get `q` of `power`, `reactive_power`, `apparent_power`, `power_factor`, `serial` (keys
-  stay: they are part of the Home Assistant ids). Units convert between W and kW, Wh and kWh, var and kvar,
-  varh and kvarh. A quantity the source lacks is derived where it can be: a total as the sum of the three
-  phases (power, reactive and apparent power, import and export energy), power as import minus export
-  power. The API lists per target entity where its value comes from.
-- Values follow the source: computed after every poll of the source, offline with it.
+- Configuration: `"transport": "virtual"`, `"source": "<device id>"`, the template; no address. The source is
+  a real device of the list (no chains). It is a device like the others: Modbus TCP server, MQTT, the
+  integration. Read only: writes from the API, MQTT or a client are refused (the integration and MQTT
+  discovery leave its writable entities out). Shown in Home Assistant next to its source, the same
+  quantities appear twice; the page says so.
+- Mapping, automatic, per target entity: the source entity of the same quantity (`q`, else the key; Eastron's
+  `total_power`, `total_reactive_power`, `total_apparent_power`, `total_power_factor` and `serial_number` are
+  `power`, `reactive_power`, `apparent_power`, `power_factor` and `serial`), units converted between W and kW,
+  Wh and kWh, var and kvar, varh and kvarh; else a total as the sum of the three phases (power, reactive and
+  apparent power, import and export energy, reactive energies), power as import minus export power, an L1
+  value of a single phase source. Texts only from texts, options only from the same options. The API
+  (`map`, `mapped`) and the opened row list where each value comes from. SDM630 as ABB B23: 29 of 30 (the
+  B23's firmware version has none).
+- Values follow the source: computed after each of its polls, offline with it (state and error say so).
 - Modbus TCP server: every read is answered from the values, encoded as the target template says (type,
-  word order, scale); no read reaches the source. A target entity without a value reads the template's
-  "no value" (`nan`), else 0; registers no entity covers read `fill` (a new template field: ABB 65535,
-  default 0); `emulate` (a new entity field) is a fixed value for identification (ABB type "B23 112-100" at
-  0x8960). Writes answer exception 1, a virtual device whose source is offline exception 11.
+  word order, scale); no read reaches the source. An entity without a value reads the template's "no value"
+  (`nan`; u64 all ones), else 0; registers no entity covers read `fill` (ABB 65535); `emulate` gives fixed
+  values (ABB type "B23 112-100" at 0x8960, which a Victron GX checks). A value that does not fit the type
+  (out of range) reads as no value. Writes answer exception 1, a virtual device whose source is offline
+  exception 11.
 - Not on RS485: the gateway is the bus master there (decided 2026-11-11).
 
+## Home Assistant
 
 Each device is a device of its own, connected via the gateway:
 
@@ -306,6 +311,11 @@ The templates are generated from tables in `tools/modbus/gen_sdm.py`, `tools/mod
   manual request reads the serial number, an absent unit times out, invalid devices are refused, a device
   on `udp` with `goodwe_xs` reads every value. UI34: the search page adds it in one click. The unit test
   checks the AA 55 framing against the request bytes of the goodwe library (`7F 03 75 31 00 28 04 09`).
+- TC57: an SDM630 of the simulator as a virtual ABB B23 read over the Modbus TCP server the way a Victron GX
+  reads an ABB meter (type, serial, 0x5B00 x62 across the gap, energies, per phase energies, firmware without
+  source) register by register as the simulator's code encodes the ABB template; mapping in the API, invalid
+  sources refused, writes refused, the source offline answers exception 11. UI38: the page. The unit test
+  checks mapping (units, sum of phases, q) and the register image (fill, nan, u64, fixed text).
 - TC56: both ABB templates against the simulator answering gaps (`--lenient`): every value as encoded, and
   the meter's "no value" (u64 all ones, s16 and s32 largest positive) shows no value.
 - TC55: the Modbus TCP server against the simulator (`--log-reads`) playing an SDM630 on Modbus TCP and a

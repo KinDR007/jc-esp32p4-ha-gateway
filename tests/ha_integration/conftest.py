@@ -60,6 +60,9 @@ MODBUS = {
                     "relay": True, "fault": False}},
         {"id": "d2", "name": "MQTT only", "template": "peacefair_pzem017", "template_rev": 1, "manufacturer": "Peacefair",
          "model": "PZEM-017", "transport": "rtu", "slave": 2, "expose": "mqtt", "enabled": True, "state": "ok", "values": {}},
+        {"id": "d3", "name": "Emulated", "template": "peacefair_pzem017", "template_rev": 1, "manufacturer": "Peacefair",
+         "model": "PZEM-017 / PZEM-003", "transport": "virtual", "source": "d1", "expose": "integration", "enabled": True, "state": "ok",
+         "values": {"voltage": 52.31, "shunt": "100 A", "relay": True}},
     ]
 }
 

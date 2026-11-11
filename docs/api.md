@@ -2436,13 +2436,44 @@ Response:
         "total_power": 1835,
         "import_energy": 15234.112
       }
+    },
+    {
+      "id": "d2",
+      "name": "House meter as ABB B23",
+      "template": "abb_b23",
+      "transport": "virtual",
+      "source": "d1",
+      "poll_s": 0,
+      "expose": "none",
+      "enabled": true,
+      "manufacturer": "ABB",
+      "model": "B23 / B24 (EQ meter)",
+      "template_rev": 1781302,
+      "state": "ok",
+      "error": "",
+      "age_s": 2,
+      "polls": 120,
+      "errors": 0,
+      "values": {
+        "voltage_l1": 231.4,
+        "power": 1835,
+        "type": "B23 112-100"
+      },
+      "map": {
+        "voltage_l1": "voltage_l1",
+        "power": "total_power",
+        "type": "fixed",
+        "firmware": ""
+      },
+      "mapped": 29,
+      "entities": 30
     }
   ],
   "max_devices": 16
 }
 ```
 
-Effects: values hold the entities read (key from the template): numbers already scaled, true/false for bits and coils, the text of a map entry, strings. state: ok, partial (some reads refused), offline (3 polls without an answer; tried again every 30 s), starting or off. expose: integration, mqtt, both or none. poll_s 0 means the template's interval.
+Effects: values hold the entities read (key from the template): numbers already scaled, true/false for bits and coils, the text of a map entry, strings. state: ok, partial (some reads refused), offline (3 polls without an answer; tried again every 30 s), starting or off. expose: integration, mqtt, both or none. poll_s 0 means the template's interval. A virtual device (transport virtual) shows the values of its source as its template's device: map tells per entity where its value comes from (a source key, a sum like power_l1+power_l2+power_l3, a difference, "fixed" for the template's emulate value, "" for none, " x1000" when units convert), mapped how many entities have a source.
 
 #### PUT `/api/modbus`
 
@@ -2475,6 +2506,13 @@ Body:
       "poll_s": 5,
       "expose": "both",
       "enabled": true
+    },
+    {
+      "name": "House meter as ABB B23",
+      "template": "abb_b23",
+      "transport": "virtual",
+      "source": "d1",
+      "expose": "none"
     }
   ]
 }
@@ -2488,9 +2526,9 @@ Response:
 }
 ```
 
-Errors: 400 baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; transport not rtu/tcp/udp; tcp or udp without host; slave not 1-247 (TCP, UDP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.
+Errors: 400 baud not 1200-115200 of the list, parity not N/E/O, stop not 1/2, timeout_ms not 50-5000; more than 16 devices; unknown template; transport not rtu/tcp/udp/virtual; virtual without source, or source not a non-virtual device of the list; tcp or udp without host; slave not 1-247 (TCP, UDP 0-255); port, poll_s, expose or enabled invalid; name over 32 characters or with quotes, braces, backslash.
 
-Effects: transport: rtu (RS485), tcp (Modbus TCP, port 502) or udp (GoodWe Wi-Fi module: Modbus RTU over UDP, answers with AA 55, port 8899). devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.
+Effects: transport: rtu (RS485), tcp (Modbus TCP, port 502), virtual (emulation: source is the id of the device whose values it shows; no address; read only; values follow each poll of the source; docs/modbus.md) or udp (GoodWe Wi-Fi module: Modbus RTU over UDP, answers with AA 55, port 8899). devices replaces the whole list: send the ones to keep with their id; a device without id gets a new one. A device whose template and connection stay keeps its values. The answer comes after the gateway applied it (up to 2 s). MQTT discovery follows.
 
 #### GET `/api/modbus/templates`
 

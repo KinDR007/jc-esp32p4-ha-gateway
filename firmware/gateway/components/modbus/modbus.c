@@ -25,7 +25,9 @@
  * Modbus devices on RS485 (connector J4) and Modbus TCP (docs/modbus.md). One task owns both transports:
  * it applies configuration changes, runs writes and manual requests, a bus search, and polls the devices.
  * Each device follows a template (mb_template.c); values go to /api/modbus, to the push WebSocket and
- * MQTT (topic modbus/<id>), and Home Assistant shows every device as its own device.
+ * MQTT (topic modbus/<id>), and Home Assistant shows every device as its own device. A virtual device shows
+ * the values of another device (its source) as a device of another template (emulation): computed after
+ * each poll of the source, answered to Modbus TCP clients from the values.
  */
 
 static const char *TAG = "modbus";
@@ -76,6 +78,8 @@ typedef struct {
     uint16_t poll_s;  /* 0 = the template's */
     uint8_t expose;   /* EXPOSE_* bits */
     bool enabled;
+    bool virt;        /* emulation: values of source shown as template t */
+    char source[8];
     /* runtime, owned by the task; values copied under s_lock */
     const tpl_t *t;
     int nent;        /* entities the arrays below hold (the template may change before they follow) */
@@ -90,7 +94,9 @@ typedef struct {
     uint8_t *vstate; /* VAL_* */
     bool *single;
     char **text;     /* str entities */
-    cblock_t *cache; /* nent + CLIENT_BLOCKS (a poll has at most a block per entity), PSRAM */
+    cblock_t *cache; /* nent + CLIENT_BLOCKS (a poll has at most a block per entity), PSRAM; none when virtual */
+    mb_map_t *map;   /* virtual: nent, resolved against the source's template of revision map_rev */
+    uint32_t map_rev;
 } mbdev_t;
 
 enum { VAL_NONE, VAL_OK, VAL_UNSUPPORTED };
@@ -231,7 +237,8 @@ static void free_runtime(mbdev_t *d)
         }
     }
     free(d->cache);
-    d->val = NULL, d->vstate = NULL, d->single = NULL, d->text = NULL, d->cache = NULL;
+    free(d->map);
+    d->val = NULL, d->vstate = NULL, d->single = NULL, d->text = NULL, d->cache = NULL, d->map = NULL;
 }
 
 static bool alloc_runtime(mbdev_t *d)
@@ -246,8 +253,18 @@ static bool alloc_runtime(mbdev_t *d)
     d->vstate = ps_calloc(n, 1);
     d->single = ps_calloc(n, sizeof(bool));
     d->text = ps_calloc(n, sizeof(char *));
-    d->cache = ps_calloc(n + CLIENT_BLOCKS, sizeof(cblock_t));
-    return d->val && d->vstate && d->single && d->text && d->cache;
+    if (d->virt) {
+        d->map = ps_calloc(n, sizeof(mb_map_t));
+        d->map_rev = 0;
+    } else {
+        d->cache = ps_calloc(n + CLIENT_BLOCKS, sizeof(cblock_t));
+    }
+    return d->val && d->vstate && d->single && d->text && (d->virt ? d->map != NULL : d->cache != NULL);
+}
+
+static bool valid_id(const char *id)
+{
+    return id && id[0] && strlen(id) < sizeof(((mbdev_t *)0)->id) && strspn(id, "abcdefghijklmnopqrstuvwxyz0123456789") == strlen(id);
 }
 
 static const char *parse_expose(const char *s, uint8_t *out)
@@ -279,7 +296,7 @@ static const char *parse_device(const cJSON *j, mbdev_t *d)
     const char *transport = GW_JSON_STR(j, "transport"), *host = GW_JSON_STR(j, "host");
     const cJSON *slave = cJSON_GetObjectItem(j, "slave"), *port = cJSON_GetObjectItem(j, "port"), *poll = cJSON_GetObjectItem(j, "poll_s");
     const cJSON *enabled = cJSON_GetObjectItem(j, "enabled");
-    if (id && (strlen(id) >= sizeof(d->id) || !id[0] || strspn(id, "abcdefghijklmnopqrstuvwxyz0123456789") != strlen(id))) {
+    if (id && !valid_id(id)) {
         return "id: a-z, 0-9, up to 7 characters";
     }
     if (!tpl || !(d->t = find_tpl(tpl))) {
@@ -288,10 +305,15 @@ static const char *parse_device(const cJSON *j, mbdev_t *d)
     if (name && (utf8_chars(name) > NAME_CHARS || strlen(name) >= sizeof(d->name) || strpbrk(name, "\"\\{}"))) {
         return "name: up to 32 characters, no quotes, braces or backslash";
     }
+    d->virt = transport && strcmp(transport, "virtual") == 0;
     d->udp = transport && strcmp(transport, "udp") == 0;
     d->tcp = d->udp || (transport && strcmp(transport, "tcp") == 0);
-    if (transport && !d->tcp && strcmp(transport, "rtu") != 0) {
-        return "transport: rtu, tcp or udp";
+    if (transport && !d->tcp && !d->virt && strcmp(transport, "rtu") != 0) {
+        return "transport: rtu, tcp, udp or virtual";
+    }
+    const char *source = GW_JSON_STR(j, "source");
+    if (d->virt && !valid_id(source)) {
+        return "source: the id of the device a virtual device shows";
     }
     if (d->tcp && (!host || !host[0] || strlen(host) >= sizeof(d->host) || strpbrk(host, " /"))) {
         return "host: the address of the Modbus TCP or GoodWe UDP device";
@@ -300,8 +322,8 @@ static const char *parse_device(const cJSON *j, mbdev_t *d)
     if (port && (!cJSON_IsNumber(port) || p < 1 || p > 65535)) {
         return "port: 1-65535";
     }
-    int s = cJSON_IsNumber(slave) ? slave->valueint : d->t->t.slave;
-    if ((slave && !cJSON_IsNumber(slave)) || s < (d->tcp ? 0 : 1) || s > (d->tcp ? 255 : 247)) {
+    int s = d->virt ? 0 : cJSON_IsNumber(slave) ? slave->valueint : d->t->t.slave;
+    if (!d->virt && ((slave && !cJSON_IsNumber(slave)) || s < (d->tcp ? 0 : 1) || s > (d->tcp ? 255 : 247))) {
         return "slave: 1-247 (TCP: unit 0-255)";
     }
     int ps = cJSON_IsNumber(poll) ? poll->valueint : 0;
@@ -319,6 +341,9 @@ static const char *parse_device(const cJSON *j, mbdev_t *d)
         strcpy(d->id, id);
     }
     strcpy(d->tpl, tpl);
+    if (d->virt) {
+        strcpy(d->source, source);
+    }
     snprintf(d->name, sizeof(d->name), "%s", name && name[0] ? name : d->t->t.model);
     if (d->tcp) {
         strcpy(d->host, host);
@@ -382,8 +407,12 @@ static cJSON *config_json(void)
         cJSON_AddStringToObject(j, "id", d->id);
         cJSON_AddStringToObject(j, "name", d->name);
         cJSON_AddStringToObject(j, "template", d->tpl);
-        cJSON_AddStringToObject(j, "transport", d->udp ? "udp" : d->tcp ? "tcp" : "rtu");
-        cJSON_AddNumberToObject(j, "slave", d->slave);
+        cJSON_AddStringToObject(j, "transport", d->virt ? "virtual" : d->udp ? "udp" : d->tcp ? "tcp" : "rtu");
+        if (d->virt) {
+            cJSON_AddStringToObject(j, "source", d->source);
+        } else {
+            cJSON_AddNumberToObject(j, "slave", d->slave);
+        }
         if (d->tcp) {
             cJSON_AddStringToObject(j, "host", d->host);
             cJSON_AddNumberToObject(j, "port", d->port);
@@ -438,10 +467,10 @@ static void apply_config(const cJSON *root)
             }
         }
         if (old && old->t == d->t && old->tcp == d->tcp && old->udp == d->udp && !strcmp(old->host, d->host) && old->port == d->port && old->slave == d->slave &&
-            old->enabled && d->enabled) {
+            old->virt == d->virt && !strcmp(old->source, d->source) && old->enabled && d->enabled) {
             /* same device: keep its runtime */
             memcpy(&d->t, &old->t, sizeof(*d) - offsetof(mbdev_t, t));
-            old->val = NULL, old->vstate = NULL, old->single = NULL, old->text = NULL, old->cache = NULL;
+            old->val = NULL, old->vstate = NULL, old->single = NULL, old->text = NULL, old->cache = NULL, old->map = NULL;
             old->conn.sock = -1;
             d->next_us = 0;
         } else if (!alloc_runtime(d)) {
@@ -457,6 +486,14 @@ static void apply_config(const cJSON *root)
         memcpy(s_dev, next, sizeof(mbdev_t) * MAX_DEVICES);
         free(next);
         s_ndev = n;
+    }
+    for (int i = 0; i < s_ndev; i++) {
+        mbdev_t *v = &s_dev[i];
+        const mbdev_t *src = v->virt ? find_dev(v->source) : NULL;
+        if (v->virt && (!src || src->virt || !src->enabled)) {
+            v->online = false;
+            snprintf(v->error, sizeof(v->error), "source %s missing or off", v->source);
+        }
     }
 }
 
@@ -613,11 +650,27 @@ static void cache_forget(mbdev_t *d, const mb_req_t *req)
 
 int modbus_srv_cache(const char *dev, const mb_req_t *req, uint16_t ttl_ms, uint8_t *data, size_t *len)
 {
-    if (req->fc < MB_FC_READ_COILS || req->fc > MB_FC_READ_INPUT || !ttl_ms) {
+    if (req->fc < MB_FC_READ_COILS || req->fc > MB_FC_READ_INPUT) {
         return MB_ERR_ARG;
     }
     const int8_t *space = s_fc_space;
     bool bits = req->fc <= MB_FC_READ_DISCRETE;
+    *len = bits ? (req->count + 7u) / 8 : 2u * req->count;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const mbdev_t *v = find_dev(dev);
+    if (v && v->virt) {
+        /* a virtual device: every read from its values, none reaches its source */
+        int err = !v->enabled ? 0x0a : !v->online || v->nent != v->t->t.nent ? 0x0b : MB_OK;
+        if (err == MB_OK) {
+            mb_template_image(&v->t->t, (mb_space_t)space[req->fc], req->addr, req->count, v->val, v->vstate, v->text, data);
+        }
+        xSemaphoreGive(s_lock);
+        return err;
+    }
+    xSemaphoreGive(s_lock);
+    if (!ttl_ms) {
+        return MB_ERR_ARG;
+    }
     int64_t now = esp_timer_get_time();
     int done = 0;
     if (bits) {
@@ -669,6 +722,84 @@ bool modbus_srv_device(const char *dev, char *name, size_t len)
     }
     xSemaphoreGive(s_lock);
     return d != NULL;
+}
+
+/* values (taken under s_lock, freed here) and availability of a device to MQTT and the push WebSocket */
+static void publish_values(const char *id, cJSON *v, bool online)
+{
+    if (!v) {
+        return;
+    }
+    char topic[32];
+    snprintf(topic, sizeof(topic), "modbus/%s", id);
+    char *text = cJSON_PrintUnformatted(v);
+    cJSON_Delete(v);
+    if (text) {
+        gw_mqtt_publish(topic, text, false); /* also the push WebSocket of the integration */
+        cJSON_free(text);
+    }
+    strlcat(topic, "/availability", sizeof(topic));
+    gw_mqtt_publish(topic, online ? "online" : "offline", true);
+}
+
+/* The virtual devices showing src: their values from its values, after each of its polls. Task only. */
+static void follow_source(const mbdev_t *src)
+{
+    for (int i = 0; i < s_ndev; i++) {
+        mbdev_t *v = &s_dev[i];
+        if (!v->virt || !v->enabled || strcmp(v->source, src->id) != 0) {
+            continue;
+        }
+        const mb_template_t *t = &v->t->t;
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        if (v->nent != t->nent || src->nent != src->t->t.nent) {
+            xSemaphoreGive(s_lock);
+            continue; /* a template was replaced: wait for the new runtime */
+        }
+        uint32_t rev = src->t->rev * 31u + v->t->rev;
+        if (v->map_rev != rev) {
+            mb_map_resolve(t, &src->t->t, v->map);
+            v->map_rev = rev;
+        }
+        v->online = src->online;
+        v->fails = src->fails;
+        v->last_ok_us = src->last_ok_us;
+        v->polls++;
+        if (src->online) {
+            v->error[0] = '\0';
+        } else {
+            snprintf(v->error, sizeof(v->error), "source: %.50s", src->error);
+        }
+        for (int k = 0; k < t->nent; k++) {
+            const mb_entity_t *e = &t->ent[k];
+            const mb_map_t *m = &v->map[k];
+            double x = 0;
+            const char *text = NULL;
+            bool ok;
+            if (m->kind == MB_MAP_CONST) {
+                text = e->emulate;
+                x = strtod(e->emulate, NULL);
+                ok = true;
+            } else if (e->type == MB_T_STR) {
+                ok = m->kind == MB_MAP_ONE && src->vstate[m->src[0]] == VAL_OK && (text = src->text[m->src[0]]) != NULL;
+            } else if ((ok = mb_map_value(m, src->val, src->vstate, &x)) && !e->nopts) {
+                double f = pow(10, e->precision);
+                x = round(x * f) / f;
+            }
+            if (e->type == MB_T_STR && ok) {
+                free(v->text[k]);
+                v->text[k] = strdup(text);
+            }
+            v->val[k] = ok ? x : 0;
+            v->vstate[k] = ok ? VAL_OK : VAL_NONE;
+        }
+        cJSON *json = v->expose ? values_json(v) : NULL;
+        bool online = v->online;
+        char id[8];
+        strcpy(id, v->id);
+        xSemaphoreGive(s_lock);
+        publish_values(id, json, online);
+    }
 }
 
 /* One poll of a device: the entities due in this cycle, block by block. */
@@ -752,19 +883,9 @@ static void poll_device(mbdev_t *d, int64_t now)
     d->next_us = now + (int64_t)(d->online || d->fails < OFFLINE_AFTER ? poll_s : OFFLINE_RETRY_S) * 1000000;
     cJSON *v = d->expose ? values_json(d) : NULL;
     bool online = d->online;
-    char topic[32];
-    snprintf(topic, sizeof(topic), "modbus/%s", d->id);
     xSemaphoreGive(s_lock);
-    if (v) {
-        char *text = cJSON_PrintUnformatted(v);
-        cJSON_Delete(v);
-        if (text) {
-            gw_mqtt_publish(topic, text, false); /* also the push WebSocket of the integration */
-            cJSON_free(text);
-        }
-        strlcat(topic, "/availability", sizeof(topic));
-        gw_mqtt_publish(topic, online ? "online" : "offline", true);
-    }
+    publish_values(d->id, v, online);
+    follow_source(d);
 }
 
 /* value of an entity for the API, MQTT and Telegram: number, bool, label or text; under s_lock */
@@ -808,6 +929,10 @@ static cJSON *values_json(const mbdev_t *d)
 static int write_entity(mbdev_t *d, const char *key, const char *value, char *err, size_t err_len)
 {
     const mb_entity_t *e = mb_template_entity(&d->t->t, key);
+    if (d->virt) {
+        snprintf(err, err_len, "%s: a virtual device is read only", d->id);
+        return MB_ERR_ARG;
+    }
     if (d->nent != d->t->t.nent) {
         snprintf(err, err_len, "device %s is being reconfigured", d->id);
         return MB_ERR_ARG;
@@ -1026,7 +1151,7 @@ int modbus_srv_submit(mb_srv_job_t *job)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     mbdev_t *d = find_dev(job->dev);
-    int err = !d || !d->enabled || !d->t ? 0x0a : !d->online && d->fails >= OFFLINE_AFTER ? 0x0b : MB_OK;
+    int err = !d || !d->enabled || !d->t ? 0x0a : d->virt ? (d->online ? 1 : 0x0b) : !d->online && d->fails >= OFFLINE_AFTER ? 0x0b : MB_OK;
     xSemaphoreGive(s_lock);
     if (err == MB_OK) {
         job->done = false;
@@ -1109,7 +1234,7 @@ static void task(void *arg)
         int64_t now = esp_timer_get_time();
         for (int i = 0; i < s_ndev; i++) {
             mbdev_t *d = &s_dev[i];
-            if (d->enabled && d->t && now >= d->next_us) {
+            if (d->enabled && d->t && !d->virt && now >= d->next_us) {
                 poll_device(d, now);
                 break; /* one device per round: jobs and writes in between */
             }
@@ -1150,6 +1275,21 @@ static cJSON *status_json(void)
         cJSON_AddNumberToObject(o, "polls", d->polls);
         cJSON_AddNumberToObject(o, "errors", d->errors);
         cJSON_AddItemToObject(o, "values", d->enabled && d->online ? values_json(d) : cJSON_CreateObject());
+        const mbdev_t *src = d->virt ? find_dev(d->source) : NULL;
+        mb_map_t *map = src && src->t && !src->virt ? ps_calloc(d->t->t.nent, sizeof(mb_map_t)) : NULL;
+        if (map) {
+            /* where each value comes from */
+            int n = mb_map_resolve(&d->t->t, &src->t->t, map);
+            cJSON *m = cJSON_AddObjectToObject(o, "map");
+            for (int k = 0; k < d->t->t.nent; k++) {
+                char how[80];
+                mb_map_describe(&map[k], &src->t->t, how, sizeof(how));
+                cJSON_AddStringToObject(m, d->t->t.ent[k].key, how);
+            }
+            cJSON_AddNumberToObject(o, "mapped", n);
+            cJSON_AddNumberToObject(o, "entities", d->t->t.nent);
+            free(map);
+        }
     }
     return root;
 }
@@ -1188,6 +1328,23 @@ static esp_err_t modbus_put(httpd_req_t *req)
         why = err[0] ? NULL : parse_device(j, &d);
         if (why) {
             snprintf(err, sizeof(err), "devices[%d] %s", k, why);
+        }
+        k++;
+    }
+    /* a virtual device shows a real device of the same list (no chains) */
+    k = 0;
+    cJSON_ArrayForEach(j, list)
+    {
+        const char *t = GW_JSON_STR(j, "transport"), *source = GW_JSON_STR(j, "source");
+        bool found = false;
+        const cJSON *o;
+        cJSON_ArrayForEach(o, list)
+        {
+            const char *ot = GW_JSON_STR(o, "transport"), *oid = GW_JSON_STR(o, "id");
+            found |= oid && source && !strcmp(oid, source) && !(ot && !strcmp(ot, "virtual"));
+        }
+        if (!err[0] && t && !strcmp(t, "virtual") && !found) {
+            snprintf(err, sizeof(err), "devices[%d] source: no such device (not virtual) in the list", k);
         }
         k++;
     }
@@ -1704,7 +1861,7 @@ static void mqtt_discovery(void)
     typedef struct {
         char id[8], name[NAME_CHARS * 3 + 1];
         const tpl_t *t;
-        bool on;
+        bool on, virt;
     } snap_t;
     snap_t *snap = ps_calloc(MAX_DEVICES, sizeof(snap_t));
     if (!snap) {
@@ -1717,6 +1874,7 @@ static void mqtt_discovery(void)
         strcpy(snap[n].id, s_dev[i].id);
         strcpy(snap[n].name, s_dev[i].name);
         snap[n].t = s_dev[i].t;
+        snap[n].virt = s_dev[i].virt;
         n++;
     }
     xSemaphoreGive(s_lock);
@@ -1753,6 +1911,9 @@ static void mqtt_discovery(void)
         strcpy(s_pub[i].dev, snap[i].id);
         for (int k = 0; k < t->nent; k++) {
             const mb_entity_t *e = &t->ent[k];
+            if (snap[i].virt && e->write) {
+                continue; /* a virtual device is read only */
+            }
             const char *component = e->write == MB_W_NUMBER   ? "number"
                                     : e->write == MB_W_SWITCH ? "switch"
                                     : e->write == MB_W_SELECT ? "select"

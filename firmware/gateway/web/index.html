@@ -4477,13 +4477,15 @@ views['system/rs485'] = () => `<div class="grid">
     <div id="mb-add-note" class="muted"></div>
     <div class="row">
       <label class="field" style="margin:0;flex:1"><span>${L('Name', 'Jméno')}</span><input type="text" id="mb-add-name" maxlength="32"></label>
-      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-add-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option><option value="udp">GoodWe UDP</option></select></label>
-      <label class="field" style="margin:0"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-add-slave" min="0" max="255" value="1" style="width:70px"></label></div>
+      <label class="field" style="margin:0"><span>${L('Connection', 'Připojení')}</span><select id="mb-add-tr"><option value="rtu">RS485</option><option value="tcp">Modbus TCP</option><option value="udp">GoodWe UDP</option><option value="virtual">${L('Emulation (virtual device)', 'Emulace (virtuální zařízení)')}</option></select></label>
+      <label class="field" style="margin:0" id="mb-add-slavef"><span>${L('Address', 'Adresa')}</span><input type="number" id="mb-add-slave" min="0" max="255" value="1" style="width:70px"></label></div>
+    <div class="row hidden" id="mb-add-virt">
+      <label class="field" style="margin:0;flex:1"><span>${L('Values of', 'Hodnoty zařízení')}</span><select id="mb-add-src"></select></label></div>
     <div class="row hidden" id="mb-add-tcp">
       <label class="field" style="margin:0;flex:1"><span>${L('Host', 'Host')}</span><input type="text" id="mb-add-host" placeholder="192.168.1.50"></label>
       <label class="field" style="margin:0"><span>${L('Port', 'Port')}</span><input type="number" id="mb-add-port" value="502" style="width:80px"></label></div>
     <div class="row">
-      <label class="field" style="margin:0"><span>${L('Read every (s)', 'Číst každých (s)')}</span><input type="number" id="mb-add-poll" min="0" max="3600" value="0" style="width:80px" title="${L('0: as the template says', '0: podle šablony')}"></label>
+      <label class="field" style="margin:0" id="mb-add-pollf"><span>${L('Read every (s)', 'Číst každých (s)')}</span><input type="number" id="mb-add-poll" min="0" max="3600" value="0" style="width:80px" title="${L('0: as the template says', '0: podle šablony')}"></label>
       <label class="field" style="margin:0"><span>${L('Home Assistant', 'Home Assistant')}</span><select id="mb-add-expose">${MB_EXPOSE().map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
       <button class="btn primary" id="mb-add">${ic('plus')}${L('Add', 'Přidat')}</button></div></div>
   <div class="card wide">${h3('lan-connect', L('Devices', 'Zařízení'))}<div class="table-wrap" id="mb-devices"><p class="muted">${L('Loading…', 'Načítám…')}</p></div></div>
@@ -4527,9 +4529,13 @@ views['system/rs485'] = () => `<div class="grid">
 const MB_EXPOSE = () => [['integration', L('integration', 'integrace')], ['mqtt', 'MQTT'], ['both', L('integration and MQTT', 'integrace a MQTT')], ['none', L('not shown', 'nezobrazovat')]];
 let mb = null, mbTpls = [], mbTimer = null, mbOpen = new Set(), mbFull = {}, mbPrefill = null;
 const mbTpl = id => mbTpls.find(t => t.id === id);
-const mbConn = d => d.transport !== 'rtu' ? `${d.transport.toUpperCase()} ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
+const mbConn = d => d.transport === 'virtual' ? `${L('emulates', 'emuluje')} ${esc(mb.devices.find(x => x.id === d.source)?.name || d.source)}`
+  : d.transport !== 'rtu' ? `${d.transport.toUpperCase()} ${esc(d.host)}:${d.port} #${d.slave}` : `RS485 #${d.slave}`;
+/* real devices a virtual one can show */
+const mbSources = () => (mb?.devices || []).filter(d => d.transport !== 'virtual');
 const mbState = d => ({ ok: pill('ok', L('ok', 'v pořádku')), partial: pill('warn', L('partly', 'částečně')), offline: pill('bad', L('offline', 'nedostupné')),
-  starting: pill('warn', L('starting', 'startuje')), off: pill('', L('off', 'vypnuto')) }[d.state] || esc(d.state)) + (d.error ? `<div class="muted">${esc(d.error)}</div>` : '');
+  starting: pill('warn', L('starting', 'startuje')), off: pill('', L('off', 'vypnuto')) }[d.state] || esc(d.state)) + (d.error ? `<div class="muted">${esc(d.error)}</div>` : '')
+  + (d.transport === 'virtual' && d.mapped !== undefined ? `<div class="muted">${L(`${d.mapped} of ${d.entities} values from the source`, `${d.mapped} z ${d.entities} hodnot ze zdroje`)}</div>` : '');
 function mbFmt(e, v) {
   if (v === undefined) return '—';
   if (typeof v === 'boolean') return v ? L('on', 'zap') : L('off', 'vyp');
@@ -4549,6 +4555,12 @@ function mbValues(d, full) {
   const ents = t.entities.filter(e => full || (!e.category && !e.write)).slice(0, full ? 999 : 4);
   if (!full) return ents.map(e => d.values[e.key] !== undefined ? `<span title="${esc(mbName(e))}">${mbFmt(e, d.values[e.key])}</span>` : '').filter(Boolean).join(' · ') || '—';
   const ro = perm('system/rs485') < 2 ? 'disabled' : '';
+  if (d.transport === 'virtual') {
+    /* read only; where each value comes from */
+    return `<table><tr><th>${L('Value', 'Hodnota')}</th><th></th><th>${L('From the source', 'Ze zdroje')}</th></tr>${ents.map(e => `<tr><td class="hw-wrap">${esc(mbName(e))}</td>
+      <td>${mbFmt(e, d.values[e.key])}</td><td class="muted">${d.map?.[e.key] === 'fixed' ? L('fixed', 'pevná') : d.map?.[e.key] ? `<code>${esc(d.map[e.key])}</code>`
+        : L('none: reads "no value"', 'žádná: čte se „bez hodnoty“')}</td></tr>`).join('')}</table>`;
+  }
   return `<table>${ents.map(e => {
     const v = d.values[e.key], w = e.write?.kind;
     let ctl = '';
@@ -4596,6 +4608,13 @@ function mbAddNote() {
   const t = mbTpl($('#mb-add-tpl').value);
   if (!t) return;
   const bus = mb?.bus, match = !bus || (t.baud === bus.baud && t.serial === `8${bus.parity}${bus.stop}`);
+  if ($('#mb-add-tr').value === 'virtual') {
+    $('#mb-add-note').innerHTML = `${L('Shows the values of the chosen device as this template\'s device: to the Modbus TCP server (System › Modbus TCP server) for clients that accept only this device, to MQTT or the integration. Matching quantities are taken over, units converted, totals summed from the phases; what the source lacks reads as "no value".',
+      'Zobrazí hodnoty zvoleného zařízení jako zařízení této šablony: pro server Modbus TCP (Systém › Server Modbus TCP) a klienty, kteří přijmou jen toto zařízení, pro MQTT nebo integraci. Převezmou se stejné veličiny, jednotky se převedou, součty se sečtou z fází; co zdroj nemá, čte se jako „bez hodnoty“.')}`
+      + ($('#mb-add-expose').value !== 'none' ? `<div class="warn-text">${L('Shown in Home Assistant next to its source, the same values appear twice.', 'V Home Assistant vedle zdroje budou stejné hodnoty dvakrát.')}</div>` : '');
+    if (!$('#mb-add-name').value || $('#mb-add-name').dataset.auto === '1') { $('#mb-add-name').value = t.model.slice(0, 32); $('#mb-add-name').dataset.auto = '1'; }
+    return;
+  }
   $('#mb-add-note').innerHTML = `${esc((lang === 'cs' && t.notes_cs) || t.notes)}<div>${L('Default', 'Výchozí')}: ${t.baud} ${t.serial}, ${L('address', 'adresa')} ${t.slave}${$('#mb-add-tr').value === 'rtu' && !match
     ? ` · <span class="warn-text">${L(`the bus runs ${bus.baud} 8${bus.parity}${bus.stop}`, `sběrnice běží ${bus.baud} 8${bus.parity}${bus.stop}`)}</span> <button class="btn" id="mb-bus-from-tpl">${L('Use the template\'s', 'Použít ze šablony')}</button>` : ''}</div>`;
   if (!$('#mb-add-name').value || $('#mb-add-name').dataset.auto === '1') { $('#mb-add-name').value = t.model.slice(0, 32); $('#mb-add-name').dataset.auto = '1'; }
@@ -4632,6 +4651,7 @@ async function loadModbus(full = true) {
     const keep = $('#mb-add-tpl').value;
     $('#mb-add-tpl').innerHTML = mbTplOptions(keep || 'eastron_sdm630', false);
     $('#mb-pr-tpl').innerHTML = mbTplOptions($('#mb-pr-tpl').value, true);
+    $('#mb-add-src').innerHTML = mbSources().map(d => `<option value="${d.id}">${esc(d.name)}${d.name !== d.model ? ` (${esc(d.model)})` : ''}</option>`).join('');
     mbAddNote();
     mbRenderDevices();
     mbRenderTemplates();
@@ -4666,7 +4686,8 @@ function mbList() {
   return mb.devices.map(d => {
     const row = document.querySelector(`tr[data-mbdev="${d.id}"]`);
     const o = { id: d.id, name: d.name, template: d.template, transport: d.transport, slave: d.slave, poll_s: d.poll_s, expose: d.expose, enabled: d.enabled };
-    if (d.transport !== 'rtu') Object.assign(o, { host: d.host, port: d.port });
+    if (d.transport === 'virtual') delete o.slave, o.source = d.source;
+    else if (d.transport !== 'rtu') Object.assign(o, { host: d.host, port: d.port });
     if (row) Object.assign(o, { name: row.querySelector('[data-mb-name]').value.trim(), expose: row.querySelector('[data-mb-expose]').value, enabled: row.querySelector('[data-mb-en]').checked });
     return o;
   });
@@ -4694,9 +4715,13 @@ function mbRawOut(r, fc) {
   }).join('')}</table>`;
 }
 document.addEventListener('change', e => {
-  if (e.target.id === 'mb-add-tpl' || e.target.id === 'mb-add-tr') {
-    $('#mb-add-tcp').classList.toggle('hidden', $('#mb-add-tr').value === 'rtu');
-    if (e.target.id === 'mb-add-tr' && $('#mb-add-tr').value !== 'rtu') $('#mb-add-port').value = $('#mb-add-tr').value === 'udp' ? 8899 : 502;
+  if (e.target.id === 'mb-add-tpl' || e.target.id === 'mb-add-tr' || e.target.id === 'mb-add-expose') {
+    const tr = $('#mb-add-tr').value;
+    $('#mb-add-tcp').classList.toggle('hidden', tr === 'rtu' || tr === 'virtual');
+    $('#mb-add-virt').classList.toggle('hidden', tr !== 'virtual');
+    $('#mb-add-slavef').classList.toggle('hidden', tr === 'virtual');
+    $('#mb-add-pollf').classList.toggle('hidden', tr === 'virtual');
+    if (e.target.id === 'mb-add-tr' && tr !== 'rtu' && tr !== 'virtual') $('#mb-add-port').value = $('#mb-add-tr').value === 'udp' ? 8899 : 502;
     if (e.target.id === 'mb-add-tpl') $('#mb-add-name').dataset.auto = '1', $('#mb-add-name').value = '';
     mbAddNote();
   }
@@ -4722,7 +4747,8 @@ document.addEventListener('click', async e => {
       const transport = $('#mb-add-tr').value;
       const d = { name: $('#mb-add-name').value.trim(), template: $('#mb-add-tpl').value, transport, slave: +$('#mb-add-slave').value,
         poll_s: +$('#mb-add-poll').value, expose: $('#mb-add-expose').value };
-      if (transport !== 'rtu') Object.assign(d, { host: $('#mb-add-host').value.trim(), port: +$('#mb-add-port').value });
+      if (transport === 'virtual') delete d.slave, d.source = $('#mb-add-src').value;
+      else if (transport !== 'rtu') Object.assign(d, { host: $('#mb-add-host').value.trim(), port: +$('#mb-add-port').value });
       await mbPut({ devices: [...mbList(), d] }, L(`Added ${d.name}`, `Přidáno ${d.name}`));
     } else if (t.id === 'mb-dev-save') {
       await mbPut({ devices: mbList() }, L('Saved', 'Uloženo'));
@@ -4927,7 +4953,7 @@ async function loadMbServer(first) {
 }
 function renderMvList() {
   const ro = perm('system/rs485') < 2 ? 'disabled' : '';
-  const opts = cur => mvDevs.map(d => `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${esc(d.name)} (${d.transport === 'rtu' ? 'RS485' : d.transport.toUpperCase()})</option>`).join('');
+  const opts = cur => mvDevs.map(d => `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${esc(d.name)} (${d.transport === 'rtu' ? 'RS485' : d.transport === 'virtual' ? L('emulation', 'emulace') : d.transport.toUpperCase()})</option>`).join('');
   $('#mv-list').innerHTML = !mvRows.length ? `<p class="muted">${mvDevs.length ? L('No device offered yet.', 'Zatím žádné nabídnuté zařízení.') : L('Add a Modbus device first: System › RS485.', 'Nejdřív přidejte zařízení Modbus: Systém › RS485.')}</p>`
     : `<table class="hw-stack"><tr>${[L('Device', 'Zařízení'), L('Unit id on the shared port', 'Unit id na sdíleném portu'), L('Own port', 'Vlastní port'), L('Requests / s', 'Dotazů / s'), L('Cache (ms)', 'Cache (ms)'),
       L('Writes', 'Zápis'), L('Writes only from', 'Zápis jen z'), ''].map(x => `<th>${x}</th>`).join('')}</tr>${mvRows.map((e, i) => `<tr>
