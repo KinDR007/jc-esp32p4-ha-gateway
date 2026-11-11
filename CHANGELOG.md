@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.15 (2026-11-11)
+
+Summary: emulation (a virtual Modbus device shows another device's values as another meter, e.g. an SDM630 as an ABB B23 over the Modbus TCP server), periodic Telegram reports of Modbus devices, I2C sensors and GPIO, ABB B21 and B23/B24 templates; integration 1.7.1.
+
 - Periodic Telegram reports, My account › Periodic reports (`/api/auth/telegram/reports`): each user up to
   4 reports of Modbus devices (virtual ones too), I2C sensors and GPIO pins, every 15 min to 7 days (or own
   minutes) aligned to the clock from a time of day: current values, minimum, maximum and average of
