@@ -24,3 +24,6 @@ docs/research/
 
 # local marketing web (not published)
 marketing/
+
+# XIAO radio B carrier board, KiCad project (local only)
+hardware/xiao_radio_pcb/

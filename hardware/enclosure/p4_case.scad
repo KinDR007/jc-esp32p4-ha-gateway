@@ -9,6 +9,7 @@
 
 part = "assembly"; // [assembly, bottom, top, fit_test, board, clash]
 xiao_bay = true;   // room left of the board for the second radio (XIAO ESP32-C5) and its antenna
+xiao_carrier = false;  // the XIAO on the carrier board plugged onto JP1 instead of the floor cradle
 ears = true;       // screw ears on the bottom shell (wall mounting)
 
 /* [Board] */
@@ -67,6 +68,13 @@ front = [["I2C", 19.75, 8.5, 5.0], ["RS485", 30.1, 11.6, 6.5], ["J5", 41.85, 11.
 sd_x = 54;                                                     // TF card slot, back edge
 mic = [20.5, Y(3)];                                            // microphone MIC1 (top port)
 xiao = [-clr - bay + 1.5, 31 - 8.9];                           // XIAO board front left corner (21 x 17.8)
+// carrier board on JP1 (local KiCad project, not in the repository): socket on the JP1 pins, XIAO and
+// supercaps under it in the bay; outline and heights as in its design.py
+car_z = zt + 2.5 + 8.5;                                        // carrier bottom: JP1 plastic + socket body
+car_xiao = [-26.6, 21.1];                                      // XIAO on its bottom, USB-C to the left wall
+car_usb_z = car_z - 1.0 - 1.6;                                 // USB-C centre: module PCB, half the receptacle
+car_sma_y = 55;                                                // SMA bulkhead behind the carrier
+car_sc_h = 14;                                                 // supercap length below the carrier (max)
 
 // ---- helpers ----
 module rbox(xa, ya, xb, yb, za, zb, r) {
@@ -128,7 +136,7 @@ module bottom() {
         union() {
             shell(0, z_s, true);
             for (h = holes) translate([h[0], h[1], 0]) cylinder(d = 6, h = z_pcb);
-            if (xiao_bay) xiao_cradle();
+            if (xiao_bay && !xiao_carrier) xiao_cradle();
             if (ears) { ear(x0, -1); ear(x1, 1); }
         }
         for (h = holes) translate([h[0], h[1], -1]) {
@@ -141,7 +149,7 @@ module bottom() {
             translate([0, 34, 0]) cylinder(d = 2, h = floor_t + 2);
         }
         // XIAO USB-C, open to the top of the bottom shell
-        if (xiao_bay) translate([x0 - 1, xiao[1] + 8.9, z_s + 0.01]) rotate([90, 0, 90])
+        if (xiao_bay && !xiao_carrier) translate([x0 - 1, xiao[1] + 8.9, z_s + 0.01]) rotate([90, 0, 90])
             linear_extrude(wall + 2) mirror([0, 1]) notch2d(9.8, z_s - floor_t - 1.6);
     }
 }
@@ -194,7 +202,13 @@ module top(bosses = true) {
             for (a = [0:60:300]) rotate(a) translate([2.2, 0, 0]) cylinder(d = 1.6, h = roof_t + 2, $fn = 16);
         }
         // XIAO antenna: SMA bulkhead (U.FL pigtail)
-        if (xiao_bay) translate([x0 - 1, xiao[1] + 8.9, z_s + 9]) rotate([0, 90, 0]) cylinder(d = 6.6, h = wall + 2);
+        if (xiao_bay && !xiao_carrier) translate([x0 - 1, xiao[1] + 8.9, z_s + 9]) rotate([0, 90, 0]) cylinder(d = 6.6, h = wall + 2);
+        if (xiao_bay && xiao_carrier) {
+            // USB-C of the XIAO under the carrier, and the SMA bulkhead behind the carrier
+            translate([x0 - 1, car_xiao[1] + 8.9, car_usb_z]) rotate([90, 0, 90])
+                linear_extrude(wall + 2) offset(1) square([9.8 - 2, 4.2 - 2], center = true);
+            translate([x0 - 1, car_sma_y, z_s + 9]) rotate([0, 90, 0]) cylinder(d = 6.6, h = wall + 2);
+        }
         // labels
         for (b = buttons) engrave(b[1], pcb_d - 0.5, 2.6, b[0], -90);
         engrave(pcb_w - 4, usb_y[2] + 4.5, 2.4, "UART", -90);
@@ -221,7 +235,17 @@ module board() {
     }
     color("black") translate([0.3, Y(48.2), zt]) cube([4.3, 33, 8.5]);         // JP1 2x13
     color("dimgray") translate([mic[0] - 1.9, mic[1] - 1.4, zt]) cube([3.8, 2.8, 1.1]);
-    if (xiao_bay) color("seagreen") translate([xiao[0], xiao[1], floor_t + 1.5]) cube([21, 17.8, 1]);
+    if (xiao_bay && !xiao_carrier) color("seagreen") translate([xiao[0], xiao[1], floor_t + 1.5]) cube([21, 17.8, 1]);
+    if (xiao_bay && xiao_carrier) {
+        color("darkgreen") translate([0, 0, car_z]) linear_extrude(1.6)
+            polygon([[-27.6, 48.5], [10.8, 48.5], [10.8, 12], [-1, 12], [-1, 1], [-27.6, 1]]);
+        color("black") translate([-0.1, 13.8, zt + 2.5]) cube([5.1, 33, 8.5]);              // socket J1
+        color("seagreen") translate([car_xiao[0], car_xiao[1], car_z - 3.5]) cube([21, 17.8, 3.5]);  // XIAO
+        color("silver") translate([car_xiao[0] - 1.5, car_xiao[1] + 8.9 - 4.5, car_usb_z - 1.6]) cube([7.4, 9, 3.2]);
+        color("navy") for (c = [-22.2, -11.4]) translate([c, 6.3, car_z - car_sc_h]) cylinder(d = 10, h = car_sc_h);
+        color("navy") for (c = [-22.6, -12.8]) translate([c - 3.3, 15.7 - 3.3, car_z - 7.7]) cube([6.6, 6.6, 7.7]);
+        color("dimgray") translate([-26.5, 10, car_z + 1.6]) cube([25, 10, 1.2]);           // switch parts on top
+    }
 }
 
 if (part == "assembly") {

@@ -17,6 +17,7 @@ Outside: 122.8 x 66.8 x 30.6 mm with the XIAO bay (`xiao_bay = false`: 94.8 x 66
 ```sh
 hardware/enclosure/make.sh                                 # stl/p4_case_{bottom,top,fit_test}.stl
 hardware/enclosure/make.sh -D xiao_bay=false -D ears=false
+hardware/enclosure/make.sh -D xiao_carrier=true             # XIAO on the JP1 carrier board
 ```
 
 `make.sh` first intersects the board model with both shells (must be empty: no part of the board
@@ -81,6 +82,12 @@ With `xiao_bay` (default), the case is 28 mm longer on the left: a cradle on the
 XIAO with its USB-C in the left wall (its own 5 V supply, [docs/dual-radio.md](../../docs/dual-radio.md)),
 the wires to JP1 run inside, and a 6.6 mm hole above takes an SMA bulkhead for its U.FL antenna (U.FL
 to SMA pigtail). Without the bay the left wall is closed.
+
+With `xiao_carrier = true` (with the bay), the XIAO sits under a carrier board plugged onto JP1
+instead of the cradle: no cradle, the USB-C opening moves up to the XIAO under the carrier (about
+11 mm above the board), and the SMA hole moves behind the carrier (y = 55). The board model then
+includes the carrier with its socket, XIAO and supercaps (up to `car_sc_h` = 14 mm below it), so
+`make.sh -D xiao_carrier=true` checks that it fits.
 
 ## Not covered
 
