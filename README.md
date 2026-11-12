@@ -117,6 +117,12 @@ theme (switches in the header, remembered by the browser). Sign-in once an accou
 `/api/zigbee/{status,reset,command}`, `/api/net/scan`, `/api/net/{lan,lan/confirm,traffic}`, `/api/reboot` (`{"full": true}` resets the C6 too), `/api/mqtt`, `/api/settings`, `/api/settings/{export,import}`, `/api/update/{check,install}`, `/api/tools/ping`, `/api/coredump`, `/api/ws` (WebSocket push for the Home Assistant integration).
 The OTBR REST API for Home Assistant is on port 8081 (Thread border router role).
 
+## Support the project
+
+The project is free and developed in spare time. If it is useful to you, a contribution helps with test
+hardware (radios, meters, inverters) and time for new features: [PayPal](https://www.paypal.com/qrcodes/managed/8932bf85-7863-4371-a069-959a189162b1)
+(also the **Sponsor** button at the top of the repository). Thank you!
+
 ## Licenses
 
 Third-party sources are fetched at build time and not included: esp-thread-br and esp-hosted-mcu
