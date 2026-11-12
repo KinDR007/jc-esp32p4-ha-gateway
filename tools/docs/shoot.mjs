@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
  * PHASE: thread (all pages, tooltips, dialogs; Thread border router role), zigbee (Zigbee coordinator role),
  * router (Zigbee router role), firmware (the System › Firmware pages only); P4GW_ROUTES="a/b c" shoots only those pages. The account must be an admin without two-factor sign-in;
  * without P4GW_USER the page must already be signed in (menu_redesign/tools/ui_proxy.py adds an API token).
- * Then python3 tools/docs/build_docs.py. */
+ * P4GW_SHOW_USER=admin shows that name instead of the signed-in account's (menu and My account), for shots taken
+ * with a temporary account. MAC addresses are always masked. Then python3 tools/docs/build_docs.py. */
 const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
@@ -22,7 +23,29 @@ const [PHASE_ROUTES, SUFFIX, EXTRAS] = PHASES[process.env.PHASE || 'thread'];
 /* P4GW_ROUTES="ha/guide system/info": only these pages of the phase (no tooltips or dialogs) */
 const ROUTES = process.env.P4GW_ROUTES ? process.env.P4GW_ROUTES.split(/\s+/) : PHASE_ROUTES;
 const ALL = !process.env.P4GW_ROUTES && EXTRAS;
-const shot = (page, name, opts = {}) => page.screenshot({ path: OUT + name + '.jpg', type: 'jpeg', quality: 82, ...opts });
+/* the shown account name (P4GW_SHOW_USER) and masked MAC addresses, before every screenshot (the page redraws them) */
+const tidy = page => page.evaluate(([own, show]) => {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) {
+    let v = n.nodeValue.replace(/\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b/g, 'xx:xx:xx:xx:xx:xx');
+    if (own && show && n.parentElement?.closest('#side-user, #prof-info')) v = v.replaceAll(own, show);
+    if (v !== n.nodeValue) n.nodeValue = v;
+  }
+  /* the user list: the temporary account's row goes, its "(you)" moves to the shown account */
+  if (own && show) {
+    for (const tr of document.querySelectorAll('#main tr')) {
+      const cell = tr.querySelector('td');
+      const name = cell?.querySelector('b')?.textContent.trim();
+      if (name === own) {
+        const you = cell.querySelector('.muted, small');
+        const target = [...document.querySelectorAll('#main tr td b')].find(b => b.textContent.trim() === show);
+        if (you && target && !target.parentElement.querySelector('.muted, small')) target.after(' ', you.cloneNode(true));
+        tr.remove();
+      }
+    }
+  }
+}, [process.env.P4GW_USER || '', process.env.P4GW_SHOW_USER || '']);
+const shot = async (page, name, opts = {}) => { await tidy(page); return page.screenshot({ path: OUT + name + '.jpg', type: 'jpeg', quality: 82, ...opts }); };
 export default async function run(page) {
   const meta = existsSync(OUT + 'index.json') ? JSON.parse(readFileSync(OUT + 'index.json', 'utf8')) : {};
   const done = [];
@@ -62,6 +85,7 @@ export default async function run(page) {
           const box = await el.boundingBox();
           if (!box || box.height < 40) break;
           const file = `${base}__${i + 1}`;
+          await tidy(page);
           await el.screenshot({ path: OUT + file + '.jpg', type: 'jpeg', quality: 82, timeout: 5000 });
           meta[r + SUFFIX].cards.push({ title, file });
           break;

@@ -49,11 +49,11 @@
     "file": "thread_topology__2"
    },
    {
-    "title": "NEIGHBORS (8)",
+    "title": "NEIGHBORS (7)",
     "file": "thread_topology__3"
    },
    {
-    "title": "ROUTERS (11)",
+    "title": "ROUTERS (10)",
     "file": "thread_topology__4"
    }
   ]
@@ -637,7 +637,7 @@
     "file": "system_api__1"
    },
    {
-    "title": "ENDPOINTS (103)",
+    "title": "ENDPOINTS (125)",
     "file": "system_api__2"
    }
   ]
