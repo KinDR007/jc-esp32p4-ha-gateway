@@ -21,3 +21,6 @@ tools/web/node_modules/
 
 # research notes and downloaded third party documents (local only)
 docs/research/
+
+# local marketing web (not published)
+marketing/
