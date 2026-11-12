@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
  * router (Zigbee router role), firmware (the System › Firmware pages only); P4GW_ROUTES="a/b c" shoots only those pages. The account must be an admin without two-factor sign-in;
  * without P4GW_USER the page must already be signed in (menu_redesign/tools/ui_proxy.py adds an API token).
  * P4GW_SHOW_USER=admin shows that name instead of the signed-in account's (menu and My account), for shots taken
- * with a temporary account. MAC addresses are always masked. Then python3 tools/docs/build_docs.py. */
+ * with a temporary account. MAC addresses and Wi-Fi network names (scan tables, SSID fields) are always masked. Then python3 tools/docs/build_docs.py. */
 const OUT = fileURLToPath(new URL('../../documentation/screenshots/', import.meta.url)); // pathname keeps %20 of a path with spaces
 const BASE = process.env.P4GW_URL || 'http://p4gw.local';
 const PHASES = {
@@ -25,9 +25,26 @@ const ROUTES = process.env.P4GW_ROUTES ? process.env.P4GW_ROUTES.split(/\s+/) : 
 const ALL = !process.env.P4GW_ROUTES && EXTRAS;
 /* the shown account name (P4GW_SHOW_USER) and masked MAC addresses, before every screenshot (the page redraws them) */
 const tidy = page => page.evaluate(([own, show]) => {
+  /* Wi-Fi network names: the SSID column of scan tables and SSID fields, shown as WiFi-A, WiFi-B... */
+  const ssids = new Set();
+  for (const t of document.querySelectorAll('#main table')) {
+    if (t.querySelector('th')?.textContent.trim() !== 'SSID') continue;
+    for (const td of t.querySelectorAll('tr > td:first-child')) if (td.colSpan === 1) ssids.add(td.textContent.trim());
+  }
+  for (const f of document.querySelectorAll('#main label.field')) {
+    const input = f.querySelector('input');
+    if (input && /SSID/.test(f.querySelector('span')?.textContent || '') && input.value) ssids.add(input.value.trim());
+  }
+  ['', 'hidden', 'skrytá', 'skryté'].forEach(s => ssids.delete(s));
+  const names = [...ssids].sort((a, b) => b.length - a.length);
+  const alias = new Map([...ssids].map((s, i) => [s, 'WiFi-' + String.fromCharCode(65 + i % 26) + (i >= 26 ? Math.floor(i / 26) : '')]));
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = names.length ? new RegExp(`(?<![\\w-])(${names.map(esc).join('|')})(?![\\w-])`, 'g') : null;
+  if (re) for (const input of document.querySelectorAll('#main input')) if (ssids.has(input.value.trim())) input.value = alias.get(input.value.trim());
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n; (n = walker.nextNode());) {
     let v = n.nodeValue.replace(/\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b/g, 'xx:xx:xx:xx:xx:xx');
+    if (re && n.parentElement?.closest('#main')) v = v.replace(re, s => alias.get(s));
     if (own && show && n.parentElement?.closest('#side-user, #prof-info')) v = v.replaceAll(own, show);
     if (v !== n.nodeValue) n.nodeValue = v;
   }
