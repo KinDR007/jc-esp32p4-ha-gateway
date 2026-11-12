@@ -1,10 +1,11 @@
 name: Pages
 
-# Publishes documentation/ (the HTML user documentation) as the GitHub Pages site of the repository.
+# Publishes the GitHub Pages site of the repository: the project page (marketing/, built by marketing/build.py)
+# at the root, the HTML user documentation (documentation/) under docs/.
 on:
   push:
     branches: [main]
-    paths: ["documentation/**", ".github/workflows/pages.yml"]
+    paths: ["documentation/**", "marketing/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,9 +25,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/docs
+          cp -r marketing/index.html marketing/style.css marketing/app.js marketing/img _site/
+          cp -r documentation/. _site/docs/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: documentation
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

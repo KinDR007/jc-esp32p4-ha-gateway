@@ -22,8 +22,6 @@ tools/web/node_modules/
 # research notes and downloaded third party documents (local only)
 docs/research/
 
-# local marketing web (not published)
-marketing/
 
 # XIAO radio B carrier board, KiCad project (local only)
 hardware/xiao_radio_pcb/
