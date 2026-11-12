@@ -22,6 +22,11 @@ block = block[:block.index('};')]
 ICONS = dict(re.findall(r"'([a-z0-9-]+)':\s*'([^']+)'", block))
 
 
+def doc(anchor=''):
+    """attributes of a link into the HTML user documentation: Czech by default, app.js follows the page language"""
+    return f'href="{DOCS}cs/index.html{"#" + anchor if anchor else ""}" data-doc="{anchor}"'
+
+
 def ic(name):
     return f'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="{ICONS[name]}"/></svg>'
 
@@ -64,7 +69,7 @@ USES = [
      [T('Mapa sítě Thread včetně kvality spojení', 'Thread network map with link quality'),
       T('Připojení k existující síti pomocí datasetu', 'Join an existing network with a dataset'),
       T('Režim routeru pro rozšíření dosahu sítě', 'Router mode to extend the mesh')],
-     'thread_topology__1.jpg', 'home-assistant.md'),
+     'thread_topology__1.jpg', 'ha'),
     ('zigbee', 'Zigbee',
      T('Koordinátor pro Zigbee2MQTT', 'Coordinator for Zigbee2MQTT'),
      T('Síťový koordinátor Zigbee dostupný přes TCP (port 6638), nebo router, který rozšíří dosah vaší sítě Zigbee. Síť se zálohuje automaticky.',
@@ -72,7 +77,7 @@ USES = [
      [T('Mapa sítě a přehled zařízení ze Zigbee2MQTT', 'Network map and devices from Zigbee2MQTT'),
       T('Povolení párování přímo z webu', 'Permit joining from the web'),
       T('Automatické noční zálohy', 'Automatic nightly backups')],
-     'zigbee_network__1.jpg', 'home-assistant.md'),
+     'zigbee_network__1.jpg', 'zigbee-network'),
     ('serial-port', T('Energie', 'Energy'),
      T('Elektroměry, střídače a Modbus', 'Meters, inverters and Modbus'),
      T('Zařízení na RS485 i Modbus TCP připojíte pomocí hotových šablon pro Eastron, ABB, Chint, ORNO, Peacefair, Victron, GoodWe a Huawei. Brána je může zpřístupnit dalším systémům jako server Modbus TCP, nebo jeden elektroměr vydávat za jiný.',
@@ -80,7 +85,7 @@ USES = [
      [T('Vyhledání zařízení na sběrnici i v síti', 'Device discovery on the bus and in the network'),
       T('Emulace: SDM630 se střídači představí jako ABB B23', 'Emulation: an SDM630 appears to your inverter as an ABB B23'),
       T('Vlastní šablony bez programování', 'Custom templates without coding')],
-     'system_rs485__3.jpg', 'docs/modbus.md'),
+     'system_rs485__3.jpg', 'system-rs485'),
     ('ear-hearing', T('Zvuk', 'Sound'),
      T('Rozpozná kouřový hlásič i tříštění skla', 'Recognises smoke alarms and breaking glass'),
      T('Vestavěný mikrofon a model YAMNet běžící přímo na čipu rozpoznají 521 druhů zvuků. Bránu naučíte i vlastní zvuky a změří vám hladinu hluku v dB(A).',
@@ -88,7 +93,7 @@ USES = [
      [T('Události a binární senzory v Home Assistant', 'Events and binary sensors in Home Assistant'),
       T('Zvonek, štěkání psa, poplach, siréna', 'Doorbell, barking, alarms, sirens'),
       T('Zpracování probíhá offline, nic se neodesílá do cloudu', 'Processed offline, nothing goes to the cloud')],
-     'sound_live.jpg', 'docs/sound-detection.md'),
+     'sound_live.jpg', 'sound-live'),
     ('chip', T('Pro kutily', 'For makers'),
      T('Senzory, relé, LED pásky a impulzní měřiče', 'Sensors, relays, LED strips and pulse meters'),
      T('24 ovladačů senzorů I2C (teplota, vlhkost, CO2, prašnost, osvětlení) a volné piny konektoru JP1, které poslouží jako vstupy, výstupy, PWM, čítače impulzů z vodoměru, teploměry 1-Wire, LED pásek WS2812 nebo most UART-TCP.',
@@ -96,7 +101,7 @@ USES = [
      [T('Vše dostupné jako entity v Home Assistant', 'Everything available as Home Assistant entities'),
       T('Stav po restartu lze nastavit pro každý pin', 'Power-on state configurable per pin'),
       T('Druhá sběrnice I2C na JP1', 'A second I2C bus on JP1')],
-     'system_gpio__1.jpg', 'docs/gpio.md'),
+     'system_gpio__1.jpg', 'system-gpio'),
     ('send', 'Telegram',
      T('Upozornění a pravidelné přehledy', 'Alerts and periodic summaries'),
      T('Bot posílá upozornění a přijímá příkazy. Každý uživatel si nastaví vlastní pravidelné přehledy: aktuální hodnoty, minima, maxima, průměry a spotřebu energie za den či týden.',
@@ -104,7 +109,7 @@ USES = [
      [T('Tiché hodiny a úroveň upozornění podle tématu', 'Quiet hours and alert levels per topic'),
       T('Příkazy s potvrzením a dvoufázovým ověřením', 'Commands with confirmation and two-factor authentication'),
       T('Přehledy ze zařízení Modbus, senzorů a GPIO', 'Reports on Modbus devices, sensors and GPIO')],
-     'profile__4.jpg', 'docs/notifications.md'),
+     'profile__4.jpg', 'profile'),
 ]
 
 # donations: support.json next to this script (kept out of git with the folder); the section shows only what is filled in
@@ -175,14 +180,14 @@ GALLERY = [
 ]
 
 DOCS_LINKS = [
-    (T('Uživatelská dokumentace', 'User documentation'), T('Popis všech stránek rozhraní se snímky obrazovky, česky i anglicky.', 'Every page of the web interface with screenshots, in Czech and English.'), DOCS),
-    (T('Instalace', 'Installation'), T('Sestavení, první instalace, aktualizace a obnova.', 'Building, first installation, updates and recovery.'), BLOB + 'docs/installation.md'),
-    (T('Hardware', 'Hardware'), T('Deska, propojky JP1, rozložení pinů a rádio B.', 'The board, JP1 jumpers, pinout and radio B.'), BLOB + 'docs/hardware.md'),
-    ('Home Assistant', T('Integrace, OTBR, Matter, Zigbee2MQTT, MQTT.', 'Integration, OTBR, Matter, Zigbee2MQTT, MQTT.'), BLOB + 'docs/home-assistant.md'),
-    ('Modbus', T('Šablony, hledání, server, emulace.', 'Templates, search, server, emulation.'), BLOB + 'docs/modbus.md'),
-    ('GPIO', T('Vstupy, výstupy, PWM, čítače, 1-Wire, WS2812.', 'Inputs, outputs, PWM, counters, 1-Wire, WS2812.'), BLOB + 'docs/gpio.md'),
-    (T('Notifikace a Telegram', 'Notifications and Telegram'), T('Bot, příkazy, periodické zprávy.', 'Bot, commands, periodic reports.'), BLOB + 'docs/notifications.md'),
-    ('HTTP API', T('128 endpointů s ukázkami volání.', '128 endpoints with request examples.'), BLOB + 'docs/api.md'),
+    (T('Uživatelská dokumentace', 'User documentation'), T('Popis všech stránek rozhraní se snímky obrazovky, česky i anglicky.', 'Every page of the web interface with screenshots, in Czech and English.'), ''),
+    (T('Instalace', 'Installation'), T('Sestavení, první instalace, aktualizace a obnova.', 'Building, first installation, updates and recovery.'), 'install'),
+    (T('Hardware', 'Hardware'), T('Deska, propojky JP1, rozložení pinů a rádio B.', 'The board, JP1 jumpers, pinout and radio B.'), 'hw'),
+    ('Home Assistant', T('Integrace, OTBR, Matter, Zigbee2MQTT, MQTT.', 'Integration, OTBR, Matter, Zigbee2MQTT, MQTT.'), 'ha'),
+    ('Modbus', T('Šablony, hledání, server, emulace.', 'Templates, search, server, emulation.'), 'system-rs485'),
+    ('GPIO', T('Vstupy, výstupy, PWM, čítače, 1-Wire, WS2812.', 'Inputs, outputs, PWM, counters, 1-Wire, WS2812.'), 'system-gpio'),
+    (T('Notifikace a Telegram', 'Notifications and Telegram'), T('Bot, příkazy, periodické zprávy.', 'Bot, commands, periodic reports.'), 'tg'),
+    ('HTTP API', T('128 endpointů s ukázkami volání.', '128 endpoints with request examples.'), 'api'),
 ]
 
 STATS = [('2', T('rádia současně', 'simultaneous radios')), ('5', T('rolí rádií', 'radio roles')), ('521', T('druhů zvuků', 'sound classes')),
@@ -237,10 +242,10 @@ def arch():
 
 
 def use_case(u):
-    icon, tag, title, text, items, img, doc = u
+    icon, tag, title, text, items, img, anchor = u
     lis = ''.join(f'<li>{x}</li>' for x in items)
     return f'''<div class="uc reveal"><div><span class="tag">{tag}</span><h3>{title}</h3><p>{text}</p><ul>{lis}</ul>
-      <a class="more" style="display:inline-block;margin-top:14px;color:var(--a1);font-weight:600;text-decoration:none" href="{BLOB + doc}" target="_blank" rel="noopener">{T("Jak na to →", "How to →")}</a></div>
+      <a class="more" style="display:inline-block;margin-top:14px;color:var(--a1);font-weight:600;text-decoration:none" {doc(anchor)} target="_blank" rel="noopener">{T("Jak na to →", "How to →")}</a></div>
       <div class="uc-img"><div class="frame"><div class="dots"><i></i><i></i><i></i></div><img src="img/{img}" alt=""></div></div></div>'''
 
 
@@ -256,7 +261,7 @@ html = f'''<!doctype html>
 <script>try {{ const l = localStorage.getItem('lang'), t = localStorage.getItem('theme');
   document.documentElement.dataset.lang = l || (navigator.language.startsWith('cs') ? 'cs' : 'en'); if (t) document.documentElement.dataset.theme = t; }} catch (e) {{}}</script>
 </head>
-<body>
+<body data-docs="{DOCS}">
 <header><div class="wrap bar">
   <a class="logo" href="#top"><img src="img/p4gw.svg" alt="">P4 Gateway</a>
   <nav><a href="#why">{T('Proč', 'Why')}</a><a href="#how">{T('Jak to funguje', 'How it works')}</a><a href="#uses">{T('Co vytvoříte', 'Use cases')}</a>
@@ -270,7 +275,7 @@ html = f'''<!doctype html>
     <h1>{T('Jedna deska.<br><span class="grad">Celý chytrý dům.</span>', 'One board.<br><span class="grad">Your whole smart home.</span>')}</h1>
     <p class="lead">{T('Thread a Matter, Zigbee, Bluetooth proxy, elektroměry a střídače na Modbusu, senzory, relé i rozpoznávání zvuků. Vše na jedné desce ESP32-P4 ve vaší síti, nastavené v prohlížeči a ihned dostupné v Home Assistant.',
       'Thread and Matter, Zigbee, a Bluetooth proxy, meters and inverters on Modbus, sensors, relays and sound recognition. All on one ESP32-P4 board on your network, configured in the browser and instantly available in Home Assistant.')}</p>
-    <div class="cta"><a class="btn primary" href="{DOCS}" target="_blank" rel="noopener">{ic('book-open-variant')}{T('Dokumentace', 'Documentation')}</a>
+    <div class="cta"><a class="btn primary" {doc()} target="_blank" rel="noopener">{ic('book-open-variant')}{T('Dokumentace', 'Documentation')}</a>
       <a class="btn" href="{GH}" target="_blank" rel="noopener">{ic('developer-board')}GitHub</a>
       <a class="btn" href="https://my.home-assistant.io/redirect/hacs_repository/?owner=KinDR007&repository=jc-esp32p4-ha-gateway&category=integration" target="_blank" rel="noopener">{ic('home-assistant')}{T('Přidat do HACS', 'Add to HACS')}</a></div>
     <div class="chips"><span class="chip">Thread BR</span><span class="chip">Matter</span><span class="chip">Zigbee2MQTT</span><span class="chip">ESPHome BLE</span>
@@ -323,7 +328,7 @@ html = f'''<!doctype html>
       <tr><td>{T('Rozhraní', 'Interfaces')}</td><td>RS485 (J4), I2C (CN3), GPIO JP1, {T('mikrofon', 'microphone')}</td></tr>
       <tr><td>{T('Ověřeno', 'Tested')}</td><td>{T('57 automatických testů hardwaru a 39 testů rozhraní', '57 automated hardware tests and 39 UI tests')}</td></tr>
     </tbody></table>
-    <a class="more" style="display:inline-block;margin-top:16px;color:var(--a1);font-weight:600;text-decoration:none" href="{BLOB}docs/hardware.md" target="_blank" rel="noopener">{T('Zapojení a propojky →', 'Wiring and jumpers →')}</a></div>
+    <a class="more" style="display:inline-block;margin-top:16px;color:var(--a1);font-weight:600;text-decoration:none" {doc('hw')} target="_blank" rel="noopener">{T('Zapojení a propojky →', 'Wiring and jumpers →')}</a></div>
   <div class="frame reveal"><div class="dots"><i></i><i></i><i></i></div><img src="img/radios_roles.jpg" alt=""></div>
 </div></section>
 
@@ -338,7 +343,7 @@ html = f'''<!doctype html>
 
 <section class="alt docs" id="docs"><div class="wrap">
   <div class="head reveal"><div class="kicker">{T('Dokumentace', 'Documentation')}</div><h2>{T('Vše srozumitelně popsáno, krok za krokem', 'Everything explained, step by step')}</h2></div>
-  <div class="grid g4">{''.join(f'<a class="card reveal" href="{u}" target="_blank" rel="noopener"><h3>{t}</h3><p>{d}</p></a>' for t, d, u in DOCS_LINKS)}</div>
+  <div class="grid g4">{''.join(f'<a class="card reveal" {doc(a)} target="_blank" rel="noopener"><h3>{t}</h3><p>{d}</p></a>' for t, d, a in DOCS_LINKS)}</div>
 </div></section>
 
 {support()}
@@ -347,11 +352,11 @@ html = f'''<!doctype html>
   <h2>{T('Brána, která patří jen vám', 'A gateway that is truly yours')}</h2>
   <p>{T('Otevřený kód, žádný cloud, žádné předplatné. Vyzkoušejte ji ještě dnes.', 'Open source, no cloud, no subscription. Try it today.')}</p>
   <div class="cta" style="justify-content:center"><a class="btn" href="{GH}/releases/latest" target="_blank" rel="noopener">{ic('cloud-download-outline')}{T('Stáhnout nejnovější verzi', 'Download the latest release')}</a>
-    <a class="btn ghost" href="{DOCS}" target="_blank" rel="noopener">{ic('book-open-variant')}{T('Číst dokumentaci', 'Read the docs')}</a>
+    <a class="btn ghost" {doc()} target="_blank" rel="noopener">{ic('book-open-variant')}{T('Číst dokumentaci', 'Read the docs')}</a>
     {f'<a class="btn ghost" href="#support">♥ {T("Podpořit projekt", "Support the project")}</a>' if support() else ''}</div>
 </div></div></section>
 
-<footer><div class="wrap"><span>P4 Gateway · <a href="{GH}" target="_blank" rel="noopener">GitHub</a> · <a href="{DOCS}" target="_blank" rel="noopener">{T('Dokumentace', 'Documentation')}</a> · <a href="{GH}/releases" target="_blank" rel="noopener">{T('Vydání', 'Releases')}</a></span>
+<footer><div class="wrap"><span>P4 Gateway · <a href="{GH}" target="_blank" rel="noopener">GitHub</a> · <a {doc()} target="_blank" rel="noopener">{T('Dokumentace', 'Documentation')}</a> · <a href="{GH}/releases" target="_blank" rel="noopener">{T('Vydání', 'Releases')}</a></span>
   <span>{T('Ikony: Material Design Icons (Apache-2.0)', 'Icons: Material Design Icons (Apache-2.0)')}</span></div></footer>
 
 <script src="app.js"></script>

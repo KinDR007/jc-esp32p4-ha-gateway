@@ -25,3 +25,10 @@ document.getElementById('tabs').addEventListener('click', e => {
 
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* links into the HTML user documentation follow the page language */
+const docLinks = () => document.querySelectorAll('a[data-doc]').forEach(a => {
+  a.href = `${document.body.dataset.docs}${root.dataset.lang === 'en' ? 'en' : 'cs'}/index.html${a.dataset.doc ? '#' + a.dataset.doc : ''}`;
+});
+docLinks();
+document.getElementById('lang').addEventListener('click', docLinks);
